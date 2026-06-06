@@ -26,6 +26,7 @@ vi.mock('../../api/history', () => ({
     getNews: vi.fn().mockResolvedValue({ total: 0, items: [] }),
     getMarkdown: vi.fn().mockResolvedValue('# report'),
     getDiagnostics: vi.fn(),
+    deleteByCode: vi.fn(),
     getStockBarList: vi.fn().mockResolvedValue({ total: 0, items: [] }),
   },
 }));
@@ -226,6 +227,104 @@ describe('HomePage', () => {
     expect(screen.getByRole('heading', { name: '开始分析', level: 3 })).toBeInTheDocument();
     expect(screen.getByText('输入股票代码进行分析，或从左侧选择历史报告查看。')).toBeInTheDocument();
     expect(screen.getByText('暂无个股记录')).toBeInTheDocument();
+  });
+
+  it('shows market review history in the stock bar', async () => {
+    vi.mocked(historyApi.getStockBarList).mockResolvedValue({
+      total: 1,
+      items: [{
+        id: 11,
+        stockCode: 'AAPL',
+        stockName: 'Apple',
+        reportType: 'detailed',
+        sentimentScore: 72,
+        operationAdvice: '观察',
+        analysisCount: 2,
+        lastAnalysisTime: '2026-03-19T08:00:00Z',
+      }],
+    });
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({
+          total: 1,
+          page: 1,
+          limit: 10,
+          items: [marketReviewHistoryItem],
+        });
+      }
+      return Promise.resolve({
+        total: 0,
+        page: 1,
+        limit: 20,
+        items: [],
+      });
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(marketReviewHistoryReport);
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('button', { name: /MARKET/ })).toBeInTheDocument();
+    const newerStockButton = await screen.findByRole('button', { name: /AAPL/ });
+    const marketButton = await screen.findByRole('button', { name: /MARKET/ });
+    expect(newerStockButton.compareDocumentPosition(marketButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText('大盘复盘历史')).not.toBeInTheDocument();
+    expect(historyApi.getList).toHaveBeenCalledWith({
+      stockCode: 'MARKET',
+      reportType: 'market_review',
+      page: 1,
+      limit: 10,
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /MARKET/ }));
+
+    expect(await screen.findByText('大盘复盘摘要')).toBeInTheDocument();
+  });
+
+  it('removes the MARKET stock bar item after deleting market review history', async () => {
+    let isMarketReviewDeleted = false;
+    vi.mocked(historyApi.getStockBarList).mockResolvedValue({
+      total: 0,
+      items: [],
+    });
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({
+          total: isMarketReviewDeleted ? 0 : 1,
+          page: 1,
+          limit: 10,
+          items: isMarketReviewDeleted ? [] : [marketReviewHistoryItem],
+        });
+      }
+      return Promise.resolve({
+        total: 0,
+        page: 1,
+        limit: 20,
+        items: [],
+      });
+    });
+    vi.mocked(historyApi.deleteByCode).mockImplementation(async () => {
+      isMarketReviewDeleted = true;
+      return { deleted: 1 };
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('button', { name: /MARKET/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '删除 大盘复盘 历史记录' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /MARKET/ })).not.toBeInTheDocument();
+    });
+    expect(historyApi.deleteByCode).toHaveBeenCalledWith('MARKET');
   });
 
   it('surfaces duplicate task warnings from dashboard submission', async () => {
@@ -717,14 +816,15 @@ describe('HomePage', () => {
     );
 
     await screen.findByText('大盘复盘摘要');
-    const reanalyzeButton = screen.getByRole('button', { name: '重新分析' });
-    const followUpButton = screen.getByRole('button', { name: '追问 AI' });
-
-    expect(reanalyzeButton).toBeDisabled();
-    expect(followUpButton).toBeDisabled();
-
-    fireEvent.click(reanalyzeButton);
-    fireEvent.click(followUpButton);
+    expect(screen.queryByRole('heading', { name: '大盘复盘详情' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '市场情绪与赚钱效应' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '行业/主题轮动' })).toBeInTheDocument();
+    expect(screen.getByText('赚钱效应')).toBeInTheDocument();
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '重新分析' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '追问 AI' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '历史趋势' })).toBeInTheDocument();
+    expect(historyApi.getMarkdown).toHaveBeenCalledWith(marketReviewHistoryReport.meta.id);
 
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalled();

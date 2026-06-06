@@ -142,6 +142,7 @@ function buildHistoryParams(page: number) {
 function buildStockHistoryParams(stockCode: string, page: number, filters: StockHistoryFilters) {
   const params: {
     stockCode: string;
+    reportType?: 'market_review';
     startDate?: string;
     endDate?: string;
     page: number;
@@ -151,6 +152,10 @@ function buildStockHistoryParams(stockCode: string, page: number, filters: Stock
     page,
     limit: STOCK_HISTORY_PAGE_SIZE,
   };
+
+  if (stockCode === MARKET_REVIEW_HISTORY_CODE) {
+    params.reportType = 'market_review';
+  }
 
   if (filters.range === '30d') {
     params.startDate = getRecentStartDate(30);
@@ -182,6 +187,19 @@ function reportToHistoryItem(report: AnalysisReport): HistoryItem | null {
     changePct: report.meta.changePct,
     modelUsed: report.meta.modelUsed,
     createdAt: report.meta.createdAt,
+  };
+}
+
+function normalizeSelectedReport(report: AnalysisReport): AnalysisReport {
+  if (report.meta.reportType !== 'market_review' || report.meta.stockCode) {
+    return report;
+  }
+  return {
+    ...report,
+    meta: {
+      ...report.meta,
+      stockCode: MARKET_REVIEW_HISTORY_CODE,
+    },
   };
 }
 
@@ -244,7 +262,7 @@ async function fetchStockHistory(
   const state = get();
   const report = state.selectedReport;
 
-  if (!report || report.meta.reportType === 'market_review') {
+  if (!report || !report.meta.stockCode) {
     resetStockHistoryState(set);
     set({
       isHistoryTrendOpen: false,
@@ -391,7 +409,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
   closeMarkdownDrawer: () => set({ markdownDrawerOpen: false }),
 
   openHistoryTrend: async () => {
-    if (!get().selectedReport || get().selectedReport?.meta.reportType === 'market_review') {
+    if (!get().selectedReport || !get().selectedReport?.meta.stockCode) {
       return;
     }
     set({ isHistoryTrendOpen: true });
@@ -451,7 +469,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     }
 
     try {
-      const report = await historyApi.getDetail(recordId);
+      const report = normalizeSelectedReport(await historyApi.getDetail(recordId));
       if (requestId !== reportRequestSeq) {
         return;
       }
@@ -462,7 +480,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
         isLoadingReport: false,
       });
 
-      if (report.meta.reportType === 'market_review' || !report.meta.stockCode) {
+      if (!report.meta.stockCode) {
         stockHistoryRequestSeq += 1;
         resetStockHistoryState(set);
         set({ isHistoryTrendOpen: false });
