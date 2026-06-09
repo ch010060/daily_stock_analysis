@@ -9,7 +9,9 @@ missing or render error. Template path is relative to project root.
 Any expensive data preparation should be injected by the caller via extra_context.
 """
 
+import copy
 import logging
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -29,6 +31,66 @@ from src.report_language import (
 from src.utils.data_processing import normalize_model_used
 
 logger = logging.getLogger(__name__)
+
+NARRATIVE_TEXT_FIELDS = (
+    "news_summary",
+    "analysis_summary",
+    "risk_warning",
+    "trend_analysis",
+    "technical_analysis",
+    "fundamental_analysis",
+)
+
+_SCRIPT_BLOCK_RE = re.compile(
+    r"<\s*script\b[^>]*>.*?<\s*/\s*script\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+_SCRIPT_TAG_RE = re.compile(r"<\s*/?\s*script\b[^>]*>", re.IGNORECASE | re.DOTALL)
+_JAVASCRIPT_SCHEME_RE = re.compile(
+    r"j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*:",
+    re.IGNORECASE,
+)
+_RAW_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def sanitize_narrative_text(value: Any) -> str:
+    """Remove obvious active-content payloads while preserving Markdown text."""
+    if value is None:
+        return ""
+    text = str(value)
+    text = _SCRIPT_BLOCK_RE.sub("", text)
+    text = _SCRIPT_TAG_RE.sub("", text)
+    text = _JAVASCRIPT_SCHEME_RE.sub("blocked-url:", text)
+    return _RAW_CONTROL_CHARS_RE.sub("", text)
+
+
+def sanitize_narrative_payload(value: Any) -> Any:
+    """Recursively sanitize rendered narrative payload values."""
+    if isinstance(value, str):
+        return sanitize_narrative_text(value)
+    if isinstance(value, list):
+        return [sanitize_narrative_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(sanitize_narrative_payload(item) for item in value)
+    if isinstance(value, dict):
+        return {key: sanitize_narrative_payload(item) for key, item in value.items()}
+    return value
+
+
+def sanitize_analysis_result(result: AnalysisResult) -> AnalysisResult:
+    """Return a shallow sanitized copy for rendering without mutating analysis data."""
+    safe_result = copy.copy(result)
+    for field_name in NARRATIVE_TEXT_FIELDS:
+        if hasattr(safe_result, field_name):
+            setattr(
+                safe_result,
+                field_name,
+                sanitize_narrative_text(getattr(safe_result, field_name)),
+            )
+    dashboard = getattr(safe_result, "dashboard", None)
+    if dashboard:
+        safe_result.dashboard = sanitize_narrative_payload(dashboard)
+    return safe_result
 
 
 def _escape_md(text: str) -> str:
@@ -99,6 +161,7 @@ def render(
     if report_date is None:
         report_date = datetime.now().strftime("%Y-%m-%d")
 
+    safe_results = [sanitize_analysis_result(result) for result in results]
     templates_dir = _resolve_templates_dir()
     template_name = f"report_{platform}.j2"
     template_path = templates_dir / template_name
@@ -109,7 +172,7 @@ def render(
     report_language = normalize_report_language(
         (extra_context or {}).get("report_language")
         or next(
-            (getattr(result, "report_language", None) for result in results if getattr(result, "report_language", None)),
+            (getattr(result, "report_language", None) for result in safe_results if getattr(result, "report_language", None)),
             None,
         )
         or getattr(get_config(), "report_language", "zh")
@@ -117,7 +180,7 @@ def render(
     labels = get_report_labels(report_language)
 
     # Build template context with pre-computed signal levels (sorted by score)
-    sorted_results = sorted(results, key=lambda x: x.sentiment_score, reverse=True)
+    sorted_results = sorted(safe_results, key=lambda x: x.sentiment_score, reverse=True)
     sorted_enriched = []
     for r in sorted_results:
         st, se, _ = get_signal_level(r.operation_advice, r.sentiment_score, report_language)
@@ -131,13 +194,13 @@ def render(
             "localized_trend_prediction": localize_trend_prediction(r.trend_prediction, report_language),
         })
 
-    buy_count = sum(1 for r in results if getattr(r, "decision_type", "") == "buy")
-    sell_count = sum(1 for r in results if getattr(r, "decision_type", "") == "sell")
-    hold_count = sum(1 for r in results if getattr(r, "decision_type", "") in ("hold", ""))
+    buy_count = sum(1 for r in safe_results if getattr(r, "decision_type", "") == "buy")
+    sell_count = sum(1 for r in safe_results if getattr(r, "decision_type", "") == "sell")
+    hold_count = sum(1 for r in safe_results if getattr(r, "decision_type", "") in ("hold", ""))
     show_llm_model = bool(getattr(get_config(), "report_show_llm_model", True))
     models_used: List[str] = []
     if show_llm_model:
-        for result in results:
+        for result in safe_results:
             model = normalize_model_used(getattr(result, "model_used", None))
             if model:
                 models_used.append(model)
