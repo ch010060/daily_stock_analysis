@@ -1,0 +1,24 @@
+{
+  "symbol": "TW:2330",
+  "market": "TW",
+  "fetched_at": "fixture",
+  "news_context_text": "【台積電 2330 最新情報】\n1. AI 晶片需求持續強勁，CoWoS 先進封裝產能供不應求，法人持續加碼。\n2. Q1 2025 營收符合預期，毛利率 53.1%，優於市場共識 52.4%。\n3. 2nm 製程進入量產準備，Apple、NVIDIA 均已確認訂單。\n4. 風險：地緣政治緊張（兩岸情勢）、新台幣升值影響美元收益換算、電力供應限制。",
+  "dimensions": {
+    "latest_news": {
+      "success": true,
+      "results_count": 4,
+      "summary": "AI demand strong; Q1 revenue in-line; 2nm mass production prep confirmed"
+    },
+    "risk_check": {
+      "success": true,
+      "results_count": 3,
+      "summary": "Geopolitical risk, FX headwind, power supply constraint identified"
+    },
+    "earnings_preview": {
+      "success": true,
+      "results_count": 2,
+      "summary": "Q2 2025 guidance positive; capex plan maintained at $38-42B for full year"
+    }
+  },
+  "source": "fixture"
+}

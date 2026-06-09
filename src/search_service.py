@@ -41,6 +41,29 @@ from src.config import (
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_NEWS_CONTEXT_MAX_TOTAL_CHARS = 8000
+NEWS_CONTEXT_TRUNCATION_MARKER_TEMPLATE = "[TRUNCATED: news context capped at {max_chars} chars]"
+
+
+def cap_news_context(
+    text: Optional[str],
+    max_chars: Optional[int] = DEFAULT_NEWS_CONTEXT_MAX_TOTAL_CHARS,
+) -> Optional[str]:
+    """Apply a deterministic total length cap to news context text."""
+    if text is None or max_chars is None:
+        return text
+
+    safe_max_chars = max(0, max_chars)
+    if len(text) <= safe_max_chars:
+        return text
+
+    marker = NEWS_CONTEXT_TRUNCATION_MARKER_TEMPLATE.format(max_chars=safe_max_chars)
+    truncated = text[:safe_max_chars].rstrip()
+    if not truncated:
+        return marker
+    return f"{truncated}\n{marker}"
+
+
 # Transient network errors (retryable)
 _SEARCH_TRANSIENT_EXCEPTIONS = (
     requests.exceptions.SSLError,
@@ -3632,13 +3655,19 @@ class SearchService:
         
         return results
     
-    def format_intel_report(self, intel_results: Dict[str, SearchResponse], stock_name: str) -> str:
+    def format_intel_report(
+        self,
+        intel_results: Dict[str, SearchResponse],
+        stock_name: str,
+        max_total_chars: Optional[int] = DEFAULT_NEWS_CONTEXT_MAX_TOTAL_CHARS,
+    ) -> str:
         """
         格式化情报搜索结果为报告
         
         Args:
             intel_results: 多维度搜索结果
             stock_name: 股票名称
+            max_total_chars: 最大总字符数，超出时截断并附加标记
             
         Returns:
             格式化的情报报告文本
@@ -3687,7 +3716,7 @@ class SearchService:
             else:
                 lines.append("  未找到相关信息")
         
-        return "\n".join(lines)
+        return cap_news_context("\n".join(lines), max_chars=max_total_chars) or ""
     
     def batch_search(
         self,

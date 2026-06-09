@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
+- [新功能] 新增 fixture-first TaiwanFinMindFetcher 与台股 TW 2330/2454 离线行情、基本面、筹码和公司资料 fixtures，供 TW+US Route B MVP Phase 2.1 验证使用。
+- [新功能] 新增 TW/US symbol normalizer，支持 TW:2330、2330.TW、US:AAPL 等显式市场格式，并对无市场裸码 fail fast。
+- [新功能] 新增 TaiwanFinMindFetcher 四层网络守卫（DSA_FIXTURE_MODE / DSA_ALLOW_EXTERNAL_NETWORK / FINMIND_ENABLED / FINMIND_API_TOKEN），默认全离线；新增 US 市场 AAPL/NVDA 行情与新闻 fixtures；FinMind>=0.6.0 标记为可选依赖。
 
 ## [3.20.0] - 2026-06-03
 

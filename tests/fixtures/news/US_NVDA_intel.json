@@ -1,0 +1,24 @@
+{
+  "symbol": "US:NVDA",
+  "market": "US",
+  "fetched_at": "fixture",
+  "news_context_text": "【NVIDIA NVDA Latest Intel】\n1. Blackwell GPU architecture shipping at record pace; hyperscalers (Microsoft, Google, Amazon, Meta) all ramping orders for 2025.\n2. Data Center revenue $35.6B in Q4 FY2025, +93% YoY; gross margin 73.5% above guidance.\n3. Sovereign AI demand strong from Middle East, Japan, and Europe government programs.\n4. Risks: US export controls tightening on H20/B20 chips to China; AMD MI300X gaining data center traction; valuation premium requires continued execution.",
+  "dimensions": {
+    "latest_news": {
+      "success": true,
+      "results_count": 4,
+      "summary": "Blackwell ramp strong; Data Center +93% YoY; sovereign AI orders expanding"
+    },
+    "risk_check": {
+      "success": true,
+      "results_count": 3,
+      "summary": "China export controls; AMD competition; premium valuation execution risk"
+    },
+    "earnings_preview": {
+      "success": true,
+      "results_count": 2,
+      "summary": "Q1 FY2026 guide $43B revenue; gross margin 70.6% midpoint; Blackwell demand exceeds supply"
+    }
+  },
+  "source": "fixture"
+}

@@ -573,6 +573,7 @@ class DataFetcherManager:
         "LongbridgeFetcher": {"hk", "us"},
         "FinnhubFetcher": {"us"},
         "AlphaVantageFetcher": {"us"},
+        "TaiwanFinMindFetcher": {"tw"},
     }
 
     def __init__(self, fetchers: Optional[List[BaseFetcher]] = None):
@@ -1058,6 +1059,7 @@ class DataFetcherManager:
         from .baostock_fetcher import BaostockFetcher
         from .yfinance_fetcher import YfinanceFetcher
         from .longbridge_fetcher import LongbridgeFetcher
+        from .taiwan_finmind_fetcher import TaiwanFinMindFetcher
         config = get_config()
         # 创建所有数据源实例（优先级在各 Fetcher 的 __init__ 中确定）
         efinance = EfinanceFetcher()
@@ -1065,6 +1067,7 @@ class DataFetcherManager:
         pytdx = PytdxFetcher()      # 通达信数据源（可配 PYTDX_HOST/PYTDX_PORT）
         baostock = BaostockFetcher()
         yfinance = YfinanceFetcher()
+        taiwan_finmind = TaiwanFinMindFetcher()
         optional_fetchers: List[BaseFetcher] = []
 
         tushare_token = (getattr(config, "tushare_token", None) or "").strip()
@@ -1102,6 +1105,7 @@ class DataFetcherManager:
                 baostock,
                 yfinance,
                 *optional_fetchers,
+                taiwan_finmind,
             ]
 
             # 按优先级排序（Tushare 如果配置了 Token 且初始化成功，优先级为 0）

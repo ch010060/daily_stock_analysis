@@ -42,7 +42,11 @@ from src.report_language import (
     localize_trend_prediction,
     normalize_report_language,
 )
-from src.search_service import SearchService
+from src.search_service import (
+    DEFAULT_NEWS_CONTEXT_MAX_TOTAL_CHARS,
+    SearchService,
+    cap_news_context,
+)
 from src.analysis_context_pack_prompt import format_analysis_context_pack_prompt_section
 from src.analysis_context_pack_overview import render_analysis_context_pack_overview
 from src.market_phase_summary import MARKET_PHASE_SUMMARY_KEY, render_market_phase_summary
@@ -80,6 +84,13 @@ logger = logging.getLogger(__name__)
 # 防御性 guard：当实例绕过 __init__（如测试中 __new__）构造时，
 # double-check 初始化 _single_stock_notify_lock 仍然线程安全。
 _SINGLE_STOCK_NOTIFY_LOCK_INIT_GUARD = threading.Lock()
+
+
+def _cap_news_context(
+    text: Optional[str],
+    max_chars: int = DEFAULT_NEWS_CONTEXT_MAX_TOTAL_CHARS,
+) -> Optional[str]:
+    return cap_news_context(text, max_chars=max_chars)
 
 
 class StockAnalysisPipeline:
@@ -488,6 +499,8 @@ class StockAnalysisPipeline:
                             news_context = social_context
                 except Exception as e:
                     logger.warning(f"{stock_name}({code}) Social sentiment fetch failed: {e}")
+
+            news_context = _cap_news_context(news_context)
 
             # Step 5: 获取分析上下文（技术面数据）
             self._emit_progress(58, f"{stock_name}：正在整理分析上下文")
@@ -2142,6 +2155,9 @@ class StockAnalysisPipeline:
         report_type: ReportType = ReportType.SIMPLE,
         analysis_query_id: Optional[str] = None,
         current_time: Optional[datetime] = None,
+        data_context_mode: str = "fetch",
+        analysis_mode: str = "full",
+        pre_built_context: Optional[Dict[str, Any]] = None,
     ) -> Optional[AnalysisResult]:
         """
         处理单只股票的完整流程
@@ -2183,10 +2199,14 @@ class StockAnalysisPipeline:
         try:
             self._emit_progress(12, f"{code}：正在准备分析任务")
             # Step 1: 获取并保存数据
-            success, error = self.fetch_and_save_stock_data(
-                code, current_time=current_time
-            )
-            
+            if data_context_mode == "prebuilt":
+                logger.info(f"[{code}] prebuilt mode: skipping data fetch")
+                success, error = True, None
+            else:
+                success, error = self.fetch_and_save_stock_data(
+                    code, current_time=current_time
+                )
+
             if not success:
                 logger.warning(f"[{code}] 数据获取失败: {error}")
                 # 即使获取失败，也尝试用已有数据分析
@@ -2194,14 +2214,22 @@ class StockAnalysisPipeline:
                 self._emit_progress(16, f"{code}：行情数据准备完成")
             
             # Step 2: AI 分析
-            if skip_analysis:
-                logger.info(f"[{code}] 跳过 AI 分析（dry-run 模式）")
+            if skip_analysis or analysis_mode == "dry_run":
+                logger.info(f"[{code}] 跳过 AI 分析（dry_run 模式）")
                 return None
-            
+
+            if analysis_mode == "fixture":
+                return self._load_llm_fixture(code)
+
             analyze_kwargs = {"query_id": effective_query_id}
             if current_time is not None:
                 analyze_kwargs["current_time"] = current_time
-            result = self.analyze_stock(code, report_type, **analyze_kwargs)
+            if data_context_mode == "prebuilt" and pre_built_context is not None:
+                result = self._analyze_with_prebuilt(
+                    code, pre_built_context, report_type, effective_query_id, current_time
+                )
+            else:
+                result = self.analyze_stock(code, report_type, **analyze_kwargs)
             
             if result and result.success:
                 logger.info(
@@ -2231,6 +2259,98 @@ class StockAnalysisPipeline:
             reset_run_diagnostic_context(diag_token)
             reset_frozen_target_date(token)
     
+    def _load_llm_fixture(self, code: str) -> Optional[AnalysisResult]:
+        """Return a canned AnalysisResult from tests/fixtures/llm/<code>.json.
+
+        Fixture filenames use underscores instead of colons so they are safe
+        across all filesystems (e.g. TW:2330 → TW_2330.json).
+        """
+        import json
+        import os
+        safe_name = code.replace(":", "_").replace("/", "_")
+        fixture_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            "tests", "fixtures", "llm", f"{safe_name}.json",
+        )
+        if not os.path.exists(fixture_path):
+            logger.warning(f"[{code}] LLM fixture not found: {fixture_path}")
+            return AnalysisResult(
+                code=code,
+                name=code,
+                sentiment_score=50,
+                trend_prediction="震荡",
+                operation_advice="观望",
+                success=False,
+                error_message=f"fixture_not_found: {safe_name}.json",
+            )
+        try:
+            with open(fixture_path, encoding="utf-8") as fh:
+                data = json.load(fh)
+            return AnalysisResult(
+                code=data.get("code", code),
+                name=data.get("name", code),
+                sentiment_score=int(data.get("sentiment_score", 50)),
+                trend_prediction=data.get("trend_prediction", "震荡"),
+                operation_advice=data.get("operation_advice", "观望"),
+                decision_type=data.get("decision_type", "hold"),
+                confidence_level=data.get("confidence_level", "中"),
+                report_language=data.get("report_language", "zh"),
+                analysis_summary=data.get("analysis_summary", ""),
+                trend_analysis=data.get("trend_analysis", ""),
+                short_term_outlook=data.get("short_term_outlook", ""),
+                medium_term_outlook=data.get("medium_term_outlook", ""),
+                technical_analysis=data.get("technical_analysis", ""),
+                risk_warning=data.get("risk_warning", ""),
+                success=bool(data.get("success", True)),
+            )
+        except Exception as exc:
+            logger.error(f"[{code}] Failed to load LLM fixture: {exc}")
+            return AnalysisResult(
+                code=code,
+                name=code,
+                sentiment_score=50,
+                trend_prediction="震荡",
+                operation_advice="观望",
+                success=False,
+                error_message=f"fixture_load_error: {exc}",
+            )
+
+    def _analyze_with_prebuilt(
+        self,
+        code: str,
+        pre_built_context: Dict[str, Any],
+        report_type: ReportType,
+        query_id: str,
+        current_time: Optional[datetime] = None,
+    ) -> Optional[AnalysisResult]:
+        """Call GeminiAnalyzer.analyze() directly with a caller-supplied context dict.
+
+        This path skips all data-fetch steps (realtime quote, chips, DB read,
+        trend analysis, news search) while keeping the full LLM analysis path
+        active.  The caller is responsible for building a well-formed context
+        dict (see adapters/snapshot_schema.py: SnapshotContext).
+        """
+        news_context: Optional[str] = pre_built_context.get("news_context")  # type: ignore[assignment]
+        news_context = _cap_news_context(news_context)
+        try:
+            result = self.analyzer.analyze(
+                pre_built_context,
+                news_context=news_context,
+                progress_callback=self._emit_progress,
+            )
+            return result
+        except Exception as exc:
+            logger.error(f"[{code}] prebuilt analysis failed: {exc}", exc_info=True)
+            return AnalysisResult(
+                code=code,
+                name=pre_built_context.get("name", code),
+                sentiment_score=50,
+                trend_prediction="震荡",
+                operation_advice="观望",
+                success=False,
+                error_message=str(exc),
+            )
+
     def run(
         self,
         stock_codes: Optional[List[str]] = None,

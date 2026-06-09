@@ -1,0 +1,11 @@
+{
+  "stock_id": "2454",
+  "market": "TW",
+  "from_date": "2025-01-01",
+  "to_date": "2025-03-31",
+  "foreign_investors_net_buy": 2800000,
+  "investment_trust_net_buy": 950000,
+  "dealer_net_buy": -120000,
+  "total_institutional_net_buy": 3630000,
+  "source": "fixture"
+}
