@@ -135,7 +135,7 @@ class TestAnspireSearchProvider(unittest.TestCase):
     def setUp(self):
         """测试前准备"""
         # ✅ 使用明确的测试占位符，不是真实密钥形态
-        self.test_api_key = "sk-test-anspire-placeholder-key-12345"
+        self.test_api_key = "anspire-placeholder-key"
         self.provider = AnspireSearchProvider([self.test_api_key])
         # 保存原始 requests 模块
         self._original_requests = sys.modules.get('requests')

@@ -38,9 +38,9 @@ from src.config import Config
 # Helpers
 # ---------------------------------------------------------------------------
 
-_GEMINI_KEY = "sk-gemini-testkey-1234"   # len >= 8
-_ANTHROPIC_KEY = "sk-anthropic-testkey-1234"
-_OPENAI_KEY = "sk-openai-testkey-1234"
+_GEMINI_KEY = "gemini-placeholder-key"   # len >= 8
+_ANTHROPIC_KEY = "anthropic-placeholder-key"
+_OPENAI_KEY = "openai-placeholder-key"
 
 
 def _cfg(**kwargs) -> Config:

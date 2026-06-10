@@ -1734,7 +1734,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "help_key": "settings.notification.chat_bots",
         "examples": [
             "DISCORD_BOT_TOKEN=your_discord_bot_token",
-            "DISCORD_MAIN_CHANNEL_ID=123456789012345678",
+            "DISCORD_MAIN_CHANNEL_ID=discord-channel-id-placeholder",
         ],
         "docs": [
             {
@@ -4090,7 +4090,7 @@ _FIELD_HELP_METADATA: Dict[str, Dict[str, Any]] = {
     "DISCORD_MAIN_CHANNEL_ID": {
         "help_key": "settings.notification.chat_bots",
         "examples": [
-            "DISCORD_MAIN_CHANNEL_ID=123456789012345678",
+            "DISCORD_MAIN_CHANNEL_ID=discord-channel-id-placeholder",
         ],
         "docs": _DOC_FULL_GUIDE_NOTIFICATION,
         "warning_codes": [],
