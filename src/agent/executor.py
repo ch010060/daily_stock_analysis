@@ -33,6 +33,130 @@ from src.market_phase_prompt import format_market_phase_prompt_section
 
 logger = logging.getLogger(__name__)
 
+_PREBUILT_RESULT_FIELDS = (
+    "code",
+    "name",
+    "operation_advice",
+    "trend_prediction",
+    "sentiment_score",
+    "confidence_level",
+    "analysis_summary",
+    "risk_warning",
+    "news_summary",
+    "report_language",
+)
+_PREBUILT_SNAPSHOT_FIELDS = (
+    "code",
+    "name",
+    "market",
+    "today",
+    "yesterday",
+    "realtime",
+    "chip",
+    "trend",
+    "fundamental",
+    "market_phase_context",
+    "news_context",
+)
+_SENSITIVE_KEY_PARTS = (
+    "api_key",
+    "token",
+    "secret",
+    "authorization",
+    "webhook",
+    "password",
+)
+_PREBUILT_VALUE_CHAR_CAP = 800
+_PREBUILT_SECTION_CHAR_CAP = 4000
+
+
+def _is_sensitive_key(key: Any) -> bool:
+    lowered = str(key).lower()
+    return any(part in lowered for part in _SENSITIVE_KEY_PARTS)
+
+
+def _get_payload_field(payload: Any, field: str) -> Any:
+    if isinstance(payload, dict):
+        return payload.get(field)
+    return getattr(payload, field, None)
+
+
+def _sanitize_prebuilt_obj(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _sanitize_prebuilt_obj(val)
+            for key, val in value.items()
+            if not _is_sensitive_key(key)
+        }
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_prebuilt_obj(item) for item in list(value)[:20]]
+    return value
+
+
+def _safe_prebuilt_value(value: Any, *, max_chars: int = _PREBUILT_VALUE_CHAR_CAP) -> str:
+    if isinstance(value, dict):
+        text = json.dumps(_sanitize_prebuilt_obj(value), ensure_ascii=False, default=str)
+    elif isinstance(value, (list, tuple)):
+        text = json.dumps(_sanitize_prebuilt_obj(value), ensure_ascii=False, default=str)
+    else:
+        text = str(value)
+    if len(text) > max_chars:
+        return text[:max_chars] + "...[TRUNCATED]"
+    return text
+
+
+def _cap_prebuilt_section(text: str) -> str:
+    if len(text) <= _PREBUILT_SECTION_CHAR_CAP:
+        return text
+    return text[:_PREBUILT_SECTION_CHAR_CAP] + "...[TRUNCATED: prebuilt context capped]"
+
+
+def build_prebuilt_context_summary(context: Optional[Dict[str, Any]]) -> str:
+    """Return a low-sensitivity read-only summary for QA prompt context."""
+    if not context:
+        return ""
+
+    result = context.get("pre_built_result")
+    if result:
+        lines = ["[系统提供的只读预构建分析结果]"]
+        for field in _PREBUILT_RESULT_FIELDS:
+            value = _get_payload_field(result, field)
+            if value is None or value == "":
+                continue
+            lines.append(f"- {field}: {_safe_prebuilt_value(value)}")
+        return _cap_prebuilt_section("\n".join(lines))
+
+    snapshot = context.get("pre_built_context")
+    if isinstance(snapshot, dict) and snapshot:
+        lines = ["[系统提供的只读 pre_built_context 快照摘要]"]
+        for field in _PREBUILT_SNAPSHOT_FIELDS:
+            if field not in snapshot or _is_sensitive_key(field):
+                continue
+            value = snapshot.get(field)
+            if value is None or value == "":
+                continue
+            lines.append(f"- {field}: {_safe_prebuilt_value(value)}")
+        return _cap_prebuilt_section("\n".join(lines))
+
+    return ""
+
+
+def get_prebuilt_report_language(context: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Return report_language embedded in the preferred prebuilt payload."""
+    if not context:
+        return None
+    result = context.get("pre_built_result")
+    if result:
+        value = _get_payload_field(result, "report_language")
+        if isinstance(value, str) and value.strip():
+            return value
+    snapshot = context.get("pre_built_context")
+    if isinstance(snapshot, dict):
+        value = snapshot.get("report_language")
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
+
 
 # ============================================================
 # Agent result
@@ -531,7 +655,9 @@ class AgentExecutor:
         default_skill_policy_section = ""
         if self.default_skill_policy:
             default_skill_policy_section = f"\n{self.default_skill_policy}\n"
-        report_language = normalize_report_language((context or {}).get("report_language", "zh"))
+        report_language = normalize_report_language(
+            (context or {}).get("report_language") or get_prebuilt_report_language(context) or "zh"
+        )
         stock_code = (context or {}).get("stock_code", "")
         market_role = get_market_role(stock_code, report_language)
         market_guidelines = get_market_guidelines(stock_code, report_language)
@@ -580,7 +706,9 @@ class AgentExecutor:
         default_skill_policy_section = ""
         if self.default_skill_policy:
             default_skill_policy_section = f"\n{self.default_skill_policy}\n"
-        report_language = normalize_report_language((context or {}).get("report_language", "zh"))
+        report_language = normalize_report_language(
+            (context or {}).get("report_language") or get_prebuilt_report_language(context) or "zh"
+        )
         stock_code = (context or {}).get("stock_code", "")
         market_role = get_market_role(stock_code, report_language)
         market_guidelines = get_market_guidelines(stock_code, report_language)
@@ -614,10 +742,13 @@ class AgentExecutor:
         # Inject previous analysis context if provided (data reuse from report follow-up)
         if context:
             context_parts = []
+            prebuilt_context_summary = build_prebuilt_context_summary(context)
             if context.get("stock_code"):
                 context_parts.append(f"股票代码: {context['stock_code']}")
             if context.get("stock_name"):
                 context_parts.append(f"股票名称: {context['stock_name']}")
+            if prebuilt_context_summary:
+                context_parts.append(prebuilt_context_summary)
             if context.get("previous_price"):
                 context_parts.append(f"上次分析价格: {context['previous_price']}")
             if context.get("previous_change_pct"):
@@ -632,6 +763,8 @@ class AgentExecutor:
                 context_parts.append(f"上次策略分析:\n{strategy_text}")
             if context_parts:
                 context_msg = "[系统提供的历史分析上下文，可供参考对比]\n" + "\n".join(context_parts)
+                if prebuilt_context_summary:
+                    context_msg += "\n\n请将上述 prebuilt 内容视为只读上下文；不要为回答本次追问重新获取行情、搜索新闻或运行完整分析流程，除非用户明确要求刷新数据。"
                 messages.append({"role": "user", "content": context_msg})
                 messages.append({"role": "assistant", "content": "好的，我已了解该股票的历史分析数据。请告诉我你想了解什么？"})
 
@@ -785,7 +918,9 @@ class AgentExecutor:
         """Build the initial user message."""
         parts = [task]
         if context:
-            report_language = normalize_report_language(context.get("report_language", "zh"))
+            report_language = normalize_report_language(
+                context.get("report_language") or get_prebuilt_report_language(context) or "zh"
+            )
             if context.get("stock_code"):
                 parts.append(f"\n股票代码: {context['stock_code']}")
             if context.get("report_type"):
@@ -808,6 +943,10 @@ class AgentExecutor:
             if isinstance(analysis_context_pack_summary, str) and analysis_context_pack_summary:
                 parts.append(analysis_context_pack_summary)
 
+            prebuilt_context_summary = build_prebuilt_context_summary(context)
+            if prebuilt_context_summary:
+                parts.append(prebuilt_context_summary)
+
             # Inject pre-fetched context data to avoid redundant fetches
             if context.get("realtime_quote"):
                 parts.append(f"\n[系统已获取的实时行情]\n{json.dumps(context['realtime_quote'], ensure_ascii=False)}")
@@ -816,5 +955,11 @@ class AgentExecutor:
             if context.get("news_context"):
                 parts.append(f"\n[系统已获取的新闻与舆情情报]\n{context['news_context']}")
 
-        parts.append("\n请使用可用工具获取缺失的数据（如历史K线、新闻等），然后以决策仪表盘 JSON 格式输出分析结果。")
+        if context and build_prebuilt_context_summary(context):
+            parts.append(
+                "\n请优先使用上述只读 prebuilt 上下文回答；不要为了该上下文重新获取行情、搜索新闻或运行完整分析流程，"
+                "除非用户明确要求刷新数据。然后以决策仪表盘 JSON 格式输出分析结果。"
+            )
+        else:
+            parts.append("\n请使用可用工具获取缺失的数据（如历史K线、新闻等），然后以决策仪表盘 JSON 格式输出分析结果。")
         return "\n".join(parts)

@@ -604,6 +604,9 @@ class AgentOrchestrator:
         risk = self._prepare_agent(RiskAgent(**common_kwargs))
         decision = self._prepare_agent(DecisionAgent(**common_kwargs))
 
+        if ctx.meta.get("response_mode") == "chat" and ctx.meta.get("prebuilt_context_summary"):
+            return [decision]
+
         if self.mode == "quick":
             return [technical, decision]
         elif self.mode == "standard":
@@ -700,6 +703,8 @@ class AgentOrchestrator:
         ctx = AgentContext(query=task)
 
         if context:
+            from src.agent.executor import build_prebuilt_context_summary, get_prebuilt_report_language
+
             ctx.stock_code = context.get("stock_code", "")
             ctx.stock_name = context.get("stock_name", "")
             requested_skills = context.get("skills")
@@ -707,12 +712,40 @@ class AgentOrchestrator:
                 requested_skills = context.get("strategies", [])
             ctx.meta["skills_requested"] = requested_skills or []
             ctx.meta["strategies_requested"] = requested_skills or []
-            ctx.meta["report_language"] = normalize_report_language(context.get("report_language", "zh"))
+            ctx.meta["report_language"] = normalize_report_language(
+                context.get("report_language") or get_prebuilt_report_language(context) or "zh"
+            )
             if context.get("market_phase_context"):
                 ctx.meta["market_phase_context"] = context["market_phase_context"]
             analysis_context_pack_summary = context.get("analysis_context_pack_summary")
             if isinstance(analysis_context_pack_summary, str) and analysis_context_pack_summary:
                 ctx.meta["analysis_context_pack_summary"] = analysis_context_pack_summary
+            prebuilt_context_summary = build_prebuilt_context_summary(context)
+            if prebuilt_context_summary:
+                ctx.meta["prebuilt_context_summary"] = prebuilt_context_summary
+                existing_summary = ctx.meta.get("analysis_context_pack_summary")
+                if isinstance(existing_summary, str) and existing_summary:
+                    ctx.meta["analysis_context_pack_summary"] = (
+                        existing_summary + "\n\n" + prebuilt_context_summary
+                    )
+                else:
+                    ctx.meta["analysis_context_pack_summary"] = prebuilt_context_summary
+                prebuilt_result = context.get("pre_built_result")
+                prebuilt_context = context.get("pre_built_context")
+                if not ctx.stock_code:
+                    if isinstance(prebuilt_result, dict):
+                        ctx.stock_code = str(prebuilt_result.get("code", ""))
+                    elif prebuilt_result:
+                        ctx.stock_code = str(getattr(prebuilt_result, "code", ""))
+                    elif isinstance(prebuilt_context, dict):
+                        ctx.stock_code = str(prebuilt_context.get("code", ""))
+                if not ctx.stock_name:
+                    if isinstance(prebuilt_result, dict):
+                        ctx.stock_name = str(prebuilt_result.get("name", ""))
+                    elif prebuilt_result:
+                        ctx.stock_name = str(getattr(prebuilt_result, "name", ""))
+                    elif isinstance(prebuilt_context, dict):
+                        ctx.stock_name = str(prebuilt_context.get("name", ""))
 
             # Pre-populate data fields that the caller already has
             for data_key in ("realtime_quote", "daily_history", "chip_distribution",
