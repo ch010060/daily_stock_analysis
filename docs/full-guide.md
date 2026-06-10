@@ -598,6 +598,19 @@ conda activate stock
 pip install -r requirements.txt
 ```
 
+#### FinMind live smoke 环境
+
+FinMind 台股 live smoke 建议使用 Python 3.11 conda 环境：
+
+```bash
+conda create -n daily-stock python=3.11 -y
+conda activate daily-stock
+python -m pip install -r requirements.txt
+python -m pip install "FinMind>=0.6.0"
+```
+
+不建议在 Python 3.12 环境中强装 FinMind。FinMind 当前依赖 `pandas<2.0.0`，可能触发 pandas 1.5.x source build，并在构建依赖阶段失败。
+
 Windows PowerShell 若仍使用系统默认代码页，首次安装依赖或运行环境检查前建议先启用 UTF-8，避免第三方工具或终端输出在中文字符上失败：
 
 ```powershell

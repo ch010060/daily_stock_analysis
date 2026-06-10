@@ -537,6 +537,19 @@ conda activate stock
 pip install -r requirements.txt
 ```
 
+#### FinMind Live Smoke Environment
+
+Use a Python 3.11 conda environment for FinMind Taiwan live smoke:
+
+```bash
+conda create -n daily-stock python=3.11 -y
+conda activate daily-stock
+python -m pip install -r requirements.txt
+python -m pip install "FinMind>=0.6.0"
+```
+
+Python 3.12 is not recommended for FinMind live smoke. FinMind currently depends on `pandas<2.0.0`, which can force a pandas 1.5.x source build and fail during build dependency setup.
+
 On Windows PowerShell, if Python or pip still uses the system default code page, enable UTF-8 before the first dependency install or environment check. This keeps terminal output and third-party tooling from failing on non-ASCII text:
 
 ```powershell

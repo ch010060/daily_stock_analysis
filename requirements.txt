@@ -66,5 +66,7 @@ fastapi>=0.109.0            # Modern Python Web framework
 uvicorn[standard]>=0.27.0   # ASGI server
 python-multipart>=0.0.6     # FastAPI File/Form upload support
 
-# Taiwan market data (optional — only used when FINMIND_ENABLED=true)
+# Taiwan market data (optional — only used when FINMIND_ENABLED=true).
+# Use a Python 3.11 conda env for FinMind live smoke; Python 3.12 may fail
+# because FinMind currently pins pandas<2 and can trigger pandas 1.5.x builds.
 FinMind>=0.6.0              # FinMind Taiwan stock API; https://finmindtrade.com
