@@ -6,15 +6,15 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, Optional
 
-SUPPORTED_REPORT_LANGUAGES = ("zh", "en")
+SUPPORTED_REPORT_LANGUAGES = ("zh", "zh_TW", "en")
 
 _REPORT_LANGUAGE_ALIASES = {
     "zh-cn": "zh",
     "zh_cn": "zh",
     "zh-hans": "zh",
     "zh_hans": "zh",
-    "zh-tw": "zh",
-    "zh_tw": "zh",
+    "zh-tw": "zh_TW",
+    "zh_tw": "zh_TW",
     "cn": "zh",
     "chinese": "zh",
     "english": "en",
@@ -26,39 +26,48 @@ _REPORT_LANGUAGE_ALIASES = {
 
 _OPERATION_ADVICE_CANONICAL_MAP = {
     "强烈买入": "strong_buy",
+    "強烈買入": "strong_buy",
     "strong buy": "strong_buy",
     "strong_buy": "strong_buy",
     "买入": "buy",
+    "買入": "buy",
     "buy": "buy",
     "加仓": "buy",
+    "加倉": "buy",
     "accumulate": "buy",
     "add position": "buy",
     "持有": "hold",
     "洗盘观察": "hold",
+    "洗盤觀察": "hold",
     "观察": "hold",
+    "觀察": "hold",
     "hold": "hold",
     "观望": "watch",
+    "觀望": "watch",
     "watch": "watch",
     "wait": "watch",
     "wait and see": "watch",
     "减仓": "reduce",
+    "減倉": "reduce",
     "reduce": "reduce",
     "trim": "reduce",
     "卖出": "sell",
+    "賣出": "sell",
     "sell": "sell",
     "强烈卖出": "strong_sell",
+    "強烈賣出": "strong_sell",
     "strong sell": "strong_sell",
     "strong_sell": "strong_sell",
 }
 
 _OPERATION_ADVICE_TRANSLATIONS = {
-    "strong_buy": {"zh": "强烈买入", "en": "Strong Buy"},
-    "buy": {"zh": "买入", "en": "Buy"},
-    "hold": {"zh": "持有", "en": "Hold"},
-    "watch": {"zh": "观望", "en": "Watch"},
-    "reduce": {"zh": "减仓", "en": "Reduce"},
-    "sell": {"zh": "卖出", "en": "Sell"},
-    "strong_sell": {"zh": "强烈卖出", "en": "Strong Sell"},
+    "strong_buy": {"zh": "强烈买入", "zh_TW": "強烈買入", "en": "Strong Buy"},
+    "buy": {"zh": "买入", "zh_TW": "買入", "en": "Buy"},
+    "hold": {"zh": "持有", "zh_TW": "持有", "en": "Hold"},
+    "watch": {"zh": "观望", "zh_TW": "觀望", "en": "Watch"},
+    "reduce": {"zh": "减仓", "zh_TW": "減倉", "en": "Reduce"},
+    "sell": {"zh": "卖出", "zh_TW": "賣出", "en": "Sell"},
+    "strong_sell": {"zh": "强烈卖出", "zh_TW": "強烈賣出", "en": "Strong Sell"},
 }
 
 _TREND_PREDICTION_CANONICAL_MAP = {
@@ -85,14 +94,23 @@ _TREND_PREDICTION_CANONICAL_MAP = {
     "强烈看空": "strong_bearish",
     "strong bearish": "strong_bearish",
     "very bearish": "strong_bearish",
+    "強勢空頭": "strong_bearish",
+    "強烈看多": "strong_bullish",
+    "強勢多頭": "strong_bullish",
+    "多頭排列": "bullish",
+    "空頭排列": "bearish",
+    "弱勢多頭": "bullish",
+    "弱勢空頭": "bearish",
+    "盤整": "sideways",
+    "強烈看空": "strong_bearish",
 }
 
 _TREND_PREDICTION_TRANSLATIONS = {
-    "strong_bullish": {"zh": "强烈看多", "en": "Strong Bullish"},
-    "bullish": {"zh": "看多", "en": "Bullish"},
-    "sideways": {"zh": "震荡", "en": "Sideways"},
-    "bearish": {"zh": "看空", "en": "Bearish"},
-    "strong_bearish": {"zh": "强烈看空", "en": "Strong Bearish"},
+    "strong_bullish": {"zh": "强烈看多", "zh_TW": "強烈看多", "en": "Strong Bullish"},
+    "bullish": {"zh": "看多", "zh_TW": "看多", "en": "Bullish"},
+    "sideways": {"zh": "震荡", "zh_TW": "震盪", "en": "Sideways"},
+    "bearish": {"zh": "看空", "zh_TW": "看空", "en": "Bearish"},
+    "strong_bearish": {"zh": "强烈看空", "zh_TW": "強烈看空", "en": "Strong Bearish"},
 }
 
 _CONFIDENCE_LEVEL_CANONICAL_MAP = {
@@ -106,9 +124,9 @@ _CONFIDENCE_LEVEL_CANONICAL_MAP = {
 }
 
 _CONFIDENCE_LEVEL_TRANSLATIONS = {
-    "high": {"zh": "高", "en": "High"},
-    "medium": {"zh": "中", "en": "Medium"},
-    "low": {"zh": "低", "en": "Low"},
+    "high": {"zh": "高", "zh_TW": "高", "en": "High"},
+    "medium": {"zh": "中", "zh_TW": "中", "en": "Medium"},
+    "low": {"zh": "低", "zh_TW": "低", "en": "Low"},
 }
 
 _CHIP_HEALTH_CANONICAL_MAP = {
@@ -121,9 +139,9 @@ _CHIP_HEALTH_CANONICAL_MAP = {
 }
 
 _CHIP_HEALTH_TRANSLATIONS = {
-    "healthy": {"zh": "健康", "en": "Healthy"},
-    "average": {"zh": "一般", "en": "Average"},
-    "caution": {"zh": "警惕", "en": "Caution"},
+    "healthy": {"zh": "健康", "zh_TW": "健康", "en": "Healthy"},
+    "average": {"zh": "一般", "zh_TW": "一般", "en": "Average"},
+    "caution": {"zh": "警惕", "zh_TW": "警惕", "en": "Caution"},
 }
 
 _BIAS_STATUS_CANONICAL_MAP = {
@@ -133,33 +151,38 @@ _BIAS_STATUS_CANONICAL_MAP = {
     "警惕": "caution",
     "caution": "caution",
     "危险": "danger",
+    "危險": "danger",
     "risk": "danger",
     "danger": "danger",
 }
 
 _BIAS_STATUS_TRANSLATIONS = {
-    "safe": {"zh": "安全", "en": "Safe"},
-    "caution": {"zh": "警戒", "en": "Caution"},
-    "danger": {"zh": "危险", "en": "Danger"},
+    "safe": {"zh": "安全", "zh_TW": "安全", "en": "Safe"},
+    "caution": {"zh": "警戒", "zh_TW": "警戒", "en": "Caution"},
+    "danger": {"zh": "危险", "zh_TW": "危險", "en": "Danger"},
 }
 
 _PLACEHOLDER_BY_LANGUAGE = {
     "zh": "待补充",
+    "zh_TW": "待補充",
     "en": "TBD",
 }
 
 _UNKNOWN_BY_LANGUAGE = {
     "zh": "未知",
+    "zh_TW": "未知",
     "en": "Unknown",
 }
 
 _NO_DATA_BY_LANGUAGE = {
     "zh": "数据缺失",
+    "zh_TW": "資料缺失",
     "en": "Data unavailable",
 }
 
 _CHIP_UNAVAILABLE_BY_LANGUAGE = {
     "zh": "筹码分布未启用或数据源暂不可用，未纳入筹码判断。",
+    "zh_TW": "籌碼分布未啟用或資料來源暫不可用，未納入籌碼判斷。",
     "en": "Chip distribution is disabled or temporarily unavailable; chip signals were not used.",
 }
 
@@ -172,14 +195,19 @@ _CHIP_PLACEHOLDER_EXACT = {
     "unknown",
     "tbd",
     "数据缺失",
+    "資料缺失",
     "未知",
     "暂无",
+    "暫無",
     "待补充",
+    "待補充",
 }
 
 _CHIP_PLACEHOLDER_HINTS = (
     "数据缺失",
+    "資料缺失",
     "无法判断",
+    "無法判斷",
     "data unavailable",
     "unavailable",
     "not available",
@@ -196,6 +224,7 @@ _CHIP_UNAVAILABLE_REASON_KEYS = (
 
 _GENERIC_STOCK_NAME_BY_LANGUAGE = {
     "zh": "待确认股票",
+    "zh_TW": "待確認股票",
     "en": "Unnamed Stock",
 }
 
@@ -418,6 +447,112 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
     },
 }
 
+_REPORT_LABELS["zh_TW"] = {
+    **_REPORT_LABELS["zh"],
+    "dashboard_title": "決策儀表板",
+    "brief_title": "決策簡報",
+    "analyzed_prefix": "共分析",
+    "stock_unit": "檔股票",
+    "stock_unit_compact": "檔",
+    "buy_label": "買入",
+    "watch_label": "觀望",
+    "sell_label": "賣出",
+    "summary_heading": "分析結果摘要",
+    "info_heading": "重要資訊速覽",
+    "sentiment_summary_label": "輿情情緒",
+    "earnings_outlook_label": "業績預期",
+    "risk_alerts_label": "風險提示",
+    "positive_catalysts_label": "利多催化",
+    "latest_news_label": "最新動態",
+    "core_conclusion_heading": "核心結論",
+    "one_sentence_label": "一句話決策",
+    "time_sensitivity_label": "時效性",
+    "default_time_sensitivity": "本週內",
+    "position_status_label": "持倉情況",
+    "action_advice_label": "操作建議",
+    "no_position_label": "空倉者",
+    "has_position_label": "持倉者",
+    "continue_holding": "繼續持有",
+    "market_snapshot_heading": "當日行情",
+    "close_label": "收盤",
+    "prev_close_label": "昨收",
+    "open_label": "開盤",
+    "high_label": "最高",
+    "low_label": "最低",
+    "change_pct_label": "漲跌幅",
+    "change_amount_label": "漲跌額",
+    "amplitude_label": "振幅",
+    "volume_label": "成交量",
+    "amount_label": "成交額",
+    "current_price_label": "目前價格",
+    "volume_ratio_label": "量比",
+    "turnover_rate_label": "換手率",
+    "source_label": "行情來源",
+    "data_perspective_heading": "資料透視",
+    "ma_alignment_label": "均線排列",
+    "bullish_alignment_label": "多頭排列",
+    "yes_label": "是",
+    "no_label": "否",
+    "trend_strength_label": "趨勢強度",
+    "price_metrics_label": "價格指標",
+    "bias_ma5_label": "乖離率(MA5)",
+    "support_level_label": "支撐位",
+    "resistance_level_label": "壓力位",
+    "chip_label": "籌碼",
+    "phase_decision_heading": "盤中決策護欄",
+    "action_window_label": "行動窗口",
+    "immediate_action_label": "目前動作",
+    "watch_conditions_label": "觀察條件",
+    "next_check_time_label": "下次檢查",
+    "confidence_reason_label": "信心理由",
+    "data_limitations_label": "資料限制",
+    "battle_plan_heading": "作戰計畫",
+    "ideal_buy_label": "理想買入點",
+    "secondary_buy_label": "次優買入點",
+    "stop_loss_label": "停損位",
+    "take_profit_label": "目標位",
+    "suggested_position_label": "倉位建議",
+    "entry_plan_label": "建倉策略",
+    "risk_control_label": "風控策略",
+    "checklist_heading": "檢查清單",
+    "failed_checks_heading": "檢查未通過項",
+    "history_compare_heading": "歷史訊號對比",
+    "time_label": "時間",
+    "score_label": "評分",
+    "advice_label": "建議",
+    "trend_label": "趨勢",
+    "generated_at_label": "報告生成時間",
+    "report_time_label": "生成時間",
+    "no_results": "無分析結果",
+    "report_title": "股票分析報告",
+    "avg_score_label": "均分",
+    "action_points_heading": "操作點位",
+    "position_advice_heading": "持倉建議",
+    "analysis_model_label": "分析模型",
+    "not_investment_advice": "AI 生成，僅供參考，不構成投資建議",
+    "details_report_hint": "詳細報告見",
+    "financial_summary_heading": "財務摘要",
+    "report_date_label": "報告期",
+    "revenue_label": "營業收入",
+    "net_profit_label": "歸母淨利",
+    "operating_cash_flow_label": "營業現金流",
+    "revenue_yoy_label": "營收年增率",
+    "net_profit_yoy_label": "淨利年增率",
+    "gross_margin_label": "毛利率",
+    "shareholder_return_heading": "股東回報",
+    "ttm_cash_dividend_label": "近12月每股現金股利(稅前)",
+    "ttm_event_count_label": "近12月配息次數",
+    "ttm_dividend_yield_label": "TTM 股息率",
+    "latest_ex_dividend_label": "最近除息日",
+    "related_boards_heading": "關聯板塊",
+    "board_name_label": "板塊",
+    "board_type_label": "類型",
+    "board_status_label": "板塊表現",
+    "board_change_pct_label": "板塊漲跌幅",
+    "leading_board_label": "領漲",
+    "lagging_board_label": "領跌",
+}
+
 _DECISION_INTENT_NEGATIONS = (
     "不",
     "并非",
@@ -629,7 +764,7 @@ def localize_trend_prediction(value: Any, language: Optional[str]) -> str:
     raw_text = str(value or "").strip()
     if not raw_text:
         return raw_text
-    if normalized_language == "zh":
+    if normalized_language in {"zh", "zh_TW"}:
         if re.search(r"[\u4e00-\u9fff]", raw_text):
             return raw_text
     return _translate_from_map(
@@ -816,6 +951,16 @@ def get_sentiment_label(score: int, language: Optional[str]) -> str:
         if score >= 20:
             return "Bearish"
         return "Very Bearish"
+    if normalized == "zh_TW":
+        if score >= 80:
+            return "極度樂觀"
+        if score >= 60:
+            return "樂觀"
+        if score >= 40:
+            return "中性"
+        if score >= 20:
+            return "悲觀"
+        return "極度悲觀"
 
     if score >= 80:
         return "极度乐观"
