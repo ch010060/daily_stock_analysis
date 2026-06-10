@@ -759,6 +759,14 @@ class DataFetcherManager:
         )
 
     @staticmethod
+    def _controlled_tw_live_mode_enabled() -> bool:
+        return (
+            not _env_bool("DSA_FIXTURE_MODE", False)
+            and _env_bool("DSA_ALLOW_EXTERNAL_NETWORK", False)
+            and _env_bool("FINMIND_ENABLED", False)
+        )
+
+    @staticmethod
     def _normalize_explicit_fixture_symbol(stock_code: str):
         try:
             from adapters.symbol_normalizer import normalize_symbol
@@ -860,12 +868,98 @@ class DataFetcherManager:
                 f"[fixture-no-network] {normalized.canonical}: {error_reason}"
             ) from exc
 
+    def _try_controlled_tw_live_daily_data(
+        self,
+        raw_stock_code: str,
+        start_date: Optional[str],
+        end_date: Optional[str],
+        days: int,
+    ) -> Optional[Tuple[pd.DataFrame, str]]:
+        if not self._controlled_tw_live_mode_enabled():
+            return None
+
+        normalized = self._normalize_explicit_fixture_symbol(raw_stock_code)
+        if normalized is None or normalized.market != "TW":
+            return None
+
+        fetcher = self._get_fetcher_by_name("TaiwanFinMindFetcher", capability="daily_data")
+        if fetcher is None:
+            raise DataFetchError(
+                f"[controlled-tw-live] TaiwanFinMindFetcher unavailable for {normalized.canonical}"
+            )
+
+        attempt_start = time.time()
+        try:
+            logger.info(
+                "[数据源路由] controlled TW live %s 直接使用 [%s]",
+                normalized.canonical,
+                fetcher.name,
+            )
+            df = self._call_fetcher_method(
+                fetcher,
+                "get_daily_data",
+                stock_code=normalized.canonical,
+                start_date=start_date,
+                end_date=end_date,
+                days=days,
+            )
+            duration_ms = int((time.time() - attempt_start) * 1000)
+            if df is not None and not df.empty:
+                record_provider_run(
+                    data_type="daily_data",
+                    provider=fetcher.name,
+                    operation="get_daily_data",
+                    success=True,
+                    latency_ms=duration_ms,
+                    record_count=len(df),
+                )
+                return df, fetcher.name
+
+            record_provider_run(
+                data_type="daily_data",
+                provider=fetcher.name,
+                operation="get_daily_data",
+                success=False,
+                latency_ms=duration_ms,
+                error_type="empty",
+                error_message="controlled TW live result empty",
+                record_count=0,
+            )
+            raise DataFetchError(
+                f"[controlled-tw-live] {fetcher.name} returned empty data "
+                f"for {normalized.canonical}"
+            )
+        except Exception as exc:
+            duration_ms = int((time.time() - attempt_start) * 1000)
+            error_type, error_reason = summarize_exception(exc)
+            record_provider_run(
+                data_type="daily_data",
+                provider=fetcher.name,
+                operation="get_daily_data",
+                success=False,
+                latency_ms=duration_ms,
+                error_type=error_type,
+                error_message=error_reason,
+            )
+            raise DataFetchError(
+                f"[controlled-tw-live] {normalized.canonical}: {error_reason}"
+            ) from exc
+
     def _get_fixture_no_network_stock_name(self, raw_stock_code: str) -> Optional[str]:
         if not self._fixture_no_network_mode_enabled():
             return None
 
         normalized = self._normalize_explicit_fixture_symbol(raw_stock_code)
         if normalized is None or normalized.market not in {"TW", "US"}:
+            return None
+        return normalized.canonical
+
+    def _get_controlled_tw_live_stock_name(self, raw_stock_code: str) -> Optional[str]:
+        if not self._controlled_tw_live_mode_enabled():
+            return None
+
+        normalized = self._normalize_explicit_fixture_symbol(raw_stock_code)
+        if normalized is None or normalized.market != "TW":
             return None
         return normalized.canonical
 
@@ -1302,6 +1396,21 @@ class DataFetcherManager:
             elapsed = time.time() - request_start
             logger.info(
                 f"[数据源完成] {stock_code} 使用 [{source_name}] fixture/no-network 获取成功: "
+                f"rows={len(df)}, elapsed={elapsed:.2f}s"
+            )
+            return df, source_name
+
+        controlled_tw_live_routed = self._try_controlled_tw_live_daily_data(
+            raw_stock_code,
+            start_date,
+            end_date,
+            days,
+        )
+        if controlled_tw_live_routed is not None:
+            df, source_name = controlled_tw_live_routed
+            elapsed = time.time() - request_start
+            logger.info(
+                f"[数据源完成] {stock_code} 使用 [{source_name}] controlled TW live 获取成功: "
                 f"rows={len(df)}, elapsed={elapsed:.2f}s"
             )
             return df, source_name
@@ -2096,6 +2205,11 @@ class DataFetcherManager:
         if fixture_name:
             logger.info("[股票名称] fixture/no-network 使用本地代码标签: %s", fixture_name)
             return self._cache_stock_name(stock_code, fixture_name) or fixture_name
+
+        controlled_tw_name = self._get_controlled_tw_live_stock_name(raw_stock_code)
+        if controlled_tw_name:
+            logger.info("[股票名称] controlled TW live 使用本地代码标签: %s", controlled_tw_name)
+            return self._cache_stock_name(stock_code, controlled_tw_name) or controlled_tw_name
 
         # 2. 尝试从实时行情中获取（最快，可按需禁用）
         if allow_realtime:
