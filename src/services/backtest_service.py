@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from sqlalchemy import and_, select
 
@@ -23,6 +23,7 @@ class BacktestService:
     """Service layer to run and query backtests."""
 
     MAX_DYNAMIC_SUMMARY_ROWS = 2000
+    DEFAULT_MULTI_WINDOW_DAYS = (1, 3, 5, 10)
 
     def __init__(self, db_manager: Optional[DatabaseManager] = None):
         self.db = db_manager or DatabaseManager.get_instance()
@@ -212,6 +213,94 @@ class BacktestService:
             "insufficient": insufficient,
             "errors": errors,
         }
+
+    def run_multi_window_backtest(
+        self,
+        *,
+        code: Optional[str] = None,
+        windows: Optional[Sequence[int]] = None,
+        force: bool = False,
+        min_age_days: Optional[int] = None,
+        limit: int = 200,
+    ) -> Dict[str, Any]:
+        """Run existing single-window validation across multiple eval windows."""
+        requested_windows = self._normalize_multi_window_days(windows)
+        window_results: Dict[int, Dict[str, Any]] = {}
+        completed_windows: List[int] = []
+        failed_windows: List[int] = []
+
+        for window in requested_windows:
+            try:
+                stats = self.run_backtest(
+                    code=code,
+                    force=force,
+                    eval_window_days=window,
+                    min_age_days=min_age_days,
+                    limit=limit,
+                )
+                window_results[window] = {
+                    "window": window,
+                    "status": self._classify_multi_window_status(stats),
+                    "result": stats,
+                }
+                completed_windows.append(window)
+            except Exception as exc:
+                logger.error("多视窗回测失败: T+%s: %s", window, exc)
+                window_results[window] = {
+                    "window": window,
+                    "status": "error",
+                    "error": str(exc),
+                }
+                failed_windows.append(window)
+
+        return {
+            "requested_windows": requested_windows,
+            "windows": window_results,
+            "completed_windows": completed_windows,
+            "failed_windows": failed_windows,
+        }
+
+    @classmethod
+    def _normalize_multi_window_days(cls, windows: Optional[Sequence[int]]) -> List[int]:
+        raw_windows = cls.DEFAULT_MULTI_WINDOW_DAYS if windows is None else windows
+        normalized: List[int] = []
+        seen: set[int] = set()
+
+        for raw_window in raw_windows:
+            if isinstance(raw_window, bool):
+                raise ValueError("eval windows must be positive integers")
+            try:
+                window = int(raw_window)
+            except (TypeError, ValueError):
+                raise ValueError("eval windows must be positive integers") from None
+            if window <= 0:
+                raise ValueError("eval windows must be positive integers")
+            if window in seen:
+                continue
+            seen.add(window)
+            normalized.append(window)
+
+        if not normalized:
+            raise ValueError("eval windows must not be empty")
+
+        return normalized
+
+    @staticmethod
+    def _classify_multi_window_status(stats: Dict[str, Any]) -> str:
+        processed = int(stats.get("processed") or 0)
+        completed = int(stats.get("completed") or 0)
+        insufficient = int(stats.get("insufficient") or 0)
+        errors = int(stats.get("errors") or 0)
+
+        if errors:
+            return "completed_with_errors"
+        if processed == 0:
+            return "no_candidates"
+        if insufficient and completed == 0:
+            return "insufficient_data"
+        if insufficient:
+            return "completed_with_insufficient_data"
+        return "completed"
 
     def get_recent_evaluations(
         self,
