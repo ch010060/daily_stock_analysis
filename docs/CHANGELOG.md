@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] 加固 server/WebUI/API 启动安全门，默认仅允许本机监听、忽略 wildcard CORS，并要求管理员认证与 PBKDF2 密码哈希就绪。
 - [修复] SearXNG 默认关闭公共实例发现，fixture/no-network 模式禁止访问 `searx.space`，仅保留显式本机自建实例配置。
 - [修复] 加固 server/WebUI 报告渲染路径，避免 LLM/report/dashboard 内容中的脚本、JavaScript URL 与事件处理器 payload 被浏览器执行。
+- [文档] 补充 server-safe 本机 WebUI/API profile，明确需关闭 stock-index 远程刷新、公共搜索发现、实时数据源与通知路径，并同步 SearXNG fail-closed 默认说明。
 
 ## [3.20.0] - 2026-06-03
 
