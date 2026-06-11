@@ -2778,7 +2778,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "WEBUI_HOST": {
         "title": "Web UI Host",
-        "description": "Host address for Web UI service binding.",
+        "description": "Local-only host address for Web UI service binding. Unsafe public binds are rejected by server startup gates.",
         "category": "system",
         "data_type": "string",
         "ui_control": "text",
@@ -2792,7 +2792,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "help_key": "settings.system.WEBUI_HOST",
         "examples": [
             "WEBUI_HOST=127.0.0.1",
-            "WEBUI_HOST=0.0.0.0",
+            "WEBUI_HOST=localhost",
         ],
         "docs": [
             {
@@ -2804,7 +2804,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
                 "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#webui-与-api-服务",
             },
         ],
-        "warning_codes": ["public_bind_requires_auth", "restart_required"],
+        "warning_codes": ["local_bind_required", "restart_required"],
     },
     "WEBUI_PORT": {
         "title": "Web UI Port",
@@ -2891,7 +2891,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "ADMIN_AUTH_ENABLED": {
         "title": "Admin Auth Enabled",
-        "description": "Enable password protection for Web UI. The first visit initializes the admin password.",
+        "description": "Enable password protection for Web UI. Server startup requires this to be true with a stored admin password hash.",
         "category": "system",
         "data_type": "boolean",
         "ui_control": "switch",
