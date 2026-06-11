@@ -6,6 +6,15 @@ interface JsonViewerProps {
   className?: string;
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /**
  * JSON 结构化展示组件
  * 支持语法高亮和折叠
@@ -35,14 +44,14 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
   const highlightJson = (json: string): React.ReactNode => {
     return json.split('\n').map((line, index) => {
       // 高亮 key
-      let highlighted = line.replace(
-        /"([^"]+)":/g,
-        '<span class="text-cyan-400">"$1"</span>:'
+      let highlighted = escapeHtml(line).replace(
+        /(&quot;.*?&quot;)(:)/g,
+        '<span class="text-cyan-400">$1</span>$2'
       );
       // 高亮字符串值
       highlighted = highlighted.replace(
-        /: "([^"]*)"/g,
-        ': <span class="text-emerald-400">"$1"</span>'
+        /(: )(&quot;.*?&quot;)/g,
+        '$1<span class="text-emerald-400">$2</span>'
       );
       // 高亮数字
       highlighted = highlighted.replace(

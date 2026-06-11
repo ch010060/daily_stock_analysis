@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] 默认不再注册 AlphaSift API 路由，需显式启用 `ALPHASIFT_ROUTE_ENABLED` 后才可暴露选股接口。
 - [修复] 加固 server/WebUI/API 启动安全门，默认仅允许本机监听、忽略 wildcard CORS，并要求管理员认证与 PBKDF2 密码哈希就绪。
 - [修复] SearXNG 默认关闭公共实例发现，fixture/no-network 模式禁止访问 `searx.space`，仅保留显式本机自建实例配置。
+- [修复] 加固 server/WebUI 报告渲染路径，避免 LLM/report/dashboard 内容中的脚本、JavaScript URL 与事件处理器 payload 被浏览器执行。
 
 ## [3.20.0] - 2026-06-03
 

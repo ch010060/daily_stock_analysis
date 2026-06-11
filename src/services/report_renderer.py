@@ -50,6 +50,10 @@ _JAVASCRIPT_SCHEME_RE = re.compile(
     r"j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*:",
     re.IGNORECASE,
 )
+_EVENT_HANDLER_ATTR_RE = re.compile(
+    r"\s+on[a-zA-Z][\w:-]*\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s>]+)",
+    re.IGNORECASE,
+)
 _RAW_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
@@ -61,6 +65,7 @@ def sanitize_narrative_text(value: Any) -> str:
     text = _SCRIPT_BLOCK_RE.sub("", text)
     text = _SCRIPT_TAG_RE.sub("", text)
     text = _JAVASCRIPT_SCHEME_RE.sub("blocked-url:", text)
+    text = _EVENT_HANDLER_ATTR_RE.sub("", text)
     return _RAW_CONTROL_CHARS_RE.sub("", text)
 
 

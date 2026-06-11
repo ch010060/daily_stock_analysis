@@ -20,14 +20,17 @@ for optional_module in ("litellm", "json_repair"):
 
 from src.analyzer import AnalysisResult
 from src.config import Config
+from src.formatters import markdown_to_html_document
 from src.notification import NotificationService
-from src.services.report_renderer import render
+from src.services.report_renderer import render, sanitize_narrative_text
 
 
 SCRIPT_PAYLOAD = "<script>alert(1)</script>"
 JAVASCRIPT_PAYLOAD = "[bad link](javascript:alert(1))"
+EVENT_HANDLER_PAYLOAD = "<img src=x onerror=alert(1)>"
 MARKDOWN_PAYLOAD = "- markdown bullet survives\n[good link](https://example.com/news)"
 CONTROL_PAYLOAD = "raw\x00control\x08chars"
+ZH_TW_PAYLOAD = "繁體中文內容應保留"
 
 
 def _make_renderer_config() -> mock.MagicMock:
@@ -53,7 +56,9 @@ def _unsafe_text(prefix: str) -> str:
         MARKDOWN_PAYLOAD,
         SCRIPT_PAYLOAD,
         JAVASCRIPT_PAYLOAD,
+        EVENT_HANDLER_PAYLOAD,
         CONTROL_PAYLOAD,
+        ZH_TW_PAYLOAD,
     ])
 
 
@@ -104,6 +109,7 @@ class TestRenderingSafety(unittest.TestCase):
         self.assertNotIn("<script", lowered)
         self.assertNotIn("</script", lowered)
         self.assertNotIn("javascript:", lowered)
+        self.assertNotIn("onerror", lowered)
         self.assertNotIn("\x00", output)
         self.assertNotIn("\x08", output)
 
@@ -145,6 +151,24 @@ class TestRenderingSafety(unittest.TestCase):
         self.assert_payloads_neutralized(output)
         self.assertIn("- markdown bullet survives", output)
         self.assertIn("[good link](https://example.com/news)", output)
+
+    def test_sanitizer_neutralizes_event_handler_payloads(self) -> None:
+        output = sanitize_narrative_text(EVENT_HANDLER_PAYLOAD)
+
+        self.assertNotIn("onerror", output.lower())
+        self.assertIn("<img", output.lower())
+
+    def test_markdown_to_html_document_neutralizes_active_content(self) -> None:
+        output = markdown_to_html_document(_unsafe_text("Browser-facing HTML"))
+
+        self.assert_payloads_neutralized(output)
+
+    def test_markdown_to_html_document_preserves_normal_markdown_and_zh_tw(self) -> None:
+        output = markdown_to_html_document(MARKDOWN_PAYLOAD + "\n" + ZH_TW_PAYLOAD)
+
+        self.assertIn("<li>markdown bullet survives", output)
+        self.assertIn('<a href="https://example.com/news">good link</a>', output)
+        self.assertIn(ZH_TW_PAYLOAD, output)
 
 
 if __name__ == "__main__":
