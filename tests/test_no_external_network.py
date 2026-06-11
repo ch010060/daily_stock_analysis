@@ -15,6 +15,7 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from data_provider.taiwan_finmind_fetcher import TaiwanFinMindFetcher
+from src.search_service import SearchService
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "market" / "tw"
 
@@ -50,6 +51,15 @@ class TestNoExternalNetwork(unittest.TestCase):
             df = fetcher._fetch_raw_data("2330", "2025-01-01", "2025-03-31")
         mock_socket.assert_not_called()
         self.assertFalse(df.empty)
+
+    @patch("src.search_service.requests.get", side_effect=AssertionError("searx.space must not be called"))
+    def test_searxng_public_discovery_disabled_in_no_network_mode(self, mock_get):
+        """DSA_ALLOW_EXTERNAL_NETWORK=false prevents SearXNG public discovery provider creation."""
+        env = {"DSA_FIXTURE_MODE": "false", "DSA_ALLOW_EXTERNAL_NETWORK": "false"}
+        with patch.dict(os.environ, env):
+            service = SearchService(searxng_public_instances_enabled=True)
+        mock_get.assert_not_called()
+        self.assertFalse(any(provider.name == "SearXNG" for provider in service._providers))
 
 
 if __name__ == "__main__":

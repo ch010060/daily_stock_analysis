@@ -23,6 +23,16 @@ class TestSearXNGSearchProvider(unittest.TestCase):
 
     def setUp(self) -> None:
         SearXNGSearchProvider.reset_public_instance_cache()
+        self._env_patch = patch.dict(
+            "os.environ",
+            {
+                "DSA_FIXTURE_MODE": "false",
+                "DSA_ALLOW_EXTERNAL_NETWORK": "true",
+            },
+            clear=False,
+        )
+        self._env_patch.start()
+        self.addCleanup(self._env_patch.stop)
         # Clear penalized-instance state if the provider implements it.
         if hasattr(SearXNGSearchProvider, "_penalized_instances"):
             SearXNGSearchProvider._penalized_instances.clear()
@@ -89,7 +99,7 @@ class TestSearXNGSearchProvider(unittest.TestCase):
             }
         )
 
-        provider = self._create_provider(["https://searx.example.org"])
+        provider = self._create_provider(["http://127.0.0.1:6666"])
         resp = provider.search("AAPL stock", max_results=5, days=7)
 
         self.assertTrue(resp.success)
@@ -117,7 +127,7 @@ class TestSearXNGSearchProvider(unittest.TestCase):
             }
         )
 
-        provider = self._create_provider(["https://searx.example.org"])
+        provider = self._create_provider(["http://127.0.0.1:6666"])
         resp = provider.search("query", max_results=5)
 
         self.assertTrue(resp.success)
@@ -131,7 +141,7 @@ class TestSearXNGSearchProvider(unittest.TestCase):
             headers={"content-type": "text/plain"},
         )
 
-        provider = self._create_provider(["https://searx.example.org"])
+        provider = self._create_provider(["http://127.0.0.1:6666"])
         resp = provider.search("query", max_results=5)
 
         self.assertFalse(resp.success)
@@ -141,7 +151,7 @@ class TestSearXNGSearchProvider(unittest.TestCase):
     def test_self_hosted_empty_results_success(self, mock_get):
         mock_get.return_value = self._response(json_payload={"results": []})
 
-        provider = self._create_provider(["https://searx.example.org"])
+        provider = self._create_provider(["http://127.0.0.1:6666"])
         resp = provider.search("query", max_results=5)
 
         self.assertTrue(resp.success)
@@ -158,7 +168,7 @@ class TestSearXNGSearchProvider(unittest.TestCase):
             }
         )
 
-        provider = self._create_provider(["https://searx.example.org"])
+        provider = self._create_provider(["http://127.0.0.1:6666"])
         resp = provider.search("query", max_results=1)
 
         self.assertTrue(resp.success)
@@ -168,7 +178,7 @@ class TestSearXNGSearchProvider(unittest.TestCase):
     @patch("src.search_service._get_with_retry")
     def test_time_range_mapping(self, mock_get):
         mock_get.return_value = self._response(json_payload={"results": []})
-        provider = self._create_provider(["https://searx.example.org"])
+        provider = self._create_provider(["http://127.0.0.1:6666"])
 
         cases = [
             (1, "day"),
@@ -185,7 +195,7 @@ class TestSearXNGSearchProvider(unittest.TestCase):
     def test_non_json_response_returns_failure(self, mock_get):
         mock_get.return_value = self._response(json_side_effect=ValueError("No JSON"))
 
-        provider = self._create_provider(["https://searx.example.org"])
+        provider = self._create_provider(["http://127.0.0.1:6666"])
         resp = provider.search("query", max_results=5)
 
         self.assertFalse(resp.success)
@@ -195,7 +205,7 @@ class TestSearXNGSearchProvider(unittest.TestCase):
     def test_json_returns_non_dict_returns_failure(self, mock_get):
         mock_get.return_value = self._response(json_payload=[{"results": []}])
 
-        provider = self._create_provider(["https://searx.example.org"])
+        provider = self._create_provider(["http://127.0.0.1:6666"])
         resp = provider.search("query", max_results=5)
 
         self.assertFalse(resp.success)
@@ -211,23 +221,23 @@ class TestSearXNGSearchProvider(unittest.TestCase):
         ]
 
         provider = self._create_provider(
-            ["https://searx-a.example.org", "https://searx-b.example.org"]
+            ["http://127.0.0.1:6661", "http://127.0.0.1:6662"]
         )
         resp = provider.search("query", max_results=5)
 
         self.assertTrue(resp.success)
         self.assertEqual(mock_get.call_count, 2)
-        self.assertIn("https://searx-a.example.org/search", mock_get.call_args_list[0][0][0])
-        self.assertIn("https://searx-b.example.org/search", mock_get.call_args_list[1][0][0])
+        self.assertIn("http://127.0.0.1:6661/search", mock_get.call_args_list[0][0][0])
+        self.assertIn("http://127.0.0.1:6662/search", mock_get.call_args_list[1][0][0])
 
     @patch("src.search_service._get_with_retry")
     def test_self_hosted_rotation_advances_start_instance(self, mock_get):
         mock_get.return_value = self._response(json_payload={"results": []})
         provider = self._create_provider(
             [
-                "https://searx-a.example.org",
-                "https://searx-b.example.org",
-                "https://searx-c.example.org",
+                "http://127.0.0.1:6661",
+                "http://127.0.0.1:6662",
+                "http://127.0.0.1:6663",
             ]
         )
 
@@ -235,8 +245,8 @@ class TestSearXNGSearchProvider(unittest.TestCase):
         provider.search("second", max_results=5)
 
         self.assertEqual(mock_get.call_count, 2)
-        self.assertIn("https://searx-a.example.org/search", mock_get.call_args_list[0][0][0])
-        self.assertIn("https://searx-b.example.org/search", mock_get.call_args_list[1][0][0])
+        self.assertIn("http://127.0.0.1:6661/search", mock_get.call_args_list[0][0][0])
+        self.assertIn("http://127.0.0.1:6662/search", mock_get.call_args_list[1][0][0])
 
     def test_public_instance_extraction_filters_and_sorts(self):
         payload = {
@@ -429,17 +439,48 @@ class TestSearXNGSearchProvider(unittest.TestCase):
     def test_self_hosted_mode_does_not_fetch_public_instances(self, mock_get, mock_public_instances):
         mock_get.return_value = self._response(json_payload={"results": []})
 
-        provider = self._create_provider(["https://searx.example.org"], use_public_instances=True)
+        provider = self._create_provider(["http://127.0.0.1:6666"], use_public_instances=True)
         resp = provider.search("query", max_results=5)
 
         self.assertTrue(resp.success)
         mock_public_instances.assert_not_called()
 
-    def test_search_service_adds_public_searxng_provider_when_enabled(self):
+    def test_search_service_does_not_add_public_searxng_provider_by_default(self):
+        service = SearchService()
+
+        self.assertFalse(any(provider.name == "SearXNG" for provider in service._providers))
+
+    def test_search_service_adds_public_searxng_provider_when_explicitly_enabled(self):
         service = SearchService(searxng_public_instances_enabled=True)
 
         self.assertTrue(service.is_available)
         self.assertTrue(any(provider.name == "SearXNG" for provider in service._providers))
+
+    def test_search_service_ignores_public_searxng_when_fixture_mode(self):
+        with patch.dict("os.environ", {"DSA_FIXTURE_MODE": "true"}, clear=False):
+            service = SearchService(searxng_public_instances_enabled=True)
+
+        self.assertFalse(any(provider.name == "SearXNG" for provider in service._providers))
+
+    def test_search_service_ignores_public_searxng_when_network_disabled(self):
+        with patch.dict(
+            "os.environ",
+            {"DSA_FIXTURE_MODE": "false", "DSA_ALLOW_EXTERNAL_NETWORK": "false"},
+            clear=False,
+        ):
+            service = SearchService(searxng_public_instances_enabled=True)
+
+        self.assertFalse(any(provider.name == "SearXNG" for provider in service._providers))
+
+    def test_search_service_accepts_local_self_hosted_searxng(self):
+        service = SearchService(searxng_base_urls=["http://127.0.0.1:6666"])
+
+        self.assertTrue(any(provider.name == "SearXNG" for provider in service._providers))
+
+    def test_search_service_ignores_non_local_self_hosted_searxng(self):
+        service = SearchService(searxng_base_urls=["https://searx.public.example"])
+
+        self.assertFalse(any(provider.name == "SearXNG" for provider in service._providers))
 
 
 if __name__ == "__main__":

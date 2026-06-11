@@ -12,6 +12,7 @@ A股自选股智能分析系统 - 搜索服务模块
 """
 
 import logging
+import os
 import re
 import threading
 import time
@@ -1722,9 +1723,8 @@ class SearXNGSearchProvider(BaseSearchProvider):
     """
     SearXNG search engine (self-hosted, no quota).
 
-    Self-hosted instances are used when explicitly configured.
-    Otherwise, the provider can lazily discover public instances from
-    searx.space and rotate across them with per-request failover.
+    Self-hosted instances are used when explicitly configured. Public discovery
+    is disabled by default and must be explicitly enabled by callers.
     """
 
     PUBLIC_INSTANCES_URL = "https://searx.space/data/instances.json"
@@ -1740,7 +1740,11 @@ class SearXNGSearchProvider(BaseSearchProvider):
     _public_instances_lock = threading.Lock()
 
     def __init__(self, base_urls: Optional[List[str]] = None, *, use_public_instances: bool = False):
-        normalized_base_urls = [url.rstrip("/") for url in (base_urls or []) if url.strip()]
+        normalized_base_urls = [
+            url.rstrip("/")
+            for url in (base_urls or [])
+            if url.strip() and self._is_local_base_url(url)
+        ]
         super().__init__(normalized_base_urls, "SearXNG")
         self._base_urls = normalized_base_urls
         self._use_public_instances = bool(use_public_instances and not self._base_urls)
@@ -1750,6 +1754,12 @@ class SearXNGSearchProvider(BaseSearchProvider):
     @property
     def is_available(self) -> bool:
         return bool(self._base_urls) or self._use_public_instances
+
+    @staticmethod
+    def _is_local_base_url(url: str) -> bool:
+        parsed = urlparse((url or "").strip())
+        host = (parsed.hostname or "").strip().lower()
+        return parsed.scheme in {"http", "https"} and host in {"127.0.0.1", "localhost", "::1"}
 
     @classmethod
     def reset_public_instance_cache(cls) -> None:
@@ -2193,7 +2203,7 @@ class SearchService:
         serpapi_keys: Optional[List[str]] = None,
         minimax_keys: Optional[List[str]] = None,
         searxng_base_urls: Optional[List[str]] = None,
-        searxng_public_instances_enabled: bool = True,
+        searxng_public_instances_enabled: bool = False,
         news_max_age_days: int = 3,
         news_strategy_profile: str = "short",
     ):
@@ -2208,7 +2218,7 @@ class SearchService:
             serpapi_keys: SerpAPI Key 列表
             minimax_keys: MiniMax API Key 列表
             searxng_base_urls: SearXNG 实例地址列表（自建无配额兜底）
-            searxng_public_instances_enabled: 未配置自建实例时，是否自动使用公共 SearXNG 实例
+            searxng_public_instances_enabled: 未配置自建实例时，是否自动使用公共 SearXNG 实例（默认关闭）
             news_max_age_days: 新闻最大时效（天）
             news_strategy_profile: 新闻窗口策略档位（ultra_short/short/medium/long）
         """
@@ -2256,15 +2266,29 @@ class SearchService:
             self._providers.append(MiniMaxSearchProvider(minimax_keys))
             logger.info(f"已配置 MiniMax 搜索，共 {len(minimax_keys)} 个 API Key")
 
-        # 6. SearXNG（自建实例优先；未配置时可自动发现公共实例）
+        fixture_mode = os.getenv("DSA_FIXTURE_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
+        external_network_disabled = os.getenv("DSA_ALLOW_EXTERNAL_NETWORK", "true").strip().lower() in {
+            "0",
+            "false",
+            "no",
+            "off",
+        }
+        allow_public_searxng = bool(
+            searxng_public_instances_enabled
+            and not searxng_base_urls
+            and not fixture_mode
+            and not external_network_disabled
+        )
+
+        # 6. SearXNG（本机自建实例优先；公共发现必须显式启用且不在 fixture/no-network 模式）
         searxng_provider = SearXNGSearchProvider(
             searxng_base_urls,
-            use_public_instances=bool(searxng_public_instances_enabled and not searxng_base_urls),
+            use_public_instances=allow_public_searxng,
         )
         if searxng_provider.is_available:
             self._providers.append(searxng_provider)
-            if searxng_base_urls:
-                logger.info("已配置 SearXNG 搜索，共 %s 个自建实例", len(searxng_base_urls))
+            if searxng_provider._base_urls:
+                logger.info("已配置 SearXNG 搜索，共 %s 个本机自建实例", len(searxng_provider._base_urls))
             else:
                 logger.info("已启用 SearXNG 公共实例自动发现模式")
 

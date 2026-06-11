@@ -842,7 +842,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "SEARXNG_BASE_URLS": {
         "title": "SearXNG Base URLs",
-        "description": "Comma-separated SearXNG instance URLs (self-hosted, no quota). Enable format: json in settings.yml.",
+        "description": "Comma-separated local SearXNG instance URLs (self-hosted, no quota). Server-safe mode accepts localhost / loopback URLs only.",
         "category": "data_source",
         "data_type": "string",
         "ui_control": "text",
@@ -860,7 +860,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "display_order": 52,
         "help_key": "settings.data_source.SEARXNG_BASE_URLS",
         "examples": [
-            "SEARXNG_BASE_URLS=https://search.example.com",
+            "SEARXNG_BASE_URLS=http://127.0.0.1:6666",
             "SEARXNG_PUBLIC_INSTANCES_ENABLED=false",
         ],
         "docs": [
@@ -873,14 +873,14 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "SEARXNG_PUBLIC_INSTANCES_ENABLED": {
         "title": "SearXNG Public Instances",
-        "description": "Auto-discover public SearXNG instances from searx.space when SEARXNG_BASE_URLS is empty. Default: true; set false to disable.",
+        "description": "Auto-discover public SearXNG instances from searx.space when SEARXNG_BASE_URLS is empty. Default: false; disabled in fixture/no-network modes.",
         "category": "data_source",
         "data_type": "boolean",
         "ui_control": "switch",
         "is_sensitive": False,
         "is_required": False,
         "is_editable": True,
-        "default_value": "true",
+        "default_value": "false",
         "options": [],
         "validation": {},
         "display_order": 53,
@@ -4109,11 +4109,11 @@ _FIELD_HELP_METADATA: Dict[str, Dict[str, Any]] = {
     "SEARXNG_PUBLIC_INSTANCES_ENABLED": {
         "help_key": "settings.data_source.SEARXNG_BASE_URLS",
         "examples": [
-            "SEARXNG_PUBLIC_INSTANCES_ENABLED=true",
             "SEARXNG_PUBLIC_INSTANCES_ENABLED=false",
+            "SEARXNG_PUBLIC_INSTANCES_ENABLED=true",
         ],
         "docs": _DOC_FULL_GUIDE_SEARCH,
-        "warning_codes": ["public_instance_stability"],
+        "warning_codes": ["public_instance_stability", "disabled_by_default"],
     },
     "BIAS_THRESHOLD": {
         "help_key": "settings.data_source.BIAS_THRESHOLD",
