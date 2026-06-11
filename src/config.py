@@ -633,6 +633,7 @@ class Config:
     stock_index_remote_update_enabled: bool = True
 
     # === AlphaSift optional stock screening integration ===
+    alphasift_route_enabled: bool = False
     alphasift_enabled: bool = False
     alphasift_install_spec: str = DEFAULT_ALPHASIFT_INSTALL_SPEC
 
@@ -1794,6 +1795,7 @@ class Config:
                 minimum=1,
             ),
             portfolio_fx_update_enabled=os.getenv('PORTFOLIO_FX_UPDATE_ENABLED', 'true').lower() == 'true',
+            alphasift_route_enabled=parse_env_bool(os.getenv('ALPHASIFT_ROUTE_ENABLED'), default=False),
             alphasift_enabled=parse_env_bool(os.getenv('ALPHASIFT_ENABLED'), default=False),
             alphasift_install_spec=(
                 DEFAULT_ALPHASIFT_INSTALL_SPEC

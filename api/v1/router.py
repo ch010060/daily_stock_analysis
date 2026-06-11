@@ -9,9 +9,33 @@ API v1 路由聚合
 2. 统一添加 /api/v1 前缀
 """
 
+import os
+from importlib import import_module
+
 from fastapi import APIRouter
 
-from api.v1.endpoints import alerts, analysis, auth, history, stocks, backtest, system_config, agent, usage, portfolio, alphasift, health
+alerts = import_module("api.v1.endpoints.alerts")
+analysis = import_module("api.v1.endpoints.analysis")
+auth = import_module("api.v1.endpoints.auth")
+history = import_module("api.v1.endpoints.history")
+stocks = import_module("api.v1.endpoints.stocks")
+backtest = import_module("api.v1.endpoints.backtest")
+system_config = import_module("api.v1.endpoints.system_config")
+agent = import_module("api.v1.endpoints.agent")
+usage = import_module("api.v1.endpoints.usage")
+portfolio = import_module("api.v1.endpoints.portfolio")
+health = import_module("api.v1.endpoints.health")
+
+
+def _env_bool(name: str, *, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _alphasift_route_enabled() -> bool:
+    return _env_bool("ALPHASIFT_ROUTE_ENABLED", default=False)
 
 # 创建 v1 版本主路由
 router = APIRouter(prefix="/api/v1")
@@ -76,11 +100,13 @@ router.include_router(
     tags=["Alerts"]
 )
 
-router.include_router(
-    alphasift.router,
-    prefix="/alphasift",
-    tags=["AlphaSift"]
-)
+if _alphasift_route_enabled():
+    alphasift = import_module("api.v1.endpoints.alphasift")
+    router.include_router(
+        alphasift.router,
+        prefix="/alphasift",
+        tags=["AlphaSift"]
+    )
 
 router.include_router(
     health.router,

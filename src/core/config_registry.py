@@ -505,6 +505,31 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             },
         ],
     },
+    "ALPHASIFT_ROUTE_ENABLED": {
+        "title": "AlphaSift API Route",
+        "description": "Register the optional AlphaSift API routes. Disabled by default for server/API safety.",
+        "category": "data_source",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 18,
+        "help_key": "settings.data_source.ALPHASIFT_ROUTE_ENABLED",
+        "examples": [
+            "ALPHASIFT_ROUTE_ENABLED=false",
+            "ALPHASIFT_ROUTE_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "AlphaSift 集成说明",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/alphasift-integration.md",
+            },
+        ],
+    },
     "ALPHASIFT_INSTALL_SPEC": {
         "title": "AlphaSift Install Spec",
         "description": "Pinned AlphaSift pip install spec used by source deployments and desktop packaging.",
@@ -517,7 +542,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": DEFAULT_ALPHASIFT_INSTALL_SPEC,
         "options": [],
         "validation": {},
-        "display_order": 18,
+        "display_order": 19,
         "help_key": "settings.data_source.ALPHASIFT_INSTALL_SPEC",
         "examples": [
             f"ALPHASIFT_INSTALL_SPEC={DEFAULT_ALPHASIFT_INSTALL_SPEC}",
