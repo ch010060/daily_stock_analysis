@@ -54,6 +54,30 @@ class TestSymbolNormalization(unittest.TestCase):
         with self.assertRaises(SymbolNormalizationError):
             normalize_symbol("2330")
 
+    def test_tw_4digit_etf_symbol(self):
+        result = normalize_symbol("TW:0050")
+        self.assertEqual(result.market, "TW")
+        self.assertEqual(result.canonical, "TW:0050")
+        self.assertEqual(result.provider_symbol, "0050")
+
+    def test_tw_5digit_etf_symbol(self):
+        result = normalize_symbol("TW:00878")
+        self.assertEqual(result.market, "TW")
+        self.assertEqual(result.canonical, "TW:00878")
+        self.assertEqual(result.provider_symbol, "00878")
+
+    def test_tw_6digit_etf_symbol(self):
+        result = normalize_symbol("TW:006208")
+        self.assertEqual(result.market, "TW")
+        self.assertEqual(result.canonical, "TW:006208")
+        self.assertEqual(result.provider_symbol, "006208")
+
+    def test_tw_etf_with_uppercase_suffix(self):
+        result = normalize_symbol("TW:00981A")
+        self.assertEqual(result.market, "TW")
+        self.assertEqual(result.canonical, "TW:00981A")
+        self.assertEqual(result.provider_symbol, "00981A")
+
     def test_existing_a_h_code_path_helpers_are_unchanged(self):
         self.assertEqual(normalize_stock_code("SH600519"), "600519")
         self.assertEqual(normalize_stock_code("SZ000001"), "000001")

@@ -249,6 +249,26 @@ class TestLoadLlmFixture(unittest.TestCase):
         self.assertTrue(os.path.exists(expected_file),
                         f"Expected fixture file missing: {expected_file}")
 
+    def test_path_traversal_attempt_is_sanitized_not_escaped(self):
+        """Code with '..' is sanitized by regex; path stays inside fixture_dir."""
+        result = self.pipeline._load_llm_fixture("TW:../../etc/passwd")
+        self.assertFalse(result.success)
+        # Regex converts all non-alnum chars to '_' so '..' and '/' cannot escape;
+        # sanitized filename doesn't exist → fixture_not_found (not a crash)
+        self.assertIn("fixture_not_found", result.error_message)
+
+    def test_dot_dot_input_sanitized_to_fixture_not_found(self):
+        """Bare '../sneaky' is sanitized; no files outside fixture_dir are accessed."""
+        result = self.pipeline._load_llm_fixture("../sneaky")
+        self.assertFalse(result.success)
+        self.assertIn("fixture_not_found", result.error_message)
+
+    def test_valid_symbol_loads_after_path_guard_applied(self):
+        """Path guard must not break normal TW:2330 fixture load."""
+        result = self.pipeline._load_llm_fixture("TW:2330")
+        self.assertTrue(result.success)
+        self.assertEqual(result.code, "TW:2330")
+
 
 # ---------------------------------------------------------------------------
 # A/H regression — original flow unchanged

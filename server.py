@@ -10,12 +10,15 @@ Daily Stock Analysis - FastAPI 后端服务入口
 3. 健康检查接口
 4. 托管前端静态文件（生产模式）
 
-启动方式：
-    uvicorn server:app --reload --host 127.0.0.1 --port 8000
-    
+启动方式（本地安全模式，支持的入口）：
+    python server.py                 # 直接运行，触发安全检查后启动 uvicorn
+
     或使用 main.py:
     python main.py --serve-only      # 仅启动 API 服务
     python main.py --serve           # API 服务 + 执行分析
+
+注意：`uvicorn server:app` 直接启动会跳过 validate_server_startup_safety()
+安全检查，不属于本地安全模式的支持启动路径。
 """
 
 import logging

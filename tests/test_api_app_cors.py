@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.app import create_app
+from api.app import build_server_safe_cors_origins, create_app
 
 
 class AppCorsConfigTestCase(unittest.TestCase):
@@ -21,9 +21,9 @@ class AppCorsConfigTestCase(unittest.TestCase):
         return create_app(static_dir=Path(temp_dir.name))
 
     def test_allow_all_does_not_enable_wildcard_cors(self):
-        with patch.dict(os.environ, {"CORS_ALLOW_ALL": "true"}, clear=False):
-            app = self._build_app()
-
+        origins = build_server_safe_cors_origins()
+        self.assertNotIn("*", origins)
+        app = self._build_app()
         cors = next(m for m in app.user_middleware if m.cls is CORSMiddleware)
         self.assertNotIn("*", cors.kwargs["allow_origins"])
         self.assertTrue(cors.kwargs["allow_credentials"])

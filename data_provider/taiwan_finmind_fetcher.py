@@ -36,7 +36,10 @@ class TaiwanFinMindFetcher(BaseFetcher):
     """Fixture-first Taiwan daily bars provider following BaseFetcher."""
 
     name = "TaiwanFinMindFetcher"
-    priority = int(os.getenv("TAIWAN_FINMIND_PRIORITY", "99"))
+    try:
+        priority = int(os.getenv("TAIWAN_FINMIND_PRIORITY") or "99")
+    except (ValueError, TypeError):
+        priority = 99
 
     def __init__(
         self,

@@ -2267,11 +2267,24 @@ class StockAnalysisPipeline:
         """
         import json
         import os
-        safe_name = code.replace(":", "_").replace("/", "_")
-        fixture_path = os.path.join(
+        import re as _re
+        safe_name = _re.sub(r"[^A-Za-z0-9_\-]", "_", code)
+        fixture_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-            "tests", "fixtures", "llm", f"{safe_name}.json",
+            "tests", "fixtures", "llm",
         )
+        fixture_path = os.path.join(fixture_dir, f"{safe_name}.json")
+        if not os.path.abspath(fixture_path).startswith(os.path.abspath(fixture_dir) + os.sep):
+            logger.warning(f"[{code}] LLM fixture path rejected: {fixture_path}")
+            return AnalysisResult(
+                code=code,
+                name=code,
+                sentiment_score=50,
+                trend_prediction="震荡",
+                operation_advice="观望",
+                success=False,
+                error_message=f"fixture_path_rejected: {safe_name}.json",
+            )
         if not os.path.exists(fixture_path):
             logger.warning(f"[{code}] LLM fixture not found: {fixture_path}")
             return AnalysisResult(

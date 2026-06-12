@@ -14,17 +14,17 @@ from importlib import import_module
 
 from fastapi import APIRouter
 
-alerts = import_module("api.v1.endpoints.alerts")
-analysis = import_module("api.v1.endpoints.analysis")
-auth = import_module("api.v1.endpoints.auth")
-history = import_module("api.v1.endpoints.history")
-stocks = import_module("api.v1.endpoints.stocks")
-backtest = import_module("api.v1.endpoints.backtest")
-system_config = import_module("api.v1.endpoints.system_config")
-agent = import_module("api.v1.endpoints.agent")
-usage = import_module("api.v1.endpoints.usage")
-portfolio = import_module("api.v1.endpoints.portfolio")
-health = import_module("api.v1.endpoints.health")
+from api.v1.endpoints import alerts
+from api.v1.endpoints import analysis
+from api.v1.endpoints import auth
+from api.v1.endpoints import history
+from api.v1.endpoints import stocks
+from api.v1.endpoints import backtest
+from api.v1.endpoints import system_config
+from api.v1.endpoints import agent
+from api.v1.endpoints import usage
+from api.v1.endpoints import portfolio
+from api.v1.endpoints import health
 
 
 def _env_bool(name: str, *, default: bool = False) -> bool:

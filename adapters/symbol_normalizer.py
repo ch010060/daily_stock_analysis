@@ -17,7 +17,7 @@ class NormalizedSymbol:
     provider_symbol: str
 
 
-_TW_CODE_RE = re.compile(r"^\d{4}$")
+_TW_CODE_RE = re.compile(r"^\d{4,6}[A-Z]?$")
 _US_SYMBOL_RE = re.compile(r"^[A-Z]{1,5}$")
 
 
