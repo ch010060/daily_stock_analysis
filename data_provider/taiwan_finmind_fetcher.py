@@ -10,6 +10,7 @@ import importlib.metadata
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -67,7 +68,7 @@ class TaiwanFinMindFetcher(BaseFetcher):
             code = code[3:]
         if code.endswith(".TW"):
             code = code[:-3]
-        if not (code.isdigit() and len(code) == 4):
+        if not re.match(r"^\d{4,6}[A-Z]?$", code):
             raise DataFetchError(f"[TaiwanFinMind] unsupported Taiwan stock code: {stock_code}")
         return code
 

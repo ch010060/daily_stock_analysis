@@ -126,6 +126,35 @@ class TestFinMindGuards(unittest.TestCase):
         self.assertFalse(df.empty)
 
 
+class TestFinMindFetcherCodeValidation(unittest.TestCase):
+    """Guard: _canonical_stock_code must accept 4-6 digit TW codes including ETFs."""
+
+    def test_4digit_stock_accepted(self):
+        self.assertEqual(TaiwanFinMindFetcher._canonical_stock_code("TW:2330"), "2330")
+
+    def test_4digit_etf_accepted(self):
+        self.assertEqual(TaiwanFinMindFetcher._canonical_stock_code("TW:0050"), "0050")
+
+    def test_5digit_etf_accepted(self):
+        self.assertEqual(TaiwanFinMindFetcher._canonical_stock_code("TW:00878"), "00878")
+
+    def test_6digit_etf_accepted(self):
+        self.assertEqual(TaiwanFinMindFetcher._canonical_stock_code("TW:006208"), "006208")
+
+    def test_etf_with_suffix_accepted(self):
+        self.assertEqual(TaiwanFinMindFetcher._canonical_stock_code("TW:00981A"), "00981A")
+
+    def test_invalid_alpha_code_rejected(self):
+        from data_provider.base import DataFetchError
+        with self.assertRaises(DataFetchError):
+            TaiwanFinMindFetcher._canonical_stock_code("AAPL")
+
+    def test_3digit_rejected(self):
+        from data_provider.base import DataFetchError
+        with self.assertRaises(DataFetchError):
+            TaiwanFinMindFetcher._canonical_stock_code("123")
+
+
 class TestFinMindFetcherImportSafety(unittest.TestCase):
     """Guard: malformed env vars must not crash module import or provider construction."""
 

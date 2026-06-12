@@ -2267,7 +2267,7 @@ class SearchService:
             logger.info(f"已配置 MiniMax 搜索，共 {len(minimax_keys)} 个 API Key")
 
         fixture_mode = os.getenv("DSA_FIXTURE_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
-        external_network_disabled = os.getenv("DSA_ALLOW_EXTERNAL_NETWORK", "true").strip().lower() in {
+        external_network_disabled = os.getenv("DSA_ALLOW_EXTERNAL_NETWORK", "false").strip().lower() in {
             "0",
             "false",
             "no",
