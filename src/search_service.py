@@ -1740,11 +1740,18 @@ class SearXNGSearchProvider(BaseSearchProvider):
     _public_instances_lock = threading.Lock()
 
     def __init__(self, base_urls: Optional[List[str]] = None, *, use_public_instances: bool = False):
-        normalized_base_urls = [
-            url.rstrip("/")
-            for url in (base_urls or [])
-            if url.strip() and self._is_local_base_url(url)
-        ]
+        normalized_base_urls = []
+        for url in (base_urls or []):
+            if not url.strip():
+                continue
+            if self._is_local_base_url(url):
+                normalized_base_urls.append(url.rstrip("/"))
+            else:
+                logger.warning(
+                    "SearXNG base URL %r is not a loopback address and will be ignored; "
+                    "only localhost/127.0.0.1/::1 URLs are permitted in server-safe mode.",
+                    url.strip(),
+                )
         super().__init__(normalized_base_urls, "SearXNG")
         self._base_urls = normalized_base_urls
         self._use_public_instances = bool(use_public_instances and not self._base_urls)

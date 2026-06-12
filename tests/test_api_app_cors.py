@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for FastAPI app CORS configuration."""
 
+import logging
 import os
 import tempfile
 import unittest
@@ -47,6 +48,30 @@ class AppCorsConfigTestCase(unittest.TestCase):
         cors = next(m for m in app.user_middleware if m.cls is CORSMiddleware)
         self.assertNotIn("https://example.com", cors.kwargs["allow_origins"])
         self.assertIn("http://localhost:8080", cors.kwargs["allow_origins"])
+
+    def test_cors_allow_all_set_emits_deprecation_warning(self):
+        with self.assertLogs("api.app", level=logging.WARNING) as cm:
+            with patch.dict(os.environ, {"CORS_ALLOW_ALL": "true"}, clear=False):
+                build_server_safe_cors_origins()
+
+        self.assertTrue(any("CORS_ALLOW_ALL" in line for line in cm.output))
+
+    def test_cors_allow_all_false_still_emits_deprecation_warning(self):
+        with self.assertLogs("api.app", level=logging.WARNING) as cm:
+            with patch.dict(os.environ, {"CORS_ALLOW_ALL": "false"}, clear=False):
+                build_server_safe_cors_origins()
+
+        self.assertTrue(any("CORS_ALLOW_ALL" in line for line in cm.output))
+
+    def test_cors_allow_all_absent_emits_no_warning(self):
+        env = {k: v for k, v in os.environ.items() if k != "CORS_ALLOW_ALL"}
+        with patch.dict(os.environ, env, clear=True):
+            with self.assertLogs("api.app", level=logging.WARNING) as cm:
+                logger = logging.getLogger("api.app")
+                logger.warning("sentinel")
+                build_server_safe_cors_origins()
+
+        self.assertEqual(len([l for l in cm.output if "CORS_ALLOW_ALL" in l]), 0)
 
 
 if __name__ == "__main__":

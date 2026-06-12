@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Fail-closed tests for SearXNG public discovery and local-only configuration."""
 
+import logging
 import os
 import unittest
 from unittest.mock import patch
@@ -57,6 +58,21 @@ class SearXNGFailClosedTestCase(unittest.TestCase):
         provider = SearXNGSearchProvider(["https://searx.public.example"])
 
         self.assertFalse(provider.is_available)
+
+    def test_non_local_base_url_emits_warning(self) -> None:
+        with self.assertLogs("src.search_service", level=logging.WARNING) as cm:
+            SearXNGSearchProvider(["http://192.168.1.100:8888"])
+
+        self.assertTrue(any("192.168.1.100" in line for line in cm.output))
+
+    def test_local_base_url_emits_no_warning(self) -> None:
+        with self.assertLogs("src.search_service", level=logging.WARNING) as cm:
+            logger = logging.getLogger("src.search_service")
+            logger.warning("sentinel")
+            SearXNGSearchProvider(["http://127.0.0.1:6666"])
+
+        non_sentinel = [l for l in cm.output if "sentinel" not in l]
+        self.assertEqual(len(non_sentinel), 0)
 
 
 if __name__ == "__main__":

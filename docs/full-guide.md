@@ -1102,6 +1102,15 @@ PUSHOVER_API_TOKEN=your_api_token
 - 支持美股/港股数据
 - 美股历史数据与实时行情均统一使用 YFinance，以避免 akshare 美股复权异常导致的技术指标错误
 
+> **升级注意（Route B / Phase 5 破坏性变更）：** YFinance 美股实时数据现在默认 fail-closed。若未在 `.env` 中显式设置以下两项，有 fixture 的股票将静默使用离线 fixture 数据，无 fixture 的股票将直接 `DataFetchError`，这是预期行为：
+>
+> ```env
+> DSA_FIXTURE_MODE=false
+> DSA_ALLOW_EXTERNAL_NETWORK=true
+> ```
+>
+> 这是 Route B 离线优先安全边界的一部分，不是 bug。
+
 ### Longbridge（长桥）
 - 美股/港股数据兜底，补充 YFinance 缺失的量比、换手率、PE 等字段
 - 新接入推荐使用 Longbridge 官方 OAuth 2.0：client_id 优先使用 `LONGBRIDGE_OAUTH_CLIENT_ID`，留空且没有 Legacy Access Token 时兼容使用 `LONGBRIDGE_APP_KEY`；先在可交互环境执行 `python scripts/generate_longbridge_oauth_token.py --client-id <client_id>` 生成 SDK token 缓存

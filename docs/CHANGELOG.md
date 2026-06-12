@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] SearXNG 默认关闭公共实例发现，fixture/no-network 模式禁止访问 `searx.space`，仅保留显式本机自建实例配置。
 - [修复] 加固 server/WebUI 报告渲染路径，避免 LLM/report/dashboard 内容中的脚本、JavaScript URL 与事件处理器 payload 被浏览器执行。
 - [文档] 补充 server-safe 本机 WebUI/API profile，明确需关闭 stock-index 远程刷新、公共搜索发现、实时数据源与通知路径，并同步 SearXNG fail-closed 默认说明。
+- [文档] 重大变更：`--serve` / `--serve-only` 现在强制要求 `ADMIN_AUTH_ENABLED=true` 并已存储有效的 PBKDF2 管理员密码哈希方可启动；未配置认证的现有本地部署将以 `ServerSafetyError` 拒绝启动，需先通过 Web 设置流程或 `python -m src.auth reset_password` 完成初始化。
+- [文档] 重大变更：YFinance/美股实时行情现在默认 fail-closed；在 `.env` 未显式设置 `DSA_FIXTURE_MODE=false` 与 `DSA_ALLOW_EXTERNAL_NETWORK=true` 时，有 fixture 的股票静默使用离线 fixture 数据，无 fixture 的股票将以 `DataFetchError` 拒绝请求，这是 Route B 离线优先的刻意安全边界。
 
 ## [3.20.0] - 2026-06-03
 
