@@ -2156,6 +2156,10 @@ class DataFetcherManager:
             logger.debug(f"[筹码分布] 功能已禁用，跳过 {stock_code}")
             return None
 
+        if self._fixture_no_network_mode_enabled():
+            logger.debug(f"[筹码分布] fixture/no-network 模式已启用，跳过 {stock_code}")
+            return None
+
         circuit_breaker = get_chip_circuit_breaker()
 
         # 直接遍历管理器已经按 priority 排好序的数据源列表
@@ -2235,6 +2239,10 @@ class DataFetcherManager:
         if fixture_name:
             logger.info("[股票名称] fixture/no-network 使用本地代码标签: %s", fixture_name)
             return self._cache_stock_name(stock_code, fixture_name) or fixture_name
+
+        if self._fixture_no_network_mode_enabled():
+            logger.info("[股票名称] fixture/no-network 无本地名称，跳过远程数据源: %s", stock_code)
+            return ""
 
         controlled_tw_name = self._get_controlled_tw_live_stock_name(raw_stock_code)
         if controlled_tw_name:
@@ -2926,6 +2934,11 @@ class DataFetcherManager:
 
         stock_code = normalize_stock_code(stock_code)
         market = _market_tag(stock_code)
+        if self._fixture_no_network_mode_enabled():
+            return self._build_market_not_supported(
+                market=market,
+                reason="fixture/no-network mode",
+            )
         is_etf = _is_etf_code(stock_code)
         if market in {"us", "hk"}:
             return self._build_offshore_fundamental_context(

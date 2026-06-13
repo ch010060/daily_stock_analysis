@@ -2355,9 +2355,12 @@ class StockAnalysisPipeline:
         """
         news_context: Optional[str] = pre_built_context.get("news_context")  # type: ignore[assignment]
         news_context = cap_news_context(news_context)
+        analyzer_context = dict(pre_built_context)
+        if not analyzer_context.get("stock_name") and analyzer_context.get("name"):
+            analyzer_context["stock_name"] = analyzer_context["name"]
         try:
             result = self.analyzer.analyze(
-                pre_built_context,
+                analyzer_context,
                 news_context=news_context,
                 progress_callback=self._emit_progress,
             )

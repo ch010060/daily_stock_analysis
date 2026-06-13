@@ -47,6 +47,9 @@ class _PoisonLegacyFetcher(BaseFetcher):
     def get_stock_name(self, stock_code: str, allow_realtime: bool = True):
         raise AssertionError(f"{self.name} must not resolve names in fixture/no-network mode")
 
+    def get_chip_distribution(self, stock_code: str):
+        raise AssertionError(f"{self.name} must not fetch chips in fixture/no-network mode")
+
 
 class _RecordingDailyFetcher(BaseFetcher):
     def __init__(self, name: str, priority: int) -> None:
@@ -145,6 +148,48 @@ class TestFixtureNoNetworkRouting(unittest.TestCase):
         self.assertFalse(us_df.empty)
         self.assertLessEqual(str(tw_df["date"].max().date()), "2025-03-31")
         self.assertLessEqual(str(us_df["date"].max().date()), "2025-03-31")
+
+    @patch("src.config.get_config")
+    def test_no_network_chip_distribution_does_not_call_live_providers(self, mock_get_config):
+        mock_get_config.return_value = SimpleNamespace(enable_chip_distribution=True)
+        live_fetcher = _PoisonLegacyFetcher("AkshareFetcher", 1)
+
+        env = {"DSA_FIXTURE_MODE": "false", "DSA_ALLOW_EXTERNAL_NETWORK": "false"}
+        with patch.dict(os.environ, env):
+            manager = DataFetcherManager(fetchers=[live_fetcher])
+            chip = manager.get_chip_distribution("600519")
+
+        self.assertIsNone(chip)
+
+    def test_no_network_stock_name_miss_does_not_call_live_providers(self):
+        live_fetcher = _PoisonLegacyFetcher("AkshareFetcher", 1)
+
+        env = {"DSA_FIXTURE_MODE": "false", "DSA_ALLOW_EXTERNAL_NETWORK": "false"}
+        with patch.dict(os.environ, env), \
+             patch("data_provider.base.get_index_stock_name", return_value=None):
+            manager = DataFetcherManager(fetchers=[live_fetcher])
+            name = manager.get_stock_name("999999", allow_realtime=False)
+
+        self.assertEqual(name, "")
+
+    @patch("src.config.get_config")
+    def test_no_network_fundamentals_do_not_call_live_adapters(self, mock_get_config):
+        mock_get_config.return_value = SimpleNamespace(enable_fundamental_pipeline=True)
+
+        env = {"DSA_FIXTURE_MODE": "false", "DSA_ALLOW_EXTERNAL_NETWORK": "false"}
+        with patch.dict(os.environ, env):
+            manager = DataFetcherManager(fetchers=[])
+            manager._fundamental_adapter = MagicMock()
+            manager.get_realtime_quote = MagicMock(
+                side_effect=AssertionError("realtime quote must not be called")
+            )
+            context = manager.get_fundamental_context("600519")
+
+        self.assertEqual(context["status"], "not_supported")
+        self.assertEqual(context["market"], "cn")
+        self.assertIn("fixture/no-network mode", context["errors"])
+        manager._fundamental_adapter.get_fundamental_bundle.assert_not_called()
+        manager.get_realtime_quote.assert_not_called()
 
 
 if __name__ == "__main__":

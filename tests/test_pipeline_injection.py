@@ -352,6 +352,24 @@ class TestAnalyzeWithPrebuiltQueryId(unittest.TestCase):
         self.assertIsNotNone(returned)
         self.assertEqual(returned.query_id, "qid-with-time")
 
+    def test_snapshot_name_is_mapped_to_analyzer_stock_name(self):
+        snap = make_minimal_snapshot("TW:2330", "台積電")
+        fake_result = _make_analysis_result()
+        self.pipeline.analyzer.analyze.return_value = fake_result
+
+        from src.core.pipeline import ReportType
+        returned = self.pipeline._analyze_with_prebuilt(
+            "TW:2330",
+            snap,
+            ReportType.FULL,
+            query_id="qid-stock-name",
+        )
+
+        analyzed_context = self.pipeline.analyzer.analyze.call_args.args[0]
+        self.assertIsNotNone(returned)
+        self.assertEqual(analyzed_context["stock_name"], "台積電")
+        self.assertNotIn("stock_name", snap)
+
     def test_analyzer_exception_returns_failure_result(self):
         snap = make_minimal_snapshot("TW:2330")
         self.pipeline.analyzer.analyze.side_effect = RuntimeError("LLM timeout")
