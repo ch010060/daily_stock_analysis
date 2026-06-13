@@ -489,6 +489,16 @@ def run_full_analysis(
 
         # Issue #373: Trading day filter (per-stock, per-market)
         effective_codes = stock_codes if stock_codes is not None else config.stock_list
+
+        # Route B: reject non-TW/US symbols before trading-day filter
+        if getattr(config, 'route_b_enforce_market_scope', False):
+            from src.core.route_b_scope import RouteBScopeError, validate_route_b_watchlist
+            try:
+                effective_codes = validate_route_b_watchlist(effective_codes, config)
+            except RouteBScopeError as exc:
+                logger.error("Route B scope error: %s", exc)
+                return
+
         filtered_codes, effective_region, should_skip = _compute_trading_day_filter(
             config, args, effective_codes
         )
@@ -501,6 +511,16 @@ def run_full_analysis(
             skipped = set(effective_codes) - set(filtered_codes)
             logger.info("今日休市股票已跳过: %s", skipped)
         stock_codes = filtered_codes
+
+        # Route B: enforce TW/US region gate for market review
+        if getattr(config, 'route_b_enforce_market_scope', False) and effective_region != '':
+            from src.core.market_review_scope_gate import get_effective_regions_for_route_b
+            run_regions, skipped_cn, deferred_tw = get_effective_regions_for_route_b(config)
+            if skipped_cn:
+                logger.warning("Route B: blocking CN market review: %s", skipped_cn)
+            if deferred_tw:
+                logger.warning("Route B: deferring TW market review (not yet implemented): %s", deferred_tw)
+            effective_region = ','.join(run_regions) if run_regions else ''
 
         # 命令行参数 --single-notify 覆盖配置（#55）
         if getattr(args, 'single_notify', False):
