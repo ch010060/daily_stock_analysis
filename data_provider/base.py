@@ -772,7 +772,12 @@ class DataFetcherManager:
             from adapters.symbol_normalizer import normalize_symbol
 
             return normalize_symbol(stock_code)
-        except Exception:
+        except Exception as exc:
+            logger.debug(
+                "_normalize_explicit_fixture_symbol(%r) failed: %s — fixture routing skipped",
+                stock_code,
+                exc,
+            )
             return None
 
     @staticmethod

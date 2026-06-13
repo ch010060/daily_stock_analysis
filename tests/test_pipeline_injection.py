@@ -308,5 +308,65 @@ class TestAHRegression(unittest.TestCase):
         self.pipeline.analyze_stock.assert_not_called()
 
 
+# ---------------------------------------------------------------------------
+# _analyze_with_prebuilt — query_id propagation
+# ---------------------------------------------------------------------------
+
+class TestAnalyzeWithPrebuiltQueryId(unittest.TestCase):
+
+    def setUp(self):
+        self.pipeline = _make_pipeline()
+
+    def test_query_id_propagated_to_result(self):
+        snap = make_minimal_snapshot("TW:2330")
+        fake_result = _make_analysis_result()
+        self.pipeline.analyzer.analyze.return_value = fake_result
+
+        from src.core.pipeline import ReportType
+        returned = self.pipeline._analyze_with_prebuilt(
+            "TW:2330",
+            snap,
+            ReportType.FULL,
+            query_id="test-qid-123",
+        )
+
+        self.assertIsNotNone(returned)
+        self.assertEqual(returned.query_id, "test-qid-123")
+
+    def test_query_id_propagated_when_current_time_provided(self):
+        from datetime import datetime
+        snap = make_minimal_snapshot("TW:2330")
+        fake_result = _make_analysis_result()
+        self.pipeline.analyzer.analyze.return_value = fake_result
+
+        from src.core.pipeline import ReportType
+        returned = self.pipeline._analyze_with_prebuilt(
+            "TW:2330",
+            snap,
+            ReportType.FULL,
+            query_id="qid-with-time",
+            current_time=datetime(2025, 6, 12, 10, 0, 0),
+        )
+
+        self.assertIsNotNone(returned)
+        self.assertEqual(returned.query_id, "qid-with-time")
+
+    def test_analyzer_exception_returns_failure_result(self):
+        snap = make_minimal_snapshot("TW:2330")
+        self.pipeline.analyzer.analyze.side_effect = RuntimeError("LLM timeout")
+
+        from src.core.pipeline import ReportType
+        returned = self.pipeline._analyze_with_prebuilt(
+            "TW:2330",
+            snap,
+            ReportType.FULL,
+            query_id="qid-error",
+        )
+
+        self.assertIsNotNone(returned)
+        self.assertFalse(returned.success)
+        self.assertIn("LLM timeout", returned.error_message)
+
+
 if __name__ == "__main__":
     unittest.main()

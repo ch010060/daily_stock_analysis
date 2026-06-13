@@ -86,12 +86,6 @@ logger = logging.getLogger(__name__)
 _SINGLE_STOCK_NOTIFY_LOCK_INIT_GUARD = threading.Lock()
 
 
-def _cap_news_context(
-    text: Optional[str],
-    max_chars: int = DEFAULT_NEWS_CONTEXT_MAX_TOTAL_CHARS,
-) -> Optional[str]:
-    return cap_news_context(text, max_chars=max_chars)
-
 
 class StockAnalysisPipeline:
     """
@@ -500,7 +494,7 @@ class StockAnalysisPipeline:
                 except Exception as e:
                     logger.warning(f"{stock_name}({code}) Social sentiment fetch failed: {e}")
 
-            news_context = _cap_news_context(news_context)
+            news_context = cap_news_context(news_context)
 
             # Step 5: 获取分析上下文（技术面数据）
             self._emit_progress(58, f"{stock_name}：正在整理分析上下文")
@@ -2344,13 +2338,15 @@ class StockAnalysisPipeline:
         dict (see adapters/snapshot_schema.py: SnapshotContext).
         """
         news_context: Optional[str] = pre_built_context.get("news_context")  # type: ignore[assignment]
-        news_context = _cap_news_context(news_context)
+        news_context = cap_news_context(news_context)
         try:
             result = self.analyzer.analyze(
                 pre_built_context,
                 news_context=news_context,
                 progress_callback=self._emit_progress,
             )
+            if result:
+                result.query_id = query_id
             return result
         except Exception as exc:
             logger.error(f"[{code}] prebuilt analysis failed: {exc}", exc_info=True)

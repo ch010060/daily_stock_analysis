@@ -593,7 +593,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 20,
-        "help_key": "settings.data_source.TUSHARE_TOKEN",
+        "help_key": "settings.data_source.FINMIND_API_TOKEN",
         "examples": [
             "FINMIND_API_TOKEN=",
         ],

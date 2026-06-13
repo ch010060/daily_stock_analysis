@@ -84,6 +84,42 @@ class TestSymbolNormalization(unittest.TestCase):
         self.assertEqual(normalize_stock_code("1810.HK"), "HK01810")
         self.assertEqual(normalize_stock_code("HK700"), "HK00700")
 
+    def test_us_multiclass_dot_suffix(self):
+        result = normalize_symbol("US:BRK.B")
+        self.assertEqual(result.market, "US")
+        self.assertEqual(result.canonical, "US:BRK.B")
+        self.assertEqual(result.provider_symbol, "BRK.B")
+
+    def test_us_multiclass_hyphen_suffix(self):
+        result = normalize_symbol("US:BRK-B")
+        self.assertEqual(result.market, "US")
+        self.assertEqual(result.canonical, "US:BRK-B")
+        self.assertEqual(result.provider_symbol, "BRK-B")
+
+    def test_us_bf_b_dot_suffix(self):
+        result = normalize_symbol("US:BF.B")
+        self.assertEqual(result.market, "US")
+        self.assertEqual(result.canonical, "US:BF.B")
+        self.assertEqual(result.provider_symbol, "BF.B")
+
+    def test_us_multiclass_bare_market_hint(self):
+        result = normalize_symbol("BRK.B", market="US")
+        self.assertEqual(result.market, "US")
+        self.assertEqual(result.canonical, "US:BRK.B")
+
+    def test_us_multiclass_too_long_suffix_rejected(self):
+        with self.assertRaises(SymbolNormalizationError):
+            normalize_symbol("US:BRK.BCX")
+
+    def test_us_lowercase_multiclass_normalizes_to_upper(self):
+        result = normalize_symbol("US:brk.b")
+        self.assertEqual(result.market, "US")
+        self.assertEqual(result.canonical, "US:BRK.B")
+
+    def test_tw_code_dot_suffix_not_confused_with_us(self):
+        result = normalize_symbol("2330.TW")
+        self.assertEqual(result.market, "TW")
+
 
 if __name__ == "__main__":
     unittest.main()

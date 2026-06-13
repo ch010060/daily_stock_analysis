@@ -197,6 +197,10 @@ class TaiwanFinMindFetcher(BaseFetcher):
         return out
 
     def _read_json_fixture(self, stock_code: str, filename: str) -> Dict[str, Any]:
+        # MVP: supplemental data (chips, fundamentals, company profile) is fixture-backed
+        # only; live FinMind supplemental APIs are deferred to a post-MVP phase.
+        # The four-guard network chain (DSA_FIXTURE_MODE / DSA_ALLOW_EXTERNAL_NETWORK /
+        # FINMIND_ENABLED / FINMIND_API_TOKEN) currently applies to daily bars only.
         fixture_path = self._fixture_dir(stock_code) / filename
         if not fixture_path.exists():
             raise DataFetchError(f"[TaiwanFinMind] fixture not found: {filename}")
