@@ -367,6 +367,7 @@ class TestAnalyzeWithPrebuiltQueryId(unittest.TestCase):
         self.assertIsNotNone(returned)
         self.assertFalse(returned.success)
         self.assertIn("LLM timeout", returned.error_message)
+        self.assertEqual(returned.query_id, "qid-error")
 
 
 if __name__ == "__main__":

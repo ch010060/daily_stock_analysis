@@ -970,6 +970,31 @@ System defaults to AkShare (free), also supports other data sources:
 - Supports US/HK stock data
 - US stock historical and real-time data both use YFinance exclusively to avoid technical indicator errors from akshare's US stock adjustment issues
 
+> **Upgrade note (Route B / Phase 5 breaking change):** YFinance US real-time data is now fail-closed by default. Without both of the following set explicitly in `.env`, stocks with a fixture silently use offline fixture data, and stocks without a fixture raise `DataFetchError`. This is intentional behavior:
+>
+> ```env
+> DSA_FIXTURE_MODE=false
+> DSA_ALLOW_EXTERNAL_NETWORK=true
+> ```
+>
+> This is part of the Route B offline-first safety boundary, not a bug.
+
+### Taiwan FinMind (Taiwan offline + live data source)
+- Requires Python 3.11; see [FinMind Live Smoke Environment](#finmind-live-smoke-environment) for setup
+- Defaults to offline fixture only; to enable live Taiwan data set all three:
+  - `FINMIND_ENABLED=true`
+  - `DSA_ALLOW_EXTERNAL_NETWORK=true` (see safety flags below)
+  - `FINMIND_API_TOKEN=<token>` (obtain from https://finmindtrade.com)
+- `TAIWAN_FINMIND_PRIORITY=99`: lower values are tried earlier by DataFetcherManager
+- `FinMind>=0.6.0` is an optional dependency; install only when live Taiwan mode is needed
+
+### Safety flags (apply to all providers)
+
+| Variable | Description | Default |
+|---|---|---|
+| `DSA_FIXTURE_MODE` | `true` = force fully offline; all data read from local fixtures, no network calls | `false` |
+| `DSA_ALLOW_EXTERNAL_NETWORK` | `true` = permit live FinMind/YFinance/Tavily/SearXNG calls; **empty, unset, or any value other than `true` is treated as disabled (fail-closed)** | `false` |
+
 ### Longbridge
 - Optional fallback for US/HK stocks, mainly used to supplement fields that YFinance may miss
 - New integrations should use Longbridge OAuth 2.0: the client id is read from `LONGBRIDGE_OAUTH_CLIENT_ID`, or from `LONGBRIDGE_APP_KEY` when no Legacy Access Token is configured; run `python scripts/generate_longbridge_oauth_token.py --client-id <client_id>` once on an interactive machine to generate the SDK token cache

@@ -1111,6 +1111,22 @@ PUSHOVER_API_TOKEN=your_api_token
 >
 > 这是 Route B 离线优先安全边界的一部分，不是 bug。
 
+### Taiwan FinMind（台股离线 + 实时数据源）
+- 需要 Python 3.11；参见 [FinMind live smoke 环境](#finmind-live-smoke-环境) 配置说明
+- 默认仅使用离线 fixture；启用台股实时数据需同时设置三项：
+  - `FINMIND_ENABLED=true`
+  - `DSA_ALLOW_EXTERNAL_NETWORK=true`（见下方说明）
+  - `FINMIND_API_TOKEN=<token>`（从 https://finmindtrade.com 获取）
+- `TAIWAN_FINMIND_PRIORITY=99`：数字越小，DataFetcherManager 中的优先级越高
+- `FinMind>=0.6.0` 为可选依赖，仅台股实时模式下需要安装
+
+### 安全标志（适用于所有数据源）
+
+| 变量 | 说明 | 默认 |
+|---|---|---|
+| `DSA_FIXTURE_MODE` | `true` = 强制全离线，所有数据均从本地 fixture 读取，不调用任何网络接口 | `false` |
+| `DSA_ALLOW_EXTERNAL_NETWORK` | `true` = 允许 FinMind/YFinance/Tavily/SearXNG 等实时调用；**空值、未设置或其他非 `true` 值均视为禁用（fail-closed）** | `false` |
+
 ### Longbridge（长桥）
 - 美股/港股数据兜底，补充 YFinance 缺失的量比、换手率、PE 等字段
 - 新接入推荐使用 Longbridge 官方 OAuth 2.0：client_id 优先使用 `LONGBRIDGE_OAUTH_CLIENT_ID`，留空且没有 Legacy Access Token 时兼容使用 `LONGBRIDGE_APP_KEY`；先在可交互环境执行 `python scripts/generate_longbridge_oauth_token.py --client-id <client_id>` 生成 SDK token 缓存
