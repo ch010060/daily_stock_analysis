@@ -81,10 +81,18 @@ from bot.models import BotMessage
 
 logger = logging.getLogger(__name__)
 
+
+def _cap_news_context(
+    text: Optional[str],
+    max_chars: Optional[int] = DEFAULT_NEWS_CONTEXT_MAX_TOTAL_CHARS,
+) -> Optional[str]:
+    """Compatibility wrapper for callers that imported the old private helper."""
+    return cap_news_context(text, max_chars=max_chars)
+
+
 # 防御性 guard：当实例绕过 __init__（如测试中 __new__）构造时，
 # double-check 初始化 _single_stock_notify_lock 仍然线程安全。
 _SINGLE_STOCK_NOTIFY_LOCK_INIT_GUARD = threading.Lock()
-
 
 
 class StockAnalysisPipeline:
