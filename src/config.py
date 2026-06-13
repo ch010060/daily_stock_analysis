@@ -633,6 +633,7 @@ class Config:
     stock_index_remote_update_enabled: bool = True
 
     # === AlphaSift optional stock screening integration ===
+    alphasift_route_enabled: bool = False
     alphasift_enabled: bool = False
     alphasift_install_spec: str = DEFAULT_ALPHASIFT_INSTALL_SPEC
 
@@ -702,7 +703,7 @@ class Config:
     brave_api_keys: List[str] = field(default_factory=list)  # Brave Search API Keys
     serpapi_keys: List[str] = field(default_factory=list)  # SerpAPI Keys
     searxng_base_urls: List[str] = field(default_factory=list)  # SearXNG instance URLs (self-hosted, no quota)
-    searxng_public_instances_enabled: bool = True  # Auto-discover public SearXNG instances when base URLs are absent
+    searxng_public_instances_enabled: bool = False  # Auto-discover public SearXNG instances when base URLs are absent
 
     # === Social Sentiment (US stocks only, api.adanos.org) ===
     social_sentiment_api_key: Optional[str] = None
@@ -1353,7 +1354,7 @@ class Config:
             )
         searxng_public_instances_enabled = parse_env_bool(
             os.getenv('SEARXNG_PUBLIC_INSTANCES_ENABLED'),
-            default=True,
+            default=False,
         )
 
         # 企微消息类型与最大字节数逻辑
@@ -1794,6 +1795,7 @@ class Config:
                 minimum=1,
             ),
             portfolio_fx_update_enabled=os.getenv('PORTFOLIO_FX_UPDATE_ENABLED', 'true').lower() == 'true',
+            alphasift_route_enabled=parse_env_bool(os.getenv('ALPHASIFT_ROUTE_ENABLED'), default=False),
             alphasift_enabled=parse_env_bool(os.getenv('ALPHASIFT_ENABLED'), default=False),
             alphasift_install_spec=(
                 DEFAULT_ALPHASIFT_INSTALL_SPEC
@@ -2211,7 +2213,7 @@ class Config:
         raw = (value or "").strip()
         if raw and not is_supported_report_language_value(raw):
             logging.getLogger(__name__).warning(
-                "REPORT_LANGUAGE '%s' invalid, fallback to 'zh' (valid: zh/en)",
+                "REPORT_LANGUAGE '%s' invalid, fallback to 'zh' (valid: zh/zh_TW/en)",
                 value,
             )
         return normalized

@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
+- [新功能] 新增 fixture-first TaiwanFinMindFetcher 与台股 TW 2330/2454 离线行情、基本面、筹码和公司资料 fixtures，供 TW+US Route B MVP Phase 2.1 验证使用。
+- [新功能] 新增 TW/US symbol normalizer，支持 TW:2330、2330.TW、US:AAPL 等显式市场格式，并对无市场裸码 fail fast。
+- [新功能] 新增 TaiwanFinMindFetcher 四层网络守卫（DSA_FIXTURE_MODE / DSA_ALLOW_EXTERNAL_NETWORK / FINMIND_ENABLED / FINMIND_API_TOKEN），默认全离线；新增 US 市场 AAPL/NVDA 行情与新闻 fixtures；FinMind>=0.6.0 标记为可选依赖。
+- [修复] 默认不再注册 AlphaSift API 路由，需显式启用 `ALPHASIFT_ROUTE_ENABLED` 后才可暴露选股接口。
+- [修复] 加固 server/WebUI/API 启动安全门，默认仅允许本机监听、忽略 wildcard CORS，并要求管理员认证与 PBKDF2 密码哈希就绪。
+- [修复] SearXNG 默认关闭公共实例发现，fixture/no-network 模式禁止访问 `searx.space`，仅保留显式本机自建实例配置。
+- [修复] 加固 server/WebUI 报告渲染路径，避免 LLM/report/dashboard 内容中的脚本、JavaScript URL 与事件处理器 payload 被浏览器执行。
+- [文档] 补充 server-safe 本机 WebUI/API profile，明确需关闭 stock-index 远程刷新、公共搜索发现、实时数据源与通知路径，并同步 SearXNG fail-closed 默认说明。
+- [文档] 重大变更：`--serve` / `--serve-only` 现在强制要求 `ADMIN_AUTH_ENABLED=true` 并已存储有效的 PBKDF2 管理员密码哈希方可启动；未配置认证的现有本地部署将以 `ServerSafetyError` 拒绝启动，需先通过 Web 设置流程或 `python -m src.auth reset_password` 完成初始化。
+- [文档] 重大变更：YFinance/美股实时行情现在默认 fail-closed；在 `.env` 未显式设置 `DSA_FIXTURE_MODE=false` 与 `DSA_ALLOW_EXTERNAL_NETWORK=true` 时，有 fixture 的股票静默使用离线 fixture 数据，无 fixture 的股票将以 `DataFetchError` 拒绝请求，这是 Route B 离线优先的刻意安全边界。
+- [文档] MVP 范围说明：TaiwanFinMindFetcher 的 chips/fundamentals/company_profile 方法为 fixture-only 路径，不受四层网络守卫控制；Phase 3.3 live smoke 仅覆盖 daily bars，补充数据实时化延至后续 Phase。
+- [修复] US 股票代码正则扩展支持多类别代码（BRK.B、BRK-B、BF.B 等），新增 `([.-][A-Z]{1,2})?` 可选后缀。
+- [修复] `_analyze_with_prebuilt` 现在将 `query_id` 写入返回结果，与常规分析路径行为对齐。
+- [修复] fixture/no-network 模式下股票名称现在从 `tests/fixtures/market/<market>/<symbol>/company_profile.json` 的 `name` 字段读取，不再回退到原始代码符号（如 `TW:2330`、`US:AAPL`）。
+- [修复] `DSA_ALLOW_EXTERNAL_NETWORK` 空值或未设置时现在正确视为禁用（fail-closed），仅 `1/true/yes/on` 等显式允许值才开放外网；原错误逻辑导致空字符串被误判为允许外网。
 
 ## [3.20.0] - 2026-06-03
 

@@ -42,6 +42,7 @@ from src.report_language import (
     normalize_report_language,
 )
 from src.services.history_service import HistoryService, MarkdownReportGenerationError
+from src.services.report_renderer import sanitize_narrative_text
 from src.utils.data_processing import (
     normalize_model_used,
     extract_fundamental_detail_fields,
@@ -635,4 +636,4 @@ def get_history_markdown(
             }
         )
 
-    return MarkdownReportResponse(content=markdown_content)
+    return MarkdownReportResponse(content=sanitize_narrative_text(markdown_content))

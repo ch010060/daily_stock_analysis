@@ -110,8 +110,11 @@ def markdown_to_html_document(markdown_text: str) -> str:
     Returns:
         Full HTML document string with DOCTYPE, head, and body.
     """
+    from src.services.report_renderer import sanitize_narrative_text
+
+    safe_markdown_text = sanitize_narrative_text(markdown_text)
     html_content = markdown2.markdown(
-        markdown_text,
+        safe_markdown_text,
         extras=["tables", "fenced-code-blocks", "break-on-newline", "cuddled-lists"],
     )
 

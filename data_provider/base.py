@@ -15,8 +15,11 @@
 """
 
 import logging
+import json
+import os
 import random
 import time
+from pathlib import Path
 from threading import BoundedSemaphore, RLock, Thread
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
@@ -36,6 +39,15 @@ logger = logging.getLogger(__name__)
 
 # === 标准化列名定义 ===
 STANDARD_COLUMNS = ['date', 'open', 'high', 'low', 'close', 'volume', 'amount', 'pct_chg']
+FIXTURE_DAILY_START_DATE = "2025-01-01"
+FIXTURE_DAILY_END_DATE = "2025-03-31"
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def unwrap_exception(exc: Exception) -> Exception:
@@ -573,6 +585,7 @@ class DataFetcherManager:
         "LongbridgeFetcher": {"hk", "us"},
         "FinnhubFetcher": {"us"},
         "AlphaVantageFetcher": {"us"},
+        "TaiwanFinMindFetcher": {"tw"},
     }
 
     def __init__(self, fetchers: Optional[List[BaseFetcher]] = None):
@@ -739,6 +752,246 @@ class DataFetcherManager:
             )
 
         return kept
+
+    @staticmethod
+    def _fixture_no_network_mode_enabled() -> bool:
+        return (
+            _env_bool("DSA_FIXTURE_MODE", False)
+            or not _env_bool("DSA_ALLOW_EXTERNAL_NETWORK", False)
+        )
+
+    @staticmethod
+    def _controlled_tw_live_mode_enabled() -> bool:
+        return (
+            not _env_bool("DSA_FIXTURE_MODE", False)
+            and _env_bool("DSA_ALLOW_EXTERNAL_NETWORK", False)
+            and _env_bool("FINMIND_ENABLED", False)
+        )
+
+    @staticmethod
+    def _normalize_explicit_fixture_symbol(stock_code: str):
+        try:
+            from adapters.symbol_normalizer import normalize_symbol
+
+            return normalize_symbol(stock_code)
+        except Exception as exc:
+            logger.debug(
+                "_normalize_explicit_fixture_symbol(%r) failed: %s — fixture routing skipped",
+                stock_code,
+                exc,
+            )
+            return None
+
+    @staticmethod
+    def _fixture_daily_request_range(
+        start_date: Optional[str],
+        end_date: Optional[str],
+    ) -> Tuple[str, str]:
+        if start_date and end_date:
+            return start_date, end_date
+        return FIXTURE_DAILY_START_DATE, FIXTURE_DAILY_END_DATE
+
+    def _try_fixture_no_network_daily_data(
+        self,
+        raw_stock_code: str,
+        start_date: Optional[str],
+        end_date: Optional[str],
+        days: int,
+    ) -> Optional[Tuple[pd.DataFrame, str]]:
+        if not self._fixture_no_network_mode_enabled():
+            return None
+
+        normalized = self._normalize_explicit_fixture_symbol(raw_stock_code)
+        if normalized is None or normalized.market not in {"TW", "US"}:
+            return None
+
+        fetcher_name = (
+            "TaiwanFinMindFetcher" if normalized.market == "TW" else "YfinanceFetcher"
+        )
+        fetcher = self._get_fetcher_by_name(fetcher_name, capability="daily_data")
+        if fetcher is None:
+            return None
+
+        request_start_date, request_end_date = self._fixture_daily_request_range(
+            start_date,
+            end_date,
+        )
+        attempt_start = time.time()
+        try:
+            logger.info(
+                "[数据源路由] fixture/no-network %s 直接使用 [%s]",
+                normalized.canonical,
+                fetcher.name,
+            )
+            df = self._call_fetcher_method(
+                fetcher,
+                "get_daily_data",
+                stock_code=normalized.canonical,
+                start_date=request_start_date,
+                end_date=request_end_date,
+                days=days,
+            )
+            duration_ms = int((time.time() - attempt_start) * 1000)
+            if df is not None and not df.empty:
+                record_provider_run(
+                    data_type="daily_data",
+                    provider=fetcher.name,
+                    operation="get_daily_data",
+                    success=True,
+                    latency_ms=duration_ms,
+                    record_count=len(df),
+                )
+                return df, fetcher.name
+
+            record_provider_run(
+                data_type="daily_data",
+                provider=fetcher.name,
+                operation="get_daily_data",
+                success=False,
+                latency_ms=duration_ms,
+                error_type="empty",
+                error_message="fixture result empty",
+                record_count=0,
+            )
+            raise DataFetchError(
+                f"[fixture-no-network] {fetcher.name} fixture returned empty data "
+                f"for {normalized.canonical}"
+            )
+        except Exception as exc:
+            duration_ms = int((time.time() - attempt_start) * 1000)
+            error_type, error_reason = summarize_exception(exc)
+            record_provider_run(
+                data_type="daily_data",
+                provider=fetcher.name,
+                operation="get_daily_data",
+                success=False,
+                latency_ms=duration_ms,
+                error_type=error_type,
+                error_message=error_reason,
+            )
+            raise DataFetchError(
+                f"[fixture-no-network] {normalized.canonical}: {error_reason}"
+            ) from exc
+
+    def _try_controlled_tw_live_daily_data(
+        self,
+        raw_stock_code: str,
+        start_date: Optional[str],
+        end_date: Optional[str],
+        days: int,
+    ) -> Optional[Tuple[pd.DataFrame, str]]:
+        if not self._controlled_tw_live_mode_enabled():
+            return None
+
+        normalized = self._normalize_explicit_fixture_symbol(raw_stock_code)
+        if normalized is None or normalized.market != "TW":
+            return None
+
+        fetcher = self._get_fetcher_by_name("TaiwanFinMindFetcher", capability="daily_data")
+        if fetcher is None:
+            raise DataFetchError(
+                f"[controlled-tw-live] TaiwanFinMindFetcher unavailable for {normalized.canonical}"
+            )
+
+        attempt_start = time.time()
+        try:
+            logger.info(
+                "[数据源路由] controlled TW live %s 直接使用 [%s]",
+                normalized.canonical,
+                fetcher.name,
+            )
+            df = self._call_fetcher_method(
+                fetcher,
+                "get_daily_data",
+                stock_code=normalized.canonical,
+                start_date=start_date,
+                end_date=end_date,
+                days=days,
+            )
+            duration_ms = int((time.time() - attempt_start) * 1000)
+            if df is not None and not df.empty:
+                record_provider_run(
+                    data_type="daily_data",
+                    provider=fetcher.name,
+                    operation="get_daily_data",
+                    success=True,
+                    latency_ms=duration_ms,
+                    record_count=len(df),
+                )
+                return df, fetcher.name
+
+            record_provider_run(
+                data_type="daily_data",
+                provider=fetcher.name,
+                operation="get_daily_data",
+                success=False,
+                latency_ms=duration_ms,
+                error_type="empty",
+                error_message="controlled TW live result empty",
+                record_count=0,
+            )
+            raise DataFetchError(
+                f"[controlled-tw-live] {fetcher.name} returned empty data "
+                f"for {normalized.canonical}"
+            )
+        except Exception as exc:
+            duration_ms = int((time.time() - attempt_start) * 1000)
+            error_type, error_reason = summarize_exception(exc)
+            record_provider_run(
+                data_type="daily_data",
+                provider=fetcher.name,
+                operation="get_daily_data",
+                success=False,
+                latency_ms=duration_ms,
+                error_type=error_type,
+                error_message=error_reason,
+            )
+            raise DataFetchError(
+                f"[controlled-tw-live] {normalized.canonical}: {error_reason}"
+            ) from exc
+
+    def _get_fixture_no_network_stock_name(self, raw_stock_code: str) -> Optional[str]:
+        if not self._fixture_no_network_mode_enabled():
+            return None
+
+        normalized = self._normalize_explicit_fixture_symbol(raw_stock_code)
+        if normalized is None or normalized.market not in {"TW", "US"}:
+            return None
+        return self._get_fixture_company_profile_stock_name(normalized)
+
+    def _get_controlled_tw_live_stock_name(self, raw_stock_code: str) -> Optional[str]:
+        if not self._controlled_tw_live_mode_enabled():
+            return None
+
+        normalized = self._normalize_explicit_fixture_symbol(raw_stock_code)
+        if normalized is None or normalized.market != "TW":
+            return None
+        return self._get_fixture_company_profile_stock_name(normalized)
+
+    @staticmethod
+    def _get_fixture_company_profile_stock_name(normalized) -> str:
+        fixture_path = (
+            Path(__file__).resolve().parents[1]
+            / "tests"
+            / "fixtures"
+            / "market"
+            / normalized.market.lower()
+            / normalized.provider_symbol
+            / "company_profile.json"
+        )
+        try:
+            with fixture_path.open("r", encoding="utf-8") as fh:
+                profile = json.load(fh)
+            name = profile.get("name") if isinstance(profile, dict) else None
+            if isinstance(name, str) and name.strip():
+                return name.strip()
+        except (OSError, json.JSONDecodeError, TypeError) as exc:
+            logger.debug(
+                "fixture company_profile name unavailable for %s: %s",
+                normalized.canonical,
+                exc,
+            )
+        return normalized.canonical
 
     def _get_cached_stock_name(self, stock_code: str) -> Optional[str]:
         self._ensure_concurrency_guards()
@@ -1058,6 +1311,7 @@ class DataFetcherManager:
         from .baostock_fetcher import BaostockFetcher
         from .yfinance_fetcher import YfinanceFetcher
         from .longbridge_fetcher import LongbridgeFetcher
+        from .taiwan_finmind_fetcher import TaiwanFinMindFetcher
         config = get_config()
         # 创建所有数据源实例（优先级在各 Fetcher 的 __init__ 中确定）
         efinance = EfinanceFetcher()
@@ -1065,6 +1319,7 @@ class DataFetcherManager:
         pytdx = PytdxFetcher()      # 通达信数据源（可配 PYTDX_HOST/PYTDX_PORT）
         baostock = BaostockFetcher()
         yfinance = YfinanceFetcher()
+        taiwan_finmind = TaiwanFinMindFetcher()
         optional_fetchers: List[BaseFetcher] = []
 
         tushare_token = (getattr(config, "tushare_token", None) or "").strip()
@@ -1102,6 +1357,7 @@ class DataFetcherManager:
                 baostock,
                 yfinance,
                 *optional_fetchers,
+                taiwan_finmind,
             ]
 
             # 按优先级排序（Tushare 如果配置了 Token 且初始化成功，优先级为 0）
@@ -1152,11 +1408,42 @@ class DataFetcherManager:
         from .us_index_mapping import is_us_index_code, is_us_stock_code
 
         # Normalize code (strip SH/SZ prefix etc.)
+        raw_stock_code = stock_code
         stock_code = normalize_stock_code(stock_code)
 
         fetchers = self._get_fetchers_snapshot()
         errors = []
         request_start = time.time()
+
+        fixture_routed = self._try_fixture_no_network_daily_data(
+            raw_stock_code,
+            start_date,
+            end_date,
+            days,
+        )
+        if fixture_routed is not None:
+            df, source_name = fixture_routed
+            elapsed = time.time() - request_start
+            logger.info(
+                f"[数据源完成] {stock_code} 使用 [{source_name}] fixture/no-network 获取成功: "
+                f"rows={len(df)}, elapsed={elapsed:.2f}s"
+            )
+            return df, source_name
+
+        controlled_tw_live_routed = self._try_controlled_tw_live_daily_data(
+            raw_stock_code,
+            start_date,
+            end_date,
+            days,
+        )
+        if controlled_tw_live_routed is not None:
+            df, source_name = controlled_tw_live_routed
+            elapsed = time.time() - request_start
+            logger.info(
+                f"[数据源完成] {stock_code} 使用 [{source_name}] controlled TW live 获取成功: "
+                f"rows={len(df)}, elapsed={elapsed:.2f}s"
+            )
+            return df, source_name
 
         # 快速路径：美股使用专用数据源路由；港股先过滤不支持港股日线的数据源
         #   - 配置长桥凭据后: Longbridge 为首选, YFinance/AkShare 兜底
@@ -1869,6 +2156,10 @@ class DataFetcherManager:
             logger.debug(f"[筹码分布] 功能已禁用，跳过 {stock_code}")
             return None
 
+        if self._fixture_no_network_mode_enabled():
+            logger.debug(f"[筹码分布] fixture/no-network 模式已启用，跳过 {stock_code}")
+            return None
+
         circuit_breaker = get_chip_circuit_breaker()
 
         # 直接遍历管理器已经按 priority 排好序的数据源列表
@@ -1943,6 +2234,20 @@ class DataFetcherManager:
         index_name = get_index_stock_name(stock_code)
         if is_meaningful_stock_name(index_name, stock_code):
             return self._cache_stock_name(stock_code, index_name) or index_name
+
+        fixture_name = self._get_fixture_no_network_stock_name(raw_stock_code)
+        if fixture_name:
+            logger.info("[股票名称] fixture/no-network 使用本地代码标签: %s", fixture_name)
+            return self._cache_stock_name(stock_code, fixture_name) or fixture_name
+
+        if self._fixture_no_network_mode_enabled():
+            logger.info("[股票名称] fixture/no-network 无本地名称，跳过远程数据源: %s", stock_code)
+            return ""
+
+        controlled_tw_name = self._get_controlled_tw_live_stock_name(raw_stock_code)
+        if controlled_tw_name:
+            logger.info("[股票名称] controlled TW live 使用本地代码标签: %s", controlled_tw_name)
+            return self._cache_stock_name(stock_code, controlled_tw_name) or controlled_tw_name
 
         # 2. 尝试从实时行情中获取（最快，可按需禁用）
         if allow_realtime:
@@ -2629,6 +2934,11 @@ class DataFetcherManager:
 
         stock_code = normalize_stock_code(stock_code)
         market = _market_tag(stock_code)
+        if self._fixture_no_network_mode_enabled():
+            return self._build_market_not_supported(
+                market=market,
+                reason="fixture/no-network mode",
+            )
         is_etf = _is_etf_code(stock_code)
         if market in {"us", "hk"}:
             return self._build_offshore_fundamental_context(

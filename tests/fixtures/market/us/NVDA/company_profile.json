@@ -1,0 +1,13 @@
+{
+  "symbol": "US:NVDA",
+  "name": "NVIDIA Corporation",
+  "market": "US",
+  "sector": "Technology",
+  "industry": "Semiconductors",
+  "exchange": "NASDAQ",
+  "currency": "USD",
+  "description": "NVIDIA Corporation provides graphics and compute and networking solutions in the United States, Taiwan, China, and internationally.",
+  "employees": 32000,
+  "website": "https://www.nvidia.com",
+  "source": "fixture"
+}

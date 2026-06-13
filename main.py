@@ -345,8 +345,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         '--host',
         type=str,
-        default='0.0.0.0',
-        help='FastAPI 服务监听地址（默认 0.0.0.0）'
+        default='127.0.0.1',
+        help='FastAPI 服务监听地址（默认 127.0.0.1；仅允许本机地址）'
     )
 
     parser.add_argument(
@@ -675,6 +675,9 @@ def start_api_server(host: str, port: int, config: Config) -> None:
     """
     import threading
     import uvicorn
+    from api.app import validate_server_startup_safety
+
+    validate_server_startup_safety(host)
 
     def run_server():
         level_name = (config.log_level or "INFO").lower()
@@ -849,7 +852,7 @@ def main() -> int:
 
     # 兼容旧版 WEBUI_HOST/WEBUI_PORT：如果用户未通过 --host/--port 指定，则使用旧变量
     if start_serve:
-        if args.host == '0.0.0.0' and os.getenv('WEBUI_HOST'):
+        if args.host == '127.0.0.1' and os.getenv('WEBUI_HOST'):
             args.host = os.getenv('WEBUI_HOST')
         if args.port == 8000 and os.getenv('WEBUI_PORT'):
             args.port = int(os.getenv('WEBUI_PORT'))

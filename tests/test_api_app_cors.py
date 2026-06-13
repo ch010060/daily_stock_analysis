@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for FastAPI app CORS configuration."""
 
+import logging
 import os
 import tempfile
 import unittest
@@ -9,7 +10,7 @@ from unittest.mock import patch
 
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.app import create_app
+from api.app import build_server_safe_cors_origins, create_app
 
 
 class AppCorsConfigTestCase(unittest.TestCase):
@@ -20,21 +21,63 @@ class AppCorsConfigTestCase(unittest.TestCase):
         self.addCleanup(temp_dir.cleanup)
         return create_app(static_dir=Path(temp_dir.name))
 
-    def test_allow_all_disables_credentials(self):
-        with patch.dict(os.environ, {"CORS_ALLOW_ALL": "true"}, clear=False):
-            app = self._build_app()
-
+    def test_allow_all_does_not_enable_wildcard_cors(self):
+        origins = build_server_safe_cors_origins()
+        self.assertNotIn("*", origins)
+        app = self._build_app()
         cors = next(m for m in app.user_middleware if m.cls is CORSMiddleware)
-        self.assertEqual(cors.kwargs["allow_origins"], ["*"])
-        self.assertFalse(cors.kwargs["allow_credentials"])
+        self.assertNotIn("*", cors.kwargs["allow_origins"])
+        self.assertTrue(cors.kwargs["allow_credentials"])
 
     def test_explicit_origin_list_keeps_credentials_enabled(self):
-        with patch.dict(os.environ, {"CORS_ALLOW_ALL": "false"}, clear=False):
+        env = {k: v for k, v in os.environ.items() if k != "CORS_ALLOW_ALL"}
+        env["CORS_ALLOW_ALL"] = "false"
+        with patch.dict(os.environ, env, clear=True):
             app = self._build_app()
 
         cors = next(m for m in app.user_middleware if m.cls is CORSMiddleware)
         self.assertIn("http://localhost:5173", cors.kwargs["allow_origins"])
         self.assertTrue(cors.kwargs["allow_credentials"])
+
+    def test_unsafe_extra_origin_is_ignored(self):
+        with patch.dict(
+            os.environ,
+            {"CORS_ORIGINS": "https://example.com,http://localhost:8080"},
+            clear=False,
+        ):
+            app = self._build_app()
+
+        cors = next(m for m in app.user_middleware if m.cls is CORSMiddleware)
+        self.assertNotIn("https://example.com", cors.kwargs["allow_origins"])
+        self.assertIn("http://localhost:8080", cors.kwargs["allow_origins"])
+
+    def test_cors_allow_all_set_emits_deprecation_warning(self):
+        with self.assertLogs("api.app", level=logging.WARNING) as cm:
+            with patch.dict(os.environ, {"CORS_ALLOW_ALL": "true"}, clear=False):
+                build_server_safe_cors_origins()
+
+        self.assertTrue(any("CORS_ALLOW_ALL" in line for line in cm.output))
+
+    def test_cors_allow_all_false_emits_no_warning(self):
+        env = {k: v for k, v in os.environ.items() if k != "CORS_ALLOW_ALL"}
+        env["CORS_ALLOW_ALL"] = "false"
+        with patch.dict(os.environ, env, clear=True):
+            with self.assertLogs("api.app", level=logging.WARNING) as cm:
+                logger = logging.getLogger("api.app")
+                logger.warning("sentinel")
+                build_server_safe_cors_origins()
+
+        self.assertEqual(len([l for l in cm.output if "CORS_ALLOW_ALL" in l]), 0)
+
+    def test_cors_allow_all_absent_emits_no_warning(self):
+        env = {k: v for k, v in os.environ.items() if k != "CORS_ALLOW_ALL"}
+        with patch.dict(os.environ, env, clear=True):
+            with self.assertLogs("api.app", level=logging.WARNING) as cm:
+                logger = logging.getLogger("api.app")
+                logger.warning("sentinel")
+                build_server_safe_cors_origins()
+
+        self.assertEqual(len([l for l in cm.output if "CORS_ALLOW_ALL" in l]), 0)
 
 
 if __name__ == "__main__":

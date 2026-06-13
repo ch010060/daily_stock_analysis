@@ -505,6 +505,31 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             },
         ],
     },
+    "ALPHASIFT_ROUTE_ENABLED": {
+        "title": "AlphaSift API Route",
+        "description": "Register the optional AlphaSift API routes. Disabled by default for server/API safety.",
+        "category": "data_source",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 18,
+        "help_key": "settings.data_source.ALPHASIFT_ROUTE_ENABLED",
+        "examples": [
+            "ALPHASIFT_ROUTE_ENABLED=false",
+            "ALPHASIFT_ROUTE_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "AlphaSift 集成说明",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/alphasift-integration.md",
+            },
+        ],
+    },
     "ALPHASIFT_INSTALL_SPEC": {
         "title": "AlphaSift Install Spec",
         "description": "Pinned AlphaSift pip install spec used by source deployments and desktop packaging.",
@@ -517,7 +542,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": DEFAULT_ALPHASIFT_INSTALL_SPEC,
         "options": [],
         "validation": {},
-        "display_order": 18,
+        "display_order": 19,
         "help_key": "settings.data_source.ALPHASIFT_INSTALL_SPEC",
         "examples": [
             f"ALPHASIFT_INSTALL_SPEC={DEFAULT_ALPHASIFT_INSTALL_SPEC}",
@@ -528,6 +553,134 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
                 "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/alphasift-integration.md",
             },
         ],
+    },
+    "FINMIND_ENABLED": {
+        "title": "FinMind Live Data",
+        "description": "Enable live Taiwan market data through FinMind. Keep false for local fixture-only validation.",
+        "category": "data_source",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 19,
+        "help_key": "settings.data_source.realtime_quotes",
+        "examples": [
+            "FINMIND_ENABLED=false",
+            "FINMIND_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：数据源配置",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#数据源配置",
+            },
+        ],
+        "warning_codes": ["external_network_guard"],
+    },
+    "FINMIND_API_TOKEN": {
+        "title": "FinMind API Token",
+        "description": "Optional token required only when FinMind live mode is explicitly enabled.",
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "password",
+        "is_sensitive": True,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {},
+        "display_order": 20,
+        "help_key": "settings.data_source.FINMIND_API_TOKEN",
+        "examples": [
+            "FINMIND_API_TOKEN=",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：数据源配置",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#数据源配置",
+            },
+        ],
+        "warning_codes": ["secret_value", "external_network_guard"],
+    },
+    "TAIWAN_FINMIND_PRIORITY": {
+        "title": "Taiwan FinMind Priority",
+        "description": "Provider priority for the Taiwan FinMind fetcher. Lower values are tried earlier by DataFetcherManager.",
+        "category": "data_source",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "99",
+        "options": [],
+        "validation": {"min": 0},
+        "display_order": 21,
+        "help_key": "settings.data_source.REALTIME_SOURCE_PRIORITY",
+        "examples": [
+            "TAIWAN_FINMIND_PRIORITY=99",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：数据源配置",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#数据源配置",
+            },
+        ],
+        "warning_codes": ["provider_priority_order"],
+    },
+    "DSA_FIXTURE_MODE": {
+        "title": "Fixture Mode",
+        "description": "Force local fixture data and prevent live provider calls during offline validation.",
+        "category": "data_source",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 24,
+        "help_key": "settings.data_source.realtime_quotes",
+        "examples": [
+            "DSA_FIXTURE_MODE=false",
+            "DSA_FIXTURE_MODE=true",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：数据源配置",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#数据源配置",
+            },
+        ],
+        "warning_codes": ["offline_fixture_mode"],
+    },
+    "DSA_ALLOW_EXTERNAL_NETWORK": {
+        "title": "Allow External Network",
+        "description": "Permit live external provider calls such as FinMind, YFinance, Tavily, or SearXNG. Keep false for local-only validation.",
+        "category": "data_source",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 25,
+        "help_key": "settings.data_source.realtime_quotes",
+        "examples": [
+            "DSA_ALLOW_EXTERNAL_NETWORK=false",
+            "DSA_ALLOW_EXTERNAL_NETWORK=true",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：数据源配置",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#数据源配置",
+            },
+        ],
+        "warning_codes": ["external_network_guard"],
     },
     "REALTIME_SOURCE_PRIORITY": {
         "title": "Realtime Source Priority",
@@ -689,7 +842,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "SEARXNG_BASE_URLS": {
         "title": "SearXNG Base URLs",
-        "description": "Comma-separated SearXNG instance URLs (self-hosted, no quota). Enable format: json in settings.yml.",
+        "description": "Comma-separated local SearXNG instance URLs (self-hosted, no quota). Server-safe mode accepts localhost / loopback URLs only.",
         "category": "data_source",
         "data_type": "string",
         "ui_control": "text",
@@ -707,7 +860,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "display_order": 52,
         "help_key": "settings.data_source.SEARXNG_BASE_URLS",
         "examples": [
-            "SEARXNG_BASE_URLS=https://search.example.com",
+            "SEARXNG_BASE_URLS=http://127.0.0.1:6666",
             "SEARXNG_PUBLIC_INSTANCES_ENABLED=false",
         ],
         "docs": [
@@ -720,14 +873,14 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "SEARXNG_PUBLIC_INSTANCES_ENABLED": {
         "title": "SearXNG Public Instances",
-        "description": "Auto-discover public SearXNG instances from searx.space when SEARXNG_BASE_URLS is empty. Default: true; set false to disable.",
+        "description": "Auto-discover public SearXNG instances from searx.space when SEARXNG_BASE_URLS is empty. Default: false; disabled in fixture/no-network modes.",
         "category": "data_source",
         "data_type": "boolean",
         "ui_control": "switch",
         "is_sensitive": False,
         "is_required": False,
         "is_editable": True,
-        "default_value": "true",
+        "default_value": "false",
         "options": [],
         "validation": {},
         "display_order": 53,
@@ -1734,7 +1887,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "help_key": "settings.notification.chat_bots",
         "examples": [
             "DISCORD_BOT_TOKEN=your_discord_bot_token",
-            "DISCORD_MAIN_CHANNEL_ID=123456789012345678",
+            "DISCORD_MAIN_CHANNEL_ID=discord-channel-id-placeholder",
         ],
         "docs": [
             {
@@ -2625,7 +2778,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "WEBUI_HOST": {
         "title": "Web UI Host",
-        "description": "Host address for Web UI service binding.",
+        "description": "Local-only host address for Web UI service binding. Unsafe public binds are rejected by server startup gates.",
         "category": "system",
         "data_type": "string",
         "ui_control": "text",
@@ -2639,7 +2792,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "help_key": "settings.system.WEBUI_HOST",
         "examples": [
             "WEBUI_HOST=127.0.0.1",
-            "WEBUI_HOST=0.0.0.0",
+            "WEBUI_HOST=localhost",
         ],
         "docs": [
             {
@@ -2651,7 +2804,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
                 "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#webui-与-api-服务",
             },
         ],
-        "warning_codes": ["public_bind_requires_auth", "restart_required"],
+        "warning_codes": ["local_bind_required", "restart_required"],
     },
     "WEBUI_PORT": {
         "title": "Web UI Port",
@@ -2738,7 +2891,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "ADMIN_AUTH_ENABLED": {
         "title": "Admin Auth Enabled",
-        "description": "Enable password protection for Web UI. The first visit initializes the admin password.",
+        "description": "Enable password protection for Web UI. Server startup requires this to be true with a stored admin password hash.",
         "category": "system",
         "data_type": "boolean",
         "ui_control": "switch",
@@ -3956,11 +4109,11 @@ _FIELD_HELP_METADATA: Dict[str, Dict[str, Any]] = {
     "SEARXNG_PUBLIC_INSTANCES_ENABLED": {
         "help_key": "settings.data_source.SEARXNG_BASE_URLS",
         "examples": [
-            "SEARXNG_PUBLIC_INSTANCES_ENABLED=true",
             "SEARXNG_PUBLIC_INSTANCES_ENABLED=false",
+            "SEARXNG_PUBLIC_INSTANCES_ENABLED=true",
         ],
         "docs": _DOC_FULL_GUIDE_SEARCH,
-        "warning_codes": ["public_instance_stability"],
+        "warning_codes": ["public_instance_stability", "disabled_by_default"],
     },
     "BIAS_THRESHOLD": {
         "help_key": "settings.data_source.BIAS_THRESHOLD",
@@ -4090,7 +4243,7 @@ _FIELD_HELP_METADATA: Dict[str, Dict[str, Any]] = {
     "DISCORD_MAIN_CHANNEL_ID": {
         "help_key": "settings.notification.chat_bots",
         "examples": [
-            "DISCORD_MAIN_CHANNEL_ID=123456789012345678",
+            "DISCORD_MAIN_CHANNEL_ID=discord-channel-id-placeholder",
         ],
         "docs": _DOC_FULL_GUIDE_NOTIFICATION,
         "warning_codes": [],

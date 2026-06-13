@@ -1,0 +1,15 @@
+{
+  "symbol": "US:NVDA",
+  "market": "US",
+  "from_date": "2025-01-01",
+  "to_date": "2025-03-31",
+  "pe_ratio": 45.8,
+  "market_cap_usd": 3500000000000,
+  "revenue_growth_yoy": 1.22,
+  "eps_ttm": 2.94,
+  "dividend_yield": 0.0003,
+  "debt_to_equity": 0.42,
+  "return_on_equity": 0.91,
+  "gross_margin": 0.745,
+  "source": "fixture"
+}

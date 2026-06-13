@@ -1,0 +1,24 @@
+{
+  "symbol": "US:AAPL",
+  "market": "US",
+  "fetched_at": "fixture",
+  "news_context_text": "【Apple AAPL Latest Intel】\n1. Apple Intelligence features driving iPhone 16 upgrade cycle; management guides for accelerating revenue in Q2 FY2025.\n2. Services segment grew 14% YoY in Q1 FY2025, reaching $26.3B; gross margin 75.1%.\n3. Vision Pro sales below initial targets but developer ecosystem expanding; no major design refresh expected until 2026.\n4. Risks: China revenue decline (-11% YoY in Q1); antitrust investigations in EU and US; AI feature differentiation still unclear.",
+  "dimensions": {
+    "latest_news": {
+      "success": true,
+      "results_count": 4,
+      "summary": "iPhone 16 upgrade cycle underway; Services margins expand; Vision Pro disappoints"
+    },
+    "risk_check": {
+      "success": true,
+      "results_count": 3,
+      "summary": "China market headwinds; EU/US antitrust; AI feature clarity needed"
+    },
+    "earnings_preview": {
+      "success": true,
+      "results_count": 2,
+      "summary": "Q2 FY2025 guidance in-line; buyback program $110B approved; dividend raised"
+    }
+  },
+  "source": "fixture"
+}

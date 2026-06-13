@@ -146,8 +146,8 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | `BOCHA_API_KEYS` | [Bocha Search](https://open.bocha.cn/) Web Search API (Chinese search optimized, supports AI summaries, multiple keys comma-separated) | Optional |
 | `BRAVE_API_KEYS` | [Brave Search](https://brave.com/search/api/) API (privacy-first, US-stock news enrichment, comma-separated for multiple keys) | Optional |
 | `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimax.io/) Coding Plan Web Search (structured search results) | Optional |
-| `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); when empty the app auto-discovers public instances | Optional |
-| `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Auto-discover public SearXNG instances from `searx.space` when `SEARXNG_BASE_URLS` is empty (default `true`) | Optional |
+| `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); server-safe/local-only mode accepts loopback instances only | Optional |
+| `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Default `false` and fail-closed; when explicitly enabled with empty `SEARXNG_BASE_URLS`, auto-discovers public SearXNG instances from `searx.space` | Optional |
 | `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/weborder/#/login?reg=834638) Token | Optional |
 | `TICKFLOW_API_KEY` | [TickFlow](https://tickflow.org) API key for CN market review index enhancement; market breadth also uses TickFlow when the plan supports universe queries | Optional |
 
@@ -288,8 +288,8 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `MINIMAX_API_KEYS` | MiniMax Coding Plan Web Search (structured results) | Optional |
 | `SOCIAL_SENTIMENT_API_KEY` | Stock Sentiment API Key (Reddit / X / Polymarket, US stocks optional) | Optional |
 | `SOCIAL_SENTIMENT_API_URL` | Stock Sentiment API endpoint (default `https://api.adanos.org`) | Optional |
-| `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); when empty the app auto-discovers public instances | Optional |
-| `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Auto-discover public SearXNG instances from `searx.space` when `SEARXNG_BASE_URLS` is empty (default `true`) | Optional |
+| `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); server-safe/local-only mode accepts loopback instances only | Optional |
+| `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Default `false` and fail-closed; when explicitly enabled with empty `SEARXNG_BASE_URLS`, auto-discovers public SearXNG instances from `searx.space` | Optional |
 
 > Behavior note: Search and social sentiment are optional enhancement services. If either service fails to initialize, the system logs a warning and degrades gracefully by skipping that stage without blocking the core analysis flow.
 
@@ -405,7 +405,7 @@ docker run -d \
   -v "$(pwd)/logs:/app/logs" \
   -v "$(pwd)/reports:/app/reports" \
   zhulinsen/daily_stock_analysis:latest \
-  python main.py --serve-only --host 0.0.0.0 --port 8000
+  python main.py --serve-only --host 127.0.0.1 --port 8000
 
 # Scheduled-task mode
 docker run -d \
@@ -459,7 +459,7 @@ services:
   server:
     <<: *common
     container_name: stock-server
-    command: ["python", "main.py", "--serve-only", "--host", "0.0.0.0", "--port", "${API_PORT:-8000}"]
+    command: ["python", "main.py", "--serve-only", "--host", "127.0.0.1", "--port", "${API_PORT:-8000}"]
     ports:
       - "${API_PORT:-8000}:${API_PORT:-8000}"
 ```
@@ -518,7 +518,7 @@ docker run -d \
   -v "$(pwd)/logs:/app/logs" \
   -v "$(pwd)/reports:/app/reports" \
   stock-analysis \
-  python main.py --serve-only --host 0.0.0.0 --port 8000
+  python main.py --serve-only --host 127.0.0.1 --port 8000
 ```
 
 ---
@@ -536,6 +536,19 @@ conda create -n stock python=3.10
 conda activate stock
 pip install -r requirements.txt
 ```
+
+#### FinMind Live Smoke Environment
+
+Use a Python 3.11 conda environment for FinMind Taiwan live smoke:
+
+```bash
+conda create -n daily-stock python=3.11 -y
+conda activate daily-stock
+python -m pip install -r requirements.txt
+python -m pip install "FinMind>=0.6.0"
+```
+
+Python 3.12 is not recommended for FinMind live smoke. FinMind currently depends on `pandas<2.0.0`, which can force a pandas 1.5.x source build and fail during build dependency setup.
 
 On Windows PowerShell, if Python or pip still uses the system default code page, enable UTF-8 before the first dependency install or environment check. This keeps terminal output and third-party tooling from failing on non-ASCII text:
 
@@ -957,6 +970,31 @@ System defaults to AkShare (free), also supports other data sources:
 - Supports US/HK stock data
 - US stock historical and real-time data both use YFinance exclusively to avoid technical indicator errors from akshare's US stock adjustment issues
 
+> **Upgrade note (Route B / Phase 5 breaking change):** YFinance US real-time data is now fail-closed by default. Without both of the following set explicitly in `.env`, stocks with a fixture silently use offline fixture data, and stocks without a fixture raise `DataFetchError`. This is intentional behavior:
+>
+> ```env
+> DSA_FIXTURE_MODE=false
+> DSA_ALLOW_EXTERNAL_NETWORK=true
+> ```
+>
+> This is part of the Route B offline-first safety boundary, not a bug.
+
+### Taiwan FinMind (Taiwan offline + live data source)
+- Requires Python 3.11; see [FinMind Live Smoke Environment](#finmind-live-smoke-environment) for setup
+- Defaults to offline fixture only; to enable live Taiwan data set all three:
+  - `FINMIND_ENABLED=true`
+  - `DSA_ALLOW_EXTERNAL_NETWORK=true` (see safety flags below)
+  - `FINMIND_API_TOKEN=<token>` (obtain from https://finmindtrade.com)
+- `TAIWAN_FINMIND_PRIORITY=99`: lower values are tried earlier by DataFetcherManager
+- `FinMind>=0.6.0` is an optional dependency; install only when live Taiwan mode is needed
+
+### Safety flags (apply to all providers)
+
+| Variable | Description | Default |
+|---|---|---|
+| `DSA_FIXTURE_MODE` | `true` = force fully offline; all data read from local fixtures, no network calls | `false` |
+| `DSA_ALLOW_EXTERNAL_NETWORK` | `true` = permit live FinMind/YFinance/Tavily/SearXNG calls; **empty, unset, or any value other than `true` is treated as disabled (fail-closed)** | `false` |
+
 ### Longbridge
 - Optional fallback for US/HK stocks, mainly used to supplement fields that YFinance may miss
 - New integrations should use Longbridge OAuth 2.0: the client id is read from `LONGBRIDGE_OAUTH_CLIENT_ID`, or from `LONGBRIDGE_APP_KEY` when no Legacy Access Token is configured; run `python scripts/generate_longbridge_oauth_token.py --client-id <client_id>` once on an interactive machine to generate the SDK token cache
@@ -1223,7 +1261,7 @@ curl "http://127.0.0.1:8000/api/v1/backtest/results?page=1&limit=20"
 Modify default port or allow LAN access:
 
 ```bash
-python main.py --serve-only --host 0.0.0.0 --port 8888
+python main.py --serve-only --host 127.0.0.1 --port 8888
 ```
 
 ### Supported Stock Code Formats

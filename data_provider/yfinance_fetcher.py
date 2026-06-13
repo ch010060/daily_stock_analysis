@@ -16,8 +16,10 @@ YfinanceFetcher - 兜底数据源 (Priority 4)
 
 import csv
 import logging
+import re
 from datetime import datetime
 from io import StringIO
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -31,7 +33,7 @@ from tenacity import (
     before_sleep_log,
 )
 
-from .base import BaseFetcher, DataFetchError, STANDARD_COLUMNS, is_bse_code
+from .base import BaseFetcher, DataFetchError, STANDARD_COLUMNS, is_bse_code, _env_bool
 from .realtime_types import UnifiedRealtimeQuote, RealtimeSource
 from .us_index_mapping import get_us_index_yf_symbol, is_us_stock_code
 
@@ -51,6 +53,10 @@ except (ImportError, ModuleNotFoundError):
 import os
 
 logger = logging.getLogger(__name__)
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[1]
 
 
 class YfinanceFetcher(BaseFetcher):
@@ -78,6 +84,49 @@ class YfinanceFetcher(BaseFetcher):
         """初始化 YfinanceFetcher"""
         pass
 
+    def _fixture_mode_enabled(self) -> bool:
+        return _env_bool("DSA_FIXTURE_MODE", False)
+
+    def _external_network_allowed(self) -> bool:
+        return _env_bool("DSA_ALLOW_EXTERNAL_NETWORK", False)
+
+    def _canonical_fixture_symbol(self, stock_code: str) -> str:
+        symbol = (stock_code or "").strip().upper()
+        if symbol.startswith("US:"):
+            symbol = symbol[3:]
+        if symbol.endswith(".US"):
+            symbol = symbol[:-3]
+        return symbol
+
+    _US_FIXTURE_SYMBOL_RE = re.compile(r"^[A-Z0-9]{1,10}([.\-][A-Z]{1,2})?$")
+
+    def _find_us_daily_fixture(self, stock_code: str, start_date: str, end_date: str) -> Path:
+        symbol = self._canonical_fixture_symbol(stock_code)
+        if not self._US_FIXTURE_SYMBOL_RE.match(symbol):
+            raise DataFetchError(f"[Yfinance] invalid fixture symbol: {symbol!r}")
+        fixture_dir = _repo_root() / "tests" / "fixtures" / "market" / "us" / symbol
+        exact = fixture_dir / f"daily_bars_{start_date}_{end_date}.csv"
+        if exact.exists():
+            return exact
+        matches = sorted(fixture_dir.glob("daily_bars_*.csv"))
+        if matches:
+            return matches[0]
+        raise DataFetchError(f"[Yfinance] fixture not found for {stock_code}")
+
+    def _load_us_fixture_csv(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
+        fixture_path = self._find_us_daily_fixture(stock_code, start_date, end_date)
+        df = pd.read_csv(fixture_path)
+        if "date" in df.columns:
+            dates = pd.to_datetime(df["date"], errors="coerce")
+            start = pd.to_datetime(start_date)
+            end = pd.to_datetime(end_date)
+            df = df.loc[(dates >= start) & (dates <= end)].copy()
+        df.attrs["_cache_source"] = "fixture"
+        df.attrs["_cache_start"] = start_date
+        df.attrs["_cache_end"] = end_date
+        df.attrs["_cache_symbol"] = self._canonical_fixture_symbol(stock_code)
+        return df
+
     def _convert_stock_code(self, stock_code: str) -> str:
         """
         转换股票代码为 Yahoo Finance 格式
@@ -103,6 +152,10 @@ class YfinanceFetcher(BaseFetcher):
             'AAPL'
         """
         code = stock_code.strip().upper()
+        if code.startswith("US:"):
+            code = code[3:]
+        if code.endswith(".US"):
+            code = code[:-3]
 
         # 美股指数：映射到 Yahoo Finance 符号（如 SPX -> ^GSPC）
         yf_symbol, _ = get_us_index_yf_symbol(code)
@@ -167,10 +220,13 @@ class YfinanceFetcher(BaseFetcher):
         2. 调用 yfinance API
         3. 处理返回数据
         """
-        import yfinance as yf
-
         # 转换代码格式
         yf_code = self._convert_stock_code(stock_code)
+
+        if self._fixture_mode_enabled() or not self._external_network_allowed():
+            return self._load_us_fixture_csv(yf_code, start_date, end_date)
+
+        import yfinance as yf
 
         logger.debug(f"调用 yfinance.download({yf_code}, {start_date}, {end_date})")
 
@@ -215,6 +271,11 @@ class YfinanceFetcher(BaseFetcher):
         需要映射到标准列名：
         date, open, high, low, close, volume, amount, pct_chg
         """
+        cache_source = df.attrs.get("_cache_source")
+        request_start = df.attrs.get("_cache_start", "")
+        request_end = df.attrs.get("_cache_end", "")
+        cache_symbol = df.attrs.get("_cache_symbol", self._canonical_fixture_symbol(stock_code))
+
         df = df.copy()
 
         # 处理 MultiIndex 列名（新版 yfinance 返回格式）
@@ -271,6 +332,14 @@ class YfinanceFetcher(BaseFetcher):
         keep_cols = ['code'] + STANDARD_COLUMNS
         existing_cols = [col for col in keep_cols if col in df.columns]
         df = df[existing_cols]
+
+        if cache_source:
+            df.attrs["cache_meta"] = {
+                "source": cache_source,
+                "market": "US",
+                "symbol": f"US:{cache_symbol}",
+                "request_range": f"{request_start}~{request_end}",
+            }
 
         return df
 

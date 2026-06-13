@@ -12,6 +12,7 @@ A股自选股智能分析系统 - 搜索服务模块
 """
 
 import logging
+import os
 import re
 import threading
 import time
@@ -40,6 +41,29 @@ from src.config import (
 )
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_NEWS_CONTEXT_MAX_TOTAL_CHARS = 8000
+NEWS_CONTEXT_TRUNCATION_MARKER_TEMPLATE = "[TRUNCATED: news context capped at {max_chars} chars]"
+
+
+def cap_news_context(
+    text: Optional[str],
+    max_chars: Optional[int] = DEFAULT_NEWS_CONTEXT_MAX_TOTAL_CHARS,
+) -> Optional[str]:
+    """Apply a deterministic total length cap to news context text."""
+    if text is None or max_chars is None:
+        return text
+
+    safe_max_chars = max(0, max_chars)
+    if len(text) <= safe_max_chars:
+        return text
+
+    marker = NEWS_CONTEXT_TRUNCATION_MARKER_TEMPLATE.format(max_chars=safe_max_chars)
+    truncated = text[:safe_max_chars].rstrip()
+    if not truncated:
+        return marker
+    return f"{truncated}\n{marker}"
+
 
 # Transient network errors (retryable)
 _SEARCH_TRANSIENT_EXCEPTIONS = (
@@ -1699,9 +1723,8 @@ class SearXNGSearchProvider(BaseSearchProvider):
     """
     SearXNG search engine (self-hosted, no quota).
 
-    Self-hosted instances are used when explicitly configured.
-    Otherwise, the provider can lazily discover public instances from
-    searx.space and rotate across them with per-request failover.
+    Self-hosted instances are used when explicitly configured. Public discovery
+    is disabled by default and must be explicitly enabled by callers.
     """
 
     PUBLIC_INSTANCES_URL = "https://searx.space/data/instances.json"
@@ -1717,7 +1740,18 @@ class SearXNGSearchProvider(BaseSearchProvider):
     _public_instances_lock = threading.Lock()
 
     def __init__(self, base_urls: Optional[List[str]] = None, *, use_public_instances: bool = False):
-        normalized_base_urls = [url.rstrip("/") for url in (base_urls or []) if url.strip()]
+        normalized_base_urls = []
+        for url in (base_urls or []):
+            if not url.strip():
+                continue
+            if self._is_local_base_url(url):
+                normalized_base_urls.append(url.rstrip("/"))
+            else:
+                logger.warning(
+                    "SearXNG base URL %r is not a loopback address and will be ignored; "
+                    "only localhost/127.0.0.1/::1 URLs are permitted in server-safe mode.",
+                    url.strip(),
+                )
         super().__init__(normalized_base_urls, "SearXNG")
         self._base_urls = normalized_base_urls
         self._use_public_instances = bool(use_public_instances and not self._base_urls)
@@ -1727,6 +1761,12 @@ class SearXNGSearchProvider(BaseSearchProvider):
     @property
     def is_available(self) -> bool:
         return bool(self._base_urls) or self._use_public_instances
+
+    @staticmethod
+    def _is_local_base_url(url: str) -> bool:
+        parsed = urlparse((url or "").strip())
+        host = (parsed.hostname or "").strip().lower()
+        return parsed.scheme in {"http", "https"} and host in {"127.0.0.1", "localhost", "::1"}
 
     @classmethod
     def reset_public_instance_cache(cls) -> None:
@@ -2126,7 +2166,7 @@ class SearchService:
     NEWS_OVERSAMPLE_MAX = 10
     FUTURE_TOLERANCE_DAYS = 1
     _CHINESE_TEXT_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
-    _US_STOCK_RE = re.compile(r"^[A-Za-z]{1,5}(\.[A-Za-z])?$")
+    _US_STOCK_RE = re.compile(r"^[A-Za-z]{1,5}([.\-][A-Za-z])?$")
     _DIRECT_NEWS_CATEGORY = "direct_company_news"
     _SECTOR_NEWS_CATEGORY = "sector_related_news"
     _MACRO_NEWS_CATEGORY = "macro_market_news"
@@ -2170,7 +2210,7 @@ class SearchService:
         serpapi_keys: Optional[List[str]] = None,
         minimax_keys: Optional[List[str]] = None,
         searxng_base_urls: Optional[List[str]] = None,
-        searxng_public_instances_enabled: bool = True,
+        searxng_public_instances_enabled: bool = False,
         news_max_age_days: int = 3,
         news_strategy_profile: str = "short",
     ):
@@ -2185,7 +2225,7 @@ class SearchService:
             serpapi_keys: SerpAPI Key 列表
             minimax_keys: MiniMax API Key 列表
             searxng_base_urls: SearXNG 实例地址列表（自建无配额兜底）
-            searxng_public_instances_enabled: 未配置自建实例时，是否自动使用公共 SearXNG 实例
+            searxng_public_instances_enabled: 未配置自建实例时，是否自动使用公共 SearXNG 实例（默认关闭）
             news_max_age_days: 新闻最大时效（天）
             news_strategy_profile: 新闻窗口策略档位（ultra_short/short/medium/long）
         """
@@ -2207,46 +2247,62 @@ class SearchService:
             NEWS_STRATEGY_WINDOWS["short"],
         )
 
+        fixture_mode = os.getenv("DSA_FIXTURE_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
+        external_network_enabled = os.getenv("DSA_ALLOW_EXTERNAL_NETWORK", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        external_providers_allowed = external_network_enabled and not fixture_mode
+
         # 初始化搜索引擎（按优先级排序）
         # 1. Bocha 优先（中文搜索优化，AI摘要）
-        if bocha_keys:
+        if bocha_keys and external_providers_allowed:
             self._providers.append(BochaSearchProvider(bocha_keys))
             logger.info(f"已配置 Bocha 搜索，共 {len(bocha_keys)} 个 API Key")
 
         # 2. Tavily（免费额度更多，每月 1000 次）
-        if tavily_keys:
+        if tavily_keys and external_providers_allowed:
             self._providers.append(TavilySearchProvider(tavily_keys))
             logger.info(f"已配置 Tavily 搜索，共 {len(tavily_keys)} 个 API Key")
 
         # 3. Brave Search（隐私优先，全球覆盖）
-        if brave_keys:
+        if brave_keys and external_providers_allowed:
             self._providers.append(BraveSearchProvider(brave_keys))
             logger.info(f"已配置 Brave 搜索，共 {len(brave_keys)} 个 API Key")
 
         # 4. SerpAPI 作为备选（每月 100 次）
-        if serpapi_keys:
+        if serpapi_keys and external_providers_allowed:
             self._providers.append(SerpAPISearchProvider(serpapi_keys))
             logger.info(f"已配置 SerpAPI 搜索，共 {len(serpapi_keys)} 个 API Key")
 
         # 5. MiniMax（Coding Plan Web Search，结构化结果）
-        if minimax_keys:
+        if minimax_keys and external_providers_allowed:
             self._providers.append(MiniMaxSearchProvider(minimax_keys))
             logger.info(f"已配置 MiniMax 搜索，共 {len(minimax_keys)} 个 API Key")
 
-        # 6. SearXNG（自建实例优先；未配置时可自动发现公共实例）
+        allow_public_searxng = bool(
+            searxng_public_instances_enabled
+            and not searxng_base_urls
+            and not fixture_mode
+            and external_network_enabled
+        )
+
+        # 6. SearXNG（本机自建实例优先；公共发现必须显式启用且不在 fixture/no-network 模式）
         searxng_provider = SearXNGSearchProvider(
             searxng_base_urls,
-            use_public_instances=bool(searxng_public_instances_enabled and not searxng_base_urls),
+            use_public_instances=allow_public_searxng,
         )
         if searxng_provider.is_available:
             self._providers.append(searxng_provider)
-            if searxng_base_urls:
-                logger.info("已配置 SearXNG 搜索，共 %s 个自建实例", len(searxng_base_urls))
+            if searxng_provider._base_urls:
+                logger.info("已配置 SearXNG 搜索，共 %s 个本机自建实例", len(searxng_provider._base_urls))
             else:
                 logger.info("已启用 SearXNG 公共实例自动发现模式")
 
         # 7. Anspire Search（实时智能搜索优化）
-        if anspire_keys:
+        if anspire_keys and external_providers_allowed:
             self._providers.insert(0, AnspireSearchProvider(anspire_keys))
             logger.info(f"已配置 Anspire Search 搜索，共 {len(anspire_keys)} 个 API Key")
             
@@ -3632,13 +3688,19 @@ class SearchService:
         
         return results
     
-    def format_intel_report(self, intel_results: Dict[str, SearchResponse], stock_name: str) -> str:
+    def format_intel_report(
+        self,
+        intel_results: Dict[str, SearchResponse],
+        stock_name: str,
+        max_total_chars: Optional[int] = DEFAULT_NEWS_CONTEXT_MAX_TOTAL_CHARS,
+    ) -> str:
         """
         格式化情报搜索结果为报告
         
         Args:
             intel_results: 多维度搜索结果
             stock_name: 股票名称
+            max_total_chars: 最大总字符数，超出时截断并附加标记
             
         Returns:
             格式化的情报报告文本
@@ -3687,7 +3749,7 @@ class SearchService:
             else:
                 lines.append("  未找到相关信息")
         
-        return "\n".join(lines)
+        return cap_news_context("\n".join(lines), max_chars=max_total_chars) or ""
     
     def batch_search(
         self,

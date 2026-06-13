@@ -151,8 +151,8 @@ daily_stock_analysis/
 | `BOCHA_API_KEYS` | [博查搜索](https://open.bocha.cn/) Web Search API（中文搜索优化，支持AI摘要，多个key用逗号分隔） | 可选 |
 | `BRAVE_API_KEYS` | [Brave Search](https://brave.com/search/api/) API（隐私优先，美股优化，多个key用逗号分隔） | 可选 |
 | `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimax.io/) Coding Plan Web Search（结构化搜索结果） | 可选 |
-| `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；留空时默认自动发现公共实例 | 可选 |
-| `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `true`） | 可选 |
+| `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；server-safe/local-only 模式仅允许 loopback 实例 | 可选 |
+| `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `false`，fail-closed） | 可选 |
 | `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/weborder/#/login?reg=834638 ) Token | 可选 |
 | `LONGBRIDGE_OAUTH_CLIENT_ID` | [Longbridge OpenAPI](https://open.longbridge.com/) OAuth client_id；留空且无 Legacy Access Token 时会兼容使用 `LONGBRIDGE_APP_KEY` | 可选 |
 | `LONGBRIDGE_OAUTH_TOKEN_CACHE_B64` | OAuth token 缓存文件的 base64 内容，供 GitHub Actions / Docker 等 headless 环境恢复 SDK token 缓存 | 可选 |
@@ -325,8 +325,8 @@ daily_stock_analysis/
 | `MINIMAX_API_KEYS` | MiniMax Coding Plan Web Search（结构化搜索结果） | 可选 |
 | `SOCIAL_SENTIMENT_API_KEY` | Stock Sentiment API Key（Reddit / X / Polymarket，可选） | 可选 |
 | `SOCIAL_SENTIMENT_API_URL` | Stock Sentiment API 地址（默认 `https://api.adanos.org`） | 可选 |
-| `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；留空时默认自动发现公共实例 | 可选 |
-| `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `true`） | 可选 |
+| `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；server-safe/local-only 模式仅允许 loopback 实例 | 可选 |
+| `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `false`，fail-closed） | 可选 |
 | `NEWS_STRATEGY_PROFILE` | 新闻策略窗口档位：`ultra_short`(1天)/`short`(3天)/`medium`(7天)/`long`(30天)；实际窗口取与 `NEWS_MAX_AGE_DAYS` 的最小值 | 默认 `short` |
 | `NEWS_MAX_AGE_DAYS` | 新闻最大时效（天），搜索时限制结果在近期内 | 默认 `3` |
 | `BIAS_THRESHOLD` | 乖离率阈值（%），超过提示不追高；强势趋势股自动放宽到 1.5 倍 | 默认 `5.0` |
@@ -466,7 +466,7 @@ docker run -d \
   -v "$(pwd)/logs:/app/logs" \
   -v "$(pwd)/reports:/app/reports" \
   zhulinsen/daily_stock_analysis:latest \
-  python main.py --serve-only --host 0.0.0.0 --port 8000
+  python main.py --serve-only --host 127.0.0.1 --port 8000
 
 # 定时任务模式
 docker run -d \
@@ -520,7 +520,7 @@ services:
   server:
     <<: *common
     container_name: stock-server
-    command: ["python", "main.py", "--serve-only", "--host", "0.0.0.0", "--port", "${API_PORT:-8000}"]
+    command: ["python", "main.py", "--serve-only", "--host", "127.0.0.1", "--port", "${API_PORT:-8000}"]
     ports:
       - "${API_PORT:-8000}:${API_PORT:-8000}"
 ```
@@ -579,7 +579,7 @@ docker run -d \
   -v "$(pwd)/logs:/app/logs" \
   -v "$(pwd)/reports:/app/reports" \
   stock-analysis \
-  python main.py --serve-only --host 0.0.0.0 --port 8000
+  python main.py --serve-only --host 127.0.0.1 --port 8000
 ```
 
 ---
@@ -597,6 +597,19 @@ conda create -n stock python=3.10
 conda activate stock
 pip install -r requirements.txt
 ```
+
+#### FinMind live smoke 环境
+
+FinMind 台股 live smoke 建议使用 Python 3.11 conda 环境：
+
+```bash
+conda create -n daily-stock python=3.11 -y
+conda activate daily-stock
+python -m pip install -r requirements.txt
+python -m pip install "FinMind>=0.6.0"
+```
+
+不建议在 Python 3.12 环境中强装 FinMind。FinMind 当前依赖 `pandas<2.0.0`，可能触发 pandas 1.5.x source build，并在构建依赖阶段失败。
 
 Windows PowerShell 若仍使用系统默认代码页，首次安装依赖或运行环境检查前建议先启用 UTF-8，避免第三方工具或终端输出在中文字符上失败：
 
@@ -1089,6 +1102,31 @@ PUSHOVER_API_TOKEN=your_api_token
 - 支持美股/港股数据
 - 美股历史数据与实时行情均统一使用 YFinance，以避免 akshare 美股复权异常导致的技术指标错误
 
+> **升级注意（Route B / Phase 5 破坏性变更）：** YFinance 美股实时数据现在默认 fail-closed。若未在 `.env` 中显式设置以下两项，有 fixture 的股票将静默使用离线 fixture 数据，无 fixture 的股票将直接 `DataFetchError`，这是预期行为：
+>
+> ```env
+> DSA_FIXTURE_MODE=false
+> DSA_ALLOW_EXTERNAL_NETWORK=true
+> ```
+>
+> 这是 Route B 离线优先安全边界的一部分，不是 bug。
+
+### Taiwan FinMind（台股离线 + 实时数据源）
+- 需要 Python 3.11；参见 [FinMind live smoke 环境](#finmind-live-smoke-环境) 配置说明
+- 默认仅使用离线 fixture；启用台股实时数据需同时设置三项：
+  - `FINMIND_ENABLED=true`
+  - `DSA_ALLOW_EXTERNAL_NETWORK=true`（见下方说明）
+  - `FINMIND_API_TOKEN=<token>`（从 https://finmindtrade.com 获取）
+- `TAIWAN_FINMIND_PRIORITY=99`：数字越小，DataFetcherManager 中的优先级越高
+- `FinMind>=0.6.0` 为可选依赖，仅台股实时模式下需要安装
+
+### 安全标志（适用于所有数据源）
+
+| 变量 | 说明 | 默认 |
+|---|---|---|
+| `DSA_FIXTURE_MODE` | `true` = 强制全离线，所有数据均从本地 fixture 读取，不调用任何网络接口 | `false` |
+| `DSA_ALLOW_EXTERNAL_NETWORK` | `true` = 允许 FinMind/YFinance/Tavily/SearXNG 等实时调用；**空值、未设置或其他非 `true` 值均视为禁用（fail-closed）** | `false` |
+
 ### Longbridge（长桥）
 - 美股/港股数据兜底，补充 YFinance 缺失的量比、换手率、PE 等字段
 - 新接入推荐使用 Longbridge 官方 OAuth 2.0：client_id 优先使用 `LONGBRIDGE_OAUTH_CLIENT_ID`，留空且没有 Legacy Access Token 时兼容使用 `LONGBRIDGE_APP_KEY`；先在可交互环境执行 `python scripts/generate_longbridge_oauth_token.py --client-id <client_id>` 生成 SDK token 缓存
@@ -1391,7 +1429,7 @@ curl "http://127.0.0.1:8000/api/v1/backtest/results?page=1&limit=20"
 修改默认端口或允许局域网访问：
 
 ```bash
-python main.py --serve-only --host 0.0.0.0 --port 8888
+python main.py --serve-only --host 127.0.0.1 --port 8888
 ```
 
 ### 支持的股票代码格式

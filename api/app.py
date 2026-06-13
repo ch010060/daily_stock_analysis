@@ -23,7 +23,7 @@ import re
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 from typing import List, Optional
 
 from fastapi import FastAPI, Request
@@ -33,6 +33,14 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
+
+LOCAL_SERVER_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+DEFAULT_CORS_ORIGINS = (
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+)
 
 # Match src="/assets/foo.js" / href="/assets/foo.css" produced by the
 # vite build. Used by the startup self-check to surface packaging
@@ -47,6 +55,68 @@ _FRONTEND_INDEX_NO_CACHE_HEADERS = {
     "Pragma": "no-cache",
     "Expires": "0",
 }
+
+
+class ServerSafetyError(RuntimeError):
+    """Raised when server/WebUI/API startup safety gates are not satisfied."""
+
+
+def _normalize_bind_host(host: str | None) -> str:
+    normalized = (host or "").strip().lower()
+    if normalized.startswith("[") and normalized.endswith("]"):
+        normalized = normalized[1:-1]
+    return normalized
+
+
+def validate_local_server_host(host: str | None) -> str:
+    """Return normalized host or raise when the bind host is not local-only."""
+    normalized = _normalize_bind_host(host)
+    if normalized not in LOCAL_SERVER_HOSTS:
+        raise ServerSafetyError(
+            "Unsafe server bind host rejected; use 127.0.0.1, localhost, or ::1."
+        )
+    return normalized
+
+
+def _is_local_cors_origin(origin: str) -> bool:
+    parsed = urlparse(origin.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return False
+    hostname = _normalize_bind_host(parsed.hostname)
+    return hostname in LOCAL_SERVER_HOSTS
+
+
+def build_server_safe_cors_origins(extra_origins: str | None = None) -> List[str]:
+    """Build local-only CORS origins; wildcard and non-local origins are ignored."""
+    if os.environ.get("CORS_ALLOW_ALL", "").strip().lower() in {"1", "true", "yes", "on"}:
+        logger.warning(
+            "CORS_ALLOW_ALL is set but no longer has any effect; "
+            "wildcard CORS is permanently disabled for server safety. "
+            "Remove CORS_ALLOW_ALL from your .env to silence this warning."
+        )
+    origins = list(DEFAULT_CORS_ORIGINS)
+    for origin in (extra_origins or "").split(","):
+        candidate = origin.strip()
+        if candidate and candidate not in origins and _is_local_cors_origin(candidate):
+            origins.append(candidate)
+    return origins
+
+
+def validate_admin_auth_ready() -> None:
+    """Require admin auth enabled and a valid stored PBKDF2 password hash."""
+    from src.auth import has_stored_password, is_auth_enabled, refresh_auth_state
+
+    refresh_auth_state()
+    if not is_auth_enabled():
+        raise ServerSafetyError("Server startup requires ADMIN_AUTH_ENABLED=true.")
+    if not has_stored_password():
+        raise ServerSafetyError("Server startup requires a stored admin password hash.")
+
+
+def validate_server_startup_safety(host: str | None) -> None:
+    """Validate server/WebUI/API startup gates before uvicorn starts."""
+    validate_local_server_host(host)
+    validate_admin_auth_ready()
 
 
 def _frontend_index_response(static_dir: Path) -> FileResponse:
@@ -220,28 +290,12 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     # CORS 配置
     # ============================================================
     
-    allowed_origins = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ]
-    
-    # 从环境变量添加额外的允许来源
-    extra_origins = os.environ.get("CORS_ORIGINS", "")
-    if extra_origins:
-        allowed_origins.extend([o.strip() for o in extra_origins.split(",") if o.strip()])
-    
-    # 允许所有来源（开发/演示用）
-    allow_all_origins = os.environ.get("CORS_ALLOW_ALL", "").lower() == "true"
-    allow_credentials = not allow_all_origins
-    if allow_all_origins:
-        allowed_origins = ["*"]
-    
+    allowed_origins = build_server_safe_cors_origins(os.environ.get("CORS_ORIGINS", ""))
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
-        allow_credentials=allow_credentials,
+        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )

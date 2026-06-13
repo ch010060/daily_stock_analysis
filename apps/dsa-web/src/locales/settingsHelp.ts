@@ -184,6 +184,14 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Web 选股入口、AlphaSift 策略读取和选股 API。'],
     notes: ['AlphaSift 复用 DSA 环境变量；关闭时不影响原有分析、报告和通知流程。'],
   },
+  'settings.data_source.ALPHASIFT_ROUTE_ENABLED': {
+    title: 'AlphaSift API 路由',
+    summary: '控制是否注册可选的 AlphaSift API 路由。',
+    usage: '默认关闭。只有明确设为 true 时，后端才会暴露 AlphaSift 选股相关 API。',
+    valueNotes: ['该开关独立于 ALPHASIFT_ENABLED，用于服务启动时的路由暴露边界。'],
+    impact: ['影响 AlphaSift API 路由是否可访问；关闭时不会影响原有分析、报告和通知流程。'],
+    notes: ['公开或共享部署中请保持默认关闭，除非已经确认认证与部署边界。'],
+  },
   'settings.data_source.ALPHASIFT_INSTALL_SPEC': {
     title: 'AlphaSift 安装来源',
     summary: '配置源码部署或打包阶段使用的受信任 AlphaSift pip 来源。',
@@ -210,6 +218,14 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     impact: ['影响现价、技术指标、盘中分析和部分报告字段。'],
     notes: ['单一数据源失败应降级到后续数据源，不应拖垮主流程。'],
+  },
+  'settings.data_source.FINMIND_API_TOKEN': {
+    title: 'FinMind API Token',
+    summary: '用于显式启用 FinMind 台湾市场实时数据时的访问凭证。',
+    usage: '仅在 FINMIND_ENABLED=true 且允许外部网络访问时需要填写；本地 fixture 验证应保持为空。',
+    valueNotes: ['该字段按敏感值处理，设置页不会直接展示完整内容。', '未配置 token 时，FinMind live 路径会 fail closed。'],
+    impact: ['影响台湾市场 live daily bar 数据获取；不影响默认离线 fixture 流程。'],
+    notes: ['不要把真实 token 提交到仓库、issue、截图或日志。'],
   },
   'settings.data_source.search_api_keys': {
     title: '搜索服务 API Key',
@@ -1120,6 +1136,14 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects the Web screening entry, AlphaSift strategy loading, and screening API.'],
     notes: ['AlphaSift reuses DSA environment variables; disabling it does not affect existing analysis, reports, or notifications.'],
   },
+  'settings.data_source.ALPHASIFT_ROUTE_ENABLED': {
+    title: 'AlphaSift API Route',
+    summary: 'Controls whether the optional AlphaSift API routes are registered.',
+    usage: 'Disabled by default. Set to true only when the backend should expose AlphaSift screening APIs.',
+    valueNotes: ['This switch is separate from ALPHASIFT_ENABLED and defines the route exposure boundary at server startup.'],
+    impact: ['Affects whether AlphaSift API routes are reachable; disabling it does not affect existing analysis, reports, or notifications.'],
+    notes: ['Keep disabled for public or shared deployments unless authentication and deployment boundaries are confirmed.'],
+  },
   'settings.data_source.ALPHASIFT_INSTALL_SPEC': {
     title: 'AlphaSift Install Source',
     summary: 'Configures the trusted AlphaSift pip source used by source deployments or desktop packaging.',
@@ -1143,6 +1167,14 @@ const settingsHelpEnUS: SettingsHelpMap = {
     valueNotes: ['Disabling realtime quotes falls back toward historical close prices.', 'Realtime technical indicators use intraday prices.'],
     impact: ['Affects current price, technical indicators, intraday analysis, and report fields.'],
     notes: ['A single provider failure should fall back to the next source.'],
+  },
+  'settings.data_source.FINMIND_API_TOKEN': {
+    title: 'FinMind API Token',
+    summary: 'Access credential used only when FinMind live Taiwan market data is explicitly enabled.',
+    usage: 'Required only when FINMIND_ENABLED=true and external network access is allowed. Keep empty for local fixture validation.',
+    valueNotes: ['This field is treated as sensitive, so the settings page does not show the full value.', 'Without a token, the FinMind live path fails closed.'],
+    impact: ['Affects Taiwan live daily-bar fetching; it does not affect the default offline fixture flow.'],
+    notes: ['Do not commit real tokens or expose them in issues, screenshots, or logs.'],
   },
   'settings.data_source.search_api_keys': {
     title: 'Search API Keys',

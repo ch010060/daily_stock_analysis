@@ -49,6 +49,7 @@ from src.report_language import (
 from bot.models import BotMessage
 from src.utils.sanitize import sanitize_diagnostic_text
 from src.utils.data_processing import normalize_model_used
+from src.services.report_renderer import sanitize_analysis_result
 from src.notification_sender import (
     AstrbotSender,
     CustomWebhookSender,
@@ -249,6 +250,11 @@ class NotificationService(
             channel_names = [ChannelDetector.get_channel_name(ch) for ch in self._available_channels]
             channel_names.extend(self._context_channels)
             logger.info(f"已配置 {len(channel_names)} 个通知渠道：{', '.join(channel_names)}")
+
+    @staticmethod
+    def _sanitize_render_results(results: List[AnalysisResult]) -> List[AnalysisResult]:
+        """Return sanitized copies for rendered report text without mutating inputs."""
+        return [sanitize_analysis_result(result) for result in results]
 
     def _normalize_report_type(self, report_type: Any) -> ReportType:
         """Normalize string/enum input into ReportType."""
@@ -762,6 +768,7 @@ class NotificationService(
             report_date = datetime.now().strftime('%Y-%m-%d')
         report_language = self._get_report_language(results)
         labels = get_report_labels(report_language)
+        results = self._sanitize_render_results(results)
 
         # 标题
         report_lines = [
@@ -1028,6 +1035,7 @@ class NotificationService(
             if out:
                 return out
 
+        results = self._sanitize_render_results(results)
         if report_date is None:
             report_date = datetime.now().strftime('%Y-%m-%d')
 
@@ -1333,6 +1341,7 @@ class NotificationService(
             if out:
                 return out
 
+        results = self._sanitize_render_results(results)
         report_date = datetime.now().strftime('%Y-%m-%d')
         
         # 按评分排序
@@ -1484,6 +1493,7 @@ class NotificationService(
         report_date = datetime.now().strftime('%Y-%m-%d')
         report_language = self._get_report_language(results)
         labels = get_report_labels(report_language)
+        results = self._sanitize_render_results(results)
 
         # 按评分排序
         sorted_results = sorted(results, key=lambda x: x.sentiment_score, reverse=True)
@@ -1577,6 +1587,7 @@ class NotificationService(
             )
             if out:
                 return out
+        results = self._sanitize_render_results(results)
         # Fallback: brief summary from dashboard report
         if not results:
             return f"# {report_date} {labels['brief_title']}\n\n{labels['no_results']}"
@@ -1623,6 +1634,7 @@ class NotificationService(
         report_date = datetime.now().strftime('%Y-%m-%d %H:%M')
         report_language = self._get_report_language(result)
         labels = get_report_labels(report_language)
+        result = sanitize_analysis_result(result)
         signal_text, signal_emoji, _ = self._get_signal_level(result)
         dashboard = result.dashboard if hasattr(result, 'dashboard') and result.dashboard else {}
         core = dashboard.get('core_conclusion', {}) if dashboard else {}
