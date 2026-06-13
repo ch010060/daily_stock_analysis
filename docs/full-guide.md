@@ -466,7 +466,7 @@ docker run -d \
   -v "$(pwd)/logs:/app/logs" \
   -v "$(pwd)/reports:/app/reports" \
   zhulinsen/daily_stock_analysis:latest \
-  python main.py --serve-only --host 0.0.0.0 --port 8000
+  python main.py --serve-only --host 127.0.0.1 --port 8000
 
 # 定时任务模式
 docker run -d \
@@ -520,7 +520,7 @@ services:
   server:
     <<: *common
     container_name: stock-server
-    command: ["python", "main.py", "--serve-only", "--host", "0.0.0.0", "--port", "${API_PORT:-8000}"]
+    command: ["python", "main.py", "--serve-only", "--host", "127.0.0.1", "--port", "${API_PORT:-8000}"]
     ports:
       - "${API_PORT:-8000}:${API_PORT:-8000}"
 ```
@@ -579,7 +579,7 @@ docker run -d \
   -v "$(pwd)/logs:/app/logs" \
   -v "$(pwd)/reports:/app/reports" \
   stock-analysis \
-  python main.py --serve-only --host 0.0.0.0 --port 8000
+  python main.py --serve-only --host 127.0.0.1 --port 8000
 ```
 
 ---
@@ -1429,7 +1429,7 @@ curl "http://127.0.0.1:8000/api/v1/backtest/results?page=1&limit=20"
 修改默认端口或允许局域网访问：
 
 ```bash
-python main.py --serve-only --host 0.0.0.0 --port 8888
+python main.py --serve-only --host 127.0.0.1 --port 8888
 ```
 
 ### 支持的股票代码格式

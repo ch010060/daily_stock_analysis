@@ -71,8 +71,8 @@ RUN mkdir -p /app/data /app/logs /app/reports && \
 ENV PYTHONUNBUFFERED=1
 ENV LOG_DIR=/app/logs
 ENV DATABASE_PATH=/app/data/stock_analysis.db
-# Web/API service
-ENV WEBUI_HOST=0.0.0.0
+# Web/API service (Route B server-safe profile binds loopback by default)
+ENV WEBUI_HOST=127.0.0.1
 ENV API_PORT=8000
 
 # 暴露 API 端口

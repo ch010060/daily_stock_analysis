@@ -22,6 +22,13 @@ FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "market" / "tw"
 
 class TestNoExternalNetwork(unittest.TestCase):
 
+    def _assert_no_external_search_providers(self, service: SearchService) -> None:
+        external_names = {"Bocha", "Tavily", "Brave", "SerpAPI", "MiniMax", "Anspire"}
+        self.assertTrue(
+            all(provider.name not in external_names for provider in service._providers),
+            f"external providers should be suppressed in no-network mode: {[provider.name for provider in service._providers]}",
+        )
+
     def _fetcher(self, finmind_enabled: bool = False) -> TaiwanFinMindFetcher:
         return TaiwanFinMindFetcher(fixture_root=FIXTURE_ROOT, finmind_enabled=finmind_enabled)
 
@@ -52,6 +59,21 @@ class TestNoExternalNetwork(unittest.TestCase):
         mock_socket.assert_not_called()
         self.assertFalse(df.empty)
 
+    @patch("socket.create_connection", side_effect=ConnectionRefusedError("network blocked in test"))
+    def test_fixture_mode_with_fake_keys_still_has_no_external_search_providers(self, mock_socket):
+        """Fixture mode suppresses all keyed external search providers even with keys."""
+        with patch.dict(os.environ, {"DSA_FIXTURE_MODE": "true", "DSA_ALLOW_EXTERNAL_NETWORK": "true"}):
+            service = SearchService(
+                bocha_keys=["k1"],
+                tavily_keys=["k2"],
+                brave_keys=["k3"],
+                serpapi_keys=["k4"],
+                minimax_keys=["k5"],
+                anspire_keys=["k6"],
+            )
+        mock_socket.assert_not_called()
+        self._assert_no_external_search_providers(service)
+
     @patch("src.search_service.requests.get", side_effect=AssertionError("searx.space must not be called"))
     def test_searxng_public_discovery_disabled_in_no_network_mode(self, mock_get):
         """DSA_ALLOW_EXTERNAL_NETWORK=false prevents SearXNG public discovery provider creation."""
@@ -59,6 +81,24 @@ class TestNoExternalNetwork(unittest.TestCase):
         with patch.dict(os.environ, env):
             service = SearchService(searxng_public_instances_enabled=True)
         mock_get.assert_not_called()
+        self.assertFalse(any(provider.name == "SearXNG" for provider in service._providers))
+
+    @patch("src.search_service.requests.get", side_effect=AssertionError("searx.space must not be called"))
+    def test_no_network_with_fake_keys_still_has_no_external_search_providers(self, mock_get):
+        """DSA_ALLOW_EXTERNAL_NETWORK=false suppresses all keyed external providers."""
+        env = {"DSA_FIXTURE_MODE": "false", "DSA_ALLOW_EXTERNAL_NETWORK": "false"}
+        with patch.dict(os.environ, env):
+            service = SearchService(
+                bocha_keys=["k1"],
+                tavily_keys=["k2"],
+                brave_keys=["k3"],
+                serpapi_keys=["k4"],
+                minimax_keys=["k5"],
+                anspire_keys=["k6"],
+                searxng_public_instances_enabled=True,
+            )
+        mock_get.assert_not_called()
+        self._assert_no_external_search_providers(service)
         self.assertFalse(any(provider.name == "SearXNG" for provider in service._providers))
 
 

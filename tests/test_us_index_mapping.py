@@ -88,6 +88,11 @@ class TestIsUsStockCode(unittest.TestCase):
         self.assertTrue(is_us_stock_code('BRK.B'))
         self.assertTrue(is_us_stock_code('BRK.A'))
 
+    def test_stock_with_hyphen_suffix(self):
+        """Stock codes with one-char hyphen suffix should return True"""
+        self.assertTrue(is_us_stock_code('BRK-B'))
+        self.assertTrue(is_us_stock_code('BF-B'))
+
     def test_case_insensitive(self):
         """Stock code matching should be case-insensitive"""
         self.assertTrue(is_us_stock_code('aapl'))
@@ -122,12 +127,10 @@ class TestIsUsStockCode(unittest.TestCase):
 
     def test_invalid_patterns(self):
         """Invalid patterns should return False"""
-        invalid = ['TOOLONG', 'A', 'AB.CD', '123', 'A1B2', '']
+        invalid = ['TOOLONG', 'AB.CD', '123', 'A1B2', '']
         for code in invalid:
             with self.subTest(code=code):
-                # Note: Single letter like 'A' might be valid, but 'TOOLONG' (6 chars) is not
-                if len(code) > 5:
-                    self.assertFalse(is_us_stock_code(code), f"{code} should NOT be a US stock")
+                self.assertFalse(is_us_stock_code(code), f"{code} should NOT be a US stock")
 
     def test_empty_and_none(self):
         """Empty string and None should return False"""

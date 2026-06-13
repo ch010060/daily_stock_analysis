@@ -85,10 +85,12 @@ Dockerfile 已采用多阶段构建，前端会在镜像构建时自动打包。
 3. 找到「启动命令」配置项
 4. 输入你需要的启动命令，例如：
     - 启动 FastAPI：`python main.py --serve`
-    - 仅启动 FastAPI：`python main.py --serve-only --host 0.0.0.0 --port 8000`
+    - 仅启动 FastAPI：`python main.py --serve-only --host 127.0.0.1 --port 8000`
     - 启动定时任务：`python main.py --schedule`
 5. 点击「保存」
 6. 重启服务
+
+> Route B 目前以本地/內网安全 profile 为主；若需公开部署场景（`0.0.0.0`/公网监听）需使用另行定义的部署 profile 并通过独立审核。
 
 ## 4. Discord 机器人部署
 
@@ -135,7 +137,7 @@ Dockerfile 已采用多阶段构建，前端会在镜像构建时自动打包。
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `API_HOST` | API 服务监听地址 | `0.0.0.0` |
+| `API_HOST` | API 服务监听地址 | `127.0.0.1` |
 | `API_PORT` | API 服务端口 | `8000` |
 
 > 旧版 `WEBUI_HOST`/`WEBUI_PORT`/`WEBUI_ENABLED` 环境变量仍兼容，会自动转发到 API 服务。

@@ -2166,7 +2166,7 @@ class SearchService:
     NEWS_OVERSAMPLE_MAX = 10
     FUTURE_TOLERANCE_DAYS = 1
     _CHINESE_TEXT_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
-    _US_STOCK_RE = re.compile(r"^[A-Za-z]{1,5}(\.[A-Za-z])?$")
+    _US_STOCK_RE = re.compile(r"^[A-Za-z]{1,5}([.\-][A-Za-z])?$")
     _DIRECT_NEWS_CATEGORY = "direct_company_news"
     _SECTOR_NEWS_CATEGORY = "sector_related_news"
     _MACRO_NEWS_CATEGORY = "macro_market_news"
@@ -2247,42 +2247,46 @@ class SearchService:
             NEWS_STRATEGY_WINDOWS["short"],
         )
 
+        fixture_mode = os.getenv("DSA_FIXTURE_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
+        external_network_enabled = os.getenv("DSA_ALLOW_EXTERNAL_NETWORK", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        external_providers_allowed = external_network_enabled and not fixture_mode
+
         # 初始化搜索引擎（按优先级排序）
         # 1. Bocha 优先（中文搜索优化，AI摘要）
-        if bocha_keys:
+        if bocha_keys and external_providers_allowed:
             self._providers.append(BochaSearchProvider(bocha_keys))
             logger.info(f"已配置 Bocha 搜索，共 {len(bocha_keys)} 个 API Key")
 
         # 2. Tavily（免费额度更多，每月 1000 次）
-        if tavily_keys:
+        if tavily_keys and external_providers_allowed:
             self._providers.append(TavilySearchProvider(tavily_keys))
             logger.info(f"已配置 Tavily 搜索，共 {len(tavily_keys)} 个 API Key")
 
         # 3. Brave Search（隐私优先，全球覆盖）
-        if brave_keys:
+        if brave_keys and external_providers_allowed:
             self._providers.append(BraveSearchProvider(brave_keys))
             logger.info(f"已配置 Brave 搜索，共 {len(brave_keys)} 个 API Key")
 
         # 4. SerpAPI 作为备选（每月 100 次）
-        if serpapi_keys:
+        if serpapi_keys and external_providers_allowed:
             self._providers.append(SerpAPISearchProvider(serpapi_keys))
             logger.info(f"已配置 SerpAPI 搜索，共 {len(serpapi_keys)} 个 API Key")
 
         # 5. MiniMax（Coding Plan Web Search，结构化结果）
-        if minimax_keys:
+        if minimax_keys and external_providers_allowed:
             self._providers.append(MiniMaxSearchProvider(minimax_keys))
             logger.info(f"已配置 MiniMax 搜索，共 {len(minimax_keys)} 个 API Key")
 
-        fixture_mode = os.getenv("DSA_FIXTURE_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
-        external_network_disabled = not (
-            os.getenv("DSA_ALLOW_EXTERNAL_NETWORK", "").strip().lower()
-            in {"1", "true", "yes", "on"}
-        )
         allow_public_searxng = bool(
             searxng_public_instances_enabled
             and not searxng_base_urls
             and not fixture_mode
-            and not external_network_disabled
+            and external_network_enabled
         )
 
         # 6. SearXNG（本机自建实例优先；公共发现必须显式启用且不在 fixture/no-network 模式）
@@ -2298,7 +2302,7 @@ class SearchService:
                 logger.info("已启用 SearXNG 公共实例自动发现模式")
 
         # 7. Anspire Search（实时智能搜索优化）
-        if anspire_keys:
+        if anspire_keys and external_providers_allowed:
             self._providers.insert(0, AnspireSearchProvider(anspire_keys))
             logger.info(f"已配置 Anspire Search 搜索，共 {len(anspire_keys)} 个 API Key")
             

@@ -18,7 +18,7 @@ class NormalizedSymbol:
 
 
 _TW_CODE_RE = re.compile(r"^\d{4,6}[A-Z]?$")
-_US_SYMBOL_RE = re.compile(r"^[A-Z]{1,5}([.\-][A-Z]{1,2})?$")
+_US_SYMBOL_RE = re.compile(r"^[A-Z]{1,5}([.\-][A-Z])?$")
 
 
 def normalize_symbol(symbol: str, market: Optional[str] = None) -> NormalizedSymbol:
