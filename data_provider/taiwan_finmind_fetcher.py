@@ -17,16 +17,9 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 
-from .base import BaseFetcher, DataFetchError, STANDARD_COLUMNS
+from .base import BaseFetcher, DataFetchError, STANDARD_COLUMNS, _env_bool
 
 logger = logging.getLogger(__name__)
-
-
-def _env_bool(name: str, default: bool = False) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _repo_root() -> Path:

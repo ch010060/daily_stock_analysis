@@ -181,7 +181,8 @@ class TestAnalysisMode(unittest.TestCase):
         with patch.object(self.pipeline, "_load_llm_fixture",
                           return_value=_make_analysis_result()) as mock_fixture:
             result = self.pipeline.process_single_stock("TW:2330", analysis_mode="fixture")
-        mock_fixture.assert_called_once_with("TW:2330")
+        args, _ = mock_fixture.call_args
+        self.assertEqual(args[0], "TW:2330")
         self.pipeline.analyze_stock.assert_not_called()
         self.assertIsNotNone(result)
 

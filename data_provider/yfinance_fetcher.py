@@ -16,6 +16,7 @@ YfinanceFetcher - 兜底数据源 (Priority 4)
 
 import csv
 import logging
+import re
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
@@ -32,7 +33,7 @@ from tenacity import (
     before_sleep_log,
 )
 
-from .base import BaseFetcher, DataFetchError, STANDARD_COLUMNS, is_bse_code
+from .base import BaseFetcher, DataFetchError, STANDARD_COLUMNS, is_bse_code, _env_bool
 from .realtime_types import UnifiedRealtimeQuote, RealtimeSource
 from .us_index_mapping import get_us_index_yf_symbol, is_us_stock_code
 
@@ -52,13 +53,6 @@ except (ImportError, ModuleNotFoundError):
 import os
 
 logger = logging.getLogger(__name__)
-
-
-def _env_bool(name: str, default: bool = False) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _repo_root() -> Path:
@@ -104,8 +98,12 @@ class YfinanceFetcher(BaseFetcher):
             symbol = symbol[:-3]
         return symbol
 
+    _US_FIXTURE_SYMBOL_RE = re.compile(r"^[A-Z0-9]{1,10}([.\-][A-Z]{1,2})?$")
+
     def _find_us_daily_fixture(self, stock_code: str, start_date: str, end_date: str) -> Path:
         symbol = self._canonical_fixture_symbol(stock_code)
+        if not self._US_FIXTURE_SYMBOL_RE.match(symbol):
+            raise DataFetchError(f"[Yfinance] invalid fixture symbol: {symbol!r}")
         fixture_dir = _repo_root() / "tests" / "fixtures" / "market" / "us" / symbol
         exact = fixture_dir / f"daily_bars_{start_date}_{end_date}.csv"
         if exact.exists():

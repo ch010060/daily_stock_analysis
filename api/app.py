@@ -88,7 +88,7 @@ def _is_local_cors_origin(origin: str) -> bool:
 
 def build_server_safe_cors_origins(extra_origins: str | None = None) -> List[str]:
     """Build local-only CORS origins; wildcard and non-local origins are ignored."""
-    if os.environ.get("CORS_ALLOW_ALL"):
+    if os.environ.get("CORS_ALLOW_ALL", "").strip().lower() in {"1", "true", "yes", "on"}:
         logger.warning(
             "CORS_ALLOW_ALL is set but no longer has any effect; "
             "wildcard CORS is permanently disabled for server safety. "

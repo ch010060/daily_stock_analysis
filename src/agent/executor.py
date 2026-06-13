@@ -955,7 +955,7 @@ class AgentExecutor:
             if context.get("news_context"):
                 parts.append(f"\n[系统已获取的新闻与舆情情报]\n{context['news_context']}")
 
-        if context and build_prebuilt_context_summary(context):
+        if prebuilt_context_summary:
             parts.append(
                 "\n请优先使用上述只读 prebuilt 上下文回答；不要为了该上下文重新获取行情、搜索新闻或运行完整分析流程，"
                 "除非用户明确要求刷新数据。然后以决策仪表盘 JSON 格式输出分析结果。"

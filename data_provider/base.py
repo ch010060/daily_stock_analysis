@@ -808,9 +808,7 @@ class DataFetcherManager:
         )
         fetcher = self._get_fetcher_by_name(fetcher_name, capability="daily_data")
         if fetcher is None:
-            raise DataFetchError(
-                f"[fixture-no-network] {fetcher_name} unavailable for {normalized.canonical}"
-            )
+            return None
 
         request_start_date, request_end_date = self._fixture_daily_request_range(
             start_date,

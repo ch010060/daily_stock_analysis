@@ -30,7 +30,9 @@ class AppCorsConfigTestCase(unittest.TestCase):
         self.assertTrue(cors.kwargs["allow_credentials"])
 
     def test_explicit_origin_list_keeps_credentials_enabled(self):
-        with patch.dict(os.environ, {"CORS_ALLOW_ALL": "false"}, clear=False):
+        env = {k: v for k, v in os.environ.items() if k != "CORS_ALLOW_ALL"}
+        env["CORS_ALLOW_ALL"] = "false"
+        with patch.dict(os.environ, env, clear=True):
             app = self._build_app()
 
         cors = next(m for m in app.user_middleware if m.cls is CORSMiddleware)
@@ -56,12 +58,16 @@ class AppCorsConfigTestCase(unittest.TestCase):
 
         self.assertTrue(any("CORS_ALLOW_ALL" in line for line in cm.output))
 
-    def test_cors_allow_all_false_still_emits_deprecation_warning(self):
-        with self.assertLogs("api.app", level=logging.WARNING) as cm:
-            with patch.dict(os.environ, {"CORS_ALLOW_ALL": "false"}, clear=False):
+    def test_cors_allow_all_false_emits_no_warning(self):
+        env = {k: v for k, v in os.environ.items() if k != "CORS_ALLOW_ALL"}
+        env["CORS_ALLOW_ALL"] = "false"
+        with patch.dict(os.environ, env, clear=True):
+            with self.assertLogs("api.app", level=logging.WARNING) as cm:
+                logger = logging.getLogger("api.app")
+                logger.warning("sentinel")
                 build_server_safe_cors_origins()
 
-        self.assertTrue(any("CORS_ALLOW_ALL" in line for line in cm.output))
+        self.assertEqual(len([l for l in cm.output if "CORS_ALLOW_ALL" in l]), 0)
 
     def test_cors_allow_all_absent_emits_no_warning(self):
         env = {k: v for k, v in os.environ.items() if k != "CORS_ALLOW_ALL"}

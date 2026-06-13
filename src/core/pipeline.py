@@ -2213,7 +2213,7 @@ class StockAnalysisPipeline:
                 return None
 
             if analysis_mode == "fixture":
-                return self._load_llm_fixture(code)
+                return self._load_llm_fixture(code, effective_query_id)
 
             analyze_kwargs = {"query_id": effective_query_id}
             if current_time is not None:
@@ -2253,7 +2253,7 @@ class StockAnalysisPipeline:
             reset_run_diagnostic_context(diag_token)
             reset_frozen_target_date(token)
     
-    def _load_llm_fixture(self, code: str) -> Optional[AnalysisResult]:
+    def _load_llm_fixture(self, code: str, query_id: str = "") -> Optional[AnalysisResult]:
         """Return a canned AnalysisResult from tests/fixtures/llm/<code>.json.
 
         Fixture filenames use underscores instead of colons so they are safe
@@ -2270,7 +2270,7 @@ class StockAnalysisPipeline:
         fixture_path = os.path.join(fixture_dir, f"{safe_name}.json")
         if not os.path.abspath(fixture_path).startswith(os.path.abspath(fixture_dir) + os.sep):
             logger.warning(f"[{code}] LLM fixture path rejected: {fixture_path}")
-            return AnalysisResult(
+            result = AnalysisResult(
                 code=code,
                 name=code,
                 sentiment_score=50,
@@ -2279,9 +2279,11 @@ class StockAnalysisPipeline:
                 success=False,
                 error_message=f"fixture_path_rejected: {safe_name}.json",
             )
+            result.query_id = query_id
+            return result
         if not os.path.exists(fixture_path):
             logger.warning(f"[{code}] LLM fixture not found: {fixture_path}")
-            return AnalysisResult(
+            result = AnalysisResult(
                 code=code,
                 name=code,
                 sentiment_score=50,
@@ -2290,10 +2292,12 @@ class StockAnalysisPipeline:
                 success=False,
                 error_message=f"fixture_not_found: {safe_name}.json",
             )
+            result.query_id = query_id
+            return result
         try:
             with open(fixture_path, encoding="utf-8") as fh:
                 data = json.load(fh)
-            return AnalysisResult(
+            result = AnalysisResult(
                 code=data.get("code", code),
                 name=data.get("name", code),
                 sentiment_score=int(data.get("sentiment_score", 50)),
@@ -2310,9 +2314,11 @@ class StockAnalysisPipeline:
                 risk_warning=data.get("risk_warning", ""),
                 success=bool(data.get("success", True)),
             )
+            result.query_id = query_id
+            return result
         except Exception as exc:
             logger.error(f"[{code}] Failed to load LLM fixture: {exc}")
-            return AnalysisResult(
+            result = AnalysisResult(
                 code=code,
                 name=code,
                 sentiment_score=50,
@@ -2321,6 +2327,8 @@ class StockAnalysisPipeline:
                 success=False,
                 error_message=f"fixture_load_error: {exc}",
             )
+            result.query_id = query_id
+            return result
 
     def _analyze_with_prebuilt(
         self,
