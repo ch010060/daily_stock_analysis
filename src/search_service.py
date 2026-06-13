@@ -2274,12 +2274,10 @@ class SearchService:
             logger.info(f"已配置 MiniMax 搜索，共 {len(minimax_keys)} 个 API Key")
 
         fixture_mode = os.getenv("DSA_FIXTURE_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
-        external_network_disabled = os.getenv("DSA_ALLOW_EXTERNAL_NETWORK", "false").strip().lower() in {
-            "0",
-            "false",
-            "no",
-            "off",
-        }
+        external_network_disabled = not (
+            os.getenv("DSA_ALLOW_EXTERNAL_NETWORK", "").strip().lower()
+            in {"1", "true", "yes", "on"}
+        )
         allow_public_searxng = bool(
             searxng_public_instances_enabled
             and not searxng_base_urls

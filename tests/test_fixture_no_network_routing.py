@@ -93,7 +93,7 @@ class TestFixtureNoNetworkRouting(unittest.TestCase):
             name = manager.get_stock_name("TW:2330", allow_realtime=False)
             df, source = manager.get_daily_data("TW:2330")
 
-        self.assertEqual(name, "TW:2330")
+        self.assertEqual(name, "Taiwan Semiconductor Manufacturing Co.")
         self.assertEqual(source, "TaiwanFinMindFetcher")
         self.assertFalse(df.empty)
         self.assertGreaterEqual(str(df["date"].min().date()), "2025-01-01")
@@ -108,7 +108,7 @@ class TestFixtureNoNetworkRouting(unittest.TestCase):
                 name = manager.get_stock_name("US:AAPL", allow_realtime=False)
                 df, source = manager.get_daily_data("US:AAPL")
 
-        self.assertEqual(name, "US:AAPL")
+        self.assertEqual(name, "Apple Inc.")
         self.assertEqual(source, "YfinanceFetcher")
         self.assertFalse(df.empty)
         self.assertIn("close", df.columns)

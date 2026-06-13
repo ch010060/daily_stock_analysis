@@ -15,9 +15,11 @@
 """
 
 import logging
+import json
 import os
 import random
 import time
+from pathlib import Path
 from threading import BoundedSemaphore, RLock, Thread
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
@@ -955,7 +957,7 @@ class DataFetcherManager:
         normalized = self._normalize_explicit_fixture_symbol(raw_stock_code)
         if normalized is None or normalized.market not in {"TW", "US"}:
             return None
-        return normalized.canonical
+        return self._get_fixture_company_profile_stock_name(normalized)
 
     def _get_controlled_tw_live_stock_name(self, raw_stock_code: str) -> Optional[str]:
         if not self._controlled_tw_live_mode_enabled():
@@ -964,6 +966,31 @@ class DataFetcherManager:
         normalized = self._normalize_explicit_fixture_symbol(raw_stock_code)
         if normalized is None or normalized.market != "TW":
             return None
+        return self._get_fixture_company_profile_stock_name(normalized)
+
+    @staticmethod
+    def _get_fixture_company_profile_stock_name(normalized) -> str:
+        fixture_path = (
+            Path(__file__).resolve().parents[1]
+            / "tests"
+            / "fixtures"
+            / "market"
+            / normalized.market.lower()
+            / normalized.provider_symbol
+            / "company_profile.json"
+        )
+        try:
+            with fixture_path.open("r", encoding="utf-8") as fh:
+                profile = json.load(fh)
+            name = profile.get("name") if isinstance(profile, dict) else None
+            if isinstance(name, str) and name.strip():
+                return name.strip()
+        except (OSError, json.JSONDecodeError, TypeError) as exc:
+            logger.debug(
+                "fixture company_profile name unavailable for %s: %s",
+                normalized.canonical,
+                exc,
+            )
         return normalized.canonical
 
     def _get_cached_stock_name(self, stock_code: str) -> Optional[str]:

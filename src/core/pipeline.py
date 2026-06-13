@@ -2358,7 +2358,7 @@ class StockAnalysisPipeline:
             return result
         except Exception as exc:
             logger.error(f"[{code}] prebuilt analysis failed: {exc}", exc_info=True)
-            return AnalysisResult(
+            result = AnalysisResult(
                 code=code,
                 name=pre_built_context.get("name", code),
                 sentiment_score=50,
@@ -2367,6 +2367,8 @@ class StockAnalysisPipeline:
                 success=False,
                 error_message=str(exc),
             )
+            result.query_id = query_id
+            return result
 
     def run(
         self,
