@@ -1,0 +1,9 @@
+{
+  "status": 200,
+  "msg": "success",
+  "data": [
+    {"date": "2026-06-10", "stock_id": "TPEx", "price": 768.50},
+    {"date": "2026-06-11", "stock_id": "TPEx", "price": 769.80},
+    {"date": "2026-06-12", "stock_id": "TPEx", "price": 770.19}
+  ]
+}

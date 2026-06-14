@@ -1,0 +1,9 @@
+{
+  "status": 200,
+  "msg": "success",
+  "data": [
+    {"date": "2026-06-10", "stock_id": "0050", "open": 102.50, "max": 103.00, "min": 102.00, "close": 102.80, "spread": 0.30, "Trading_Volume": 70000000, "Trading_money": 7196000000, "Trading_turnover": 71000},
+    {"date": "2026-06-11", "stock_id": "0050", "open": 103.00, "max": 103.50, "min": 102.50, "close": 103.20, "spread": 0.40, "Trading_Volume": 65000000, "Trading_money": 6708000000, "Trading_turnover": 66000},
+    {"date": "2026-06-12", "stock_id": "0050", "open": 103.25, "max": 103.75, "min": 101.55, "close": 101.95, "spread": -1.25, "Trading_Volume": 76563613, "Trading_money": 7836572620, "Trading_turnover": 77668}
+  ]
+}

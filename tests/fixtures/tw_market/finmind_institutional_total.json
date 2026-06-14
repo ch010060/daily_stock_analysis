@@ -1,0 +1,16 @@
+{
+  "status": 200,
+  "msg": "success",
+  "data": [
+    {"date": "2026-06-10", "name": "Dealer_Hedging", "buy": 12000000000, "sell": 11000000000},
+    {"date": "2026-06-10", "name": "Dealer_self", "buy": 8000000000, "sell": 7500000000},
+    {"date": "2026-06-10", "name": "Foreign_Investor", "buy": 85000000000, "sell": 80000000000},
+    {"date": "2026-06-10", "name": "Investment_Trust", "buy": 5000000000, "sell": 4500000000},
+    {"date": "2026-06-10", "name": "total", "buy": 110000000000, "sell": 103000000000},
+    {"date": "2026-06-12", "name": "Dealer_Hedging", "buy": 13000000000, "sell": 12000000000},
+    {"date": "2026-06-12", "name": "Dealer_self", "buy": 9000000000, "sell": 8000000000},
+    {"date": "2026-06-12", "name": "Foreign_Investor", "buy": 87000000000, "sell": 82000000000},
+    {"date": "2026-06-12", "name": "Investment_Trust", "buy": 5500000000, "sell": 5000000000},
+    {"date": "2026-06-12", "name": "total", "buy": 114500000000, "sell": 107000000000}
+  ]
+}

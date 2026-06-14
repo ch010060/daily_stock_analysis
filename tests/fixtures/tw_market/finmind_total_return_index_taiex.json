@@ -1,0 +1,9 @@
+{
+  "status": 200,
+  "msg": "success",
+  "data": [
+    {"date": "2026-06-10", "stock_id": "TAIEX", "price": 100800.12},
+    {"date": "2026-06-11", "stock_id": "TAIEX", "price": 100750.00},
+    {"date": "2026-06-12", "stock_id": "TAIEX", "price": 100933.47}
+  ]
+}
