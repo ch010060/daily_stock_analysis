@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "generated": "2026-06-14",
   "source": "FinMind official API documentation (finmind.github.io)",
   "base_url": "https://api.finmindtrade.com/api/v4",
@@ -115,14 +115,18 @@
       },
       "columns": ["date", "stock_id", "Trading_Volume", "Trading_money", "open", "max", "min", "close", "spread", "Trading_turnover"],
       "data_id_required": true,
-      "tier": "free",
+      "tier": "backer",
       "update_frequency": "daily",
       "live_probe": {
-        "enabled": true,
+        "enabled": false,
         "sample_data_id": "2330"
       },
-      "fallback": [],
-      "caveats": ["Prices are adjusted for dividends and splits; recommended for backtesting"]
+      "fallback": ["yfinance:2330.TW"],
+      "caveats": [
+        "Prices are adjusted for dividends and splits; recommended for backtesting",
+        "Requires Backer tier or higher — free (register) account returns api_error",
+        "Live probe disabled until Backer token available; use yfinance fallback for now"
+      ]
     },
     {
       "dataset": "TaiwanStockPER",
