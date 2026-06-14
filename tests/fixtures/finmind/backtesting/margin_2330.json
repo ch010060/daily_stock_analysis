@@ -1,0 +1,92 @@
+[
+  {
+    "date": "2026-03-23",
+    "stock_id": "2330",
+    "MarginPurchaseTodayBalance": 800000,
+    "MarginPurchaseYesterdayBalance": 795000,
+    "ShortSaleTodayBalance": 120000,
+    "ShortSaleYesterdayBalance": 121000,
+    "Note": ""
+  },
+  {
+    "date": "2026-03-24",
+    "stock_id": "2330",
+    "MarginPurchaseTodayBalance": 805000,
+    "MarginPurchaseYesterdayBalance": 800000,
+    "ShortSaleTodayBalance": 119000,
+    "ShortSaleYesterdayBalance": 120000,
+    "Note": ""
+  },
+  {
+    "date": "2026-03-25",
+    "stock_id": "2330",
+    "MarginPurchaseTodayBalance": 810000,
+    "MarginPurchaseYesterdayBalance": 805000,
+    "ShortSaleTodayBalance": 118000,
+    "ShortSaleYesterdayBalance": 119000,
+    "Note": ""
+  },
+  {
+    "date": "2026-03-26",
+    "stock_id": "2330",
+    "MarginPurchaseTodayBalance": 815000,
+    "MarginPurchaseYesterdayBalance": 810000,
+    "ShortSaleTodayBalance": 117000,
+    "ShortSaleYesterdayBalance": 118000,
+    "Note": ""
+  },
+  {
+    "date": "2026-03-27",
+    "stock_id": "2330",
+    "MarginPurchaseTodayBalance": 820000,
+    "MarginPurchaseYesterdayBalance": 815000,
+    "ShortSaleTodayBalance": 116000,
+    "ShortSaleYesterdayBalance": 117000,
+    "Note": ""
+  },
+  {
+    "date": "2026-03-30",
+    "stock_id": "2330",
+    "MarginPurchaseTodayBalance": 825000,
+    "MarginPurchaseYesterdayBalance": 820000,
+    "ShortSaleTodayBalance": 115000,
+    "ShortSaleYesterdayBalance": 116000,
+    "Note": ""
+  },
+  {
+    "date": "2026-03-31",
+    "stock_id": "2330",
+    "MarginPurchaseTodayBalance": 830000,
+    "MarginPurchaseYesterdayBalance": 825000,
+    "ShortSaleTodayBalance": 114000,
+    "ShortSaleYesterdayBalance": 115000,
+    "Note": ""
+  },
+  {
+    "date": "2026-04-01",
+    "stock_id": "2330",
+    "MarginPurchaseTodayBalance": 835000,
+    "MarginPurchaseYesterdayBalance": 830000,
+    "ShortSaleTodayBalance": 113000,
+    "ShortSaleYesterdayBalance": 114000,
+    "Note": ""
+  },
+  {
+    "date": "2026-04-02",
+    "stock_id": "2330",
+    "MarginPurchaseTodayBalance": 840000,
+    "MarginPurchaseYesterdayBalance": 835000,
+    "ShortSaleTodayBalance": 112000,
+    "ShortSaleYesterdayBalance": 113000,
+    "Note": ""
+  },
+  {
+    "date": "2026-04-03",
+    "stock_id": "2330",
+    "MarginPurchaseTodayBalance": 845000,
+    "MarginPurchaseYesterdayBalance": 840000,
+    "ShortSaleTodayBalance": 111000,
+    "ShortSaleYesterdayBalance": 112000,
+    "Note": ""
+  }
+]

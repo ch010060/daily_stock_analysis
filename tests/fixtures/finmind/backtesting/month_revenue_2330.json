@@ -1,0 +1,100 @@
+[
+  {
+    "date": "2025-02-10",
+    "stock_id": "2330",
+    "revenue": 180000000000.0,
+    "revenue_month": 2,
+    "revenue_year": 2025
+  },
+  {
+    "date": "2025-03-10",
+    "stock_id": "2330",
+    "revenue": 185000000000.0,
+    "revenue_month": 3,
+    "revenue_year": 2025
+  },
+  {
+    "date": "2025-04-10",
+    "stock_id": "2330",
+    "revenue": 190000000000.0,
+    "revenue_month": 4,
+    "revenue_year": 2025
+  },
+  {
+    "date": "2025-05-10",
+    "stock_id": "2330",
+    "revenue": 195000000000.0,
+    "revenue_month": 5,
+    "revenue_year": 2025
+  },
+  {
+    "date": "2025-06-10",
+    "stock_id": "2330",
+    "revenue": 200000000000.0,
+    "revenue_month": 6,
+    "revenue_year": 2025
+  },
+  {
+    "date": "2025-07-10",
+    "stock_id": "2330",
+    "revenue": 210000000000.0,
+    "revenue_month": 7,
+    "revenue_year": 2025
+  },
+  {
+    "date": "2025-08-10",
+    "stock_id": "2330",
+    "revenue": 215000000000.0,
+    "revenue_month": 8,
+    "revenue_year": 2025
+  },
+  {
+    "date": "2025-09-10",
+    "stock_id": "2330",
+    "revenue": 220000000000.0,
+    "revenue_month": 9,
+    "revenue_year": 2025
+  },
+  {
+    "date": "2025-10-10",
+    "stock_id": "2330",
+    "revenue": 225000000000.0,
+    "revenue_month": 10,
+    "revenue_year": 2025
+  },
+  {
+    "date": "2025-11-10",
+    "stock_id": "2330",
+    "revenue": 230000000000.0,
+    "revenue_month": 11,
+    "revenue_year": 2025
+  },
+  {
+    "date": "2025-12-10",
+    "stock_id": "2330",
+    "revenue": 240000000000.0,
+    "revenue_month": 12,
+    "revenue_year": 2025
+  },
+  {
+    "date": "2026-01-10",
+    "stock_id": "2330",
+    "revenue": 260000000000.0,
+    "revenue_month": 1,
+    "revenue_year": 2026
+  },
+  {
+    "date": "2026-02-10",
+    "stock_id": "2330",
+    "revenue": 255000000000.0,
+    "revenue_month": 2,
+    "revenue_year": 2026
+  },
+  {
+    "date": "2026-03-10",
+    "stock_id": "2330",
+    "revenue": 270000000000.0,
+    "revenue_month": 3,
+    "revenue_year": 2026
+  }
+]
