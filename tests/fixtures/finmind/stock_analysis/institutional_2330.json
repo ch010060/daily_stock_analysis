@@ -1,0 +1,6 @@
+[
+  {"date": "2026-06-13", "stock_id": "2330", "name": "Foreign_Investor", "buy": 38000000000, "sell": 20000000000},
+  {"date": "2026-06-13", "stock_id": "2330", "name": "Investment_Trust", "buy": 1500000000, "sell": 800000000},
+  {"date": "2026-06-13", "stock_id": "2330", "name": "Dealer_self", "buy": 500000000, "sell": 300000000},
+  {"date": "2026-06-13", "stock_id": "2330", "name": "Dealer_Hedging", "buy": 200000000, "sell": 150000000}
+]

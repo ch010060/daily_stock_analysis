@@ -1,0 +1,8 @@
+[
+  {"date": "2026-03-31", "stock_id": "2330", "type": "OperatingCashFlow", "value": 420000000000, "origin_name": "營業活動之現金流量"},
+  {"date": "2026-03-31", "stock_id": "2330", "type": "InvestingCashFlow", "value": -380000000000, "origin_name": "投資活動之現金流量"},
+  {"date": "2026-03-31", "stock_id": "2330", "type": "FinancingCashFlow", "value": -85000000000, "origin_name": "籌資活動之現金流量"},
+  {"date": "2026-03-31", "stock_id": "2330", "type": "FreeCashFlow", "value": 40000000000, "origin_name": "自由現金流量"},
+  {"date": "2025-12-31", "stock_id": "2330", "type": "OperatingCashFlow", "value": 380000000000, "origin_name": "營業活動之現金流量"},
+  {"date": "2025-12-31", "stock_id": "2330", "type": "InvestingCashFlow", "value": -360000000000, "origin_name": "投資活動之現金流量"}
+]
