@@ -93,10 +93,10 @@ def _post_with_retry(url: str, *, headers: Dict[str, str], json: Dict[str, Any],
     reraise=True,
 )
 def _get_with_retry(
-    url: str, *, headers: Dict[str, str], params: Dict[str, Any], timeout: int
+    url: str, *, headers: Dict[str, str], params: Dict[str, Any], timeout: int, verify: bool = True
 ) -> requests.Response:
     """GET with retry on transient SSL/network errors."""
-    return requests.get(url, headers=headers, params=params, timeout=timeout)
+    return requests.get(url, headers=headers, params=params, timeout=timeout, verify=verify)
 
 
 def fetch_url_content(url: str, timeout: int = 5) -> str:
@@ -1951,7 +1951,8 @@ class SearXNGSearchProvider(BaseSearchProvider):
             }
 
             request_get = _get_with_retry if retry_enabled else requests.get
-            response = request_get(search_url, headers=headers, params=params, timeout=timeout)
+            ssl_verify = not self._is_local_base_url(base_url)
+            response = request_get(search_url, headers=headers, params=params, timeout=timeout, verify=ssl_verify)
 
             if response.status_code != 200:
                 error_msg = self._parse_http_error(response)

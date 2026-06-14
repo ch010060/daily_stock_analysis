@@ -891,9 +891,18 @@ class Config:
     market_review_enabled: bool = True        # 是否启用大盘复盘
     # 大盘复盘市场区域：cn(A股)、hk(港股)、us(美股)、both(三市场)，us 适合仅关注美股的用户
     market_review_region: str = "cn"
+    # 多市场大盘复盘区域列表（MARKET_REVIEW_REGIONS=TW,US）；优先级高于 market_review_region
+    # 内部使用小写区域码：tw / us / cn / hk；空列表表示回退到 market_review_region
+    market_review_regions: List[str] = field(default_factory=list)
     market_review_color_scheme: str = "green_up"
     # 交易日检查：默认启用，非交易日跳过执行；设为 false 或 --force-run 可强制执行（Issue #373）
     trading_day_check_enabled: bool = True
+
+    # === Route B TW/US runtime scope enforcement ===
+    # ROUTE_B_ENFORCE_MARKET_SCOPE=true 时，只允许 TW/US 股票分析和大盘复盘
+    route_b_enforce_market_scope: bool = False
+    # ROUTE_B_MARKETS=TW,US 指定允许的市场（大写，逗号分隔）
+    route_b_markets: List[str] = field(default_factory=lambda: ["TW", "US"])
 
     # === 实时行情增强数据配置 ===
     # 实时行情开关（关闭后使用历史收盘价进行分析）
@@ -1692,10 +1701,19 @@ class Config:
             market_review_region=cls._parse_market_review_region(
                 os.getenv('MARKET_REVIEW_REGION', 'cn')
             ),
+            market_review_regions=cls._parse_market_review_regions_multi(
+                os.getenv('MARKET_REVIEW_REGIONS', '')
+            ),
             market_review_color_scheme=cls._parse_market_review_color_scheme(
                 os.getenv('MARKET_REVIEW_COLOR_SCHEME', 'green_up')
             ),
             trading_day_check_enabled=os.getenv('TRADING_DAY_CHECK_ENABLED', 'true').lower() != 'false',
+            route_b_enforce_market_scope=parse_env_bool(
+                os.getenv('ROUTE_B_ENFORCE_MARKET_SCOPE'), default=False
+            ),
+            route_b_markets=cls._parse_route_b_markets(
+                os.getenv('ROUTE_B_MARKETS', 'TW,US')
+            ),
             webui_enabled=os.getenv('WEBUI_ENABLED', 'false').lower() == 'true',
             webui_host=os.getenv('WEBUI_HOST', '127.0.0.1'),
             webui_port=parse_env_int(os.getenv('WEBUI_PORT'), 8000, field_name='WEBUI_PORT', minimum=1, maximum=65535),
@@ -2249,6 +2267,54 @@ class Config:
             f"MARKET_REVIEW_REGION 配置值 '{value}' 无效，已回退为默认值 'cn'（合法值：cn / hk / us / both）"
         )
         return 'cn'
+
+    @classmethod
+    def _parse_market_review_regions_multi(cls, value: str) -> List[str]:
+        """Parse MARKET_REVIEW_REGIONS (e.g. 'TW,US') into internal region codes.
+
+        Accepted values (case-insensitive): tw, us, cn, hk.
+        Returns an empty list when value is blank (falls back to market_review_region).
+        """
+        _map = {"tw": "tw", "us": "us", "cn": "cn", "hk": "hk"}
+        if not value or not value.strip():
+            return []
+        regions: List[str] = []
+        for item in value.split(","):
+            item = item.strip().lower()
+            if not item:
+                continue
+            mapped = _map.get(item)
+            if mapped:
+                regions.append(mapped)
+            else:
+                logger.warning(
+                    "MARKET_REVIEW_REGIONS 中未知区域值 %r，已忽略（合法值：tw / us / cn / hk）",
+                    item,
+                )
+        return regions
+
+    @classmethod
+    def _parse_route_b_markets(cls, value: str) -> List[str]:
+        """Parse ROUTE_B_MARKETS (e.g. 'TW,US') into uppercase market codes.
+
+        Falls back to ['TW', 'US'] when value is blank or invalid.
+        """
+        if not value or not value.strip():
+            return ["TW", "US"]
+        _valid = {"TW", "US", "HK", "CN"}
+        markets: List[str] = []
+        for item in value.split(","):
+            item = item.strip().upper()
+            if not item:
+                continue
+            if item in _valid:
+                markets.append(item)
+            else:
+                logger.warning(
+                    "ROUTE_B_MARKETS 中未知市场值 %r，已忽略（合法值：TW / US / HK / CN）",
+                    item,
+                )
+        return markets if markets else ["TW", "US"]
 
     @classmethod
     def _parse_market_review_color_scheme(cls, value: str) -> str:

@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [文档] 重大变更：YFinance/美股实时行情现在默认 fail-closed；在 `.env` 未显式设置 `DSA_FIXTURE_MODE=false` 与 `DSA_ALLOW_EXTERNAL_NETWORK=true` 时，有 fixture 的股票静默使用离线 fixture 数据，无 fixture 的股票将以 `DataFetchError` 拒绝请求，这是 Route B 离线优先的刻意安全边界。
 - [文档] MVP 范围说明：TaiwanFinMindFetcher 的 chips/fundamentals/company_profile 方法为 fixture-only 路径，不受四层网络守卫控制；Phase 3.3 live smoke 仅覆盖 daily bars，补充数据实时化延至后续 Phase。
 - [修复] US 股票代码正则扩展支持多类别代码（BRK.B、BRK-B、BF.B 等），新增 `([.-][A-Z]{1,2})?` 可选后缀。
+- [新功能] Route B 新增 TW/US runtime scope gate（`ROUTE_B_ENFORCE_MARKET_SCOPE`）：A 股 / CN 股票代码被拒绝，空 TW/US watchlist fail-closed 并附可操作错误提示；CN-only 数据源（Efinance/Akshare/Baostock/Pytdx）不会被呼叫。
+- [新功能] 新增大盤復盤多市場設定 `MARKET_REVIEW_REGIONS=TW,US`；Route B 模式下大盤復盤預設啟用 TW+US，CN/A 股大盤復盤被封鎖（附 warning 日誌），TW 大盤復盤標記為 deferred（尚未實作），US 大盤復盤正常啟用。
+- [改進] Config 新增 `route_b_enforce_market_scope`、`route_b_markets`、`market_review_regions` 欄位，對應環境變數 `ROUTE_B_ENFORCE_MARKET_SCOPE`、`ROUTE_B_MARKETS`、`MARKET_REVIEW_REGIONS`。
 - [修复] `_analyze_with_prebuilt` 现在将 `query_id` 写入返回结果，与常规分析路径行为对齐。
 - [修复] fixture/no-network 模式下股票名称现在从 `tests/fixtures/market/<market>/<symbol>/company_profile.json` 的 `name` 字段读取，不再回退到原始代码符号（如 `TW:2330`、`US:AAPL`）。
 - [修复] `DSA_ALLOW_EXTERNAL_NETWORK` 空值或未设置时现在正确视为禁用（fail-closed），仅 `1/true/yes/on` 等显式允许值才开放外网；原错误逻辑导致空字符串被误判为允许外网。

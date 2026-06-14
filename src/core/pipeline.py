@@ -2650,7 +2650,9 @@ class StockAnalysisPipeline:
     ) -> None:
         """保存分析报告到本地文件（与通知推送解耦）"""
         try:
+            from src.core.zh_tw_localization import localize_if_route_b
             report = self._generate_aggregate_report(results, report_type)
+            report = localize_if_route_b(report)
             filepath = self.notifier.save_report_to_file(report)
             logger.info(f"决策仪表盘日报已保存: {filepath}")
         except Exception as e:
