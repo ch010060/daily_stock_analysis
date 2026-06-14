@@ -1,5 +1,5 @@
 {
-  "version": "1.0.1",
+  "version": "1.1.0",
   "generated": "2026-06-14",
   "source": "FinMind official API documentation (finmind.github.io)",
   "base_url": "https://api.finmindtrade.com/api/v4",
@@ -15,7 +15,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_trading_date",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "is_trading_day"],
       "data_id_required": false,
@@ -39,7 +39,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_info",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["industry_category", "stock_id", "stock_name", "type", "date"],
       "data_id_required": false,
@@ -63,7 +63,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_news",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "title", "summary", "link", "source"],
       "data_id_required": true,
@@ -87,7 +87,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_daily",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "Trading_Volume", "Trading_money", "open", "max", "min", "close", "spread", "Trading_turnover"],
       "data_id_required": true,
@@ -111,7 +111,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_daily_adj",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "Trading_Volume", "Trading_money", "open", "max", "min", "close", "spread", "Trading_turnover"],
       "data_id_required": true,
@@ -139,7 +139,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_per",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "PER", "dividend_yield", "PBR"],
       "data_id_required": true,
@@ -163,7 +163,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_market_value",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "market_value"],
       "data_id_required": true,
@@ -187,7 +187,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_day_trading",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "BuyAfterSale", "Volume", "BuyAfterSaleVolume"],
       "data_id_required": true,
@@ -211,7 +211,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_month_revenue",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "country", "revenue", "revenue_month", "revenue_year"],
       "data_id_required": true,
@@ -235,7 +235,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_financial_statement",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "type", "value", "origin_name"],
       "data_id_required": true,
@@ -259,7 +259,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_balance_sheet",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "type", "value", "origin_name"],
       "data_id_required": true,
@@ -283,7 +283,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_cash_flows_statement",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "type", "value", "origin_name"],
       "data_id_required": true,
@@ -307,7 +307,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_dividend",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "StockEarningsDistribution", "StockStatutoryReserveTransfer", "StockCapitalReserveTransfer", "StockReward", "CashEarningsDistribution", "CashStatutoryReserveTransfer", "CashCapitalReserveTransfer", "CashReward", "CashDividendPaymentDate", "StockDividendPaymentDate"],
       "data_id_required": true,
@@ -331,7 +331,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_dividend_result",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "before_price", "after_price", "stock_and_cache_dividend", "stock_or_cache_dividend", "max_price", "min_price", "open_price", "reference_price"],
       "data_id_required": true,
@@ -355,7 +355,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_institutional_investors",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "name", "buy", "sell"],
       "data_id_required": true,
@@ -379,7 +379,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_margin_purchase_short_sale",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "MarginPurchaseBuy", "MarginPurchaseSell", "MarginPurchaseCashRepayment", "MarginPurchaseYesterdayBalance", "MarginPurchaseTodayBalance", "MarginPurchaseLimit", "ShortSaleBuy", "ShortSaleSell", "ShortSaleCashRepayment", "ShortSaleYesterdayBalance", "ShortSaleTodayBalance", "ShortSaleLimit", "Note"],
       "data_id_required": true,
@@ -403,7 +403,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_shareholding",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "HoldingSharesCount", "HoldingSharesRatio", "ForeignInvestmentUpperLimitRatio", "ChineseInvestmentUpperLimitRatio", "NumberOfShareholdersMoreThan1000Shares"],
       "data_id_required": true,
@@ -427,7 +427,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_securities_lending",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "SecuritiesLendingBorrowVolume", "SecuritiesLendingBorrowFee", "SecuritiesLendingBorrowMoney", "SecuritiesLendingCollateral", "SecuritiesLendingCollateralInterest"],
       "data_id_required": true,
@@ -451,7 +451,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_total_return_index",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "price"],
       "data_id_required": true,
@@ -479,7 +479,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_total_institutional_investors",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "name", "buy", "sell"],
       "data_id_required": false,
@@ -503,7 +503,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_total_margin_purchase_short_sale",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "name", "TodayBalance", "YesBalance"],
       "data_id_required": false,
@@ -531,7 +531,7 @@
       },
       "sdk": {
         "method": null,
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "securities_trader_id", "buy", "sell"],
       "data_id_required": true,
@@ -559,7 +559,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_government_bank_buy_sell",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "buy_government_bank", "sell_government_bank"],
       "data_id_required": true,
@@ -583,7 +583,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_block_trade",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "volume", "price"],
       "data_id_required": true,
@@ -607,7 +607,7 @@
       },
       "sdk": {
         "method": "taiwan_futures_daily",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "futures_id", "contract_date", "open", "max", "min", "close", "spread", "spread_percent", "volume", "settlement_price"],
       "data_id_required": true,
@@ -631,7 +631,7 @@
       },
       "sdk": {
         "method": "taiwan_option_daily",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "futures_id", "call_put", "strike_price", "contract_date", "open", "max", "min", "close", "volume", "settlement_price"],
       "data_id_required": true,
@@ -655,7 +655,7 @@
       },
       "sdk": {
         "method": "taiwan_futures_institutional_investors",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "futures_id", "name", "long_open_interest_balance", "short_open_interest_balance", "long_open_interest_balance_unit", "short_open_interest_balance_unit"],
       "data_id_required": true,
@@ -679,7 +679,7 @@
       },
       "sdk": {
         "method": "taiwan_option_institutional_investors",
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "futures_id", "name", "long_open_interest_balance", "short_open_interest_balance"],
       "data_id_required": true,
@@ -703,7 +703,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_kbar",
-        "async_batch": true
+        "bulk_download_available": true
       },
       "columns": ["date", "stock_id", "open", "max", "min", "close", "volume"],
       "data_id_required": true,
@@ -717,7 +717,7 @@
       "caveats": [
         "Sponsor tier required for per-stock query",
         "SponsorPro use_object=True for full-market daily parquet batch download",
-        "async_batch=true refers to use_object=True Sponsor Pro bulk download"
+        "bulk_download_available=true refers to use_object=True Sponsor Pro bulk download"
       ]
     },
     {
@@ -731,7 +731,7 @@
       },
       "sdk": {
         "method": "taiwan_stock_tick",
-        "async_batch": true
+        "bulk_download_available": true
       },
       "columns": ["date", "stock_id", "deal_price", "volume"],
       "data_id_required": true,
@@ -745,7 +745,7 @@
       "caveats": [
         "Sponsor tier required for per-stock tick query",
         "SponsorPro use_object=True for full-market daily parquet batch download",
-        "async_batch=true refers to use_object=True Sponsor Pro bulk download"
+        "bulk_download_available=true refers to use_object=True Sponsor Pro bulk download"
       ]
     },
     {
@@ -759,7 +759,7 @@
       },
       "sdk": {
         "method": null,
-        "async_batch": false
+        "bulk_download_available": false
       },
       "columns": ["date", "stock_id", "price", "volume"],
       "data_id_required": true,
