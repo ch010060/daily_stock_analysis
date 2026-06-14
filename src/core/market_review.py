@@ -31,6 +31,7 @@ _MARKET_REVIEW_MARKETS = (
     ('cn', 'cn_title', 'A 股'),
     ('hk', 'hk_title', '港股'),
     ('us', 'us_title', '美股'),
+    ('tw', 'tw_title', '台股'),
 )
 _MARKET_REVIEW_REGION_ORDER = tuple(market for market, _, _ in _MARKET_REVIEW_MARKETS)
 _VALID_MARKET_REVIEW_REGIONS = frozenset(_MARKET_REVIEW_REGION_ORDER)
@@ -45,6 +46,7 @@ def _get_market_review_text(language: str) -> dict[str, str]:
             "cn_title": "# A-share Market Recap",
             "us_title": "# US Market Recap",
             "hk_title": "# HK Market Recap",
+            "tw_title": "# TW Market Recap",
             "separator": "> Next market recap follows",
         }
     if normalized == "zh_TW":
@@ -54,6 +56,7 @@ def _get_market_review_text(language: str) -> dict[str, str]:
             "cn_title": "# A股大盤回顧",
             "us_title": "# 美股大盤回顧",
             "hk_title": "# 港股大盤回顧",
+            "tw_title": "# 台股大盤回顧",
             "separator": "> 以下為下一市場大盤回顧",
         }
     return {
@@ -62,6 +65,7 @@ def _get_market_review_text(language: str) -> dict[str, str]:
         "cn_title": "# A股大盘复盘",
         "us_title": "# 美股大盘复盘",
         "hk_title": "# 港股大盘复盘",
+        "tw_title": "# 台股大盤回顧",
         "separator": "> 以下为下一市场大盘复盘",
     }
 
