@@ -14,7 +14,7 @@ from typing import List
 class MarketProfile:
     """大盘复盘市场区域配置"""
 
-    region: str  # "cn" | "us"
+    region: str  # "cn" | "us" | "hk" | "tw"
     # 用于判断整体走势的指数代码，cn 用上证 000001，us 用标普 SPX
     mood_index_code: str
     # 新闻搜索关键词
@@ -66,11 +66,39 @@ HK_PROFILE = MarketProfile(
     has_sector_rankings=False,
 )
 
+TW_PROFILE = MarketProfile(
+    region="tw",
+    mood_index_code="TAIEX",
+    news_queries=[
+        "台股 大盤 今日",
+        "TAIEX 台股 加權指數 半導體",
+        "台積電 台股 盤勢",
+        "櫃買 指數 台股",
+        "外資 投信 自營商 台股",
+    ],
+    prompt_index_hint="分析加權指數（TAIEX）、櫃買指數（TPEx）、0050走勢，關注半導體與科技板塊主線",
+    has_market_stats=False,
+    has_sector_rankings=False,
+)
+
+
+_PROFILE_MAP = {
+    "cn": CN_PROFILE,
+    "us": US_PROFILE,
+    "hk": HK_PROFILE,
+    "tw": TW_PROFILE,
+}
+
 
 def get_profile(region: str) -> MarketProfile:
-    """根据 region 返回对应的 MarketProfile"""
-    if region == "us":
-        return US_PROFILE
-    if region == "hk":
-        return HK_PROFILE
-    return CN_PROFILE
+    """Return MarketProfile for the given region.
+
+    Raises ValueError for unrecognised regions to prevent silent CN fallback.
+    """
+    try:
+        return _PROFILE_MAP[region]
+    except KeyError:
+        raise ValueError(
+            f"Unsupported market review region: {region!r}. "
+            f"Accepted values: {sorted(_PROFILE_MAP)}"
+        )

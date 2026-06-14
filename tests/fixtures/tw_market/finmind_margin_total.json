@@ -1,0 +1,12 @@
+{
+  "status": 200,
+  "msg": "success",
+  "data": [
+    {"date": "2026-06-10", "name": "MarginPurchaseMoney", "TodayBalance": 550000000000, "YesBalance": 545000000000, "buy": 40000000000, "sell": 35000000000, "Return": 500000000},
+    {"date": "2026-06-10", "name": "ShortSaleMoney", "TodayBalance": 20000000000, "YesBalance": 19500000000, "buy": 1500000000, "sell": 1000000000, "Return": 100000000},
+    {"date": "2026-06-10", "name": "ShortSaleVolume", "TodayBalance": 100000, "YesBalance": 98000, "buy": 8000, "sell": 6000, "Return": 2000},
+    {"date": "2026-06-12", "name": "MarginPurchaseMoney", "TodayBalance": 557027949000, "YesBalance": 549176982000, "buy": 43665056000, "sell": 35337448000, "Return": 476641000},
+    {"date": "2026-06-12", "name": "ShortSaleMoney", "TodayBalance": 21000000000, "YesBalance": 20500000000, "buy": 1600000000, "sell": 1100000000, "Return": 100000000},
+    {"date": "2026-06-12", "name": "ShortSaleVolume", "TodayBalance": 102000, "YesBalance": 100000, "buy": 8500, "sell": 6500, "Return": 2000}
+  ]
+}

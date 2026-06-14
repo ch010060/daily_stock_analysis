@@ -117,12 +117,12 @@ class TestFilterRegionsForRouteB(unittest.TestCase):
         self.assertIn("cn", skipped_cn)
         self.assertEqual(deferred_tw, [])
 
-    def test_tw_region_deferred_not_cn_fallback(self):
-        """TW must be deferred, not turned into CN."""
+    def test_tw_region_implemented_not_cn_fallback(self):
+        """TW is now implemented; it routes to run, not deferred, not CN."""
         run, skipped_cn, deferred_tw = filter_regions_for_route_b(["tw"])
-        self.assertEqual(run, [])
+        self.assertIn("tw", run)
         self.assertEqual(skipped_cn, [])
-        self.assertIn("tw", deferred_tw)
+        self.assertEqual(deferred_tw, [])
 
     def test_us_cn_mixed_blocks_cn_runs_us(self):
         run, skipped_cn, deferred_tw = filter_regions_for_route_b(["us", "cn"])
@@ -133,14 +133,15 @@ class TestFilterRegionsForRouteB(unittest.TestCase):
     def test_tw_us_cn_all_three(self):
         run, skipped_cn, deferred_tw = filter_regions_for_route_b(["tw", "us", "cn"])
         self.assertIn("us", run)
+        self.assertIn("tw", run)
         self.assertIn("cn", skipped_cn)
-        self.assertIn("tw", deferred_tw)
+        self.assertEqual(deferred_tw, [])
 
-    def test_all_cn_skipped_all_tw_deferred_returns_empty_run(self):
+    def test_cn_blocked_tw_runs_cn_tw_mix(self):
         run, skipped_cn, deferred_tw = filter_regions_for_route_b(["cn", "tw"])
-        self.assertEqual(run, [])
+        self.assertIn("tw", run)
         self.assertIn("cn", skipped_cn)
-        self.assertIn("tw", deferred_tw)
+        self.assertEqual(deferred_tw, [])
 
     def test_empty_list_returns_empty_tuples(self):
         run, skipped_cn, deferred_tw = filter_regions_for_route_b([])
@@ -158,12 +159,13 @@ class TestFilterRegionsForRouteB(unittest.TestCase):
 class TestGetEffectiveRegionsForRouteB(unittest.TestCase):
     """get_effective_regions_for_route_b uses ROUTE_B_MARKETS by default."""
 
-    def test_tw_us_defaults_give_us_run_tw_deferred(self):
+    def test_tw_us_defaults_give_both_run(self):
         config = _config(markets=["TW", "US"])
         run, skipped_cn, deferred_tw = get_effective_regions_for_route_b(config)
         self.assertIn("us", run)
+        self.assertIn("tw", run)
         self.assertNotIn("cn", run)
-        self.assertIn("tw", deferred_tw)
+        self.assertEqual(deferred_tw, [])
 
     def test_explicit_regions_override_defaults(self):
         config = _config(markets=["TW", "US"])
@@ -297,31 +299,33 @@ class TestNoCNIndexProviders(unittest.TestCase):
             mock_analyzer_cls.assert_not_called()
 
 
-class TestTWMarketReviewDeferred(unittest.TestCase):
-    """TW market review is explicitly deferred; must not fallback to CN."""
+class TestTWMarketReviewImplemented(unittest.TestCase):
+    """TW market review is implemented (Phase 7E-FINAL); routes to run_regions, not deferred."""
 
-    def test_tw_deferred_not_cn_fallback(self):
+    def test_tw_routes_to_run_not_cn_fallback(self):
         run, skipped_cn, deferred_tw = filter_regions_for_route_b(["tw"])
-        self.assertNotIn("cn", run, "TW deferred must not produce CN fallback")
-        self.assertIn("tw", deferred_tw)
+        self.assertNotIn("cn", run, "TW must not produce CN fallback")
+        self.assertIn("tw", run)
+        self.assertEqual(deferred_tw, [])
 
-    def test_tw_us_tw_deferred_us_runs(self):
+    def test_tw_us_both_run(self):
         run, skipped_cn, deferred_tw = filter_regions_for_route_b(["tw", "us"])
         self.assertIn("us", run)
-        self.assertIn("tw", deferred_tw)
+        self.assertIn("tw", run)
         self.assertNotIn("cn", run)
+        self.assertEqual(deferred_tw, [])
 
-    def test_tw_only_deferred_no_market_review_runs(self):
+    def test_tw_only_routes_to_run(self):
         run, _, deferred_tw = filter_regions_for_route_b(["tw"])
-        self.assertEqual(run, [])
-        self.assertIn("tw", deferred_tw)
+        self.assertIn("tw", run)
+        self.assertEqual(deferred_tw, [])
 
-    def test_all_deferred_or_blocked_skips_review(self):
-        """When both TW (deferred) and CN (blocked) are the only regions, run is empty."""
+    def test_cn_blocked_when_tw_cn_requested(self):
+        """When TW and CN are requested, CN is blocked but TW runs."""
         run, skipped_cn, deferred_tw = filter_regions_for_route_b(["tw", "cn"])
-        self.assertEqual(run, [])
         self.assertIn("cn", skipped_cn)
-        self.assertIn("tw", deferred_tw)
+        self.assertIn("tw", run)
+        self.assertEqual(deferred_tw, [])
 
 
 class TestUSMarketReviewAccepted(unittest.TestCase):
@@ -347,10 +351,9 @@ class TestReportOutputGate(unittest.TestCase):
     """Report/output guarding: non-TW/US results must not be written."""
 
     def test_tw_us_regions_after_gate_are_writable(self):
-        """After Route B gate, only TW/US (implemented) regions produce output."""
+        """After Route B gate, TW and US both appear in run_regions (both implemented)."""
         config = _config(markets=["TW", "US"])
         run, skipped_cn, deferred_tw = get_effective_regions_for_route_b(config)
-        # Only 'us' is both TW/US and implemented; 'tw' is deferred
         for region in run:
             self.assertNotEqual(region, "cn",
                 f"Region {region!r} is CN and must not be in run_regions")
@@ -367,10 +370,11 @@ class TestReportOutputGate(unittest.TestCase):
         # Verify that run is falsy so downstream can gate on it
         self.assertFalse(run)
 
-    def test_tw_deferred_has_explicit_skip_status(self):
-        """TW deferred regions appear in deferred_tw, giving clear skip status."""
-        _, _, deferred_tw = filter_regions_for_route_b(["tw"])
-        self.assertTrue(deferred_tw, "TW deferred list should not be empty")
+    def test_tw_implemented_routes_to_run(self):
+        """TW is now implemented; it appears in run_regions, not deferred_tw."""
+        run, _, deferred_tw = filter_regions_for_route_b(["tw"])
+        self.assertIn("tw", run, "TW should be in run_regions after Phase 7E-FINAL unlock")
+        self.assertNotIn("tw", deferred_tw)
 
 
 if __name__ == "__main__":
