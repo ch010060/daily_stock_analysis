@@ -1,0 +1,20 @@
+{
+  "status": 200,
+  "msg": "",
+  "data": [
+    {
+      "date": "2026-06-01",
+      "stock_id": "2330",
+      "StockEarningsDistribution": 0.0,
+      "StockStatutoryReserveTransfer": 0.0,
+      "StockCapitalReserveTransfer": 0.0,
+      "StockReward": 0.0,
+      "CashEarningsDistribution": 4.5,
+      "CashStatutoryReserveTransfer": 0.0,
+      "CashCapitalReserveTransfer": 0.0,
+      "CashReward": 0.0,
+      "CashDividendPaymentDate": "2026-07-15",
+      "StockDividendPaymentDate": ""
+    }
+  ]
+}

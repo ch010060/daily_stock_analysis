@@ -8,16 +8,28 @@
       "dataset": "TaiwanStockTradingDate",
       "market": "TW",
       "category": "calendar",
-      "feature_groups": ["latest_info", "market_review", "dataset_explorer"],
+      "feature_groups": [
+        "latest_info",
+        "market_review",
+        "dataset_explorer"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_trading_date",
         "bulk_download_available": false
       },
-      "columns": ["date", "is_trading_day"],
+      "columns": [
+        "date",
+        "is_trading_day"
+      ],
       "data_id_required": false,
       "tier": "free",
       "update_frequency": "daily",
@@ -26,22 +38,36 @@
         "sample_data_id": null
       },
       "fallback": [],
-      "caveats": ["No data_id needed; returns all trading dates in the range"]
+      "caveats": [
+        "No data_id needed; returns all trading dates in the range"
+      ]
     },
     {
       "dataset": "TaiwanStockInfo",
       "market": "TW",
       "category": "reference",
-      "feature_groups": ["stock_analysis", "dataset_explorer", "panel_prompt"],
+      "feature_groups": [
+        "stock_analysis",
+        "dataset_explorer",
+        "panel_prompt"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset"]
+        "params": [
+          "dataset"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_info",
         "bulk_download_available": false
       },
-      "columns": ["industry_category", "stock_id", "stock_name", "type", "date"],
+      "columns": [
+        "industry_category",
+        "stock_id",
+        "stock_name",
+        "type",
+        "date"
+      ],
       "data_id_required": false,
       "tier": "free",
       "update_frequency": "irregular",
@@ -50,46 +76,89 @@
         "sample_data_id": null
       },
       "fallback": [],
-      "caveats": ["No date range needed; returns full stock list snapshot"]
+      "caveats": [
+        "No date range needed; returns full stock list snapshot"
+      ]
     },
     {
       "dataset": "TaiwanStockNews",
       "market": "TW",
       "category": "news",
-      "feature_groups": ["latest_info", "stock_analysis", "panel_prompt"],
+      "feature_groups": [
+        "latest_info",
+        "stock_analysis",
+        "panel_prompt"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_news",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "title", "summary", "link", "source"],
+      "columns": [
+        "date",
+        "stock_id",
+        "title",
+        "summary",
+        "link",
+        "source"
+      ],
       "data_id_required": true,
       "tier": "unknown",
       "update_frequency": "intraday",
       "live_probe": {
         "enabled": false,
-        "sample_data_id": "2330"
+        "sample_data_id": "2330",
+        "note": "HTTP 400 observed in Phase 8C live probe; may be tier or endpoint issue"
       },
       "fallback": [],
-      "caveats": ["Tier requirement not confirmed in free tier; probe before production use"]
+      "caveats": [
+        "Tier requirement not confirmed in free tier; probe before production use",
+        "Phase 8C live probe returned HTTP 400 — dataset may require different params or higher tier; collector emits data_unavailable event and continues"
+      ]
     },
     {
       "dataset": "TaiwanStockPrice",
       "market": "TW",
       "category": "technical",
-      "feature_groups": ["stock_analysis", "backtesting", "strategy_analysis", "market_review"],
+      "feature_groups": [
+        "stock_analysis",
+        "backtesting",
+        "strategy_analysis",
+        "market_review"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_daily",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "Trading_Volume", "Trading_money", "open", "max", "min", "close", "spread", "Trading_turnover"],
+      "columns": [
+        "date",
+        "stock_id",
+        "Trading_Volume",
+        "Trading_money",
+        "open",
+        "max",
+        "min",
+        "close",
+        "spread",
+        "Trading_turnover"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "daily",
@@ -97,23 +166,47 @@
         "enabled": true,
         "sample_data_id": "2330"
       },
-      "fallback": ["yfinance:2330.TW"],
-      "caveats": ["data_id is 4-digit TWSE/TPEx stock code"]
+      "fallback": [
+        "yfinance:2330.TW"
+      ],
+      "caveats": [
+        "data_id is 4-digit TWSE/TPEx stock code"
+      ]
     },
     {
       "dataset": "TaiwanStockPriceAdj",
       "market": "TW",
       "category": "technical",
-      "feature_groups": ["backtesting", "strategy_analysis", "stock_analysis"],
+      "feature_groups": [
+        "backtesting",
+        "strategy_analysis",
+        "stock_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_daily_adj",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "Trading_Volume", "Trading_money", "open", "max", "min", "close", "spread", "Trading_turnover"],
+      "columns": [
+        "date",
+        "stock_id",
+        "Trading_Volume",
+        "Trading_money",
+        "open",
+        "max",
+        "min",
+        "close",
+        "spread",
+        "Trading_turnover"
+      ],
       "data_id_required": true,
       "tier": "backer",
       "update_frequency": "daily",
@@ -121,7 +214,9 @@
         "enabled": false,
         "sample_data_id": "2330"
       },
-      "fallback": ["yfinance:2330.TW"],
+      "fallback": [
+        "yfinance:2330.TW"
+      ],
       "caveats": [
         "Prices are adjusted for dividends and splits; recommended for backtesting",
         "Requires Backer tier or higher — free (register) account returns api_error",
@@ -132,16 +227,31 @@
       "dataset": "TaiwanStockPER",
       "market": "TW",
       "category": "technical",
-      "feature_groups": ["stock_analysis", "strategy_analysis", "backtesting"],
+      "feature_groups": [
+        "stock_analysis",
+        "strategy_analysis",
+        "backtesting"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_per",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "PER", "dividend_yield", "PBR"],
+      "columns": [
+        "date",
+        "stock_id",
+        "PER",
+        "dividend_yield",
+        "PBR"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "daily",
@@ -156,16 +266,28 @@
       "dataset": "TaiwanStockMarketValue",
       "market": "TW",
       "category": "technical",
-      "feature_groups": ["stock_analysis", "strategy_analysis"],
+      "feature_groups": [
+        "stock_analysis",
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_market_value",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "market_value"],
+      "columns": [
+        "date",
+        "stock_id",
+        "market_value"
+      ],
       "data_id_required": true,
       "tier": "unknown",
       "update_frequency": "daily",
@@ -174,22 +296,38 @@
         "sample_data_id": "2330"
       },
       "fallback": [],
-      "caveats": ["Tier requirement not confirmed; probe before production use"]
+      "caveats": [
+        "Tier requirement not confirmed; probe before production use"
+      ]
     },
     {
       "dataset": "TaiwanStockDayTrading",
       "market": "TW",
       "category": "technical",
-      "feature_groups": ["stock_analysis", "strategy_analysis"],
+      "feature_groups": [
+        "stock_analysis",
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_day_trading",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "BuyAfterSale", "Volume", "BuyAfterSaleVolume"],
+      "columns": [
+        "date",
+        "stock_id",
+        "BuyAfterSale",
+        "Volume",
+        "BuyAfterSaleVolume"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "daily",
@@ -198,22 +336,40 @@
         "sample_data_id": "2330"
       },
       "fallback": [],
-      "caveats": ["Day-trading (當沖) volume data"]
+      "caveats": [
+        "Day-trading (當沖) volume data"
+      ]
     },
     {
       "dataset": "TaiwanStockMonthRevenue",
       "market": "TW",
       "category": "fundamental",
-      "feature_groups": ["stock_analysis", "backtesting", "strategy_analysis"],
+      "feature_groups": [
+        "stock_analysis",
+        "backtesting",
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_month_revenue",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "country", "revenue", "revenue_month", "revenue_year"],
+      "columns": [
+        "date",
+        "stock_id",
+        "country",
+        "revenue",
+        "revenue_month",
+        "revenue_year"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "monthly",
@@ -222,22 +378,39 @@
         "sample_data_id": "2330"
       },
       "fallback": [],
-      "caveats": ["Revenue reported by 10th of following month; date is announcement date"]
+      "caveats": [
+        "Revenue reported by 10th of following month; date is announcement date"
+      ]
     },
     {
       "dataset": "TaiwanStockFinancialStatements",
       "market": "TW",
       "category": "fundamental",
-      "feature_groups": ["stock_analysis", "backtesting", "strategy_analysis"],
+      "feature_groups": [
+        "stock_analysis",
+        "backtesting",
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_financial_statement",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "type", "value", "origin_name"],
+      "columns": [
+        "date",
+        "stock_id",
+        "type",
+        "value",
+        "origin_name"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "quarterly",
@@ -246,22 +419,38 @@
         "sample_data_id": "2330"
       },
       "fallback": [],
-      "caveats": ["Returns income statement items; type field identifies each line item"]
+      "caveats": [
+        "Returns income statement items; type field identifies each line item"
+      ]
     },
     {
       "dataset": "TaiwanStockBalanceSheet",
       "market": "TW",
       "category": "fundamental",
-      "feature_groups": ["stock_analysis", "strategy_analysis"],
+      "feature_groups": [
+        "stock_analysis",
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_balance_sheet",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "type", "value", "origin_name"],
+      "columns": [
+        "date",
+        "stock_id",
+        "type",
+        "value",
+        "origin_name"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "quarterly",
@@ -276,16 +465,30 @@
       "dataset": "TaiwanStockCashFlowsStatement",
       "market": "TW",
       "category": "fundamental",
-      "feature_groups": ["stock_analysis", "strategy_analysis"],
+      "feature_groups": [
+        "stock_analysis",
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_cash_flows_statement",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "type", "value", "origin_name"],
+      "columns": [
+        "date",
+        "stock_id",
+        "type",
+        "value",
+        "origin_name"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "quarterly",
@@ -300,16 +503,38 @@
       "dataset": "TaiwanStockDividend",
       "market": "TW",
       "category": "fundamental",
-      "feature_groups": ["stock_analysis", "backtesting", "strategy_analysis"],
+      "feature_groups": [
+        "stock_analysis",
+        "backtesting",
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_dividend",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "StockEarningsDistribution", "StockStatutoryReserveTransfer", "StockCapitalReserveTransfer", "StockReward", "CashEarningsDistribution", "CashStatutoryReserveTransfer", "CashCapitalReserveTransfer", "CashReward", "CashDividendPaymentDate", "StockDividendPaymentDate"],
+      "columns": [
+        "date",
+        "stock_id",
+        "StockEarningsDistribution",
+        "StockStatutoryReserveTransfer",
+        "StockCapitalReserveTransfer",
+        "StockReward",
+        "CashEarningsDistribution",
+        "CashStatutoryReserveTransfer",
+        "CashCapitalReserveTransfer",
+        "CashReward",
+        "CashDividendPaymentDate",
+        "StockDividendPaymentDate"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "irregular",
@@ -318,22 +543,43 @@
         "sample_data_id": "2330"
       },
       "fallback": [],
-      "caveats": ["Contains declared dividend details; use TaiwanStockDividendResult for ex-dividend results"]
+      "caveats": [
+        "Contains declared dividend details; use TaiwanStockDividendResult for ex-dividend results"
+      ]
     },
     {
       "dataset": "TaiwanStockDividendResult",
       "market": "TW",
       "category": "fundamental",
-      "feature_groups": ["stock_analysis", "backtesting"],
+      "feature_groups": [
+        "stock_analysis",
+        "backtesting"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_dividend_result",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "before_price", "after_price", "stock_and_cache_dividend", "stock_or_cache_dividend", "max_price", "min_price", "open_price", "reference_price"],
+      "columns": [
+        "date",
+        "stock_id",
+        "before_price",
+        "after_price",
+        "stock_and_cache_dividend",
+        "stock_or_cache_dividend",
+        "max_price",
+        "min_price",
+        "open_price",
+        "reference_price"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "irregular",
@@ -342,22 +588,39 @@
         "sample_data_id": "2330"
       },
       "fallback": [],
-      "caveats": ["Ex-dividend result data; includes before/after prices"]
+      "caveats": [
+        "Ex-dividend result data; includes before/after prices"
+      ]
     },
     {
       "dataset": "TaiwanStockInstitutionalInvestorsBuySell",
       "market": "TW",
       "category": "chip",
-      "feature_groups": ["stock_analysis", "backtesting", "strategy_analysis"],
+      "feature_groups": [
+        "stock_analysis",
+        "backtesting",
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_institutional_investors",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "name", "buy", "sell"],
+      "columns": [
+        "date",
+        "stock_id",
+        "name",
+        "buy",
+        "sell"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "daily",
@@ -366,22 +629,49 @@
         "sample_data_id": "2330"
       },
       "fallback": [],
-      "caveats": ["name field: Foreign_Investor / Investment_Trust / Dealer_self / Dealer_Hedging"]
+      "caveats": [
+        "name field: Foreign_Investor / Investment_Trust / Dealer_self / Dealer_Hedging"
+      ]
     },
     {
       "dataset": "TaiwanStockMarginPurchaseShortSale",
       "market": "TW",
       "category": "chip",
-      "feature_groups": ["stock_analysis", "backtesting", "strategy_analysis"],
+      "feature_groups": [
+        "stock_analysis",
+        "backtesting",
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_margin_purchase_short_sale",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "MarginPurchaseBuy", "MarginPurchaseSell", "MarginPurchaseCashRepayment", "MarginPurchaseYesterdayBalance", "MarginPurchaseTodayBalance", "MarginPurchaseLimit", "ShortSaleBuy", "ShortSaleSell", "ShortSaleCashRepayment", "ShortSaleYesterdayBalance", "ShortSaleTodayBalance", "ShortSaleLimit", "Note"],
+      "columns": [
+        "date",
+        "stock_id",
+        "MarginPurchaseBuy",
+        "MarginPurchaseSell",
+        "MarginPurchaseCashRepayment",
+        "MarginPurchaseYesterdayBalance",
+        "MarginPurchaseTodayBalance",
+        "MarginPurchaseLimit",
+        "ShortSaleBuy",
+        "ShortSaleSell",
+        "ShortSaleCashRepayment",
+        "ShortSaleYesterdayBalance",
+        "ShortSaleTodayBalance",
+        "ShortSaleLimit",
+        "Note"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "daily",
@@ -396,16 +686,32 @@
       "dataset": "TaiwanStockShareholding",
       "market": "TW",
       "category": "chip",
-      "feature_groups": ["stock_analysis", "strategy_analysis"],
+      "feature_groups": [
+        "stock_analysis",
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_shareholding",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "HoldingSharesCount", "HoldingSharesRatio", "ForeignInvestmentUpperLimitRatio", "ChineseInvestmentUpperLimitRatio", "NumberOfShareholdersMoreThan1000Shares"],
+      "columns": [
+        "date",
+        "stock_id",
+        "HoldingSharesCount",
+        "HoldingSharesRatio",
+        "ForeignInvestmentUpperLimitRatio",
+        "ChineseInvestmentUpperLimitRatio",
+        "NumberOfShareholdersMoreThan1000Shares"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "daily",
@@ -414,22 +720,40 @@
         "sample_data_id": "2330"
       },
       "fallback": [],
-      "caveats": ["Foreign shareholding ratio; data updated periodically, not every trading day"]
+      "caveats": [
+        "Foreign shareholding ratio; data updated periodically, not every trading day"
+      ]
     },
     {
       "dataset": "TaiwanStockSecuritiesLending",
       "market": "TW",
       "category": "chip",
-      "feature_groups": ["stock_analysis", "strategy_analysis"],
+      "feature_groups": [
+        "stock_analysis",
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_securities_lending",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "SecuritiesLendingBorrowVolume", "SecuritiesLendingBorrowFee", "SecuritiesLendingBorrowMoney", "SecuritiesLendingCollateral", "SecuritiesLendingCollateralInterest"],
+      "columns": [
+        "date",
+        "stock_id",
+        "SecuritiesLendingBorrowVolume",
+        "SecuritiesLendingBorrowFee",
+        "SecuritiesLendingBorrowMoney",
+        "SecuritiesLendingCollateral",
+        "SecuritiesLendingCollateralInterest"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "daily",
@@ -438,22 +762,37 @@
         "sample_data_id": "2330"
       },
       "fallback": [],
-      "caveats": ["借券資料"]
+      "caveats": [
+        "借券資料"
+      ]
     },
     {
       "dataset": "TaiwanStockTotalReturnIndex",
       "market": "TW",
       "category": "market_overview",
-      "feature_groups": ["market_review", "backtesting", "dataset_explorer"],
+      "feature_groups": [
+        "market_review",
+        "backtesting",
+        "dataset_explorer"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_total_return_index",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "price"],
+      "columns": [
+        "date",
+        "stock_id",
+        "price"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "daily",
@@ -461,7 +800,9 @@
         "enabled": true,
         "sample_data_id": "TAIEX"
       },
-      "fallback": ["yfinance:^TWII"],
+      "fallback": [
+        "yfinance:^TWII"
+      ],
       "caveats": [
         "data_id=TAIEX → 加權報酬指數 (~100933 as of 2026-06; includes reinvested dividends)",
         "data_id=TPEx → 櫃買報酬指數",
@@ -472,16 +813,28 @@
       "dataset": "TaiwanStockTotalInstitutionalInvestors",
       "market": "TW",
       "category": "market_overview",
-      "feature_groups": ["market_review", "strategy_analysis"],
+      "feature_groups": [
+        "market_review",
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_total_institutional_investors",
         "bulk_download_available": false
       },
-      "columns": ["date", "name", "buy", "sell"],
+      "columns": [
+        "date",
+        "name",
+        "buy",
+        "sell"
+      ],
       "data_id_required": false,
       "tier": "free",
       "update_frequency": "daily",
@@ -490,22 +843,36 @@
         "sample_data_id": null
       },
       "fallback": [],
-      "caveats": ["name field: Foreign_Investor / Investment_Trust / Dealer_self / Dealer_Hedging / total; raw NTD units — divide by 1e8 for 億元 display"]
+      "caveats": [
+        "name field: Foreign_Investor / Investment_Trust / Dealer_self / Dealer_Hedging / total; raw NTD units — divide by 1e8 for 億元 display"
+      ]
     },
     {
       "dataset": "TaiwanStockTotalMarginPurchaseShortSale",
       "market": "TW",
       "category": "market_overview",
-      "feature_groups": ["market_review", "strategy_analysis"],
+      "feature_groups": [
+        "market_review",
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_total_margin_purchase_short_sale",
         "bulk_download_available": false
       },
-      "columns": ["date", "name", "TodayBalance", "YesBalance"],
+      "columns": [
+        "date",
+        "name",
+        "TodayBalance",
+        "YesBalance"
+      ],
       "data_id_required": false,
       "tier": "free",
       "update_frequency": "daily",
@@ -524,16 +891,28 @@
       "dataset": "TaiwanStockTradingDailyReport",
       "market": "TW",
       "category": "chip",
-      "feature_groups": ["strategy_analysis", "dataset_explorer"],
+      "feature_groups": [
+        "strategy_analysis",
+        "dataset_explorer"
+      ],
       "rest": {
         "endpoint": "/taiwan_stock_trading_daily_report",
-        "params": ["date", "data_id"]
+        "params": [
+          "date",
+          "data_id"
+        ]
       },
       "sdk": {
         "method": null,
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "securities_trader_id", "buy", "sell"],
+      "columns": [
+        "date",
+        "stock_id",
+        "securities_trader_id",
+        "buy",
+        "sell"
+      ],
       "data_id_required": true,
       "tier": "sponsor",
       "update_frequency": "daily",
@@ -552,16 +931,28 @@
       "dataset": "TaiwanstockGovernmentBankBuySell",
       "market": "TW",
       "category": "chip",
-      "feature_groups": ["strategy_analysis"],
+      "feature_groups": [
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_government_bank_buy_sell",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "buy_government_bank", "sell_government_bank"],
+      "columns": [
+        "date",
+        "stock_id",
+        "buy_government_bank",
+        "sell_government_bank"
+      ],
       "data_id_required": true,
       "tier": "sponsor",
       "update_frequency": "daily",
@@ -570,22 +961,36 @@
         "sample_data_id": "2330"
       },
       "fallback": [],
-      "caveats": ["Sponsor tier required; 八大行庫買賣超"]
+      "caveats": [
+        "Sponsor tier required; 八大行庫買賣超"
+      ]
     },
     {
       "dataset": "TaiwanStockBlockTrade",
       "market": "TW",
       "category": "chip",
-      "feature_groups": ["strategy_analysis"],
+      "feature_groups": [
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_block_trade",
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "volume", "price"],
+      "columns": [
+        "date",
+        "stock_id",
+        "volume",
+        "price"
+      ],
       "data_id_required": true,
       "tier": "sponsor",
       "update_frequency": "daily",
@@ -594,22 +999,44 @@
         "sample_data_id": "2330"
       },
       "fallback": [],
-      "caveats": ["Sponsor tier required; 鉅額交易"]
+      "caveats": [
+        "Sponsor tier required; 鉅額交易"
+      ]
     },
     {
       "dataset": "TaiwanFuturesDaily",
       "market": "TW",
       "category": "derivatives",
-      "feature_groups": ["strategy_analysis", "dataset_explorer"],
+      "feature_groups": [
+        "strategy_analysis",
+        "dataset_explorer"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_futures_daily",
         "bulk_download_available": false
       },
-      "columns": ["date", "futures_id", "contract_date", "open", "max", "min", "close", "spread", "spread_percent", "volume", "settlement_price"],
+      "columns": [
+        "date",
+        "futures_id",
+        "contract_date",
+        "open",
+        "max",
+        "min",
+        "close",
+        "spread",
+        "spread_percent",
+        "volume",
+        "settlement_price"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "daily",
@@ -618,22 +1045,44 @@
         "sample_data_id": "TXF"
       },
       "fallback": [],
-      "caveats": ["data_id: TXF (台指期), TMF, CDF, etc."]
+      "caveats": [
+        "data_id: TXF (台指期), TMF, CDF, etc."
+      ]
     },
     {
       "dataset": "TaiwanOptionDaily",
       "market": "TW",
       "category": "derivatives",
-      "feature_groups": ["strategy_analysis", "dataset_explorer"],
+      "feature_groups": [
+        "strategy_analysis",
+        "dataset_explorer"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_option_daily",
         "bulk_download_available": false
       },
-      "columns": ["date", "futures_id", "call_put", "strike_price", "contract_date", "open", "max", "min", "close", "volume", "settlement_price"],
+      "columns": [
+        "date",
+        "futures_id",
+        "call_put",
+        "strike_price",
+        "contract_date",
+        "open",
+        "max",
+        "min",
+        "close",
+        "volume",
+        "settlement_price"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "daily",
@@ -642,22 +1091,39 @@
         "sample_data_id": "TXO"
       },
       "fallback": [],
-      "caveats": ["data_id: TXO (台指選), TX1-TX5, etc."]
+      "caveats": [
+        "data_id: TXO (台指選), TX1-TX5, etc."
+      ]
     },
     {
       "dataset": "TaiwanFuturesInstitutionalInvestors",
       "market": "TW",
       "category": "derivatives",
-      "feature_groups": ["strategy_analysis"],
+      "feature_groups": [
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_futures_institutional_investors",
         "bulk_download_available": false
       },
-      "columns": ["date", "futures_id", "name", "long_open_interest_balance", "short_open_interest_balance", "long_open_interest_balance_unit", "short_open_interest_balance_unit"],
+      "columns": [
+        "date",
+        "futures_id",
+        "name",
+        "long_open_interest_balance",
+        "short_open_interest_balance",
+        "long_open_interest_balance_unit",
+        "short_open_interest_balance_unit"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "daily",
@@ -666,22 +1132,37 @@
         "sample_data_id": "TXF"
       },
       "fallback": [],
-      "caveats": ["Deferred for Phase 8; registered for future use"]
+      "caveats": [
+        "Deferred for Phase 8; registered for future use"
+      ]
     },
     {
       "dataset": "TaiwanOptionInstitutionalInvestors",
       "market": "TW",
       "category": "derivatives",
-      "feature_groups": ["strategy_analysis"],
+      "feature_groups": [
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_option_institutional_investors",
         "bulk_download_available": false
       },
-      "columns": ["date", "futures_id", "name", "long_open_interest_balance", "short_open_interest_balance"],
+      "columns": [
+        "date",
+        "futures_id",
+        "name",
+        "long_open_interest_balance",
+        "short_open_interest_balance"
+      ],
       "data_id_required": true,
       "tier": "free",
       "update_frequency": "daily",
@@ -690,22 +1171,40 @@
         "sample_data_id": "TXO"
       },
       "fallback": [],
-      "caveats": ["Deferred for Phase 8; registered for future use"]
+      "caveats": [
+        "Deferred for Phase 8; registered for future use"
+      ]
     },
     {
       "dataset": "TaiwanStockKBar",
       "market": "TW",
       "category": "tick",
-      "feature_groups": ["backtesting", "strategy_analysis"],
+      "feature_groups": [
+        "backtesting",
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_kbar",
         "bulk_download_available": true
       },
-      "columns": ["date", "stock_id", "open", "max", "min", "close", "volume"],
+      "columns": [
+        "date",
+        "stock_id",
+        "open",
+        "max",
+        "min",
+        "close",
+        "volume"
+      ],
       "data_id_required": true,
       "tier": "sponsor",
       "update_frequency": "intraday",
@@ -724,16 +1223,28 @@
       "dataset": "TaiwanStockPriceTick",
       "market": "TW",
       "category": "tick",
-      "feature_groups": ["strategy_analysis"],
+      "feature_groups": [
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": "taiwan_stock_tick",
         "bulk_download_available": true
       },
-      "columns": ["date", "stock_id", "deal_price", "volume"],
+      "columns": [
+        "date",
+        "stock_id",
+        "deal_price",
+        "volume"
+      ],
       "data_id_required": true,
       "tier": "sponsor",
       "update_frequency": "intraday",
@@ -752,16 +1263,28 @@
       "dataset": "TaiwanVariousIndicators5Seconds",
       "market": "TW",
       "category": "tick",
-      "feature_groups": ["strategy_analysis"],
+      "feature_groups": [
+        "strategy_analysis"
+      ],
       "rest": {
         "endpoint": "/data",
-        "params": ["dataset", "data_id", "start_date", "end_date"]
+        "params": [
+          "dataset",
+          "data_id",
+          "start_date",
+          "end_date"
+        ]
       },
       "sdk": {
         "method": null,
         "bulk_download_available": false
       },
-      "columns": ["date", "stock_id", "price", "volume"],
+      "columns": [
+        "date",
+        "stock_id",
+        "price",
+        "volume"
+      ],
       "data_id_required": true,
       "tier": "sponsor",
       "update_frequency": "intraday",
@@ -770,7 +1293,9 @@
         "sample_data_id": null
       },
       "fallback": [],
-      "caveats": ["Sponsor tier required; deferred for Phase 8 — registered for future reference"]
+      "caveats": [
+        "Sponsor tier required; deferred for Phase 8 — registered for future reference"
+      ]
     }
   ]
 }
