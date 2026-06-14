@@ -469,13 +469,13 @@ class TestTWProfileStillPasses(unittest.TestCase):
 
 
 class TestScopeGateStillDefersTW(unittest.TestCase):
-    """Test 17 — Route B scope gate still defers TW."""
+    """Test 17 — Route B scope gate: TW is now implemented (Phase 7E-FINAL)."""
 
-    def test_tw_still_deferred(self):
+    def test_tw_now_implemented_routes_to_run(self):
         from src.core.market_review_scope_gate import filter_regions_for_route_b
         run, skipped_cn, deferred_tw = filter_regions_for_route_b(["tw"])
-        self.assertIn("tw", deferred_tw)
-        self.assertNotIn("tw", run)
+        self.assertIn("tw", run)
+        self.assertEqual(deferred_tw, [])
 
     def test_us_still_runs(self):
         from src.core.market_review_scope_gate import filter_regions_for_route_b

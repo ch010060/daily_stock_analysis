@@ -88,6 +88,36 @@ def _resolve_market_review_regions(raw_region: Optional[str]) -> list[str]:
     return ['cn']
 
 
+def _run_tw_market_review_section():
+    """Fetch TW market snapshot and render self-contained zh_TW markdown.
+
+    Returns (report_text, light_snapshot_dict). report_text already contains
+    the '# 台股大盤回顧' title — callers must NOT prepend an additional title.
+    """
+    from datetime import timedelta
+    from data_provider.taiwan_market import TaiwanMarketDataFetcher
+    from src.core.tw_market_review import render_tw_market_review_text
+
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    start_date = (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d")
+    try:
+        fetcher = TaiwanMarketDataFetcher()
+        snapshot = fetcher.get_tw_market_snapshot(start_date, end_date)
+        report = render_tw_market_review_text(snapshot)
+        availability = snapshot.get("availability") or {}
+        mls = {
+            "source": "TaiwanMarketDataFetcher",
+            "region": "tw",
+            "required_ok": availability.get("required_ok", False),
+            "as_of": availability.get("as_of"),
+            "sources": availability.get("sources", []),
+        }
+        return report, mls
+    except Exception as exc:
+        logger.error("TW market review section failed: %s", exc)
+        return None, {}
+
+
 def run_market_review(
     notifier: NotificationService,
     analyzer: Optional[GeminiAnalyzer] = None,
@@ -118,10 +148,17 @@ def run_market_review(
     if getattr(config, "route_b_enforce_market_scope", False) and _report_lang not in ("en",):
         _report_lang = "zh_TW"
     review_text = _get_market_review_text(_report_lang)
+    # Prefer market_review_regions (plural, MARKET_REVIEW_REGIONS=TW,US) when set;
+    # fall back to market_review_region (singular, MARKET_REVIEW_REGION=tw).
+    _plural = getattr(config, 'market_review_regions', None) or []
     raw_region = (
         override_region
         if override_region is not None
-        else (getattr(config, 'market_review_region', 'cn') or 'cn')
+        else (
+            ','.join(_plural)
+            if _plural
+            else (getattr(config, 'market_review_region', 'cn') or 'cn')
+        )
     )
     run_markets = _resolve_market_review_regions(raw_region)
     persist_region = ','.join(run_markets) if len(run_markets) > 1 else run_markets[0]
@@ -135,28 +172,38 @@ def run_market_review(
                 if mkt not in run_markets:
                     continue
                 logger.info("生成 %s 大盘复盘报告...", label)
-                mkt_analyzer = MarketAnalyzer(
-                    search_service=search_service, analyzer=analyzer, region=mkt
-                )
-                review_result = mkt_analyzer.run_daily_review_with_snapshot()
-                mkt_report = review_result.report
-                market_light_snapshots[mkt] = review_result.market_light_snapshot
-                if mkt_report:
-                    parts.append(f"{review_text[title_key]}\n\n{mkt_report}")
+                if mkt == "tw":
+                    tw_text, tw_mls = _run_tw_market_review_section()
+                    market_light_snapshots["tw"] = tw_mls
+                    if tw_text:
+                        parts.append(tw_text)
+                else:
+                    mkt_analyzer = MarketAnalyzer(
+                        search_service=search_service, analyzer=analyzer, region=mkt
+                    )
+                    review_result = mkt_analyzer.run_daily_review_with_snapshot()
+                    mkt_report = review_result.report
+                    market_light_snapshots[mkt] = review_result.market_light_snapshot
+                    if mkt_report:
+                        parts.append(f"{review_text[title_key]}\n\n{mkt_report}")
             if parts:
                 review_report = f"\n\n---\n\n{review_text['separator']}\n\n".join(parts)
             else:
                 review_report = None
         else:
             run_region = run_markets[0]
-            market_analyzer = MarketAnalyzer(
-                search_service=search_service,
-                analyzer=analyzer,
-                region=run_region,
-            )
-            review_result = market_analyzer.run_daily_review_with_snapshot()
-            review_report = review_result.report
-            market_light_snapshots = {run_region: review_result.market_light_snapshot}
+            if run_region == "tw":
+                review_report, tw_mls = _run_tw_market_review_section()
+                market_light_snapshots = {"tw": tw_mls}
+            else:
+                market_analyzer = MarketAnalyzer(
+                    search_service=search_service,
+                    analyzer=analyzer,
+                    region=run_region,
+                )
+                review_result = market_analyzer.run_daily_review_with_snapshot()
+                review_report = review_result.report
+                market_light_snapshots = {run_region: review_result.market_light_snapshot}
         
         if review_report:
             from src.core.zh_tw_localization import localize_if_route_b

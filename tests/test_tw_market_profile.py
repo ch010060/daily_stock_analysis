@@ -241,12 +241,12 @@ class TestMarketAnalyzerTWRegion(unittest.TestCase):
 
 
 class TestScopeGateStillDefersTV(unittest.TestCase):
-    """TW market review scope gate remains DEFERRED until provider phase unlocks it."""
+    """TW market review scope gate: TW is now implemented (Phase 7E-FINAL unlocked)."""
 
-    def test_tw_still_deferred_in_scope_gate(self):
+    def test_tw_implemented_in_scope_gate(self):
         run, skipped_cn, deferred_tw = filter_regions_for_route_b(["tw"])
-        self.assertIn("tw", deferred_tw, "TW should still be deferred until Phase 7E.4")
-        self.assertNotIn("tw", run)
+        self.assertIn("tw", run, "TW should be in run_regions after Phase 7E-FINAL unlock")
+        self.assertEqual(deferred_tw, [])
 
     def test_us_still_runs_in_scope_gate(self):
         run, skipped_cn, deferred_tw = filter_regions_for_route_b(["us"])

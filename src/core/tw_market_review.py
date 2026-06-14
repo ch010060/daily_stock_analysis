@@ -154,12 +154,12 @@ def render_tw_market_review_text(
         for name_key, zh_label in _INSTITUTIONAL_NAME_MAP:
             row = ctx["institutional_latest"].get(name_key)
             if row:
-                buy = float(row.get("buy") or 0)
-                sell = float(row.get("sell") or 0)
+                buy = float(row.get("buy") or 0) / 1e8
+                sell = float(row.get("sell") or 0) / 1e8
                 net = buy - sell
                 arrow = "▲" if net >= 0 else "▼"
                 inst_lines.append(
-                    f"- {zh_label}：買 {buy:,.0f}，賣 {sell:,.0f}，淨 {arrow} {abs(net):,.0f}"
+                    f"- {zh_label}：買 {buy:,.1f} 億，賣 {sell:,.1f} 億，淨 {arrow} {abs(net):,.1f} 億"
                 )
     else:
         inst_lines.append("- 三大法人資料暫不可用，本段略過，未 fallback 至其他市場")
@@ -172,13 +172,20 @@ def render_tw_market_review_text(
         for name_key, zh_label in _MARGIN_NAME_MAP:
             row = ctx["margin_latest"].get(name_key)
             if row:
-                today = float(row.get("TodayBalance") or 0)
-                yes = float(row.get("YesBalance") or 0)
-                change = today - yes
-                arrow = "▲" if change >= 0 else "▼"
-                margin_lines.append(
-                    f"- {zh_label}：今日餘額 {today:,.0f}，較昨日 {arrow} {abs(change):,.0f}"
-                )
+                today_raw = float(row.get("TodayBalance") or 0)
+                yes_raw = float(row.get("YesBalance") or 0)
+                change_raw = today_raw - yes_raw
+                arrow = "▲" if change_raw >= 0 else "▼"
+                if name_key == "ShortSaleVolume":
+                    margin_lines.append(
+                        f"- {zh_label}：今日 {today_raw:,.0f} 張，較昨日 {arrow} {abs(change_raw):,.0f} 張"
+                    )
+                else:
+                    today = today_raw / 1e8
+                    change = change_raw / 1e8
+                    margin_lines.append(
+                        f"- {zh_label}：今日 {today:,.1f} 億，較昨日 {arrow} {abs(change):,.1f} 億"
+                    )
     else:
         margin_lines.append("- 融資融券資料暫不可用，本段略過，未 fallback 至其他市場")
 

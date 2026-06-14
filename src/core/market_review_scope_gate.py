@@ -2,8 +2,7 @@
 """Market review region scope gate for Route B TW/US enforcement.
 
 Resolves which market review regions are allowed to run under Route B enforce mode.
-CN/A-share regions are always blocked; TW is marked as deferred (not yet implemented);
-US is accepted when supported.
+CN/A-share regions are always blocked; US and TW are accepted when supported.
 """
 
 import logging
@@ -11,10 +10,10 @@ from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# Internal region codes that have a working MarketAnalyzer implementation
-_IMPLEMENTED_REGIONS = frozenset({"cn", "hk", "us"})
-# Internal region codes that are recognised but not yet implemented in MarketAnalyzer
-_DEFERRED_REGIONS = frozenset({"tw"})
+# Internal region codes that have a working market review implementation
+_IMPLEMENTED_REGIONS = frozenset({"cn", "hk", "us", "tw"})
+# Internal region codes that are recognised but not yet implemented
+_DEFERRED_REGIONS = frozenset()
 # Internal region codes that are blocked under Route B
 _CN_REGIONS = frozenset({"cn"})
 
@@ -90,9 +89,9 @@ def filter_regions_for_route_b(
 
     Returns:
         (run_regions, skipped_cn, deferred_tw):
-        - run_regions:  regions that will actually run MarketAnalyzer
+        - run_regions:  regions that will actually run
         - skipped_cn:   CN regions blocked under Route B
-        - deferred_tw:  TW regions skipped because implementation is not yet available
+        - deferred_tw:  regions skipped because implementation is not yet available (empty for now)
     """
     run_regions: List[str] = []
     skipped_cn: List[str] = []
@@ -109,7 +108,7 @@ def filter_regions_for_route_b(
         elif region in _DEFERRED_REGIONS:
             deferred_tw.append(region)
             logger.info(
-                "[Route B] TW market review is not implemented yet; skipped under Route B scope."
+                "[Route B] Region %r is deferred; skipped under Route B scope.", region
             )
         elif region in _IMPLEMENTED_REGIONS:
             run_regions.append(region)
@@ -119,7 +118,7 @@ def filter_regions_for_route_b(
     if not run_regions:
         logger.info(
             "[Route B] No supported market review regions after scope filtering "
-            "(CN blocked=%r, TW deferred=%r).",
+            "(CN blocked=%r, deferred=%r).",
             skipped_cn,
             deferred_tw,
         )

@@ -342,19 +342,19 @@ class TestMarketReviewMapsHasTW(unittest.TestCase):
 
 
 class TestScopeGateStillDefersTW(unittest.TestCase):
-    """Test 18: market_review_scope_gate still defers TW (NOT unlocked in Phase 7E.3)."""
+    """Test 18: market_review_scope_gate — TW is now implemented (Phase 7E-FINAL)."""
 
-    def test_tw_in_deferred_regions(self):
-        self.assertIn("tw", _DEFERRED_REGIONS)
+    def test_tw_not_in_deferred_regions(self):
+        self.assertNotIn("tw", _DEFERRED_REGIONS)
 
-    def test_filter_regions_defers_tw_not_run(self):
+    def test_filter_regions_tw_routes_to_run(self):
         run, _, deferred_tw = filter_regions_for_route_b(["tw", "us"])
-        self.assertIn("tw", deferred_tw)
-        self.assertNotIn("tw", run)
+        self.assertIn("tw", run)
+        self.assertEqual(deferred_tw, [])
 
-    def test_filter_regions_tw_only_returns_empty_run(self):
+    def test_filter_regions_tw_only_returns_tw_in_run(self):
         run, _, _ = filter_regions_for_route_b(["tw"])
-        self.assertEqual([], run)
+        self.assertIn("tw", run)
 
     def test_us_still_runs_after_tw_added_to_map(self):
         """Adding TW to _MARKET_REVIEW_MARKETS must not block US from running."""
