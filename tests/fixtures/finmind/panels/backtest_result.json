@@ -1,0 +1,50 @@
+{
+  "ok": true,
+  "strategy_name": "buy_and_hold",
+  "symbol": "TW:2330",
+  "start_date": "2026-01-05",
+  "end_date": "2026-06-14",
+  "metrics": {
+    "total_return": 0.427,
+    "annualized_return": 0.931,
+    "max_drawdown": 0.127,
+    "volatility": 0.312,
+    "win_rate": 1.0,
+    "trade_count": 1,
+    "avg_trade_return": 0.427,
+    "exposure_ratio": 0.991,
+    "excess_return": 0.018
+  },
+  "equity_curve": [
+    {"date": "2026-01-06", "portfolio_value": 1000000.0, "position": 1052, "price": 950.0, "cash": 100.0},
+    {"date": "2026-06-13", "portfolio_value": 1427000.0, "position": 1052, "price": 1357.0, "cash": 100.0}
+  ],
+  "trades": [
+    {"signal_date": "2026-01-05", "execution_date": "2026-01-06", "action": "buy", "price": 950.0, "shares": 1052, "cost": 1002.4, "cash_after": 100.0}
+  ],
+  "signals": [
+    {"signal_date": "2026-01-05", "action": "buy"}
+  ],
+  "benchmark": {
+    "benchmark_return": 0.409,
+    "benchmark_symbol": "0050",
+    "excess_return": 0.018,
+    "benchmark_available": true
+  },
+  "data_quality": {
+    "valid_symbol": true,
+    "stock_id": "2330",
+    "adjusted_price_used": false,
+    "price_dataset": "TaiwanStockPrice",
+    "trading_calendar_source": "TaiwanStockTradingDate",
+    "benchmark_used": true,
+    "benchmark_symbol": "0050"
+  },
+  "warnings": [
+    "TaiwanStockPriceAdj unavailable (Backer tier); using unadjusted TaiwanStockPrice"
+  ],
+  "sources": ["TaiwanStockPrice", "TaiwanStockTradingDate"],
+  "recommended_prompts": [
+    "請只根據本次回測結果（buy_and_hold，截至 2026-06-14），描述交易成本對績效的影響，不得推論未來報酬。"
+  ]
+}

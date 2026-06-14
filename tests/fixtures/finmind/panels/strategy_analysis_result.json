@@ -1,0 +1,88 @@
+{
+  "ok": true,
+  "symbol": "TW:2330",
+  "start_date": "2026-01-05",
+  "end_date": "2026-06-14",
+  "strategy_results": [
+    {
+      "strategy_name": "buy_and_hold",
+      "ok": true,
+      "metrics": {"total_return": 0.427, "max_drawdown": 0.127, "trade_count": 1, "annualized_return": 0.931, "volatility": 0.312},
+      "warnings": []
+    },
+    {
+      "strategy_name": "sma_crossover",
+      "ok": true,
+      "metrics": {"total_return": 0.185, "max_drawdown": 0.102, "trade_count": 9, "annualized_return": 0.368, "volatility": 0.281},
+      "warnings": []
+    },
+    {
+      "strategy_name": "monthly_revenue_momentum",
+      "ok": true,
+      "metrics": {"total_return": 0.025, "max_drawdown": 0.072, "trade_count": 1, "annualized_return": 0.048, "volatility": 0.115},
+      "warnings": []
+    },
+    {
+      "strategy_name": "institutional_flow",
+      "ok": true,
+      "metrics": {"total_return": 0.198, "max_drawdown": 0.054, "trade_count": 12, "annualized_return": 0.397, "volatility": 0.243},
+      "warnings": []
+    }
+  ],
+  "comparison": {
+    "best_historical_return_strategy": "buy_and_hold",
+    "lowest_historical_drawdown_strategy": "institutional_flow",
+    "ranked_by_total_return": [
+      {"strategy_name": "buy_and_hold", "total_return": 0.427},
+      {"strategy_name": "institutional_flow", "total_return": 0.198},
+      {"strategy_name": "sma_crossover", "total_return": 0.185},
+      {"strategy_name": "monthly_revenue_momentum", "total_return": 0.025}
+    ],
+    "risk_adjusted_summary": [
+      {"strategy_name": "buy_and_hold", "sharpe_like": 2.99},
+      {"strategy_name": "sma_crossover", "sharpe_like": 1.31},
+      {"strategy_name": "institutional_flow", "sharpe_like": 1.63}
+    ],
+    "notes": "Rankings reflect historical backtest performance only. Not investment advice."
+  },
+  "parameter_sweep": {
+    "strategy_name": "sma_crossover",
+    "combos_run": 5,
+    "results": [
+      {"sma_fast": 5, "sma_slow": 20, "total_return": 0.185},
+      {"sma_fast": 5, "sma_slow": 60, "total_return": 0.142},
+      {"sma_fast": 10, "sma_slow": 20, "total_return": 0.173},
+      {"sma_fast": 10, "sma_slow": 60, "total_return": 0.131},
+      {"sma_fast": 20, "sma_slow": 60, "total_return": 0.108}
+    ],
+    "overfit_warning": "Parameter sweep results may overfit to historical data. Do not use to select strategy for live trading."
+  },
+  "rolling_analysis": {
+    "strategy_name": "sma_crossover",
+    "available": true,
+    "window_count": 4,
+    "ok_count": 4,
+    "win_consistency": 0.75,
+    "windows": [],
+    "note": "Rolling window results are for robustness check only, not independent observations."
+  },
+  "risk_flags": [
+    {"flag": "unadjusted_price_caveat", "severity": "low", "detail": "Adjusted price unavailable; using TaiwanStockPrice"},
+    {"flag": "underperforms_benchmark", "severity": "low", "detail": "monthly_revenue_momentum excess_return < 0"},
+    {"flag": "low_trade_count", "severity": "medium", "detail": "monthly_revenue_momentum: 1 trade in period"}
+  ],
+  "data_quality": {
+    "valid_symbol": true,
+    "strategies_run": 4,
+    "strategies_ok": 4,
+    "adjusted_price_used": false
+  },
+  "recommended_prompts": [
+    "請只根據本次策略分析結果（截至 2026-06-14），指出 2330 最明顯的過度擬合風險，不得推論未來報酬。",
+    "請只根據本次策略分析結果，說明各策略的主要風險旗標，不得建議投資決策。"
+  ],
+  "warnings": [
+    "TaiwanStockPriceAdj unavailable (Backer tier); using unadjusted TaiwanStockPrice"
+  ],
+  "sources": ["TaiwanStockPrice", "TaiwanStockTradingDate", "TaiwanStockMonthRevenue", "TaiwanStockInstitutionalInvestorsBuySell"]
+}

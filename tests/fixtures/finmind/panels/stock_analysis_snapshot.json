@@ -1,0 +1,48 @@
+{
+  "ok": true,
+  "symbol": "TW:2330",
+  "stock_id": "2330",
+  "start_date": "2026-01-05",
+  "end_date": "2026-06-14",
+  "sections": {
+    "price_volume": {
+      "latest_close": 950.0,
+      "latest_date": "2026-06-13",
+      "latest_volume": 30000000,
+      "row_count": 112,
+      "date_range": {"start": "2026-01-06", "end": "2026-06-13"}
+    },
+    "valuation": {
+      "latest_per": 22.5,
+      "latest_pbr": 6.1,
+      "latest_date": "2026-06-13",
+      "row_count": 112
+    },
+    "monthly_revenue": {
+      "latest_monthly_revenue": 250000000000,
+      "latest_month": "2026-02",
+      "yoy_growth_pct": 45.0,
+      "row_count": 14
+    },
+    "institutional_flow": {
+      "latest_foreign_net": 50000,
+      "rolling_5d_foreign_net": 120000,
+      "row_count": 60
+    }
+  },
+  "data_quality": {
+    "valid_symbol": true,
+    "partial": true,
+    "sections_ok": 4,
+    "sections_missing": ["market_cap", "fundamentals", "balance_sheet", "cash_flow", "dividend", "margin", "latest_info"],
+    "optional_missing": ["market_cap", "fundamentals", "balance_sheet", "cash_flow", "dividend", "margin", "latest_info"],
+    "adjusted_price_used": false,
+    "price_dataset": "TaiwanStockPrice"
+  },
+  "sources": ["finmind"],
+  "missing": ["market_cap", "fundamentals", "balance_sheet", "cash_flow", "dividend", "margin", "latest_info"],
+  "warnings": ["TaiwanStockPriceAdj unavailable (Backer tier); using unadjusted TaiwanStockPrice"],
+  "recommended_prompts": [
+    "只根據本 snapshot 的資料（截至 2026-06-14），整理 2330 最重要的三個技術面變化，不得引用外部資料。"
+  ]
+}
