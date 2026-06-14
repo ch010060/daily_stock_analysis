@@ -47,6 +47,15 @@ def _get_market_review_text(language: str) -> dict[str, str]:
             "hk_title": "# HK Market Recap",
             "separator": "> Next market recap follows",
         }
+    if normalized == "zh_TW":
+        return {
+            "root_title": "# 🎯 大盤回顧",
+            "push_title": "🎯 大盤回顧",
+            "cn_title": "# A股大盤回顧",
+            "us_title": "# 美股大盤回顧",
+            "hk_title": "# 港股大盤回顧",
+            "separator": "> 以下為下一市場大盤回顧",
+        }
     return {
         "root_title": "# 🎯 大盘复盘",
         "push_title": "🎯 大盘复盘",
@@ -101,7 +110,10 @@ def run_market_review(
     """
     logger.info("开始执行大盘复盘分析...")
     config = get_config()
-    review_text = _get_market_review_text(getattr(config, "report_language", "zh"))
+    _report_lang = getattr(config, "report_language", "zh")
+    if getattr(config, "route_b_enforce_market_scope", False) and _report_lang not in ("en",):
+        _report_lang = "zh_TW"
+    review_text = _get_market_review_text(_report_lang)
     raw_region = (
         override_region
         if override_region is not None
@@ -143,6 +155,8 @@ def run_market_review(
             market_light_snapshots = {run_region: review_result.market_light_snapshot}
         
         if review_report:
+            from src.core.zh_tw_localization import localize_if_route_b
+            review_report = localize_if_route_b(review_report)
             # 保存报告到文件
             date_str = datetime.now().strftime('%Y%m%d')
             report_filename = f"market_review_{date_str}.md"
@@ -253,4 +267,8 @@ def _summarize_market_review(review_report: str, report_language: str) -> str:
         text = line.strip().lstrip("#").strip()
         if text and not text.startswith("---") and not text.startswith(">"):
             return text[:200]
-    return "Market review report generated." if report_language == "en" else "大盘复盘报告已生成。"
+    if report_language == "en":
+        return "Market review report generated."
+    if report_language == "zh_TW":
+        return "大盤回顧報告已生成。"
+    return "大盘复盘报告已生成。"
