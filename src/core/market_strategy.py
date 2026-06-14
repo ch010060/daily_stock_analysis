@@ -163,10 +163,68 @@ HK_BLUEPRINT = MarketStrategyBlueprint(
 )
 
 
+TW_BLUEPRINT = MarketStrategyBlueprint(
+    region="tw",
+    title="台股市場三段式回顧策略",
+    positioning="聚焦加權指數趨勢、法人資金動向與半導體板塊輪動，形成次日交易計劃。",
+    principles=[
+        "先看加權指數方向，再看外資、投信、自營商淨買超，最後看半導體龍頭持續性。",
+        "結論必須映射到倉位、節奏與風險控制動作。",
+        "判斷使用當日資料與近3日新聞，不臆測未驗證資訊。",
+    ],
+    dimensions=[
+        StrategyDimension(
+            name="趨勢結構",
+            objective="判斷市場處於上升、震盪還是防守階段。",
+            checkpoints=[
+                "加權指數與櫃買指數是否同向",
+                "放量上漲或縮量下跌是否成立",
+                "關鍵支撐阻力是否被突破",
+            ],
+        ),
+        StrategyDimension(
+            name="法人資金",
+            objective="識別外資、投信、自營商對市場情緒的影響。",
+            checkpoints=[
+                "外資淨買超 / 淨賣超方向與規模",
+                "投信是否有護盤動作",
+                "融資餘額是否擴張或收縮",
+            ],
+        ),
+        StrategyDimension(
+            name="主線板塊",
+            objective="提煉可交易主線與規避方向。",
+            checkpoints=[
+                "半導體 / 台積電是否帶動加權指數",
+                "電子零組件、網通、AI相關是否有輪動",
+                "傳產、金融是否提供防禦支撐",
+            ],
+        ),
+    ],
+    action_framework=[
+        "進攻：加權指數共振上行 + 外資持續買超 + 半導體主線強化。",
+        "均衡：指數分化或縮量震盪，控制倉位並等待確認。",
+        "防守：指數轉弱 + 外資賣超擴散，優先風控與減倉。",
+    ],
+)
+
+_BLUEPRINT_MAP = {
+    "cn": CN_BLUEPRINT,
+    "us": US_BLUEPRINT,
+    "hk": HK_BLUEPRINT,
+    "tw": TW_BLUEPRINT,
+}
+
+
 def get_market_strategy_blueprint(region: str) -> MarketStrategyBlueprint:
-    """Return strategy blueprint by market region."""
-    if region == "us":
-        return US_BLUEPRINT
-    if region == "hk":
-        return HK_BLUEPRINT
-    return CN_BLUEPRINT
+    """Return strategy blueprint by market region.
+
+    Raises ValueError for unrecognised regions to prevent silent CN fallback.
+    """
+    try:
+        return _BLUEPRINT_MAP[region]
+    except KeyError:
+        raise ValueError(
+            f"Unsupported market strategy region: {region!r}. "
+            f"Accepted values: {sorted(_BLUEPRINT_MAP)}"
+        )
