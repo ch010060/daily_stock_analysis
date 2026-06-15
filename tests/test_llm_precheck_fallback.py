@@ -25,7 +25,6 @@ _STUB_MODS = (
     "openai",
     "tiktoken",
     # HTTP / data libraries
-    "requests",
     "httpx",
     "aiohttp",
     "tenacity",
