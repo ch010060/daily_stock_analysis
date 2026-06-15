@@ -2186,6 +2186,79 @@ class GeminiAnalyzer:
 
         return legacy_entries
 
+    @staticmethod
+    def _is_local_api_base(base_url: Optional[str]) -> bool:
+        """Return True when base_url points to a local / private-network server."""
+        if not base_url:
+            return False
+        try:
+            from urllib.parse import urlparse
+            host = urlparse(base_url).hostname or ""
+            return (
+                host in ("localhost", "127.0.0.1", "::1")
+                or host.startswith("192.168.")
+                or host.startswith("10.")
+                or (host.startswith("172.") and len(host.split(".")) == 4)
+            )
+        except Exception:
+            return False
+
+    @staticmethod
+    def _probe_api_base_reachable(base_url: str, timeout: float = 2.0) -> bool:
+        """Quick GET /models probe to check if a local LLM server is up."""
+        try:
+            import requests as _req
+            url = base_url.rstrip("/") + "/models"
+            resp = _req.get(url, timeout=timeout)
+            return resp.status_code < 500
+        except Exception:
+            return False
+
+    def _filter_reachable_model_list(
+        self, model_list: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Remove model_list entries whose local api_base is unreachable.
+
+        Cloud channels (no api_base or public domain) are always kept.
+        Local servers (private-IP / localhost api_base) are probed once;
+        if unreachable the whole group sharing that api_base is dropped and
+        the system falls through to the next channel in the Router.
+        """
+        probed: Dict[str, bool] = {}
+        reachable: List[Dict[str, Any]] = []
+        skipped_bases: set = set()
+
+        for entry in model_list:
+            params = entry.get("litellm_params", {})
+            api_base = params.get("api_base") or params.get("base_url") or ""
+            if not self._is_local_api_base(api_base):
+                reachable.append(entry)
+                continue
+            if api_base not in probed:
+                ok = self._probe_api_base_reachable(api_base)
+                probed[api_base] = ok
+                if not ok:
+                    skipped_bases.add(api_base)
+                    logger.warning(
+                        "Analyzer LLM: local server unreachable, skipping channel — %s",
+                        api_base,
+                    )
+                else:
+                    logger.info(
+                        "Analyzer LLM: local server reachable — %s", api_base
+                    )
+            if probed[api_base]:
+                reachable.append(entry)
+
+        if skipped_bases:
+            remaining = list(dict.fromkeys(
+                e["litellm_params"]["model"] for e in reachable
+            ))
+            logger.info(
+                "Analyzer LLM: after pre-check, active models: %s", remaining
+            )
+        return reachable
+
     def _init_litellm(self) -> None:
         """Initialize litellm Router from channels / YAML / legacy keys."""
         config = self._get_runtime_config()
@@ -2198,7 +2271,16 @@ class GeminiAnalyzer:
 
         # --- Channel / YAML path: build Router from pre-built model_list ---
         if self._has_channel_config(config):
-            model_list = config.llm_model_list
+            model_list = self._filter_reachable_model_list(config.llm_model_list)
+            if not model_list:
+                logger.warning(
+                    "Analyzer LLM: all configured channels are unreachable; "
+                    "LLM analysis will be unavailable until a provider comes online"
+                )
+                self._litellm_available = False
+                return
+            # Store filtered list so router_model_names reflects only live deployments
+            self._active_model_list: List[Dict[str, Any]] = model_list
             try:
                 self._router = Router(
                     model_list=model_list,
@@ -2495,17 +2577,24 @@ class GeminiAnalyzer:
         )
         requested_temperature = generation_config.get('temperature', 0.7)
 
-        models_to_try = [config.litellm_model] + (config.litellm_fallback_models or [])
-        models_to_try = [m for m in models_to_try if m]
-
         use_channel_router = self._has_channel_config(config)
+        # Use the pre-check filtered list so router_model_names and models_to_try
+        # only include models that actually have live Router deployments.
+        active_list = getattr(self, "_active_model_list", None) or config.llm_model_list
+        router_model_names = set(get_configured_llm_models(active_list))
+
+        if use_channel_router and router_model_names:
+            # Channel router is active: iterate only over live router models.
+            models_to_try = list(dict.fromkeys(get_configured_llm_models(active_list)))
+        else:
+            models_to_try = [config.litellm_model] + (config.litellm_fallback_models or [])
+            models_to_try = [m for m in models_to_try if m]
 
         last_error = None
         last_response_text: Optional[str] = None
         last_model: Optional[str] = None
         last_usage: Dict[str, Any] = {}
         effective_system_prompt = system_prompt or self.TEXT_SYSTEM_PROMPT
-        router_model_names = set(get_configured_llm_models(config.llm_model_list))
         for model in models_to_try:
             recovery_model_list = config.llm_model_list
             legacy_router_model_list = getattr(self, "_legacy_router_model_list", None) or []
@@ -2753,7 +2842,13 @@ class GeminiAnalyzer:
             )
             
             config = self._get_runtime_config()
-            model_name = config.litellm_model or "unknown"
+            # Show active channel models when channel router is in use; fall back to litellm_model.
+            _active = getattr(self, "_active_model_list", None)
+            if _active and self._has_channel_config(config):
+                from src.config import get_configured_llm_models as _gcm  # noqa: PLC0415
+                model_name = ",".join(_gcm(_active)) or config.litellm_model or "unknown"
+            else:
+                model_name = config.litellm_model or "unknown"
             logger.info(f"========== AI 分析 {name}({code}) ==========")
             logger.info(f"[LLM配置] 模型: {model_name}")
             logger.info(f"[LLM配置] Prompt 长度: {len(prompt)} 字符")
