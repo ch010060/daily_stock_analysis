@@ -22,6 +22,8 @@ from src.report_language import (
     get_report_labels,
     normalize_report_language,
     is_supported_report_language_value,
+    localize_operation_advice as _real_localize_op,
+    localize_trend_prediction as _real_localize_trend,
 )
 from src.core.zh_tw_localization import (
     localize_route_b_zh_tw_text,
@@ -222,6 +224,112 @@ class TestZhEnPathsUnchanged(unittest.TestCase):
     def test_en_labels_buy_label(self):
         labels = get_report_labels("en")
         self.assertEqual(labels["buy_label"], "Buy")
+
+
+class TestZhTWFallbackHardening(unittest.TestCase):
+    """Phase 9G: verify fallback decision labels are language-aware and never emit
+    obvious Simplified Chinese when report_language is zh_TW."""
+
+    def setUp(self):
+        # Use module-level references captured before test_llm_precheck_fallback patches them.
+        self.localize_op = _real_localize_op
+        self.localize_trend = _real_localize_trend
+
+    def test_watch_localizes_to_traditional_for_zh_tw(self):
+        """'watch' canonical → '觀望' in zh_TW, not '观望'."""
+        result = self.localize_op("watch", "zh_TW")
+        self.assertEqual(result, "觀望")
+        self.assertNotIn("观望", result)
+
+    def test_watch_localizes_to_simplified_for_zh(self):
+        """zh path still returns '观望'."""
+        result = self.localize_op("watch", "zh")
+        self.assertEqual(result, "观望")
+
+    def test_watch_localizes_to_english_for_en(self):
+        result = self.localize_op("watch", "en")
+        self.assertEqual(result, "Watch")
+
+    def test_sideways_localizes_to_traditional_for_zh_tw(self):
+        """'sideways' canonical → '震盪' in zh_TW, not '震荡'."""
+        result = self.localize_trend("sideways", "zh_TW")
+        self.assertEqual(result, "震盪")
+        self.assertNotIn("震荡", result)
+
+    def test_buy_localizes_to_traditional_for_zh_tw(self):
+        result = self.localize_op("buy", "zh_TW")
+        self.assertEqual(result, "買入")
+        self.assertNotIn("买入", result)
+
+    def test_sell_localizes_to_traditional_for_zh_tw(self):
+        result = self.localize_op("sell", "zh_TW")
+        self.assertEqual(result, "賣出")
+        self.assertNotIn("卖出", result)
+
+    def test_strong_buy_localizes_to_traditional_for_zh_tw(self):
+        result = self.localize_op("strong_buy", "zh_TW")
+        self.assertEqual(result, "強烈買入")
+
+    def test_strong_sell_localizes_to_traditional_for_zh_tw(self):
+        result = self.localize_op("strong_sell", "zh_TW")
+        self.assertEqual(result, "強烈賣出")
+
+    def test_reduce_localizes_to_traditional_for_zh_tw(self):
+        result = self.localize_op("reduce", "zh_TW")
+        self.assertEqual(result, "減倉")
+
+    def test_input_simplified_watch_is_recognized_and_converted(self):
+        """Input '观望' recognized as 'watch' canonical and converted to '觀望' for zh_TW."""
+        result = self.localize_op("观望", "zh_TW")
+        self.assertEqual(result, "觀望")
+
+    def test_input_simplified_buy_is_recognized_and_converted(self):
+        result = self.localize_op("买入", "zh_TW")
+        self.assertEqual(result, "買入")
+
+    def test_input_simplified_sideways_is_recognized_and_converted(self):
+        result = self.localize_trend("震荡", "zh_TW")
+        self.assertEqual(result, "震盪")
+
+    def test_pipeline_fallback_labels_not_simplified_for_zh_tw(self):
+        """All label helpers used in pipeline fallback emit Traditional for zh_TW."""
+        watch = self.localize_op("watch", "zh_TW")
+        sideways = self.localize_trend("sideways", "zh_TW")
+        self.assertNotIn("观望", watch)
+        self.assertNotIn("震荡", sideways)
+        self.assertIn("觀望", watch)
+        self.assertIn("震盪", sideways)
+
+    def test_zh_tw_market_review_labels_not_simplified(self):
+        """Market review zh_TW title labels use Traditional Chinese."""
+        from src.core.market_review import _get_market_review_text
+        text = _get_market_review_text("zh_TW")
+        for key in ("root_title", "tw_title", "us_title", "separator"):
+            val = text[key]
+            self.assertNotIn("报告", val, f"{key} contains Simplified '报告'")
+            self.assertNotIn("诊断", val, f"{key} contains Simplified '诊断'")
+            self.assertNotIn("市场", val, f"{key} contains Simplified '市场'")
+
+    def test_zh_tw_market_review_titles_contain_traditional(self):
+        from src.core.market_review import _get_market_review_text
+        text = _get_market_review_text("zh_TW")
+        self.assertIn("大盤", text["root_title"])
+        self.assertIn("台股", text["tw_title"])
+        self.assertIn("美股", text["us_title"])
+
+    def test_zh_tw_report_labels_no_simplified_watch_buy(self):
+        """Report label dict for zh_TW has no '观望' or '买入'."""
+        labels = get_report_labels("zh_TW")
+        self.assertNotIn("观望", labels.get("watch_label", ""))
+        self.assertNotIn("买入", labels.get("buy_label", ""))
+        self.assertNotIn("卖出", labels.get("sell_label", ""))
+
+    def test_zh_tw_report_labels_traditional_values(self):
+        """Report label dict for zh_TW uses Traditional."""
+        labels = get_report_labels("zh_TW")
+        self.assertEqual(labels.get("watch_label"), "觀望")
+        self.assertEqual(labels.get("buy_label"), "買入")
+        self.assertEqual(labels.get("sell_label"), "賣出")
 
 
 if __name__ == "__main__":

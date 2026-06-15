@@ -163,14 +163,13 @@ class TestTriggerAnalysisRouteBGate:
 
     def test_cn_code_rejected_when_route_b_enforced(self, monkeypatch):
         monkeypatch.setenv("ROUTE_B_ENFORCE_MARKET_SCOPE", "true")
+        monkeypatch.setenv("ROUTE_B_MARKETS", "TW,US")
         from fastapi import HTTPException
         from api.v1.endpoints.analysis import trigger_analysis
-        from src.config import get_config
 
         req = self._make_request("600519")
-        config = get_config()
         with pytest.raises(HTTPException) as exc_info:
-            trigger_analysis(req, config=config)
+            trigger_analysis(req, config=None)
         assert exc_info.value.status_code == 400
         detail = exc_info.value.detail
         assert detail["error"] == "route_b_scope_error"
@@ -179,15 +178,14 @@ class TestTriggerAnalysisRouteBGate:
     def test_tw_code_not_rejected_when_route_b_enforced(self, monkeypatch):
         """TW code should pass the Route B gate without raising scope error."""
         monkeypatch.setenv("ROUTE_B_ENFORCE_MARKET_SCOPE", "true")
+        monkeypatch.setenv("ROUTE_B_MARKETS", "TW,US")
         from fastapi import HTTPException
         from api.v1.endpoints.analysis import trigger_analysis
-        from src.config import get_config
 
         req = self._make_request("2330")
-        config = get_config()
         # Should not raise a route_b_scope_error (may raise other errors from queue/pipeline)
         try:
-            trigger_analysis(req, config=config)
+            trigger_analysis(req, config=None)
         except HTTPException as exc:
             assert exc.detail.get("error") != "route_b_scope_error", (
                 f"Route B scope gate incorrectly rejected TW:2330. Detail: {exc.detail}"

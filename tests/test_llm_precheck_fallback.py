@@ -38,6 +38,7 @@ _STUB_MODS = (
     "alphasift.dsa_adapter",
     # DB / ORM (sqlalchemy pulled in by src.storage)
     "sqlalchemy",
+    "sqlalchemy.exc",
     "sqlalchemy.orm",
     "sqlalchemy.ext",
     "sqlalchemy.ext.asyncio",
@@ -47,6 +48,8 @@ _STUB_MODS = (
     "src.report_language",
     "src.schemas",
     "src.schemas.report_schema",
+    "src.schemas.market_light",
+    "src.schemas.analysis_context_pack",
     "src.market_context",
     "src.market_phase_prompt",
     "src.data",
@@ -56,6 +59,7 @@ _STUB_MODS = (
     "src.llm.generation_params",
     "src.llm.errors",
     "src.agent",
+    "src.agent.events",
     "src.agent.llm_adapter",
     "src.agent.skills",
     "src.agent.skills.defaults",
@@ -90,7 +94,7 @@ sys.modules["src.llm.errors"].call_litellm_with_param_recovery = MagicMock(
     side_effect=lambda fn, model, call_kwargs, **k: fn(call_kwargs)
 )
 sys.modules["src.report_language"].get_report_language = MagicMock(return_value="zh_TW")
-sys.modules["src.report_language"].localize_trend_prediction = MagicMock(side_effect=lambda x, **k: x)
+sys.modules["src.report_language"].localize_trend_prediction = MagicMock(side_effect=lambda x, lang=None, **k: x)
 sys.modules["src.market_context"].get_market_role = MagicMock(return_value="TW")
 sys.modules["src.market_context"].get_market_guidelines = MagicMock(return_value="")
 

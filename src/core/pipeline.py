@@ -1257,7 +1257,7 @@ class StockAnalysisPipeline:
             name=stock_name,
             sentiment_score=50,
             trend_prediction="Unknown" if report_language == "en" else "未知",
-            operation_advice="Watch" if report_language == "en" else "观望",
+            operation_advice=localize_operation_advice("watch", report_language),
             confidence_level=localize_confidence_level("medium", report_language),
             report_language=report_language,
             success=agent_result.success,
@@ -1337,7 +1337,7 @@ class StockAnalysisPipeline:
                 allow_dict=True,
                 expect_text=True,
             ):
-                result.operation_advice = str(raw_advice) if raw_advice else ("Watch" if report_language == "en" else "观望")
+                result.operation_advice = localize_operation_advice(str(raw_advice), report_language) if raw_advice else localize_operation_advice("watch", report_language)
             else:
                 signal_label = self._trend_signal_fallback(trend_result, report_language)
                 if signal_label:
@@ -1649,7 +1649,7 @@ class StockAnalysisPipeline:
     ) -> None:
         if trend_result is None:
             result.sentiment_score = 50
-            result.operation_advice = "Watch" if report_language == "en" else "观望"
+            result.operation_advice = localize_operation_advice("watch", report_language)
             return
 
         score = getattr(trend_result, "signal_score", None)
@@ -1671,7 +1671,7 @@ class StockAnalysisPipeline:
         if signal_label:
             result.operation_advice = signal_label
         else:
-            result.operation_advice = "Watch" if report_language == "en" else "观望"
+            result.operation_advice = localize_operation_advice("watch", report_language)
 
         from src.agent.protocols import normalize_decision_signal
 
@@ -2276,14 +2276,15 @@ class StockAnalysisPipeline:
             "tests", "fixtures", "llm",
         )
         fixture_path = os.path.join(fixture_dir, f"{safe_name}.json")
+        _fixture_lang = normalize_report_language(getattr(self.config, "report_language", "zh"))
         if not os.path.abspath(fixture_path).startswith(os.path.abspath(fixture_dir) + os.sep):
             logger.warning(f"[{code}] LLM fixture path rejected: {fixture_path}")
             result = AnalysisResult(
                 code=code,
                 name=code,
                 sentiment_score=50,
-                trend_prediction="震荡",
-                operation_advice="观望",
+                trend_prediction=localize_trend_prediction("sideways", _fixture_lang),
+                operation_advice=localize_operation_advice("watch", _fixture_lang),
                 success=False,
                 error_message=f"fixture_path_rejected: {safe_name}.json",
             )
@@ -2295,8 +2296,8 @@ class StockAnalysisPipeline:
                 code=code,
                 name=code,
                 sentiment_score=50,
-                trend_prediction="震荡",
-                operation_advice="观望",
+                trend_prediction=localize_trend_prediction("sideways", _fixture_lang),
+                operation_advice=localize_operation_advice("watch", _fixture_lang),
                 success=False,
                 error_message=f"fixture_not_found: {safe_name}.json",
             )
@@ -2305,15 +2306,16 @@ class StockAnalysisPipeline:
         try:
             with open(fixture_path, encoding="utf-8") as fh:
                 data = json.load(fh)
+            _data_lang = normalize_report_language(data.get("report_language", _fixture_lang))
             result = AnalysisResult(
                 code=data.get("code", code),
                 name=data.get("name", code),
                 sentiment_score=int(data.get("sentiment_score", 50)),
-                trend_prediction=data.get("trend_prediction", "震荡"),
-                operation_advice=data.get("operation_advice", "观望"),
+                trend_prediction=localize_trend_prediction(data.get("trend_prediction", "sideways"), _data_lang),
+                operation_advice=localize_operation_advice(data.get("operation_advice", "watch"), _data_lang),
                 decision_type=data.get("decision_type", "hold"),
                 confidence_level=data.get("confidence_level", "中"),
-                report_language=data.get("report_language", "zh"),
+                report_language=_data_lang,
                 analysis_summary=data.get("analysis_summary", ""),
                 trend_analysis=data.get("trend_analysis", ""),
                 short_term_outlook=data.get("short_term_outlook", ""),
@@ -2330,8 +2332,8 @@ class StockAnalysisPipeline:
                 code=code,
                 name=code,
                 sentiment_score=50,
-                trend_prediction="震荡",
-                operation_advice="观望",
+                trend_prediction=localize_trend_prediction("sideways", _fixture_lang),
+                operation_advice=localize_operation_advice("watch", _fixture_lang),
                 success=False,
                 error_message=f"fixture_load_error: {exc}",
             )
@@ -2369,12 +2371,13 @@ class StockAnalysisPipeline:
             return result
         except Exception as exc:
             logger.error(f"[{code}] prebuilt analysis failed: {exc}", exc_info=True)
+            _pb_lang = normalize_report_language(getattr(self.config, "report_language", "zh"))
             result = AnalysisResult(
                 code=code,
                 name=pre_built_context.get("name", code),
                 sentiment_score=50,
-                trend_prediction="震荡",
-                operation_advice="观望",
+                trend_prediction=localize_trend_prediction("sideways", _pb_lang),
+                operation_advice=localize_operation_advice("watch", _pb_lang),
                 success=False,
                 error_message=str(exc),
             )

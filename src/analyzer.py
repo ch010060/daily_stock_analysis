@@ -1370,18 +1370,26 @@ def _set_structural_hold_wording(
     resistance: Optional[float],
     flow_bias: str,
 ) -> None:
-    advice = {
+    _advice_map = {
         "zh": {
             "range": "震荡观望",
             "shakeout": "洗盘观察",
             "hold": "持有观察",
+        },
+        "zh_TW": {
+            "range": "震盪觀望",
+            "shakeout": "洗盤觀察",
+            "hold": "持有觀察",
         },
         "en": {
             "range": "Range-bound watch",
             "shakeout": "Shakeout watch",
             "hold": "Hold and watch",
         },
-    }[language].get(advice_key, "持有观察" if language == "zh" else "Hold and watch")
+    }
+    _lang_key = language if language in _advice_map else "zh"
+    _default_advice = "持有觀察" if language == "zh_TW" else ("持有观察" if language == "zh" else "Hold and watch")
+    advice = _advice_map[_lang_key].get(advice_key, _default_advice)
     reason_templates = {
         "zh": {
             "buy_near_resistance": "价格接近压力位且主力资金未确认流入，不宜仅因短线反弹追买。",
@@ -1390,6 +1398,14 @@ def _set_structural_hold_wording(
             "sell_with_inflow": "主力资金流入与卖出结论冲突，先按持有观察处理并跟踪支撑失效。",
             "hold_shakeout": "价格回落至支撑附近但资金未确认流出，更适合按洗盘观察处理。",
             "hold_mid_range": "价格处于支撑与压力之间且资金流不明确，维持震荡观望更可操作。",
+        },
+        "zh_TW": {
+            "buy_near_resistance": "價格接近壓力位且主力資金未確認流入，不宜僅因短線反彈追買。",
+            "buy_with_outflow": "主力資金流出與買入結論衝突，買點需等待支撐確認或資金回流。",
+            "sell_near_support": "價格貼近支撐且未見資金持續流出，不宜僅因單日下跌直接賣出。",
+            "sell_with_inflow": "主力資金流入與賣出結論衝突，先按持有觀察處理並追蹤支撐失效。",
+            "hold_shakeout": "價格回落至支撐附近但資金未確認流出，更適合按洗盤觀察處理。",
+            "hold_mid_range": "價格處於支撐與壓力之間且資金流不明確，維持震盪觀望更可操作。",
         },
         "en": {
             "buy_near_resistance": "Price is near resistance without confirmed main-force inflow, so chasing the rebound is not actionable.",
@@ -1400,14 +1416,19 @@ def _set_structural_hold_wording(
             "hold_mid_range": "Price is between support and resistance with neutral fund flow, so range-bound watch is more actionable.",
         },
     }
-    reason = reason_templates[language].get(reason_key, "")
+    reason = reason_templates.get(_lang_key, reason_templates["zh"]).get(reason_key, "")
     result.operation_advice = advice
-    if language == "zh" and "震荡" not in str(result.trend_prediction) and advice_key == "range":
-        result.trend_prediction = "震荡"
+    if language in ("zh", "zh_TW") and advice_key == "range":
+        _sideways = "震盪" if language == "zh_TW" else "震荡"
+        if _sideways not in str(result.trend_prediction) and "震" not in str(result.trend_prediction):
+            result.trend_prediction = _sideways
     elif language == "en" and advice_key == "range":
         result.trend_prediction = "Sideways"
 
-    if language == "zh":
+    if language == "zh_TW":
+        no_position = "空倉先不追漲殺跌，等待支撐確認、放量突破或資金回流後再行動。"
+        has_position = "持倉以關鍵支撐為風控線，未跌破前以觀察和分批控倉為主。"
+    elif language == "zh":
         no_position = "空仓先不追涨杀跌，等待支撑确认、放量突破或资金回流后再行动。"
         has_position = "持仓以关键支撑为风控线，未跌破前以观察和分批控仓为主。"
     else:
