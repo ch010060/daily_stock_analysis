@@ -173,6 +173,15 @@ class TaskService:
 
             # 创建分析管道
             config = get_config()
+
+            # Route B belt-and-suspenders guard: reject CN/UNKNOWN symbols in enforce mode.
+            from src.core.route_b_scope import is_route_b_enforced, filter_stocks_for_route_b
+            if is_route_b_enforced(config):
+                _, rejected = filter_stocks_for_route_b([code], config)
+                if rejected:
+                    raise ValueError(
+                        f"[Route B] Task rejected: {code!r} is not a TW/US symbol."
+                    )
             pipeline = StockAnalysisPipeline(
                 config=config,
                 max_workers=1,

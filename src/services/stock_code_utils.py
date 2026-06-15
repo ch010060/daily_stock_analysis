@@ -60,11 +60,21 @@ def _strip_exchange_suffix(text: str) -> Optional[str]:
 
 
 def is_code_like(value: str) -> bool:
-    """Check if string looks like a stock code (5-6 digits, 1-5 letters, or prefixed code)."""
+    """Check if string looks like a stock code (digits, 1-5 letters, or prefixed code)."""
     text = value.strip().upper()
     if not text:
         return False
-    if text.isdigit() and len(text) in (5, 6):
+    # TW market codes: explicit prefix (TW:2330) or suffix (2330.TW)
+    if text.startswith("TW:"):
+        base = text[3:]
+        if base.isdigit() and len(base) in (4, 5, 6):
+            return True
+    if text.endswith(".TW"):
+        base = text[:-3]
+        if base.isdigit() and len(base) in (4, 5, 6):
+            return True
+    # Bare 4-digit TW codes (2330, 0050), or 5-6 digit CN/HK codes
+    if text.isdigit() and len(text) in (4, 5, 6):
         return True
     if _strip_exchange_suffix(text) is not None:
         return True
