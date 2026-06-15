@@ -188,7 +188,7 @@ def delete_history_by_code(
 
 
 @router.delete(
-    "",
+    "/",
     response_model=DeleteHistoryResponse,
     responses={
         200: {"description": "删除成功"},
