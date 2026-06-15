@@ -1,0 +1,10 @@
+[
+  {"date": "2026-03-31", "stock_id": "2330", "type": "Revenue", "value": 839254000000, "origin_name": "營業收入合計"},
+  {"date": "2026-03-31", "stock_id": "2330", "type": "GrossProfit", "value": 451500000000, "origin_name": "毛利"},
+  {"date": "2026-03-31", "stock_id": "2330", "type": "OperatingIncome", "value": 380600000000, "origin_name": "營業利益"},
+  {"date": "2026-03-31", "stock_id": "2330", "type": "EPS", "value": 13.45, "origin_name": "每股盈餘"},
+  {"date": "2025-12-31", "stock_id": "2330", "type": "Revenue", "value": 760000000000, "origin_name": "營業收入合計"},
+  {"date": "2025-12-31", "stock_id": "2330", "type": "GrossProfit", "value": 400000000000, "origin_name": "毛利"},
+  {"date": "2025-12-31", "stock_id": "2330", "type": "OperatingIncome", "value": 335000000000, "origin_name": "營業利益"},
+  {"date": "2025-12-31", "stock_id": "2330", "type": "EPS", "value": 11.80, "origin_name": "每股盈餘"}
+]

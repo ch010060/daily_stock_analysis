@@ -1,0 +1,30 @@
+{
+  "status": 200,
+  "msg": "",
+  "data": [
+    {
+      "date": "2026-06-10",
+      "stock_id": "2330",
+      "country": "TW",
+      "revenue": 290000000000,
+      "revenue_month": 5,
+      "revenue_year": 2026
+    },
+    {
+      "date": "2026-05-10",
+      "stock_id": "2330",
+      "country": "TW",
+      "revenue": 210000000000,
+      "revenue_month": 4,
+      "revenue_year": 2026
+    },
+    {
+      "date": "2025-06-10",
+      "stock_id": "2330",
+      "country": "TW",
+      "revenue": 200000000000,
+      "revenue_month": 5,
+      "revenue_year": 2025
+    }
+  ]
+}

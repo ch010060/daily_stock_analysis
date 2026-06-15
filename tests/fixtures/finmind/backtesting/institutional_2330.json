@@ -1,0 +1,422 @@
+[
+  {
+    "date": "2026-03-23",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 15000000000,
+    "sell": 12000000000
+  },
+  {
+    "date": "2026-03-24",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 16000000000,
+    "sell": 12500000000
+  },
+  {
+    "date": "2026-03-25",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 17000000000,
+    "sell": 13000000000
+  },
+  {
+    "date": "2026-03-26",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 18000000000,
+    "sell": 12000000000
+  },
+  {
+    "date": "2026-03-27",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 19000000000,
+    "sell": 12500000000
+  },
+  {
+    "date": "2026-03-30",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 15000000000,
+    "sell": 13000000000
+  },
+  {
+    "date": "2026-03-31",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 16000000000,
+    "sell": 12000000000
+  },
+  {
+    "date": "2026-04-01",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 17000000000,
+    "sell": 12500000000
+  },
+  {
+    "date": "2026-04-02",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 18000000000,
+    "sell": 13000000000
+  },
+  {
+    "date": "2026-04-03",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 19000000000,
+    "sell": 12000000000
+  },
+  {
+    "date": "2026-04-06",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 15000000000,
+    "sell": 12500000000
+  },
+  {
+    "date": "2026-04-07",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 16000000000,
+    "sell": 13000000000
+  },
+  {
+    "date": "2026-04-08",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 17000000000,
+    "sell": 12000000000
+  },
+  {
+    "date": "2026-04-09",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 18000000000,
+    "sell": 12500000000
+  },
+  {
+    "date": "2026-04-10",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 19000000000,
+    "sell": 13000000000
+  },
+  {
+    "date": "2026-04-13",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 15000000000,
+    "sell": 12000000000
+  },
+  {
+    "date": "2026-04-14",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 16000000000,
+    "sell": 12500000000
+  },
+  {
+    "date": "2026-04-15",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 17000000000,
+    "sell": 13000000000
+  },
+  {
+    "date": "2026-04-16",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 18000000000,
+    "sell": 12000000000
+  },
+  {
+    "date": "2026-04-17",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 19000000000,
+    "sell": 12500000000
+  },
+  {
+    "date": "2026-04-20",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 15000000000,
+    "sell": 13000000000
+  },
+  {
+    "date": "2026-04-21",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 16000000000,
+    "sell": 12000000000
+  },
+  {
+    "date": "2026-04-22",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 17000000000,
+    "sell": 12500000000
+  },
+  {
+    "date": "2026-04-23",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 18000000000,
+    "sell": 13000000000
+  },
+  {
+    "date": "2026-04-24",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 19000000000,
+    "sell": 12000000000
+  },
+  {
+    "date": "2026-04-27",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 15000000000,
+    "sell": 12500000000
+  },
+  {
+    "date": "2026-04-28",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 16000000000,
+    "sell": 13000000000
+  },
+  {
+    "date": "2026-04-29",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 17000000000,
+    "sell": 12000000000
+  },
+  {
+    "date": "2026-04-30",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 18000000000,
+    "sell": 12500000000
+  },
+  {
+    "date": "2026-05-01",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 19000000000,
+    "sell": 13000000000
+  },
+  {
+    "date": "2026-05-04",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 15000000000,
+    "sell": 12000000000
+  },
+  {
+    "date": "2026-05-05",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 16000000000,
+    "sell": 12500000000
+  },
+  {
+    "date": "2026-05-06",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 17000000000,
+    "sell": 13000000000
+  },
+  {
+    "date": "2026-05-07",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 18000000000,
+    "sell": 12000000000
+  },
+  {
+    "date": "2026-05-08",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 19000000000,
+    "sell": 12500000000
+  },
+  {
+    "date": "2026-05-11",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 15000000000,
+    "sell": 13000000000
+  },
+  {
+    "date": "2026-05-12",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 16000000000,
+    "sell": 12000000000
+  },
+  {
+    "date": "2026-05-13",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 7000000000,
+    "sell": 18500000000
+  },
+  {
+    "date": "2026-05-14",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 8000000000,
+    "sell": 19000000000
+  },
+  {
+    "date": "2026-05-15",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 9000000000,
+    "sell": 18000000000
+  },
+  {
+    "date": "2026-05-18",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 5000000000,
+    "sell": 18500000000
+  },
+  {
+    "date": "2026-05-19",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 6000000000,
+    "sell": 19000000000
+  },
+  {
+    "date": "2026-05-20",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 7000000000,
+    "sell": 18000000000
+  },
+  {
+    "date": "2026-05-21",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 8000000000,
+    "sell": 18500000000
+  },
+  {
+    "date": "2026-05-22",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 9000000000,
+    "sell": 19000000000
+  },
+  {
+    "date": "2026-05-25",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 5000000000,
+    "sell": 18000000000
+  },
+  {
+    "date": "2026-05-26",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 6000000000,
+    "sell": 18500000000
+  },
+  {
+    "date": "2026-05-27",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 7000000000,
+    "sell": 19000000000
+  },
+  {
+    "date": "2026-05-28",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 8000000000,
+    "sell": 18000000000
+  },
+  {
+    "date": "2026-05-29",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 9000000000,
+    "sell": 18500000000
+  },
+  {
+    "date": "2026-06-01",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 5000000000,
+    "sell": 19000000000
+  },
+  {
+    "date": "2026-06-02",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 6000000000,
+    "sell": 18000000000
+  },
+  {
+    "date": "2026-06-03",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 7000000000,
+    "sell": 18500000000
+  },
+  {
+    "date": "2026-06-04",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 8000000000,
+    "sell": 19000000000
+  },
+  {
+    "date": "2026-06-05",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 9000000000,
+    "sell": 18000000000
+  },
+  {
+    "date": "2026-06-08",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 5000000000,
+    "sell": 18500000000
+  },
+  {
+    "date": "2026-06-09",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 6000000000,
+    "sell": 19000000000
+  },
+  {
+    "date": "2026-06-10",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 7000000000,
+    "sell": 18000000000
+  },
+  {
+    "date": "2026-06-11",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 8000000000,
+    "sell": 18500000000
+  },
+  {
+    "date": "2026-06-12",
+    "stock_id": "2330",
+    "name": "Foreign_Investor",
+    "buy": 9000000000,
+    "sell": 19000000000
+  }
+]

@@ -1,0 +1,62 @@
+{
+  "ok": true,
+  "source": "finmind",
+  "symbols": ["TW:2330"],
+  "start_date": "2026-01-05",
+  "end_date": "2026-06-14",
+  "events": [
+    {
+      "event_id": "evt_aabbcc112233",
+      "event_type": "monthly_revenue",
+      "symbol": "TW:2330",
+      "title": "月營收創歷史新高",
+      "summary": "2330 2026-02 月營收 250B，YoY +45%",
+      "event_date": "2026-03-10",
+      "source": "finmind",
+      "dataset": "TaiwanStockMonthRevenue",
+      "data_id": "2330",
+      "severity": "high",
+      "confidence": "confirmed",
+      "source_url": null,
+      "raw_ref": {},
+      "data_freshness": {"as_of": "2026-06-14"},
+      "follow_up_prompts": []
+    },
+    {
+      "event_id": "evt_ddeeff445566",
+      "event_type": "institutional_flow",
+      "symbol": "TW:2330",
+      "title": "外資連續買超",
+      "summary": "外資近5日買超 50,000張",
+      "event_date": "2026-06-13",
+      "source": "finmind",
+      "dataset": "TaiwanStockInstitutionalInvestorsBuySell",
+      "data_id": "2330",
+      "severity": "medium",
+      "confidence": "confirmed",
+      "source_url": null,
+      "raw_ref": {},
+      "data_freshness": {"as_of": "2026-06-14"},
+      "follow_up_prompts": []
+    }
+  ],
+  "event_count": 2,
+  "missing": ["TaiwanStockNews"],
+  "data_quality": {
+    "required_ok": true,
+    "partial": true,
+    "freshness": {
+      "datasets_ok": [
+        "TaiwanStockTradingDate",
+        "TaiwanStockMonthRevenue",
+        "TaiwanStockInstitutionalInvestorsBuySell"
+      ],
+      "datasets_missing": ["TaiwanStockNews"],
+      "datasets_unavailable": ["TaiwanStockNews"]
+    },
+    "sources": ["finmind"]
+  },
+  "recommended_prompts": [
+    "請只根據本次 FinMind 事件資料（截止 2026-06-14），整理 TW:2330 最重要的三個變化，勿引用外部資料。"
+  ]
+}
