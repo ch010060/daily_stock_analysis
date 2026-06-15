@@ -18,11 +18,12 @@ class NormalizedSymbol:
 
 
 _TW_CODE_RE = re.compile(r"^\d{4,6}[A-Z]?$")
+_TW_4DIGIT_RE = re.compile(r"^\d{4}$")
 _US_SYMBOL_RE = re.compile(r"^[A-Z]{1,5}([.\-][A-Z])?$")
 
 
 def normalize_symbol(symbol: str, market: Optional[str] = None) -> NormalizedSymbol:
-    """Normalize explicit TW/US symbols without guessing ambiguous bare codes."""
+    """Normalize TW/US symbols. Bare 4-digit codes are unambiguously TW in Route B scope."""
     raw = (symbol or "").strip()
     if not raw:
         raise SymbolNormalizationError("symbol is required")
@@ -43,6 +44,9 @@ def normalize_symbol(symbol: str, market: Optional[str] = None) -> NormalizedSym
         return _normalize_us(upper)
     if market_hint:
         raise SymbolNormalizationError(f"unsupported market: {market_hint}")
+
+    if _TW_4DIGIT_RE.fullmatch(upper):
+        return _normalize_tw(upper)
 
     raise SymbolNormalizationError(f"market is required for ambiguous symbol: {raw}")
 
