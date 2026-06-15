@@ -287,6 +287,35 @@ class TestRunMarketReviewRouteBGating(unittest.TestCase):
         self.assertIn("us", snapshots)
         self.assertIn("tw", snapshots)
 
+    # ------------------------------------------------------------------
+    # Case 6: override_region=CN cannot bypass Route B scope gate
+    # ------------------------------------------------------------------
+
+    def test_override_region_cn_still_blocked_by_route_b(self):
+        """override_region='cn' must not bypass Route B — CN is still filtered."""
+        config = _route_b_config(market_review_regions=[])
+        notifier = _make_notifier()
+
+        with patch.object(market_review_module, "get_config", return_value=config), \
+             patch.object(market_review_module, "_persist_market_review_history") as persist, \
+             patch.object(market_review_module, "MarketAnalyzer") as analyzer_cls:
+            result = run_market_review(notifier, send_notification=False, override_region="cn")
+
+        self.assertIsNone(result, "override_region=cn must be blocked by Route B scope gate")
+        analyzer_cls.assert_not_called()
+        persist.assert_not_called()
+
+    def test_override_region_cn_no_notification_sent_route_b(self):
+        """No notification when override_region=cn is blocked under Route B."""
+        config = _route_b_config(market_review_regions=[])
+        notifier = _make_notifier()
+
+        with patch.object(market_review_module, "get_config", return_value=config), \
+             patch.object(market_review_module, "MarketAnalyzer"):
+            run_market_review(notifier, send_notification=True, override_region="cn")
+
+        notifier.send.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
