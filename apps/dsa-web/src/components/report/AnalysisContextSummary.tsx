@@ -44,6 +44,14 @@ const BLOCK_LABELS: Record<ReportLanguage, Record<string, string>> = {
     fundamentals: '基本面',
     chip: '筹码',
   },
+  zh_TW: {
+    quote: '行情',
+    daily_bars: '日線',
+    technical: '技術',
+    news: '新聞',
+    fundamentals: '基本面',
+    chip: '籌碼',
+  },
   en: {
     quote: 'quote',
     daily_bars: 'daily bars',
@@ -81,6 +89,34 @@ const TEXT = {
       estimated: '估算',
       partial: '部分可用',
       fetch_failed: '抓取失败',
+    },
+  },
+  zh_TW: {
+    eyebrow: '資料上下文',
+    title: '輸入資料塊',
+    counts: '狀態計數',
+    source: '來源',
+    warnings: '告警',
+    missingReasons: '缺失原因',
+    qualityScore: '品質分',
+    limitations: '資料限制',
+    newsResultCount: '新聞結果數',
+    triggerSource: '觸發來源',
+    qualityLevel: {
+      good: '良好',
+      usable: '可用',
+      limited: '受限',
+      poor: '較差',
+    },
+    status: {
+      available: '可用',
+      missing: '缺失',
+      not_supported: '不支援',
+      fallback: '降級',
+      stale: '過期',
+      estimated: '估算',
+      partial: '部分可用',
+      fetch_failed: '擷取失敗',
     },
   },
   en: {
@@ -140,7 +176,7 @@ const getCount = (
 const formatLimitation = (
   value: string,
   language: ReportLanguage,
-  text: typeof TEXT.zh | typeof TEXT.en,
+  text: typeof TEXT.zh | typeof TEXT.zh_TW | typeof TEXT.en,
 ): string => {
   const [rawKey, ...statusParts] = value.split(':');
   if (!rawKey || statusParts.length === 0) {
@@ -155,12 +191,12 @@ const formatLimitation = (
 
   const label = BLOCK_LABELS[language][key] || key;
   const statusLabel = (text.status as Record<string, string>)[status] || status;
-  return language === 'zh' ? `${label}：${statusLabel}` : `${label}: ${statusLabel}`;
+  return language === 'en' ? `${label}: ${statusLabel}` : `${label}：${statusLabel}`;
 };
 
 export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
   overview,
-  language = 'zh',
+  language = 'zh_TW',
 }) => {
   const reportLanguage = normalizeReportLanguage(language);
   const text = TEXT[reportLanguage];
