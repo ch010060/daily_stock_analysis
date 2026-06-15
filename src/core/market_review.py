@@ -161,6 +161,24 @@ def run_market_review(
         )
     )
     run_markets = _resolve_market_review_regions(raw_region)
+    # Under Route B enforcement, filter out CN regions via scope gate.
+    if getattr(config, "route_b_enforce_market_scope", False):
+        from src.core.market_review_scope_gate import (
+            parse_market_review_regions_env,
+            get_effective_regions_for_route_b,
+        )
+        explicit = parse_market_review_regions_env(','.join(run_markets))
+        run_markets, skipped_cn, _ = get_effective_regions_for_route_b(config, explicit)
+        if skipped_cn:
+            logger.warning(
+                "[Route B] Market review: blocked CN/A-share regions %r under Route B scope.",
+                skipped_cn,
+            )
+        if not run_markets:
+            logger.warning(
+                "[Route B] Market review: no regions remain after Route B filtering; aborting."
+            )
+            return None
     persist_region = ','.join(run_markets) if len(run_markets) > 1 else run_markets[0]
 
     try:
