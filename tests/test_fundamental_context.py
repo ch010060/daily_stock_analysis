@@ -39,6 +39,15 @@ class _DummyBoardFetcher:
 
 
 class TestFundamentalContext(unittest.TestCase):
+    classlevel_env = patch.dict(os.environ, {"DSA_ALLOW_EXTERNAL_NETWORK": "true"})
+
+    @classmethod
+    def setUpClass(cls):
+        cls.classlevel_env.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.classlevel_env.stop()
     def test_offshore_market_returns_not_supported_when_adapter_empty(self) -> None:
         """When yfinance adapter has no data, offshore (US/HK) status is not_supported.
 

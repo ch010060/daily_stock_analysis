@@ -3,6 +3,7 @@
 Unit tests for strict news freshness filtering and strategy window logic (Issue #697).
 """
 
+import os
 import sys
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -47,6 +48,16 @@ def _response(results) -> SearchResponse:
 
 class SearchNewsFreshnessTestCase(unittest.TestCase):
     """Tests for strategy window and strict published_date filtering."""
+
+    classlevel_env = patch.dict(os.environ, {"DSA_ALLOW_EXTERNAL_NETWORK": "true"})
+
+    @classmethod
+    def setUpClass(cls):
+        cls.classlevel_env.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.classlevel_env.stop()
 
     def _create_service_with_mock_provider(
         self,
