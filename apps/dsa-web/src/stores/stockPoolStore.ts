@@ -36,6 +36,8 @@ let activeTaskRequestSeq = 0;
 let activeTaskLocalRevision = 0;
 const dismissedTaskIds = new Set<string>();
 
+const MARKET_REVIEW_HISTORY_CODE = 'MARKET';
+
 export interface StockPoolState {
   query: string;
   selectionSource: SelectionSource;
@@ -92,6 +94,8 @@ export interface StockPoolState {
   resetDashboardState: () => void;
   loadStockBar: () => Promise<void>;
   refreshStockBar: () => Promise<void>;
+  marketReviewHistoryItems: HistoryItem[];
+  refreshMarketReviewHistory: (silent?: boolean) => Promise<void>;
 }
 
 const initialState = {
@@ -128,6 +132,7 @@ const initialState = {
   markdownDrawerOpen: false,
   stockBarItems: [] as StockBarItem[],
   isLoadingStockBar: false,
+  marketReviewHistoryItems: [] as HistoryItem[],
 };
 
 function buildHistoryParams(page: number) {
@@ -765,5 +770,9 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     } catch {
       // keep existing items on error
     }
+  },
+
+  refreshMarketReviewHistory: async () => {
+    // stub — market review history sidebar is not yet implemented in Route B
   },
 }));

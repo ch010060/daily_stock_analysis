@@ -36,7 +36,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
   const sentimentColor = item.sentimentScore !== undefined ? getSentimentColor(item.sentimentScore) : null;
   const stockName = item.stockName || item.stockCode;
   const operationLabel = getOperationBadgeLabel(item.operationAdvice);
-  const phaseLabel = getMarketPhaseSummaryLabel(item.marketPhaseSummary, 'zh')?.replace('市场阶段: ', '').replace('市场阶段：', '');
+  const phaseLabel = getMarketPhaseSummaryLabel(item.marketPhaseSummary, undefined)?.replace('市场阶段: ', '').replace('市场阶段：', '').replace('市場階段: ', '').replace('市場階段：', '');
 
   return (
     <button

@@ -45,7 +45,7 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
 }) => {
   const sentimentColor = item.sentimentScore !== undefined ? getSentimentColor(item.sentimentScore) : null;
   const stockName = item.stockName || item.stockCode;
-  const phaseLabel = getMarketPhaseSummaryLabel(item.marketPhaseSummary, 'zh')?.replace('市场阶段: ', '').replace('市场阶段：', '');
+  const phaseLabel = getMarketPhaseSummaryLabel(item.marketPhaseSummary, undefined)?.replace('市场阶段: ', '').replace('市场阶段：', '').replace('市場階段: ', '').replace('市場階段：', '');
 
   return (
     <div className="flex items-start gap-2 group">

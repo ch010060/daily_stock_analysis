@@ -16,6 +16,7 @@ import type {
 export interface GetHistoryListParams extends HistoryFilters {
   page?: number;
   limit?: number;
+  reportType?: string;
 }
 
 export const historyApi = {
@@ -24,12 +25,13 @@ export const historyApi = {
    * @param params 筛选和分页参数
    */
   getList: async (params: GetHistoryListParams = {}): Promise<HistoryListResponse> => {
-    const { stockCode, startDate, endDate, page = 1, limit = 20 } = params;
+    const { stockCode, startDate, endDate, page = 1, limit = 20, reportType } = params;
 
     const queryParams: Record<string, string | number> = { page, limit };
     if (stockCode) queryParams.stock_code = stockCode;
     if (startDate) queryParams.start_date = startDate;
     if (endDate) queryParams.end_date = endDate;
+    if (reportType) queryParams.report_type = reportType;
 
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/history/', {
       params: queryParams,
