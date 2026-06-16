@@ -15,6 +15,10 @@ _REPORT_LANGUAGE_ALIASES = {
     "zh_hans": "zh",
     "zh-tw": "zh_TW",
     "zh_tw": "zh_TW",
+    "zh-hant": "zh_TW",
+    "zh_hant": "zh_TW",
+    "traditional": "zh_TW",
+    "tw": "zh_TW",
     "cn": "zh",
     "chinese": "zh",
     "english": "en",
@@ -764,7 +768,7 @@ def localize_trend_prediction(value: Any, language: Optional[str]) -> str:
     raw_text = str(value or "").strip()
     if not raw_text:
         return raw_text
-    if normalized_language in {"zh", "zh_TW"}:
+    if normalized_language == "zh":
         if re.search(r"[\u4e00-\u9fff]", raw_text):
             return raw_text
     return _translate_from_map(

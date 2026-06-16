@@ -176,6 +176,18 @@ def _is_hk_market(code: str) -> bool:
     return False
 
 
+def _is_tw_market(code: str) -> bool:
+    """判定是否为台股代码（4 位纯数字，或 TW: 前缀 / .TW 后缀）。"""
+    normalized = (code or "").strip().upper()
+    if normalized.startswith("TW:"):
+        base = normalized[3:]
+        return base.isdigit() and 1 <= len(base) <= 6
+    if normalized.endswith(".TW"):
+        base = normalized[:-3]
+        return base.isdigit() and 1 <= len(base) <= 6
+    return normalized.isdigit() and len(normalized) == 4
+
+
 def _is_etf_code(code: str) -> bool:
     """判定 A 股 ETF 基金代码（保守规则）。"""
     normalized = normalize_stock_code(code)
@@ -216,12 +228,14 @@ def _is_meaningful_chip_distribution(chip: Any) -> bool:
 
 
 def _market_tag(code: str) -> str:
-    """返回市场标签: cn/us/hk."""
+    """返回市场标签: tw/us/hk (Route B 下 CN 代码已在 API 层拦截)."""
     if _is_us_market(code):
         return "us"
     if _is_hk_market(code):
         return "hk"
-    return "cn"
+    if _is_tw_market(code):
+        return "tw"
+    return "tw"
 
 
 def is_bse_code(code: str) -> bool:

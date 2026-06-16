@@ -20,6 +20,7 @@ _CN_PROVIDERS = frozenset({"EfinanceFetcher", "AkshareFetcher", "BaostockFetcher
 # Symbol classification patterns
 _US_TICKER_RE = re.compile(r"^[A-Z]{1,5}([.\-][A-Z])?$")
 _CN_6DIGIT_RE = re.compile(r"^\d{6}$")
+_TW_4DIGIT_RE = re.compile(r"^\d{4}$")
 _HK_PREFIX_RE = re.compile(r"^HK\d{4,5}$")
 _HK_SUFFIX_RE = re.compile(r"^\d{4,5}\.HK$", re.IGNORECASE)
 
@@ -70,6 +71,8 @@ def classify_symbol(code: str) -> str:
         return "HK"
     if _HK_SUFFIX_RE.fullmatch(upper):
         return "HK"
+    if _TW_4DIGIT_RE.fullmatch(upper):
+        return "TW"
     if _US_TICKER_RE.fullmatch(upper):
         return "US"
     if _CN_6DIGIT_RE.fullmatch(upper):

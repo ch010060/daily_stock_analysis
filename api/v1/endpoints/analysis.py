@@ -69,6 +69,7 @@ from src.analysis_context_pack_overview import (
 from src.market_phase_summary import extract_market_phase_summary, render_market_phase_summary
 from src.report_language import get_localized_stock_name, normalize_report_language
 from src.services.name_to_code_resolver import resolve_name_to_code
+from src.core.route_b_scope import is_route_b_enforced, filter_stocks_for_route_b
 from src.services.stock_code_utils import is_code_like
 from src.services.task_queue import (
     get_task_queue,
@@ -305,6 +306,20 @@ def trigger_analysis(
                 "message": "股票代码不能为空或仅包含空白字符"
             }
         )
+
+    # Route B scope enforcement: reject non-TW/US symbols before queue submission.
+    if is_route_b_enforced(config):
+        accepted, rejected = filter_stocks_for_route_b(stock_codes, config)
+        if rejected:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "route_b_scope_error",
+                    "message": f"Route B 模式下不允許提交以下代碼：{', '.join(rejected)}。僅支援 TW/US 市場。",
+                    "rejected_codes": rejected,
+                }
+            )
+        stock_codes = accepted
 
     # Sync mode only supports single-stock analysis.
     if not request.async_mode:

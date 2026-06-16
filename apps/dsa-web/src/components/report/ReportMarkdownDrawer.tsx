@@ -87,7 +87,7 @@ export const ReportMarkdownDrawer: React.FC<ReportMarkdownDrawerProps> = ({
   stockName,
   stockCode,
   onClose,
-  reportLanguage = 'zh',
+  reportLanguage = 'zh_TW',
 }) => {
   const [isOpen, setIsOpen] = useState(true);
   const text = getReportText(normalizeReportLanguage(reportLanguage));
