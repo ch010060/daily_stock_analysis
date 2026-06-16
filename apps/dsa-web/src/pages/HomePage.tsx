@@ -18,7 +18,7 @@ import { useDashboardLifecycle, useHomeDashboardState } from '../hooks';
 import { useWatchlist } from '../hooks/useWatchlist';
 import type { SetupStatusResponse } from '../types/systemConfig';
 import { getReportText, normalizeReportLanguage } from '../utils/reportLanguage';
-import type { MarketReviewPayload, StockBarItem } from '../types/analysis';
+import type { StockBarItem } from '../types/analysis';
 
 type MarketReviewNotice = {
   variant: 'success' | 'warning' | 'danger';
@@ -91,7 +91,6 @@ const HomePage: React.FC = () => {
     clearError,
     loadInitialHistory,
     refreshHistory,
-    loadMarketReviewHistory,
     refreshMarketReviewHistory,
     selectHistoryItem,
     submitAnalysis,
@@ -540,7 +539,7 @@ const HomePage: React.FC = () => {
   }, [marketReviewReport]);
 
   const mergedStockBarItems = useMemo<StockBarItem[]>(() => {
-    const latestMarketReview = marketReviewHistoryItems[0];
+    const latestMarketReview = (marketReviewHistoryItems ?? [])[0];
     const stockItems = stockBarItems.filter((item) => item.stockCode !== 'MARKET');
     if (!latestMarketReview) {
       return stockItems;
