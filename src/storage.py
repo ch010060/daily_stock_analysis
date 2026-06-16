@@ -2669,7 +2669,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         completion_tokens, total_tokens, and called_at. Results are ordered by
         newest call first; limit is clamped to [1, 200].
         """
-        normalized_limit = max(1, min(int(limit or 50), 200))
+        normalized_limit = max(1, min(int(limit) if limit is not None else 50, 200))
         with self.session_scope() as session:
             rows = session.execute(
                 select(

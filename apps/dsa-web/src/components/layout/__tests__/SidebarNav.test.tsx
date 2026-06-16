@@ -45,7 +45,7 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByRole('link', { name: '选股' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '選股' })).not.toBeInTheDocument();
   });
 
   it('shows the screening navigation item when AlphaSift is enabled', async () => {
@@ -57,7 +57,7 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening');
+    expect(await screen.findByRole('link', { name: '選股' })).toHaveAttribute('href', '/screening');
   });
 
   it('places screening directly after chat when AlphaSift is enabled', async () => {
@@ -69,7 +69,7 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    await screen.findByRole('link', { name: '选股' });
+    await screen.findByRole('link', { name: '選股' });
     const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
     expect(hrefs.slice(0, 4)).toEqual(['/', '/chat', '/screening', '/portfolio']);
   });
@@ -85,10 +85,10 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByRole('link', { name: '选股' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '選股' })).not.toBeInTheDocument();
     window.dispatchEvent(new Event('dsa-system-config-changed'));
 
-    expect(await screen.findByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening');
+    expect(await screen.findByRole('link', { name: '選股' })).toHaveAttribute('href', '/screening');
     await waitFor(() => expect(mockGetAlphaSiftStatus.mock.calls.length).toBeGreaterThanOrEqual(2));
   });
 
@@ -102,7 +102,7 @@ describe('SidebarNav', () => {
     );
 
     expect(screen.getByTestId('chat-completion-badge')).toBeInTheDocument();
-    expect(screen.getByLabelText('问股有新消息')).toBeInTheDocument();
+    expect(screen.getByLabelText('問股有新訊息')).toBeInTheDocument();
 
     completionBadgeState.value = false;
     rerender(
@@ -146,10 +146,10 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '退出' }));
+    fireEvent.click(screen.getByRole('button', { name: '登出' }));
 
-    expect(await screen.findByRole('heading', { name: '退出登录' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '确认退出' }));
+    expect(await screen.findByRole('heading', { name: '退出登入' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '確認退出' }));
     expect(mockLogout).toHaveBeenCalled();
   });
 });

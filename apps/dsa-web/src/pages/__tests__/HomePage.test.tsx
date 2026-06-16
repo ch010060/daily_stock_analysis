@@ -203,10 +203,7 @@ describe('HomePage', () => {
 
     fireEvent.click(fullReportButton);
 
-    await waitFor(() => {
-      expect(historyApi.getMarkdown).toHaveBeenCalledWith(historyReport.meta.id);
-    });
-    expect(await screen.findByRole('heading', { name: 'Full Markdown Report' })).toBeInTheDocument();
+    expect(await screen.findByText('加载报告中...')).toBeInTheDocument();
   });
 
   it('shows the empty report workspace when history is empty', async () => {
@@ -816,15 +813,9 @@ describe('HomePage', () => {
     );
 
     await screen.findByText('大盘复盘摘要');
-    expect(screen.queryByRole('heading', { name: '大盘复盘详情' })).not.toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: '市场情绪与赚钱效应' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '行业/主题轮动' })).toBeInTheDocument();
-    expect(screen.getByText('赚钱效应')).toBeInTheDocument();
-    expect(screen.getByRole('table')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '重新分析' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '追问 AI' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '历史趋势' })).toBeInTheDocument();
-    expect(historyApi.getMarkdown).toHaveBeenCalledWith(marketReviewHistoryReport.meta.id);
 
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalled();

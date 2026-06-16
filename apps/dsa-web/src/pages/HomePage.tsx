@@ -316,6 +316,10 @@ const HomePage: React.FC = () => {
     removeTask,
   });
 
+  useEffect(() => {
+    void refreshMarketReviewHistory(false);
+  }, [refreshMarketReviewHistory]);
+
   const watchlistState = useWatchlist();
 
   const handleHistoryItemClick = useCallback((recordId: number) => {

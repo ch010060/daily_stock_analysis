@@ -772,7 +772,18 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     }
   },
 
-  refreshMarketReviewHistory: async () => {
-    // stub — market review history sidebar is not yet implemented in Route B
+  refreshMarketReviewHistory: async (silent = false) => {
+    void silent;
+    try {
+      const response = await historyApi.getList({
+        stockCode: MARKET_REVIEW_HISTORY_CODE,
+        reportType: 'market_review',
+        page: 1,
+        limit: 10,
+      });
+      set({ marketReviewHistoryItems: response.items });
+    } catch {
+      // keep existing items on error
+    }
   },
 }));
