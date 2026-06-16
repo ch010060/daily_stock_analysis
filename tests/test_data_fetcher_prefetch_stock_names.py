@@ -66,7 +66,7 @@ class _ThreadUnsafeStockListFetcher:
 
 
 class TestPrefetchStockNames(unittest.TestCase):
-    classlevel_env = patch.dict(os.environ, {"DSA_ALLOW_EXTERNAL_NETWORK": "true"})
+    classlevel_env = patch.dict(os.environ, {"DSA_ALLOW_EXTERNAL_NETWORK": "true", "DSA_FIXTURE_MODE": "false"})
 
     @classmethod
     def setUpClass(cls):

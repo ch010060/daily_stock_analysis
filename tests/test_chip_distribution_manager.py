@@ -21,7 +21,7 @@ class _ChipFetcher:
         return self._result
 
 
-@patch.dict(os.environ, {"DSA_ALLOW_EXTERNAL_NETWORK": "true"})
+@patch.dict(os.environ, {"DSA_ALLOW_EXTERNAL_NETWORK": "true", "DSA_FIXTURE_MODE": "false"})
 def test_manager_skips_placeholder_chip_distribution_and_tries_next_fetcher():
     get_chip_circuit_breaker().reset()
     empty_chip = ChipDistribution(code="600519")
@@ -44,7 +44,7 @@ def test_manager_skips_placeholder_chip_distribution_and_tries_next_fetcher():
     assert chip is valid_chip
 
 
-@patch.dict(os.environ, {"DSA_ALLOW_EXTERNAL_NETWORK": "true"})
+@patch.dict(os.environ, {"DSA_ALLOW_EXTERNAL_NETWORK": "true", "DSA_FIXTURE_MODE": "false"})
 def test_manager_accepts_zero_concentration_chip_distribution():
     get_chip_circuit_breaker().reset()
     zero_concentration_chip = ChipDistribution(
