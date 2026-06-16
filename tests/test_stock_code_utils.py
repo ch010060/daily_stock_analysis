@@ -17,8 +17,11 @@ class TestIsCodeLike:
     def test_plain_5_digit(self):
         assert is_code_like("00700") is True
 
-    def test_4_digit_rejected(self):
-        assert is_code_like("6001") is False
+    def test_4_digit_accepted_as_tw_code(self):
+        """4-digit numeric codes are accepted as potential TW stock codes.
+        The Route B scope gate handles filtering (CN vs TW) at a higher layer."""
+        assert is_code_like("6001") is True
+        assert is_code_like("2330") is True
 
     # --- Suffix format ---
     def test_suffix_sh(self):

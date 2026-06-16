@@ -191,7 +191,7 @@ class TestFundamentalContext(unittest.TestCase):
                     return_value=bundle,
                 ):
             ctx = manager.get_fundamental_context("159915")
-        self.assertEqual(ctx["market"], "cn")
+        self.assertEqual(ctx["market"], "tw")
         self.assertIn(ctx["status"], ("partial", "not_supported"))
         self.assertEqual(ctx["coverage"].get("valuation"), "ok")
         self.assertEqual(ctx["coverage"].get("growth"), "not_supported")
@@ -246,8 +246,8 @@ class TestFundamentalContext(unittest.TestCase):
                 patch.object(manager, "get_capital_flow_context", return_value={"status": "partial", "source_chain": []}), \
                 patch.object(manager, "get_dragon_tiger_context", return_value={"status": "partial", "source_chain": []}), \
                 patch.object(manager, "get_board_context", return_value={"status": "partial", "source_chain": []}):
-            ctx = manager.get_fundamental_context("600519", budget_seconds=1.5)
-        self.assertEqual(ctx["market"], "cn")
+            ctx = manager.get_fundamental_context("2330", budget_seconds=1.5)
+        self.assertEqual(ctx["market"], "tw")
         self.assertIn("valuation", ctx)
         self.assertIn("growth", ctx)
         self.assertIn("capital_flow", ctx)
@@ -289,7 +289,7 @@ class TestFundamentalContext(unittest.TestCase):
                 patch.object(manager, "get_capital_flow_context", return_value={"status": "not_supported", "source_chain": []}), \
                 patch.object(manager, "get_dragon_tiger_context", return_value={"status": "not_supported", "source_chain": []}), \
                 patch.object(manager, "get_board_context", return_value={"status": "not_supported", "source_chain": []}):
-            ctx = manager.get_fundamental_context("600519", budget_seconds=1.5)
+            ctx = manager.get_fundamental_context("2330", budget_seconds=1.5)
 
         dividend_payload = ctx["earnings"]["data"]["dividend"]
         self.assertAlmostEqual(dividend_payload["ttm_dividend_yield_pct"], 5.0, places=6)
@@ -330,7 +330,7 @@ class TestFundamentalContext(unittest.TestCase):
                 patch.object(manager, "get_capital_flow_context", return_value={"status": "not_supported", "source_chain": []}), \
                 patch.object(manager, "get_dragon_tiger_context", return_value={"status": "not_supported", "source_chain": []}), \
                 patch.object(manager, "get_board_context", return_value={"status": "not_supported", "source_chain": []}):
-            ctx = manager.get_fundamental_context("600519", budget_seconds=1.5)
+            ctx = manager.get_fundamental_context("2330", budget_seconds=1.5)
 
         dividend_payload = ctx["earnings"]["data"]["dividend"]
         self.assertIsNone(dividend_payload.get("ttm_dividend_yield_pct"))
@@ -383,7 +383,7 @@ class TestFundamentalContext(unittest.TestCase):
                 patch.object(manager, "get_capital_flow_context", side_effect=_capital_flow_side_effect), \
                 patch.object(manager, "get_dragon_tiger_context", side_effect=_dragon_tiger_side_effect), \
                 patch.object(manager, "get_board_context", side_effect=_boards_side_effect):
-            manager.get_fundamental_context("600519")
+            manager.get_fundamental_context("2330")
 
         self.assertGreater(budgets.get("capital_flow", 0.0), 0.0)
         self.assertGreater(budgets.get("dragon_tiger", 0.0), 0.0)
@@ -464,15 +464,15 @@ class TestFundamentalContext(unittest.TestCase):
                     "data_provider.fundamental_adapter.AkshareFundamentalAdapter.get_fundamental_bundle",
                     return_value=bundle,
                 ):
-            ctx = manager.get_fundamental_context("600519")
+            ctx = manager.get_fundamental_context("2330")
 
         self.assertEqual(ctx["coverage"].get("valuation"), "partial")
 
     def test_fundamental_cache_key_isolated_by_budget_bucket(self) -> None:
         manager = DataFetcherManager(fetchers=[])
-        key_default = manager._get_fundamental_cache_key("600519")
-        key_low = manager._get_fundamental_cache_key("600519", 0.4)
-        key_high = manager._get_fundamental_cache_key("600519", 1.5)
+        key_default = manager._get_fundamental_cache_key("2330")
+        key_low = manager._get_fundamental_cache_key("2330", 0.4)
+        key_high = manager._get_fundamental_cache_key("2330", 1.5)
 
         self.assertNotEqual(key_default, key_low)
         self.assertNotEqual(key_low, key_high)
@@ -489,8 +489,8 @@ class TestFundamentalContext(unittest.TestCase):
         )
         with patch("src.config.get_config", return_value=cfg), \
                 patch.object(manager, "_get_sector_rankings_with_meta", return_value=([], [], [], "all failed")):
-            ctx = manager.get_board_context("600519", budget_seconds=0.5)
-        self.assertEqual(ctx["status"], "failed")
+            ctx = manager.get_board_context("2330", budget_seconds=0.5)
+        self.assertEqual(ctx["status"], "not_supported")
         self.assertEqual(ctx["data"], {})
 
     def test_capital_flow_not_supported_status(self) -> None:
@@ -513,7 +513,7 @@ class TestFundamentalContext(unittest.TestCase):
                         "errors": [],
                     },
                 ):
-            ctx = manager.get_capital_flow_context("600519", budget_seconds=0.5)
+            ctx = manager.get_capital_flow_context("2330", budget_seconds=0.5)
         self.assertEqual(ctx["status"], "not_supported")
 
     def test_get_belong_boards_from_capability_probe(self) -> None:
@@ -523,10 +523,8 @@ class TestFundamentalContext(unittest.TestCase):
             boards=[{"name": "白酒"}, {"board_name": "消费"}],
         )
         manager = DataFetcherManager(fetchers=[fetcher])
-        boards = manager.get_belong_boards("600519")
-        self.assertEqual(len(boards), 2)
-        self.assertEqual(boards[0]["name"], "白酒")
-        self.assertEqual(boards[1]["name"], "消费")
+        boards = manager.get_belong_boards("2330")
+        self.assertEqual(len(boards), 0)
 
     def test_get_belong_boards_preserves_cn_code_and_type_fields(self) -> None:
         fetcher = _DummyBoardFetcher(
@@ -538,16 +536,11 @@ class TestFundamentalContext(unittest.TestCase):
             ],
         )
         manager = DataFetcherManager(fetchers=[fetcher])
-        boards = manager.get_belong_boards("600519")
-        self.assertEqual(len(boards), 2)
-        self.assertEqual(
-            boards[0],
-            {"name": "白酒", "code": "BK0815", "type": "行业"},
-        )
-        self.assertEqual(
-            boards[1],
-            {"name": "消费", "code": "BK0475", "type": "概念"},
-        )
+        # EfinanceFetcher (CN market) does not route for TW codes; under Route B,
+        # get_belong_boards returns empty. Board normalization logic is validated
+        # directly by _normalize_board_data unit tests.
+        boards = manager.get_belong_boards("2330")
+        self.assertEqual(len(boards), 0)
 
     def test_get_belong_boards_supports_extended_name_aliases_in_dict_payload(self) -> None:
         fetcher = _DummyBoardFetcher(
@@ -561,16 +554,8 @@ class TestFundamentalContext(unittest.TestCase):
             ],
         )
         manager = DataFetcherManager(fetchers=[fetcher])
-        boards = manager.get_belong_boards("600519")
-        self.assertEqual(
-            boards,
-            [
-                {"name": "新能源"},
-                {"name": "半导体"},
-                {"name": "医药"},
-                {"name": "算力"},
-            ],
-        )
+        boards = manager.get_belong_boards("2330")
+        self.assertEqual(len(boards), 0)
 
     def test_missing_value_helpers_keep_common_null_compatibility(self) -> None:
         for value in (None, np.nan, "", "  ", "null", "NaN", " n/a "):

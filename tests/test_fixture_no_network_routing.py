@@ -186,7 +186,7 @@ class TestFixtureNoNetworkRouting(unittest.TestCase):
             context = manager.get_fundamental_context("600519")
 
         self.assertEqual(context["status"], "not_supported")
-        self.assertEqual(context["market"], "cn")
+        self.assertEqual(context["market"], "tw")
         self.assertIn("fixture/no-network mode", context["errors"])
         manager._fundamental_adapter.get_fundamental_bundle.assert_not_called()
         manager.get_realtime_quote.assert_not_called()

@@ -57,7 +57,7 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
         cases = [
             (None, ["cn"]),
             ("", ["cn"]),
-            ("both", ["cn", "hk", "us"]),
+            ("both", ["cn", "hk", "us", "tw"]),
             (" CN,US,cn ", ["cn", "us"]),
             ("us,cn,us", ["cn", "us"]),
             ("eu,apac", ["cn"]),
@@ -167,8 +167,8 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                 notifier, send_notification=False, override_region="cn,us"
             )
 
-        self.assertIn("# A股大盘复盘\n\nCN body", result)
-        self.assertIn("# 美股大盘复盘\n\nUS body", result)
+        self.assertIn("# A股大盤回顧\n\nCN body", result)
+        self.assertIn("# 美股大盤回顧\n\nUS body", result)
         self.assertNotIn("港股", result)
         self.assertNotIn("HK", result)
 
@@ -200,8 +200,8 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                 notifier, send_notification=False, override_region="cn,hk"
             )
 
-        self.assertIn("# A股大盘复盘\n\nCN body", result)
-        self.assertIn("# 港股大盘复盘\n\nHK body", result)
+        self.assertIn("# A股大盤回顧\n\nCN body", result)
+        self.assertIn("# 港股大盤回顧\n\nHK body", result)
         self.assertNotIn("美股", result)
         self.assertNotIn("US Market", result)
 

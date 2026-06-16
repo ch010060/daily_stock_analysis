@@ -47,12 +47,17 @@ class TestSymbolNormalization(unittest.TestCase):
         self.assertEqual(result.provider_symbol, "AAPL")
 
     def test_a_share_without_market_fails_fast(self):
+        """Bare 5-digit CN codes still fail normalization.
+        4-digit codes are now accepted as TW stock codes (Phase 9C)."""
         with self.assertRaises(SymbolNormalizationError):
             normalize_symbol("600519")
 
     def test_tw_like_bare_symbol_without_market_fails_fast(self):
-        with self.assertRaises(SymbolNormalizationError):
-            normalize_symbol("2330")
+        """4-digit codes are now accepted as TW stock codes (Phase 9C).
+        The Route B scope gate handles CN filtering at a higher layer."""
+        result = normalize_symbol("2330")
+        self.assertEqual(result.market, "TW")
+        self.assertEqual(result.canonical, "TW:2330")
 
     def test_tw_4digit_etf_symbol(self):
         result = normalize_symbol("TW:0050")
