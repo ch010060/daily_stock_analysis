@@ -32,7 +32,7 @@ class TestRecordLLMUsage(unittest.TestCase):
             prompt_tokens=100,
             completion_tokens=200,
             total_tokens=300,
-            stock_code="600519",
+            stock_code="2330",
         )
         with self.db.session_scope() as session:
             rows = session.query(LLMUsage).all()
@@ -40,7 +40,7 @@ class TestRecordLLMUsage(unittest.TestCase):
             row = rows[0]
             self.assertEqual(row.call_type, "analysis")
             self.assertEqual(row.model, "gemini/gemini-2.5-flash")
-            self.assertEqual(row.stock_code, "600519")
+            self.assertEqual(row.stock_code, "2330")
             self.assertEqual(row.prompt_tokens, 100)
             self.assertEqual(row.completion_tokens, 200)
             self.assertEqual(row.total_tokens, 300)
@@ -155,6 +155,76 @@ class TestGetLLMUsageSummary(unittest.TestCase):
         self.assertEqual(result["total_tokens"], 0)
         self.assertEqual(result["by_call_type"], [])
         self.assertEqual(result["by_model"], [])
+
+    def test_token_totals_include_prompt_completion_and_model_peak(self):
+        from_dt, to_dt = self._today_range()
+        result = self.db.get_llm_usage_summary(from_dt, to_dt)
+        # 3 analysis (100p+200c=300) + 2 agent (50p+100c=150)
+        self.assertEqual(result["total_prompt_tokens"], 400)
+        self.assertEqual(result["total_completion_tokens"], 800)
+        by_model = {r["model"]: r for r in result["by_model"]}
+        flash = by_model["gemini/gemini-2.5-flash"]
+        self.assertEqual(flash["prompt_tokens"], 300)
+        self.assertEqual(flash["completion_tokens"], 600)
+        self.assertEqual(flash["max_total_tokens"], 300)
+        gpt = by_model["openai/gpt-4o"]
+        self.assertEqual(gpt["prompt_tokens"], 100)
+        self.assertEqual(gpt["completion_tokens"], 200)
+        self.assertEqual(gpt["max_total_tokens"], 150)
+
+
+class TestGetLLMUsageRecords(unittest.TestCase):
+    def setUp(self):
+        self.db = _fresh_db()
+        now = datetime.now()
+        for i in range(5):
+            row = LLMUsage(
+                call_type="analysis",
+                model="gemini/gemini-2.5-flash",
+                prompt_tokens=10 * (i + 1),
+                completion_tokens=20 * (i + 1),
+                total_tokens=30 * (i + 1),
+                stock_code="2330",
+                called_at=now,
+            )
+            with self.db.session_scope() as session:
+                session.add(row)
+
+    def tearDown(self):
+        DatabaseManager.reset_instance()
+
+    def _today_range(self):
+        now = datetime.now()
+        return now.replace(hour=0, minute=0, second=0, microsecond=0), now
+
+    def test_get_llm_usage_records_returns_recent_rows_with_limit(self):
+        from_dt, to_dt = self._today_range()
+        records = self.db.get_llm_usage_records(from_dt, to_dt, limit=3)
+        self.assertEqual(len(records), 3)
+        for rec in records:
+            self.assertIn("id", rec)
+            self.assertIn("call_type", rec)
+            self.assertIn("model", rec)
+            self.assertIn("stock_code", rec)
+            self.assertIn("prompt_tokens", rec)
+            self.assertIn("completion_tokens", rec)
+            self.assertIn("total_tokens", rec)
+            self.assertIn("called_at", rec)
+            self.assertEqual(rec["stock_code"], "2330")
+
+    def test_get_llm_usage_records_respects_limit_clamp(self):
+        from_dt, to_dt = self._today_range()
+        # limit > 200 should be clamped to 200
+        records = self.db.get_llm_usage_records(from_dt, to_dt, limit=9999)
+        self.assertLessEqual(len(records), 200)
+        # limit < 1 should be clamped to 1
+        records = self.db.get_llm_usage_records(from_dt, to_dt, limit=0)
+        self.assertEqual(len(records), 1)
+
+    def test_get_llm_usage_records_empty_range(self):
+        future = datetime(2099, 1, 1)
+        records = self.db.get_llm_usage_records(future, future)
+        self.assertEqual(records, [])
 
 
 class TestPersistUsageHelper(unittest.TestCase):

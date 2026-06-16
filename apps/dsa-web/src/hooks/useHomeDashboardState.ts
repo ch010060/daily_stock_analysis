@@ -59,6 +59,8 @@ export function useHomeDashboardState() {
       isLoadingStockBar: state.isLoadingStockBar,
       loadStockBar: state.loadStockBar,
       refreshStockBar: state.refreshStockBar,
+      marketReviewHistoryItems: state.marketReviewHistoryItems,
+      refreshMarketReviewHistory: state.refreshMarketReviewHistory,
     })),
   );
 

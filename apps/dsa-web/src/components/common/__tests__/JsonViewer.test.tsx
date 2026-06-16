@@ -17,7 +17,7 @@ describe('JsonViewer', () => {
 
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('script')).toBeNull();
-    expect(container.innerHTML).not.toContain('onerror=');
+    expect(container.querySelector('[onerror]')).toBeNull();
     expect(screen.getByText(/繁體中文內容應保留/)).toBeInTheDocument();
     expect(screen.getByText(/https:\/\/example\.com\/news/)).toBeInTheDocument();
   });

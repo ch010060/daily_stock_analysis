@@ -81,10 +81,10 @@ describe('Shell', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '退出' }));
+    fireEvent.click(screen.getByRole('button', { name: '登出' }));
 
-    expect(await screen.findByRole('heading', { name: '退出登录' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '确认退出' }));
+    expect(await screen.findByRole('heading', { name: '退出登入' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '確認退出' }));
     expect(mockLogout).toHaveBeenCalled();
   });
 });

@@ -86,27 +86,27 @@ describe('AnalysisContextSummary', () => {
 
     const panel = screen.getByTestId('analysis-context-summary');
     expect(panel).not.toHaveAttribute('open');
-    expect(within(panel).getAllByText('输入数据块')[0]).toBeVisible();
+    expect(within(panel).getAllByText('輸入資料塊')[0]).toBeVisible();
     expect(screen.getAllByText('可用 1')[0]).toBeVisible();
     expect(screen.getAllByText('缺失 1')[0]).toBeVisible();
-    expect(screen.getAllByText('抓取失败 1')[0]).toBeVisible();
-    expect(screen.getAllByText('质量分 82/100 可用')[0]).toBeVisible();
-    expect(screen.getByText('触发来源: api')).toBeVisible();
-    expect(screen.getByText('来源: mock_quote')).not.toBeVisible();
+    expect(screen.getAllByText('擷取失敗 1')[0]).toBeVisible();
+    expect(screen.getAllByText('品質分 82/100 可用')[0]).toBeVisible();
+    expect(screen.getByText('觸發來源: api')).toBeVisible();
+    expect(screen.getByText('來源: mock_quote')).not.toBeVisible();
 
-    fireEvent.click(within(panel).getAllByText('输入数据块')[0]);
+    fireEvent.click(within(panel).getAllByText('輸入資料塊')[0]);
 
     expect(panel).toHaveAttribute('open');
     expect(screen.getByText('行情')).toBeInTheDocument();
-    expect(screen.getByText('来源: mock_quote')).toBeVisible();
+    expect(screen.getByText('來源: mock_quote')).toBeVisible();
     expect(screen.getByText('告警:')).toBeInTheDocument();
     expect(screen.getByText(/intraday_realtime_overlay/)).toBeInTheDocument();
-    expect(screen.getByText('数据限制:')).toBeInTheDocument();
-    expect(screen.getByText(/基本面：抓取失败/)).toBeInTheDocument();
+    expect(screen.getByText('資料限制:')).toBeInTheDocument();
+    expect(screen.getByText(/基本面：擷取失敗/)).toBeInTheDocument();
     expect(screen.getByText(/news_provider_timeout/)).toBeInTheDocument();
     expect(screen.getByText(/news_context_missing/)).toBeInTheDocument();
     expect(screen.getByText(/fundamental_pipeline_failed/)).toBeInTheDocument();
-    expect(screen.getAllByText('新闻结果数: 3').some((item) => item.textContent === '新闻结果数: 3')).toBe(true);
+    expect(screen.getAllByText('新聞結果數: 3').some((item) => item.textContent === '新聞結果數: 3')).toBe(true);
   });
 
   it('localizes the collapsed summary for english reports', () => {
@@ -166,8 +166,8 @@ describe('AnalysisContextSummary', () => {
     expect(panel).not.toHaveAttribute('open');
     expect(within(panel).getByText('可用 0')).toBeVisible();
     expect(within(panel).getByText('缺失 0')).toBeVisible();
-    expect(within(panel).getAllByText('降级 1')[0]).toBeVisible();
-    expect(within(panel).getAllByText('过期 1')[0]).toBeVisible();
+    expect(within(panel).getAllByText('降級 1')[0]).toBeVisible();
+    expect(within(panel).getAllByText('過期 1')[0]).toBeVisible();
   });
 
   it('does not render without an overview', () => {
@@ -196,7 +196,7 @@ describe('AnalysisContextSummary', () => {
 
     render(<AnalysisContextSummary overview={unsafeOverview} />);
 
-    fireEvent.click(screen.getAllByText('输入数据块')[0]);
+    fireEvent.click(screen.getAllByText('輸入資料塊')[0]);
 
     expect(screen.queryByText('raw trend payload')).not.toBeInTheDocument();
     expect(screen.queryByText('完整新闻正文不应出现')).not.toBeInTheDocument();

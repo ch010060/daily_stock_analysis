@@ -85,3 +85,13 @@ static/
 /apps/dsa-desktop/dist/
 /apps/dsa-desktop/node_modules/
 docs/specs/
+
+# repo_local_init generated artifacts
+/.openspec_init
+/openspec
+/scratchpad.md
+/AGENT.md
+/AGENTS.md
+/CLAUDE.md
+/GEMINI.md
+/.agenthub

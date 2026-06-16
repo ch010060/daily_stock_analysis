@@ -36,6 +36,8 @@ let activeTaskRequestSeq = 0;
 let activeTaskLocalRevision = 0;
 const dismissedTaskIds = new Set<string>();
 
+const MARKET_REVIEW_HISTORY_CODE = 'MARKET';
+
 export interface StockPoolState {
   query: string;
   selectionSource: SelectionSource;
@@ -92,6 +94,8 @@ export interface StockPoolState {
   resetDashboardState: () => void;
   loadStockBar: () => Promise<void>;
   refreshStockBar: () => Promise<void>;
+  marketReviewHistoryItems: HistoryItem[];
+  refreshMarketReviewHistory: (silent?: boolean) => Promise<void>;
 }
 
 const initialState = {
@@ -128,6 +132,7 @@ const initialState = {
   markdownDrawerOpen: false,
   stockBarItems: [] as StockBarItem[],
   isLoadingStockBar: false,
+  marketReviewHistoryItems: [] as HistoryItem[],
 };
 
 function buildHistoryParams(page: number) {
@@ -142,6 +147,7 @@ function buildHistoryParams(page: number) {
 function buildStockHistoryParams(stockCode: string, page: number, filters: StockHistoryFilters) {
   const params: {
     stockCode: string;
+    reportType?: 'market_review';
     startDate?: string;
     endDate?: string;
     page: number;
@@ -151,6 +157,10 @@ function buildStockHistoryParams(stockCode: string, page: number, filters: Stock
     page,
     limit: STOCK_HISTORY_PAGE_SIZE,
   };
+
+  if (stockCode === MARKET_REVIEW_HISTORY_CODE) {
+    params.reportType = 'market_review';
+  }
 
   if (filters.range === '30d') {
     params.startDate = getRecentStartDate(30);
@@ -182,6 +192,19 @@ function reportToHistoryItem(report: AnalysisReport): HistoryItem | null {
     changePct: report.meta.changePct,
     modelUsed: report.meta.modelUsed,
     createdAt: report.meta.createdAt,
+  };
+}
+
+function normalizeSelectedReport(report: AnalysisReport): AnalysisReport {
+  if (report.meta.reportType !== 'market_review' || report.meta.stockCode) {
+    return report;
+  }
+  return {
+    ...report,
+    meta: {
+      ...report.meta,
+      stockCode: MARKET_REVIEW_HISTORY_CODE,
+    },
   };
 }
 
@@ -244,7 +267,7 @@ async function fetchStockHistory(
   const state = get();
   const report = state.selectedReport;
 
-  if (!report || report.meta.reportType === 'market_review') {
+  if (!report || !report.meta.stockCode) {
     resetStockHistoryState(set);
     set({
       isHistoryTrendOpen: false,
@@ -391,7 +414,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
   closeMarkdownDrawer: () => set({ markdownDrawerOpen: false }),
 
   openHistoryTrend: async () => {
-    if (!get().selectedReport || get().selectedReport?.meta.reportType === 'market_review') {
+    if (!get().selectedReport || !get().selectedReport?.meta.stockCode) {
       return;
     }
     set({ isHistoryTrendOpen: true });
@@ -451,7 +474,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     }
 
     try {
-      const report = await historyApi.getDetail(recordId);
+      const report = normalizeSelectedReport(await historyApi.getDetail(recordId));
       if (requestId !== reportRequestSeq) {
         return;
       }
@@ -462,7 +485,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
         isLoadingReport: false,
       });
 
-      if (report.meta.reportType === 'market_review' || !report.meta.stockCode) {
+      if (!report.meta.stockCode) {
         stockHistoryRequestSeq += 1;
         resetStockHistoryState(set);
         set({ isHistoryTrendOpen: false });
@@ -744,6 +767,21 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
         endDate: getTodayInShanghai(),
       });
       set({ stockBarItems: response.items });
+    } catch {
+      // keep existing items on error
+    }
+  },
+
+  refreshMarketReviewHistory: async (silent = false) => {
+    void silent;
+    try {
+      const response = await historyApi.getList({
+        stockCode: MARKET_REVIEW_HISTORY_CODE,
+        reportType: 'market_review',
+        page: 1,
+        limit: 10,
+      });
+      set({ marketReviewHistoryItems: response.items });
     } catch {
       // keep existing items on error
     }

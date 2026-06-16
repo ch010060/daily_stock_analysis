@@ -38,9 +38,9 @@ describe('ReportMarkdownDrawer', () => {
       await renderDrawer(onClose);
 
       expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(await screen.findByText('加载报告失败')).toBeInTheDocument();
+      expect(await screen.findByText('載入報告失敗')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+      fireEvent.click(screen.getByRole('button', { name: '關閉' }));
 
       await waitFor(() => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -63,7 +63,7 @@ describe('ReportMarkdownDrawer', () => {
       await renderDrawer();
 
       expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(await screen.findByText('加载报告失败')).toBeInTheDocument();
+      expect(await screen.findByText('載入報告失敗')).toBeInTheDocument();
     } finally {
       consoleError.mockRestore();
     }
@@ -88,7 +88,7 @@ describe('ReportMarkdownDrawer', () => {
     try {
       await renderDrawer();
 
-      expect(await screen.findByText('加载报告失败')).toBeInTheDocument();
+      expect(await screen.findByText('載入報告失敗')).toBeInTheDocument();
 
       cleanup();
       await renderDrawer();
