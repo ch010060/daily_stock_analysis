@@ -2383,11 +2383,14 @@ class GeminiAnalyzer:
         config: Config,
         use_channel_router: bool,
         router_model_names: set[str],
+        timeout: int | None = None,
     ) -> Any:
         """Dispatch a LiteLLM completion through router or direct fallback."""
         wire_models = resolve_fallback_litellm_wire_models(model, config.llm_model_list)
         register_fallback_model_pricing(wire_models)
         effective_kwargs = dict(call_kwargs)
+        if timeout is not None and timeout > 0:
+            effective_kwargs["timeout"] = timeout
         if use_channel_router and self._router and model in router_model_names:
             return self._router.completion(**effective_kwargs)
         if self._router and model == config.litellm_model and not use_channel_router:
@@ -2597,6 +2600,7 @@ class GeminiAnalyzer:
             or 8192
         )
         requested_temperature = generation_config.get('temperature', 0.7)
+        llm_timeout = getattr(config, 'llm_provider_timeout_seconds', None)
 
         use_channel_router = self._has_channel_config(config)
         # Use the pre-check filtered list so router_model_names and models_to_try
@@ -2669,6 +2673,7 @@ class GeminiAnalyzer:
                                 config=config,
                                 use_channel_router=use_channel_router,
                                 router_model_names=router_model_names,
+                                timeout=llm_timeout,
                             ),
                             model=model,
                             call_kwargs={**call_kwargs, "stream": True},
@@ -2717,6 +2722,7 @@ class GeminiAnalyzer:
                         config=config,
                         use_channel_router=use_channel_router,
                         router_model_names=router_model_names,
+                        timeout=llm_timeout,
                     ),
                     model=model,
                     call_kwargs=call_kwargs,

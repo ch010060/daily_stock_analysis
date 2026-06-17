@@ -294,6 +294,8 @@ export interface TaskStatus {
   traceId?: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress?: number;
+  stage?: string | null;
+  stageLabel?: string | null;
   result?: AnalysisResult;
   marketReviewReport?: string;
   error?: string;
@@ -312,6 +314,8 @@ export interface TaskInfo {
   stockName?: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress: number;
+  stage?: string;
+  stageLabel?: string;
   message?: string;
   reportType: string;
   createdAt: string;

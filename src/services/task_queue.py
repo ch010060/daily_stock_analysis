@@ -67,6 +67,8 @@ class TaskInfo:
     stock_name: Optional[str] = None
     status: TaskStatus = TaskStatus.PENDING
     progress: int = 0
+    stage: Optional[str] = None  # Current pipeline stage key
+    stage_label: Optional[str] = None  # User-facing zh_TW stage label
     message: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
@@ -89,6 +91,8 @@ class TaskInfo:
             "stock_name": self.stock_name,
             "status": self.status.value,
             "progress": self.progress,
+            "stage": self.stage,
+            "stage_label": self.stage_label,
             "message": self.message,
             "report_type": self.report_type,
             "analysis_phase": self.analysis_phase,
@@ -121,6 +125,8 @@ class TaskInfo:
             selection_source=self.selection_source,
             skills=list(self.skills) if self.skills is not None else None,
             trace_id=self.trace_id or self.task_id,
+            stage=self.stage,
+            stage_label=self.stage_label,
         )
 
 
@@ -563,6 +569,8 @@ class AnalysisTaskQueue:
         message: Optional[str] = None,
         *,
         event_type: str = "task_progress",
+        stage: Optional[str] = None,
+        stage_label: Optional[str] = None,
     ) -> Optional[TaskInfo]:
         """
         Update in-flight task progress and broadcast an SSE event.
@@ -582,6 +590,12 @@ class AnalysisTaskQueue:
                 changed = True
             if message is not None and message != task.message:
                 task.message = message
+                changed = True
+            if stage is not None and stage != task.stage:
+                task.stage = stage
+                changed = True
+            if stage_label is not None and stage_label != task.stage_label:
+                task.stage_label = stage_label
                 changed = True
 
             if not changed:
@@ -636,8 +650,8 @@ class AnalysisTaskQueue:
             # 执行分析
             service = AnalysisService()
 
-            def _on_progress(progress: int, message: str) -> None:
-                self.update_task_progress(task_id, progress, message)
+            def _on_progress(progress: int, message: str, *, stage: Optional[str] = None, stage_label: Optional[str] = None) -> None:
+                self.update_task_progress(task_id, progress, message, stage=stage, stage_label=stage_label)
 
             diag_token = None
             if get_current_diagnostic_context() is None:
