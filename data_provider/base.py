@@ -1845,6 +1845,20 @@ class DataFetcherManager:
         is_us_index = is_us_index_code(stock_code)
         is_us = is_us_index or _is_us_code(stock_code)
         is_hk = (not is_us) and _is_hk_market(stock_code)
+        is_tw = _is_tw_market(stock_code)
+
+        # 台股：仅使用 YFinance 获取实时行情（避免 CN 数据源无效重试耗时）
+        if is_tw:
+            primary_quote = self._try_fetcher_quote(stock_code, "YfinanceFetcher")
+            if primary_quote is not None:
+                logger.info(f"[实时行情] 台股 {stock_code} 成功获取 (来源: YfinanceFetcher)")
+                return self._enrich_realtime_quote(
+                    primary_quote,
+                    fallback_from=None,
+                    realtime_cache_ttl=getattr(config, "realtime_cache_ttl", None),
+                )
+            logger.info(f"[实时行情] 台股 {stock_code} YFinance 不可用，跳过实时行情")
+            return None
 
         if is_us or is_hk:
             prefer_lb = self._longbridge_preferred() and not is_us_index

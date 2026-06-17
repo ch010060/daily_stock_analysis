@@ -199,14 +199,18 @@ class StockAnalysisPipeline:
             )
             self.social_sentiment_service = None
 
-    def _emit_progress(self, progress: int, message: str) -> None:
+    def _emit_progress(self, progress: int, message: str, *, stage: Optional[str] = None, stage_label: Optional[str] = None) -> None:
         """Best-effort bridge from pipeline stages to task SSE progress."""
         callback = getattr(self, "progress_callback", None)
         if callback is None:
             return
         try:
+            if stage:
+                logger.info(f"[pipeline] emit stage={stage} label={stage_label} msg={message[:50]}")
+            callback(progress, message, stage=stage, stage_label=stage_label)
+        except TypeError:
+            # Fallback for old callback signatures that don't accept stage kwargs
             callback(progress, message)
-        except Exception as exc:
             query_id = getattr(self, "query_id", None)
             logger.warning(
                 "[pipeline] progress callback failed: %s (progress=%s, message=%r, query_id=%s)",
@@ -261,7 +265,26 @@ class StockAnalysisPipeline:
 
             # 从数据源获取数据
             logger.info(f"{stock_name}({code}) 开始从数据源获取数据...")
-            df, source_name = self.fetcher_manager.get_daily_data(code, days=30)
+            data_fetch_timeout = getattr(self.config, 'data_fetch_timeout_seconds', 20)
+            import concurrent.futures
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            try:
+                future = executor.submit(
+                    self.fetcher_manager.get_daily_data, code, days=10
+                )
+                df, source_name = future.result(timeout=data_fetch_timeout)
+            except concurrent.futures.TimeoutError:
+                logger.warning(
+                    f"{stock_name}({code}) 数据获取超时 ({data_fetch_timeout}s)"
+                )
+                executor.shutdown(wait=False, cancel_futures=True)
+                return False, f"数据获取超时 ({data_fetch_timeout}s)"
+            except Exception as e:
+                logger.error(f"{stock_name}({code}) 数据获取异常: {e}")
+                executor.shutdown(wait=False, cancel_futures=True)
+                return False, str(e)
+            else:
+                executor.shutdown(wait=False)
 
             if df is None or df.empty:
                 return False, "获取数据为空"
@@ -316,7 +339,7 @@ class StockAnalysisPipeline:
             market_phase_context_dict = market_phase_context.to_dict()
             market_phase_summary = render_market_phase_summary(market_phase_context_dict)
 
-            self._emit_progress(18, f"{code}：正在获取行情与筹码数据")
+            self._emit_progress(18, f"{code}：正在获取行情与筹码数据", stage="data_fetching", stage_label="正在擷取股價與基本資料")
             # 获取股票名称（先走轻量名称路径，后续若 realtime_quote 有 name 再覆盖）
             stock_name = self.fetcher_manager.get_stock_name(code, allow_realtime=False)
 
@@ -450,16 +473,33 @@ class StockAnalysisPipeline:
             # Step 4: 多维度情报搜索（最新消息+风险排查+业绩预期）
             news_context = None
             news_result_count: Optional[int] = None
-            self._emit_progress(46, f"{stock_name}：正在检索新闻与舆情")
+            self._emit_progress(46, f"{stock_name}：正在检索新闻与舆情", stage="optional_context", stage_label="正在整理新聞與延伸資料")
             if self.search_service is not None and self.search_service.is_available:
                 logger.info(f"{stock_name}({code}) 开始多维度情报搜索...")
 
-                # 使用多维度搜索（最多5次搜索）
-                intel_results = self.search_service.search_comprehensive_intel(
-                    stock_code=code,
-                    stock_name=stock_name,
-                    max_searches=5
-                )
+                import concurrent.futures
+                search_budget = getattr(self.config, 'search_total_timeout_seconds', 8)
+                executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                try:
+                    future = executor.submit(
+                        self.search_service.search_comprehensive_intel,
+                        stock_code=code,
+                        stock_name=stock_name,
+                        max_searches=5,
+                    )
+                    intel_results = future.result(timeout=search_budget)
+                except concurrent.futures.TimeoutError:
+                    logger.warning(
+                        f"{stock_name}({code}) 情报搜索超时 ({search_budget}s)，降级为无新闻模式"
+                    )
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    intel_results = None
+                except Exception as e:
+                    logger.warning(f"{stock_name}({code}) 情报搜索异常: {e}")
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    intel_results = None
+                else:
+                    executor.shutdown(wait=False)
 
                 # 格式化情报报告
                 if intel_results:
@@ -571,7 +611,7 @@ class StockAnalysisPipeline:
                     f"{stock_name}：LLM 正在生成分析结果（已接收 {chars_received} 字符）",
                 )
 
-            self._emit_progress(64, f"{stock_name}：正在请求 LLM 生成报告")
+                self._emit_progress(64, f"{stock_name}：正在请求 LLM 生成报告", stage="llm_analyzing", stage_label="正在生成完整分析報告")
             llm_started_at = time.monotonic()
             try:
                 result = self.analyzer.analyze(
