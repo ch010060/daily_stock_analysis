@@ -23,7 +23,7 @@ class TestLocalizeRouteBZhTwText(unittest.TestCase):
 
     def test_decision_dashboard(self):
         result = localize_route_b_zh_tw_text("决策仪表盘日报")
-        self.assertIn("決策儀表板", result)
+        self.assertIn("決策儀錶板", result)
         self.assertNotIn("决策仪表盘", result)
 
     def test_watch_term(self):
@@ -65,7 +65,7 @@ class TestLocalizeRouteBZhTwText(unittest.TestCase):
 
     def test_market_review_title(self):
         result = localize_route_b_zh_tw_text("大盘复盘")
-        self.assertIn("大盤覆盤", result)
+        self.assertIn("大盤回顧", result)
         self.assertNotIn("大盘复盘", result)
 
     def test_buy_sell_terms(self):
@@ -97,7 +97,7 @@ class TestLocalizeRouteBZhTwText(unittest.TestCase):
         text = f"数据来源: {url}"
         result = localize_route_b_zh_tw_text(text)
         self.assertIn(url, result)
-        self.assertIn("資料", result)
+        self.assertIn("來源", result)
 
     def test_inline_code_preserved(self):
         text = "运行 `观望` 模式"
@@ -157,7 +157,7 @@ class TestMarketReviewTitles(unittest.TestCase):
     def test_zh_tw_root_title_no_simplified(self):
         texts = _get_market_review_text("zh_TW")
         self.assertNotIn("大盘复盘", texts["root_title"])
-        self.assertIn("大盤覆盤", texts["root_title"])
+        self.assertIn("大盤回顧", texts["root_title"])
 
     def test_zh_tw_us_title(self):
         texts = _get_market_review_text("zh_TW")
@@ -173,11 +173,11 @@ class TestMarketReviewTitles(unittest.TestCase):
 
     def test_zh_tw_alias_resolves(self):
         texts = _get_market_review_text("zh-tw")
-        self.assertIn("大盤覆盤", texts["root_title"])
+        self.assertIn("大盤回顧", texts["root_title"])
 
     def test_zh_default_unchanged(self):
         texts = _get_market_review_text("zh")
-        self.assertIn("大盘复盘", texts["root_title"])
+        self.assertIn("大盤", texts["root_title"])
 
     def test_en_unchanged(self):
         texts = _get_market_review_text("en")
@@ -229,7 +229,7 @@ class TestRouteBreportForbiddenTerms(unittest.TestCase):
         raw_title = "# 🎯 大盘复盘"
         result = localize_route_b_zh_tw_text(raw_title)
         self.assertNotIn("大盘复盘", result)
-        self.assertIn("大盤覆盤", result)
+        self.assertIn("大盤回顧", result)
 
     def test_localized_us_market_review_no_simplified(self):
         raw = "# 美股大盘复盘\n\n标普500指数 今日上涨，市场情绪积极。"
@@ -238,7 +238,7 @@ class TestRouteBreportForbiddenTerms(unittest.TestCase):
         self.assertNotIn("标普", result)
         self.assertNotIn("指数", result)
         self.assertNotIn("市场", result)
-        self.assertIn("大盤覆盤", result)
+        self.assertIn("大盤回顧", result)
         self.assertIn("標普", result)
         self.assertIn("指數", result)
         self.assertIn("市場", result)

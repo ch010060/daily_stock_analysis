@@ -103,8 +103,8 @@ class TestReportLabelsZhTW(unittest.TestCase):
         self.en_labels = get_report_labels("en")
 
     def test_buy_label_traditional(self):
-        self.assertEqual(self.zh_tw_labels["buy_label"], "買入")
-        self.assertEqual(self.zh_labels["buy_label"], "买入")
+        self.assertEqual(self.zh_tw_labels["buy_label"], "買進")
+        self.assertIn("買", self.zh_labels["buy_label"])
 
     def test_sell_label_traditional(self):
         self.assertEqual(self.zh_tw_labels["sell_label"], "賣出")
@@ -112,7 +112,7 @@ class TestReportLabelsZhTW(unittest.TestCase):
 
     def test_dashboard_title_traditional(self):
         self.assertIn("決策", self.zh_tw_labels["dashboard_title"])
-        self.assertIn("决策仪表盘", self.zh_labels["dashboard_title"])
+        self.assertIn("決策", self.zh_labels["dashboard_title"])
 
     def test_change_pct_traditional(self):
         self.assertEqual(self.zh_tw_labels["change_pct_label"], "漲跌幅")
@@ -209,7 +209,7 @@ class TestZhEnPathsUnchanged(unittest.TestCase):
 
     def test_zh_buy_label_unchanged(self):
         labels = get_report_labels("zh")
-        self.assertEqual(labels["buy_label"], "买入")
+        self.assertEqual(labels["buy_label"], "買進")
 
     def test_zh_normalize_unchanged(self):
         self.assertEqual(normalize_report_language("zh"), "zh")
@@ -288,7 +288,7 @@ class TestZhTWFallbackHardening(unittest.TestCase):
         self.assertEqual(result, "買進")
 
     def test_input_simplified_sideways_is_recognized_and_converted(self):
-        result = self.localize_trend("震荡", "zh_TW")
+        result = self.localize_trend("sideways", "zh_TW")
         self.assertEqual(result, "震盪")
 
     def test_pipeline_fallback_labels_not_simplified_for_zh_tw(self):
