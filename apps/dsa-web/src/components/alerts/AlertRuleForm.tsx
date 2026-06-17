@@ -458,7 +458,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
             label="規則名稱"
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="可選，例如 茅臺價格突破"
+            placeholder="可選，例如 台積電突破壓力"
             disabled={isSubmitting}
           />
           <Select
