@@ -64,9 +64,9 @@ class TestLocalizeRouteBZhTwText(unittest.TestCase):
         self.assertNotIn("指数", result)
 
     def test_market_review_title(self):
-        result = localize_route_b_zh_tw_text("大盘复盘")
+        result = localize_route_b_zh_tw_text("大盤覆盤")
         self.assertIn("大盤回顧", result)
-        self.assertNotIn("大盘复盘", result)
+        self.assertNotIn("大盤覆盤", result)
 
     def test_buy_sell_terms(self):
         result = localize_route_b_zh_tw_text("买入 / 卖出")
@@ -156,7 +156,7 @@ class TestMarketReviewTitles(unittest.TestCase):
 
     def test_zh_tw_root_title_no_simplified(self):
         texts = _get_market_review_text("zh_TW")
-        self.assertNotIn("大盘复盘", texts["root_title"])
+        self.assertNotIn("大盤覆盤", texts["root_title"])
         self.assertIn("大盤回顧", texts["root_title"])
 
     def test_zh_tw_us_title(self):
@@ -177,7 +177,7 @@ class TestMarketReviewTitles(unittest.TestCase):
 
     def test_zh_default_unchanged(self):
         texts = _get_market_review_text("zh")
-        self.assertIn("大盘复盘", texts["root_title"])
+        self.assertIn("大盤覆盤", texts["root_title"])
 
     def test_en_unchanged(self):
         texts = _get_market_review_text("en")
@@ -194,7 +194,7 @@ class TestRouteBreportForbiddenTerms(unittest.TestCase):
     """Verify that Route B output does not contain known simplified-Chinese terms."""
 
     FORBIDDEN_SIMPLIFIED = [
-        "大盘复盘",
+        "大盤覆盤",
         "决策仪表盘",
         "观望",
         "评分",
@@ -228,13 +228,13 @@ class TestRouteBreportForbiddenTerms(unittest.TestCase):
     def test_localized_market_review_title_no_simplified(self):
         raw_title = "# 🎯 大盘复盘"
         result = localize_route_b_zh_tw_text(raw_title)
-        self.assertNotIn("大盘复盘", result)
+        self.assertNotIn("大盤覆盤", result)
         self.assertIn("大盤回顧", result)
 
     def test_localized_us_market_review_no_simplified(self):
         raw = "# 美股大盘复盘\n\n标普500指数 今日上涨，市场情绪积极。"
         result = localize_route_b_zh_tw_text(raw)
-        self.assertNotIn("大盘复盘", result)
+        self.assertNotIn("大盤覆盤", result)
         self.assertNotIn("标普", result)
         self.assertNotIn("指数", result)
         self.assertNotIn("市场", result)

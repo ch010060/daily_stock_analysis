@@ -4,7 +4,7 @@ import os, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SIMPLIFIED_CHARS = '设数据导账户买卖仓损标巩'
 EXCLUDE_DIRS = {'.git','node_modules','dist','build','coverage','__pycache__','.venv','venv','.cache','.local-artifacts-recovery','.omo','.runtime-validation','.gitnexus','.serena','logs','data','reports','cache','playwright-report','test-results'}
-EXCLUDE_FILES = {'docs/README_CN.md', 'scripts/audit_zh_tw_text.py', 'tests/test_language_zh_tw_support.py', 'tests/test_route_b_zh_tw_localization.py', 'tests/test_tw_market_review_rendering.py', 'tests/test_data_fetcher_prefetch_stock_names.py', 'tests/test_generate_index_from_csv.py', 'tests/test_notification_report_fixtures.py', 'tests/fixtures/notification_reports/single_stock_report.md', 'tests/fixtures/notification_reports/market_review_report.md', 'tests/fixtures/notification_reports/aggregate_report.md'}
+EXCLUDE_FILES = {'docs/README_CN.md', 'scripts/audit_zh_tw_text.py', 'tests/test_language_zh_tw_support.py', 'tests/test_route_b_zh_tw_localization.py', 'tests/test_tw_market_review_rendering.py', 'tests/test_data_fetcher_prefetch_stock_names.py', 'tests/test_generate_index_from_csv.py', 'tests/test_notification_report_fixtures.py', 'src/data/stock_mapping.py', 'scripts/generate_index_from_csv.py', 'tests/fixtures/notification_reports/single_stock_report.md', 'tests/fixtures/notification_reports/market_review_report.md', 'tests/fixtures/notification_reports/aggregate_report.md', }
 hits = 0
 for root, dirs, files in os.walk(ROOT):
     dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and not d.startswith('.')]
