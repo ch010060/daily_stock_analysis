@@ -2600,7 +2600,7 @@ class GeminiAnalyzer:
             or 8192
         )
         requested_temperature = generation_config.get('temperature', 0.7)
-        llm_timeout = config.llm_provider_timeout_seconds
+        llm_timeout = getattr(config, 'llm_provider_timeout_seconds', None)
 
         use_channel_router = self._has_channel_config(config)
         # Use the pre-check filtered list so router_model_names and models_to_try

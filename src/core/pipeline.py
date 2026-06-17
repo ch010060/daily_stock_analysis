@@ -209,7 +209,10 @@ class StockAnalysisPipeline:
                 logger.debug("[pipeline] emit stage=%s label=%s", stage, stage_label)
             callback(progress, message, stage=stage, stage_label=stage_label)
         except TypeError:
-            callback(progress, message)
+            try:
+                callback(progress, message)
+            except Exception:
+                pass
         except Exception as exc:
             query_id = getattr(self, "query_id", None)
             logger.warning(
@@ -258,7 +261,7 @@ class StockAnalysisPipeline:
 
             # 从数据源获取数据
             logger.info(f"{stock_name}({code}) 开始从数据源获取数据...")
-            data_fetch_timeout = getattr(self.config, 'data_fetch_timeout_seconds', 20)
+            data_fetch_timeout = getattr(getattr(self, 'config', None), 'data_fetch_timeout_seconds', 20) or 20
             import concurrent.futures
             executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
             try:
