@@ -206,23 +206,16 @@ class StockAnalysisPipeline:
             return
         try:
             if stage:
-                logger.info(f"[pipeline] emit stage={stage} label={stage_label} msg={message[:50]}")
+                logger.debug("[pipeline] emit stage=%s label=%s", stage, stage_label)
             callback(progress, message, stage=stage, stage_label=stage_label)
         except TypeError:
-            # Fallback for old callback signatures that don't accept stage kwargs
             callback(progress, message)
+        except Exception as exc:
             query_id = getattr(self, "query_id", None)
             logger.warning(
                 "[pipeline] progress callback failed: %s (progress=%s, message=%r, query_id=%s)",
-                exc,
-                progress,
-                message,
-                query_id,
-                extra={
-                    "progress": progress,
-                    "progress_message": message,
-                    "query_id": query_id,
-                },
+                exc, progress, message, query_id,
+                extra={"progress": progress, "progress_message": message, "query_id": query_id},
             )
 
     def fetch_and_save_stock_data(
