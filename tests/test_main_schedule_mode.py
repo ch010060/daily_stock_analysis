@@ -138,7 +138,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
         )
         run_full_analysis.assert_called_once_with(config, args, None)
         warning_log.assert_any_call(
-            "定时模式下检测到 --stocks 参数；计划执行将忽略启动时股票快照，并在每次运行前重新读取最新的 STOCK_LIST。"
+            "定時模式下檢測到 --stocks 引數；計劃執行將忽略啟動時股票快照，並在每次執行前重新讀取最新的 STOCK_LIST。"
         )
 
     def test_schedule_mode_reload_uses_latest_runtime_config(self) -> None:
@@ -228,7 +228,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             background_task["task"]()
 
         worker.run_once.assert_called_once_with()
-        info_log.assert_any_call("[EventMonitor] 本轮触发 %d 条提醒", 2)
+        info_log.assert_any_call("[EventMonitor] 本輪觸發 %d 條提醒", 2)
 
     def test_schedule_mode_registers_event_monitor_worker_without_legacy_rules(self) -> None:
         args = self._make_args(schedule=True)
@@ -282,14 +282,14 @@ class MainScheduleModeTestCase(unittest.TestCase):
              ) as run_diagnostics, \
              patch(
                  "src.services.notification_diagnostics.format_notification_diagnostics",
-                 return_value="通知配置诊断",
+                 return_value="通知配置診斷",
              ), \
              patch("builtins.print") as print_output:
             exit_code = main.main()
 
         self.assertEqual(exit_code, 0)
         run_diagnostics.assert_called_once_with(config)
-        print_output.assert_called_once_with("通知配置诊断")
+        print_output.assert_called_once_with("通知配置診斷")
         start_api_server.assert_not_called()
         run_full_analysis.assert_not_called()
 
@@ -577,7 +577,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
         output = capture_stream.getvalue()
-        self.assertIn("加载配置失败", output)
+        self.assertIn("載入配置失敗", output)
         self.assertIn("config boom", output)
 
     def test_bootstrap_logging_failure_does_not_block_startup(self) -> None:
@@ -625,9 +625,9 @@ class MainScheduleModeTestCase(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         run_mock.assert_called_once()
         output = capture_stream.getvalue()
-        self.assertIn("文件日志初始化失败，已降级为控制台日志输出", output)
+        self.assertIn("檔案日誌初始化失敗，已降級為控制檯日誌輸出", output)
         self.assertIn("/app/logs", output)
-        self.assertIn("官方 Docker 镜像启动入口会自动修复默认挂载目录权限", output)
+        self.assertIn("官方 Docker 映象啟動入口會自動修復預設掛載目錄許可權", output)
 
     def test_run_full_analysis_import_failure_propagates(self) -> None:
         """P1: import failures in run_full_analysis must propagate, not be swallowed."""

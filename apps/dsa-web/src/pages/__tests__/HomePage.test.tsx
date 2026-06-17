@@ -65,9 +65,9 @@ const historyItem = {
   id: 1,
   queryId: 'q-1',
   stockCode: '600519',
-  stockName: '贵州茅台',
+  stockName: '貴州茅臺',
   sentimentScore: 82,
-  operationAdvice: '买入',
+  operationAdvice: '買進',
   createdAt: '2026-03-18T08:00:00Z',
 };
 
@@ -76,15 +76,15 @@ const historyReport = {
     id: 1,
     queryId: 'q-1',
     stockCode: '600519',
-    stockName: '贵州茅台',
+    stockName: '貴州茅臺',
     reportType: 'detailed' as const,
     reportLanguage: 'zh' as const,
     createdAt: '2026-03-18T08:00:00Z',
   },
   summary: {
-    analysisSummary: '趋势维持强势',
-    operationAdvice: '继续观察买点',
-    trendPrediction: '短线震荡偏强',
+    analysisSummary: '趨勢維持強勢',
+    operationAdvice: '繼續觀察買點',
+    trendPrediction: '短線震盪偏強',
     sentimentScore: 78,
   },
 };
@@ -93,7 +93,7 @@ const marketReviewHistoryItem = {
   id: 2,
   queryId: 'market-review-q-1',
   stockCode: 'MARKET',
-  stockName: '大盘复盘',
+  stockName: '大盤覆盤',
   reportType: 'market_review' as const,
   createdAt: '2026-03-18T08:00:00Z',
 };
@@ -103,15 +103,15 @@ const marketReviewHistoryReport = {
     id: 2,
     queryId: 'market-review-q-1',
     stockCode: 'MARKET',
-    stockName: '大盘复盘',
+    stockName: '大盤覆盤',
     reportType: 'market_review' as const,
     reportLanguage: 'zh' as const,
     createdAt: '2026-03-18T08:00:00Z',
   },
   summary: {
-    analysisSummary: '大盘复盘摘要',
-    operationAdvice: '查看复盘',
-    trendPrediction: '大盘复盘',
+    analysisSummary: '大盤覆盤摘要',
+    operationAdvice: '檢視覆盤',
+    trendPrediction: '大盤覆盤',
     sentimentScore: 50,
   },
 };
@@ -131,7 +131,7 @@ describe('HomePage', () => {
     vi.mocked(historyApi.getDiagnostics).mockResolvedValue({
       status: 'unknown',
       statusLabel: '未知',
-      reason: '旧报告或诊断证据不足，无法判断本次运行状态',
+      reason: '舊報告或診斷證據不足，無法判斷本次執行狀態',
       components: {},
       copyText: 'data_status: unknown',
     });
@@ -170,8 +170,8 @@ describe('HomePage', () => {
     expect(dashboard.firstElementChild?.className).toContain('min-h-0');
     expect(dashboard.querySelector('.flex-1.flex.min-h-0.overflow-hidden')).toBeTruthy();
     expect(screen.getByTestId('home-dashboard-scroll')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('输入股票代码或名称，如 2330、AAPL')).toBeInTheDocument();
-    expect(await screen.findByText('趋势维持强势')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('輸入股票程式碼或名稱，如 2330、AAPL')).toBeInTheDocument();
+    expect(await screen.findByText('趨勢維持強勢')).toBeInTheDocument();
     expect(
       screen.getByRole('button', {
         name: getReportText(normalizeReportLanguage(historyReport.meta.reportLanguage)).fullReport,
@@ -203,7 +203,7 @@ describe('HomePage', () => {
 
     fireEvent.click(fullReportButton);
 
-    expect(await screen.findByText('加载报告中...')).toBeInTheDocument();
+    expect(await screen.findByText('載入報告中...')).toBeInTheDocument();
   });
 
   it('shows the empty report workspace when history is empty', async () => {
@@ -220,10 +220,10 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('开始分析')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '开始分析', level: 3 })).toBeInTheDocument();
-    expect(screen.getByText('输入股票代码进行分析，或从左侧选择历史报告查看。')).toBeInTheDocument();
-    expect(screen.getByText('暂无个股记录')).toBeInTheDocument();
+    expect(await screen.findByText('開始分析')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '開始分析', level: 3 })).toBeInTheDocument();
+    expect(screen.getByText('輸入股票程式碼進行分析，或從左側選擇歷史報告檢視。')).toBeInTheDocument();
+    expect(screen.getByText('暫無個股記錄')).toBeInTheDocument();
   });
 
   it('shows market review history in the stock bar', async () => {
@@ -235,7 +235,7 @@ describe('HomePage', () => {
         stockName: 'Apple',
         reportType: 'detailed',
         sentimentScore: 72,
-        operationAdvice: '观察',
+        operationAdvice: '觀察',
         analysisCount: 2,
         lastAnalysisTime: '2026-03-19T08:00:00Z',
       }],
@@ -268,7 +268,7 @@ describe('HomePage', () => {
     const newerStockButton = await screen.findByRole('button', { name: /AAPL/ });
     const marketButton = await screen.findByRole('button', { name: /MARKET/ });
     expect(newerStockButton.compareDocumentPosition(marketButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.queryByText('大盘复盘历史')).not.toBeInTheDocument();
+    expect(screen.queryByText('大盤覆盤歷史')).not.toBeInTheDocument();
     expect(historyApi.getList).toHaveBeenCalledWith({
       stockCode: 'MARKET',
       reportType: 'market_review',
@@ -278,7 +278,7 @@ describe('HomePage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /MARKET/ }));
 
-    expect(await screen.findByText('大盘复盘摘要')).toBeInTheDocument();
+    expect(await screen.findByText('大盤覆盤摘要')).toBeInTheDocument();
   });
 
   it('removes the MARKET stock bar item after deleting market review history', async () => {
@@ -316,7 +316,7 @@ describe('HomePage', () => {
 
     expect(await screen.findByRole('button', { name: /MARKET/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '删除 大盘复盘 历史记录' }));
+    fireEvent.click(screen.getByRole('button', { name: '刪除 大盤覆盤 歷史記錄' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /MARKET/ })).not.toBeInTheDocument();
@@ -341,7 +341,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    const input = await screen.findByPlaceholderText('输入股票代码或名称，如 2330、AAPL');
+    const input = await screen.findByPlaceholderText('輸入股票程式碼或名稱，如 2330、AAPL');
     fireEvent.change(input, { target: { value: '600519' } });
     fireEvent.click(screen.getByRole('button', { name: '分析' }));
 
@@ -361,13 +361,13 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
       sendNotification: true,
-      message: '大盘复盘任务已提交',
+      message: '大盤覆盤任務已提交',
       taskId: 'task-1',
     });
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
       taskId: 'task-1',
       status: 'completed',
-      marketReviewReport: '市场复盘报告示例文本',
+      marketReviewReport: '市場覆盤報告示例文字',
     });
 
     render(
@@ -376,13 +376,13 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '大盘复盘' }));
+    fireEvent.click(await screen.findByRole('button', { name: '大盤覆盤' }));
 
     await waitFor(() => {
       expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
     });
-    expect(await screen.findByText('大盘复盘已完成')).toBeInTheDocument();
-    expect(await screen.findByText('市场复盘报告示例文本')).toBeInTheDocument();
+    expect(await screen.findByText('大盤覆盤已完成')).toBeInTheDocument();
+    expect(await screen.findByText('市場覆盤報告示例文字')).toBeInTheDocument();
     expect(analysisApi.getStatus).toHaveBeenCalledWith('task-1');
   });
 
@@ -397,13 +397,13 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
       sendNotification: true,
-      message: '大盘复盘任务已提交',
+      message: '大盤覆盤任務已提交',
       taskId: 'task-1',
     });
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
       taskId: 'task-1',
       status: 'completed',
-      marketReviewReport: '市场复盘报告示例文本',
+      marketReviewReport: '市場覆盤報告示例文字',
     });
 
     render(
@@ -412,7 +412,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText('趋势维持强势');
+    await screen.findByText('趨勢維持強勢');
     const dashboardScroll = screen.getByTestId('home-dashboard-scroll');
     const scrollToMock = vi.fn(function scrollTo(this: HTMLElement, options?: ScrollToOptions) {
       if (typeof options?.top === 'number') {
@@ -425,13 +425,13 @@ describe('HomePage', () => {
     });
     dashboardScroll.scrollTop = 480;
 
-    fireEvent.click(screen.getByRole('button', { name: '大盘复盘' }));
+    fireEvent.click(screen.getByRole('button', { name: '大盤覆盤' }));
 
     await waitFor(() => {
       expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
     });
     expect(dashboardScroll.scrollTop).toBe(0);
-    expect(await screen.findByText('大盘复盘已完成')).toBeInTheDocument();
+    expect(await screen.findByText('大盤覆盤已完成')).toBeInTheDocument();
   });
 
   it('keeps market review results in the main dashboard scroll area', async () => {
@@ -444,13 +444,13 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
       sendNotification: true,
-      message: '大盘复盘任务已提交',
+      message: '大盤覆盤任務已提交',
       taskId: 'task-1',
     });
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
       taskId: 'task-1',
       status: 'completed',
-      marketReviewReport: Array.from({ length: 30 }, (_, index) => `第 ${index + 1} 行复盘内容`).join('\n'),
+      marketReviewReport: Array.from({ length: 30 }, (_, index) => `第 ${index + 1} 行復盤內容`).join('\n'),
     });
 
     render(
@@ -459,14 +459,14 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '大盘复盘' }));
+    fireEvent.click(await screen.findByRole('button', { name: '大盤覆盤' }));
 
     const dashboardScroll = screen.getByTestId('home-dashboard-scroll');
     const marketReviewReport = await screen.findByTestId('market-review-report');
     expect(dashboardScroll).toContainElement(marketReviewReport);
     expect(marketReviewReport.className).not.toContain('max-h-64');
     expect(marketReviewReport.className).not.toContain('overflow-y-auto');
-    expect(await screen.findByText('开始分析')).toBeInTheDocument();
+    expect(await screen.findByText('開始分析')).toBeInTheDocument();
   });
 
   it('shows first-run setup gaps and links to settings', async () => {
@@ -484,7 +484,7 @@ describe('HomePage', () => {
       checks: [
         {
           key: 'llm_primary',
-          title: 'LLM 主渠道',
+          title: 'LLM 主通道',
           category: 'ai_model',
           required: true,
           status: 'needs_action',
@@ -492,11 +492,11 @@ describe('HomePage', () => {
         },
         {
           key: 'stock_list',
-          title: '自选股',
+          title: '自選股',
           category: 'base',
           required: true,
           status: 'needs_action',
-          message: '缺少自选股',
+          message: '缺少自選股',
         },
       ],
     });
@@ -508,7 +508,7 @@ describe('HomePage', () => {
     );
 
     expect(await screen.findByText('基礎設定未完成')).toBeInTheDocument();
-    expect(screen.getByText(/LLM 主渠道、自选股/)).toBeInTheDocument();
+    expect(screen.getByText(/LLM 主通道、自選股/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '去配置' }));
     expect(navigateMock).toHaveBeenCalledWith('/settings');
   });
@@ -528,7 +528,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    const followUpButton = await screen.findByRole('button', { name: '追问 AI' });
+    const followUpButton = await screen.findByRole('button', { name: '追問 AI' });
     fireEvent.click(followUpButton);
 
     expect(navigateMock).toHaveBeenCalledWith(
@@ -550,7 +550,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    const trigger = await screen.findByRole('button', { name: '历史记录' });
+    const trigger = await screen.findByRole('button', { name: '歷史記錄' });
     fireEvent.click(trigger);
 
     expect(container.querySelector('.page-drawer-overlay')).toBeTruthy();
@@ -578,10 +578,10 @@ describe('HomePage', () => {
         {
           id: 1,
           stockCode: '600519',
-          stockName: '贵州茅台',
+          stockName: '貴州茅臺',
           reportType: 'detailed',
           sentimentScore: 58,
-          operationAdvice: '继续观察买点',
+          operationAdvice: '繼續觀察買點',
           analysisCount: 2,
           lastAnalysisTime: '2026-03-21T08:00:00Z',
         },
@@ -613,23 +613,23 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    const historyTrendButton = await screen.findByRole('button', { name: '历史趋势' });
+    const historyTrendButton = await screen.findByRole('button', { name: '歷史趨勢' });
     fireEvent.click(historyTrendButton);
 
     const range30Button = await screen.findByRole('button', { name: '近30天' });
     fireEvent.click(range30Button);
 
     await waitFor(() => {
-      expect(screen.getByText('暂无更多同股历史分析')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '全部历史' })).toBeInTheDocument();
+      expect(screen.getByText('暫無更多同股歷史分析')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '全部歷史' })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '全部历史' }));
+    fireEvent.click(screen.getByRole('button', { name: '全部歷史' }));
 
     await waitFor(() => {
-      expect(screen.queryByText('暂无更多同股历史分析')).not.toBeInTheDocument();
+      expect(screen.queryByText('暫無更多同股歷史分析')).not.toBeInTheDocument();
     });
-    expect(screen.getAllByRole('button', { name: /贵州茅台/ }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole('button', { name: /貴州茅臺/ }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/2次/)).toBeInTheDocument();
 
     const historyCalls = vi.mocked(historyApi.getList).mock.calls.filter((call) => call[0]?.stockCode === '600519');
@@ -642,7 +642,7 @@ describe('HomePage', () => {
     const activeTask = {
       taskId: 'task-1',
       stockCode: '600519',
-      stockName: '贵州茅台',
+      stockName: '貴州茅臺',
       status: 'processing' as const,
       progress: 45,
       message: '正在抓取最新行情',
@@ -672,7 +672,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('分析任务')).toBeInTheDocument();
+    expect(await screen.findByText('分析任務')).toBeInTheDocument();
     expect(screen.getByText('正在抓取最新行情')).toBeInTheDocument();
   });
 
@@ -696,10 +696,10 @@ describe('HomePage', () => {
     );
 
     // Wait for the report to load
-    await screen.findByText('趋势维持强势');
+    await screen.findByText('趨勢維持強勢');
 
     // Type something else in the search box
-    const input = screen.getByPlaceholderText('输入股票代码或名称，如 2330、AAPL');
+    const input = screen.getByPlaceholderText('輸入股票程式碼或名稱，如 2330、AAPL');
     fireEvent.change(input, { target: { value: 'AAPL' } });
 
     // Click "Reanalyze"
@@ -718,8 +718,8 @@ describe('HomePage', () => {
     vi.mocked(agentApi.getSkills).mockResolvedValue({
       default_skill_id: 'bull_trend',
       skills: [
-        { id: 'bull_trend', name: '默认多头趋势', description: '趋势分析' },
-        { id: 'growth_quality', name: '成长质量', description: '成长股分析' },
+        { id: 'bull_trend', name: '預設多頭趨勢', description: '趨勢分析' },
+        { id: 'growth_quality', name: '成長質量', description: '成長股分析' },
       ],
     });
     vi.mocked(historyApi.getList).mockResolvedValue({
@@ -740,9 +740,9 @@ describe('HomePage', () => {
     );
 
     fireEvent.click(await screen.findByRole('button', { name: '策略' }));
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /成长质量/ }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /成長質量/ }));
 
-    const input = screen.getByPlaceholderText('输入股票代码或名称，如 2330、AAPL');
+    const input = screen.getByPlaceholderText('輸入股票程式碼或名稱，如 2330、AAPL');
     fireEvent.change(input, { target: { value: '600519' } });
     fireEvent.click(screen.getByRole('button', { name: '分析' }));
 
@@ -758,8 +758,8 @@ describe('HomePage', () => {
     vi.mocked(agentApi.getSkills).mockResolvedValue({
       default_skill_id: 'bull_trend',
       skills: [
-        { id: 'bull_trend', name: '默认多头趋势', description: '趋势分析' },
-        { id: 'growth_quality', name: '成长质量', description: '成长股分析' },
+        { id: 'bull_trend', name: '預設多頭趨勢', description: '趨勢分析' },
+        { id: 'growth_quality', name: '成長質量', description: '成長股分析' },
       ],
     });
     vi.mocked(historyApi.getList).mockResolvedValue({
@@ -778,17 +778,17 @@ describe('HomePage', () => {
     const trigger = await screen.findByRole('button', { name: '策略' });
     fireEvent.keyDown(trigger, { key: 'ArrowDown' });
 
-    const defaultOption = await screen.findByRole('menuitemradio', { name: /默认策略/ });
+    const defaultOption = await screen.findByRole('menuitemradio', { name: /預設策略/ });
     await waitFor(() => {
       expect(defaultOption).toHaveFocus();
     });
 
     const menu = screen.getByRole('menu');
     fireEvent.keyDown(menu, { key: 'ArrowDown' });
-    expect(screen.getByRole('menuitemradio', { name: /默认多头趋势/ })).toHaveFocus();
+    expect(screen.getByRole('menuitemradio', { name: /預設多頭趨勢/ })).toHaveFocus();
 
     fireEvent.keyDown(menu, { key: 'End' });
-    expect(screen.getByRole('menuitemradio', { name: /成长质量/ })).toHaveFocus();
+    expect(screen.getByRole('menuitemradio', { name: /成長質量/ })).toHaveFocus();
 
     fireEvent.keyDown(menu, { key: 'Escape' });
     await waitFor(() => {
@@ -812,10 +812,10 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText('大盘复盘摘要');
+    await screen.findByText('大盤覆盤摘要');
     expect(screen.queryByRole('button', { name: '重新分析' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '追问 AI' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '历史趋势' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '追問 AI' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '歷史趨勢' })).toBeInTheDocument();
 
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalled();

@@ -33,8 +33,8 @@ from src.core.market_review_scope_gate import filter_regions_for_route_b
 
 
 _FORBIDDEN_CN_TERMS = [
-    "A股", "上證", "上证", "深證", "深证",
-    "創業板", "创业板", "科創50", "科创50", "沪深", "滬深",
+    "A股", "上證", "上證", "深證", "深證",
+    "創業板", "創業板", "科創50", "科創50", "滬深", "滬深",
 ]
 
 _REQUIRED_TW_TERMS = [
@@ -139,7 +139,7 @@ class TestTWBlueprint(unittest.TestCase):
 
     def test_tw_blueprint_no_cn_terms(self):
         block = TW_BLUEPRINT.to_prompt_block()
-        for term in ["A股", "上証", "深証", "創業板", "创业板"]:
+        for term in ["A股", "上証", "深証", "創業板", "創業板"]:
             self.assertNotIn(term, block, f"Forbidden term {term!r} in TW blueprint")
 
     def test_tw_blueprint_contains_tw_terms(self):
@@ -202,7 +202,7 @@ class TestMarketAnalyzerTWRegion(unittest.TestCase):
         ma = self._make_analyzer("tw")
         title = ma._get_review_title("2026-06-14")
         self.assertIn("台股大盤回顧", title)
-        self.assertNotIn("大盘复盘", title)
+        self.assertNotIn("大盤覆盤", title)
         self.assertNotIn("A-share", title)
 
     def test_tw_review_title_en(self):
@@ -220,13 +220,13 @@ class TestMarketAnalyzerTWRegion(unittest.TestCase):
 
     def test_tw_turnover_unit_zh(self):
         ma = self._make_analyzer("tw")
-        self.assertIn("億元台幣", ma._get_turnover_unit_label())
+        self.assertIn("億元臺幣", ma._get_turnover_unit_label())
 
     def test_tw_index_hint_zh(self):
         ma = self._make_analyzer("tw")
         hint = ma._get_index_hint()
         self.assertIn("TAIEX", hint)
-        self.assertNotIn("上证", hint)
+        self.assertNotIn("上證", hint)
         self.assertNotIn("S&P 500", hint)
 
     def test_us_region_unchanged(self):

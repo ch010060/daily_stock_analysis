@@ -434,7 +434,7 @@ class TestSymbolSafety(unittest.TestCase):
 
 class TestNoCNTerms(unittest.TestCase):
 
-    _CN_TERMS = ["A股", "上證", "上证", "深證", "深证", "創業板", "创业板", "科創50", "科创50"]
+    _CN_TERMS = ["A股", "上證", "上證", "深證", "深證", "創業板", "創業板", "科創50", "科創50"]
 
     def test_no_cn_terms_in_bundle(self):
         b = _make_builder()
@@ -541,7 +541,7 @@ class TestDataQualityPanel(unittest.TestCase):
     def test_data_quality_prompt_is_safe(self):
         for pc in self.dq_panel.get("prompt_cards", []):
             self.assertNotIn("買進", pc.get("prompt", ""))
-            self.assertNotIn("買入", pc.get("prompt", ""))
+            self.assertNotIn("買進", pc.get("prompt", ""))
 
 
 # ──────────────────────────────────────────────────────────────────────────────

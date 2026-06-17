@@ -118,7 +118,7 @@ def _install_alphasift(config: Config) -> Dict[str, Any]:
         except Exception as exc:
             raise HTTPException(
                 status_code=424,
-                detail={"error": "alphasift_install_failed", "message": f"自动安装 AlphaSift 失败：{exc}"},
+                detail={"error": "alphasift_install_failed", "message": f"自動安裝 AlphaSift 失敗：{exc}"},
             ) from exc
 
         if completed.returncode != 0:
@@ -129,7 +129,7 @@ def _install_alphasift(config: Config) -> Dict[str, Any]:
                 status_code=424,
                 detail={
                     "error": "alphasift_install_failed",
-                    "message": f"自动安装 AlphaSift 失败：{detail}",
+                    "message": f"自動安裝 AlphaSift 失敗：{detail}",
                 },
             )
 
@@ -139,7 +139,7 @@ def _install_alphasift(config: Config) -> Dict[str, Any]:
         if not _is_adapter_available(adapter_status):
             raise HTTPException(
                 status_code=424,
-                detail={"error": "alphasift_unavailable", "message": "AlphaSift 安装完成，但适配层当前不可用（available=false）。请检查当前 Python 环境和安装状态后重试。"},
+                detail={"error": "alphasift_unavailable", "message": "AlphaSift 安裝完成，但適配層當前不可用（available=false）。請檢查當前 Python 環境和安裝狀態後重試。"},
             )
         _get_dsa_adapter()
 
@@ -156,7 +156,7 @@ def _validate_install_spec(raw_install_spec: str) -> str:
             status_code=424,
             detail={
                 "error": "alphasift_install_spec_missing",
-                "message": f"请先将 ALPHASIFT_INSTALL_SPEC 配置为受信任来源：{DEFAULT_ALPHASIFT_INSTALL_SPEC}。",
+                "message": f"請先將 ALPHASIFT_INSTALL_SPEC 配置為受信任來源：{DEFAULT_ALPHASIFT_INSTALL_SPEC}。",
             },
         )
 
@@ -166,8 +166,8 @@ def _validate_install_spec(raw_install_spec: str) -> str:
             detail={
                 "error": "alphasift_install_spec_not_allowed",
                 "message": (
-                    "出于安全考虑，自动安装 AlphaSift 仅允许使用受信任来源："
-                    f"{DEFAULT_ALPHASIFT_INSTALL_SPEC}。如需使用本地路径或 wheel，请先手动安装到当前 Python 环境。"
+                    "出於安全考慮，自動安裝 AlphaSift 僅允許使用受信任來源："
+                    f"{DEFAULT_ALPHASIFT_INSTALL_SPEC}。如需使用本地路徑或 wheel，請先手動安裝到當前 Python 環境。"
                 ),
             },
         )
@@ -187,7 +187,7 @@ def alphasift_screen(
     _ensure_supported_strategy(request.strategy)
 
     adapter = _get_dsa_adapter()
-    screen = _get_adapter_callable(adapter, "screen", "screen() 不可调用。")
+    screen = _get_adapter_callable(adapter, "screen", "screen() 不可呼叫。")
     try:
         raw = _call_alphasift_screen(screen, request.strategy, request.market, request.max_results, config)
     except ValueError as exc:
@@ -198,14 +198,14 @@ def alphasift_screen(
     except (TypeError, KeyError) as exc:
         raise HTTPException(
             status_code=422,
-            detail={"error": "alphasift_invalid_input", "message": f"AlphaSift 参数非法：{exc}"},
+            detail={"error": "alphasift_invalid_input", "message": f"AlphaSift 引數非法：{exc}"},
         ) from exc
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(
             status_code=424,
-            detail={"error": "alphasift_screen_failed", "message": f"AlphaSift 选股运行失败：{exc}"},
+            detail={"error": "alphasift_screen_failed", "message": f"AlphaSift 選股執行失敗：{exc}"},
         ) from exc
 
     raw_data = _to_plain(raw)
@@ -249,7 +249,7 @@ def _ensure_alphasift_ready(config: Config, *, request: Request) -> None:
         return
     if not _should_auto_install_alphasift(diagnostics):
         raise _alphasift_unavailable_exception(
-            "AlphaSift 已开启但当前运行时状态异常。已保留异常诊断，避免自动重装掩盖真实问题。",
+            "AlphaSift 已開啟但當前執行時狀態異常。已保留異常診斷，避免自動重灌掩蓋真實問題。",
             diagnostics=_include_alphasift_diagnostic_suffix(diagnostics),
         )
     with _ALPHASIFT_INSTALL_LOCK:
@@ -258,7 +258,7 @@ def _ensure_alphasift_ready(config: Config, *, request: Request) -> None:
             return
         if not _should_auto_install_alphasift(diagnostics):
             raise _alphasift_unavailable_exception(
-                "AlphaSift 已开启但当前运行时状态异常。已保留异常诊断，避免自动重装掩盖真实问题。",
+                "AlphaSift 已開啟但當前執行時狀態異常。已保留異常診斷，避免自動重灌掩蓋真實問題。",
                 diagnostics=_include_alphasift_diagnostic_suffix(diagnostics),
             )
         _ensure_alphasift_install_access(request)
@@ -280,7 +280,7 @@ def _include_alphasift_diagnostic_suffix(
     normalized.setdefault("resolution", "no_auto_install")
     normalized.setdefault(
         "message",
-        "请先检查后端日志并修复运行时异常，当前未触发自动安装。",
+        "請先檢查後端日誌並修復執行時異常，當前未觸發自動安裝。",
     )
     return normalized
 
@@ -306,7 +306,7 @@ def _ensure_alphasift_install_access(request: Request) -> None:
             status_code=403,
             detail={
                 "error": "alphasift_install_access_denied",
-                "message": "AlphaSift 自动安装仅允许桌面模式或已启用管理员认证的会话。请先启用管理员认证后重试。",
+                "message": "AlphaSift 自動安裝僅允許桌面模式或已啟用管理員認證的會話。請先啟用管理員認證後重試。",
             },
         )
 
@@ -318,7 +318,7 @@ def _ensure_alphasift_install_access(request: Request) -> None:
         status_code=401,
         detail={
             "error": "alphasift_install_access_denied",
-            "message": "AlphaSift 自动安装需要有效管理员会话。",
+            "message": "AlphaSift 自動安裝需要有效管理員會話。",
         },
     )
 
@@ -347,18 +347,18 @@ def _import_alphasift() -> Any:
                 "module": str(getattr(exc, "name", ALPHASIFT_DSA_ADAPTER_MODULE)),
             }
             raise _alphasift_unavailable_exception(
-                f"AlphaSift 未安装或未挂载到当前 Python 环境，无法导入 {ALPHASIFT_DSA_ADAPTER_MODULE}：{exc}",
+                f"AlphaSift 未安裝或未掛載到當前 Python 環境，無法匯入 {ALPHASIFT_DSA_ADAPTER_MODULE}：{exc}",
                 diagnostics=diagnostics,
             ) from exc
         diagnostics = _log_unexpected_alphasift_exception("import_adapter", exc)
         raise _alphasift_unavailable_exception(
-            f"AlphaSift 适配层导入失败，请检查依赖完整性和当前 Python 环境：{exc}",
+            f"AlphaSift 適配層匯入失敗，請檢查依賴完整性和當前 Python 環境：{exc}",
             diagnostics=diagnostics,
         ) from exc
     except Exception as exc:
         diagnostics = _log_unexpected_alphasift_exception("import_adapter", exc)
         raise _alphasift_unavailable_exception(
-            f"AlphaSift 适配层导入失败，请检查依赖完整性和当前 Python 环境：{exc}",
+            f"AlphaSift 適配層匯入失敗，請檢查依賴完整性和當前 Python 環境：{exc}",
             diagnostics=diagnostics,
         ) from exc
 
@@ -379,7 +379,7 @@ def _prepare_alphasift_runtime_env() -> None:
 def _get_dsa_adapter() -> Any:
     adapter = _import_alphasift()
     for attr in ("get_status", "list_strategies", "screen"):
-        _get_adapter_callable(adapter, attr, f"{attr}() 不可调用。")
+        _get_adapter_callable(adapter, attr, f"{attr}() 不可呼叫。")
     return adapter
 
 
@@ -388,7 +388,7 @@ def _get_adapter_callable(adapter: Any, name: str, missing_error: str) -> Any:
     if not callable(callable_obj):
         raise HTTPException(
             status_code=424,
-            detail={"error": "alphasift_unavailable", "message": f"已导入 alphasift 适配层，但 {missing_error}"},
+            detail={"error": "alphasift_unavailable", "message": f"已匯入 alphasift 適配層，但 {missing_error}"},
         )
     return callable_obj
 
@@ -406,21 +406,21 @@ def _call_alphasift_status() -> Dict[str, Any]:
                 "module": str(getattr(exc, "name", ALPHASIFT_DSA_ADAPTER_MODULE)),
             }
             raise _alphasift_unavailable_exception(
-                f"AlphaSift 未安装或未挂载到当前 Python 环境，无法导入 {ALPHASIFT_DSA_ADAPTER_MODULE}：{exc}",
+                f"AlphaSift 未安裝或未掛載到當前 Python 環境，無法匯入 {ALPHASIFT_DSA_ADAPTER_MODULE}：{exc}",
                 diagnostics=diagnostics,
             ) from exc
 
         diagnostics = _log_unexpected_alphasift_exception("import_adapter", exc)
         raise _alphasift_unavailable_exception(
-            f"AlphaSift 适配层导入失败，请检查依赖完整性和当前 Python 环境：{exc}",
+            f"AlphaSift 適配層匯入失敗，請檢查依賴完整性和當前 Python 環境：{exc}",
             diagnostics=diagnostics,
         ) from exc
     try:
-        get_status = _get_adapter_callable(adapter, "get_status", "get_status() 不可调用。")
+        get_status = _get_adapter_callable(adapter, "get_status", "get_status() 不可呼叫。")
     except HTTPException as exc:
         diagnostics = _log_unexpected_alphasift_exception("get_status_callable", exc)
         raise _alphasift_unavailable_exception(
-            "AlphaSift 适配层 get_status 不可调用，请检查适配层版本。",
+            "AlphaSift 適配層 get_status 不可呼叫，請檢查適配層版本。",
             diagnostics=diagnostics,
         ) from exc
     try:
@@ -428,14 +428,14 @@ def _call_alphasift_status() -> Dict[str, Any]:
     except Exception as exc:
         diagnostics = _log_unexpected_alphasift_exception("get_status", exc)
         raise _alphasift_unavailable_exception(
-            f"AlphaSift 适配层 get_status 调用失败：{exc}",
+            f"AlphaSift 適配層 get_status 呼叫失敗：{exc}",
             diagnostics=diagnostics,
         ) from exc
     if not isinstance(result, dict):
         exc = TypeError(f"get_status returned {type(result).__name__}, expected dict")
         diagnostics = _log_unexpected_alphasift_exception("get_status_result", exc)
         raise _alphasift_unavailable_exception(
-            "AlphaSift 适配层 get_status 返回结构非法，请检查适配层版本。",
+            "AlphaSift 適配層 get_status 返回結構非法，請檢查適配層版本。",
             diagnostics=diagnostics,
         ) from exc
     return result
@@ -481,7 +481,7 @@ def _extract_alphasift_diagnostics(exc: HTTPException) -> Optional[Dict[str, str
 
 def _list_strategies() -> List[Dict[str, Any]]:
     adapter = _get_dsa_adapter()
-    list_strategies = _get_adapter_callable(adapter, "list_strategies", "list_strategies() 不可调用。")
+    list_strategies = _get_adapter_callable(adapter, "list_strategies", "list_strategies() 不可呼叫。")
     raw = _to_plain(list_strategies())
     if not isinstance(raw, list):
         raise HTTPException(
@@ -550,8 +550,8 @@ def _ensure_supported_strategy(strategy: str) -> None:
     if strategy in ids:
         return
 
-    # 兼容“策略列表为空时手动输入”以及“用户手动覆盖策略参数”场景，
-    # 策略由适配层进行最终校验，因此在列表外仍保持透传。
+    # 相容“策略列表為空時手動輸入”以及“使用者手動覆蓋策略引數”場景，
+    # 策略由適配層進行最終校驗，因此在列表外仍保持透傳。
 
 
 def _call_alphasift_screen(screen: Any, strategy: str, market: str, max_results: int, config: Config) -> Any:
@@ -826,8 +826,8 @@ def _ensure_supported_market(market: str) -> None:
             detail={
                 "error": "alphasift_invalid_market",
                 "message": (
-                    f"市场 {market} 不在 AlphaSift 适配层支持范围内"
-                    f"（支持市场：{', '.join(map(str, normalized)) or '未知'}）。"
+                    f"市場 {market} 不在 AlphaSift 適配層支援範圍內"
+                    f"（支援市場：{', '.join(map(str, normalized)) or '未知'}）。"
                 ),
             },
         )
@@ -910,9 +910,9 @@ def _build_candidate_reason(item: Dict[str, Any]) -> str:
             factor_text = "、".join(f"{key} {value:.1f}" for key, value in top_factors)
             parts.append(f"主要因子：{factor_text}")
     if item.get("industry"):
-        parts.append(f"行业：{item['industry']}")
+        parts.append(f"行業：{item['industry']}")
     if item.get("risk_level"):
-        parts.append(f"风险等级：{item['risk_level']}")
+        parts.append(f"風險等級：{item['risk_level']}")
     return "；".join(parts)
 
 

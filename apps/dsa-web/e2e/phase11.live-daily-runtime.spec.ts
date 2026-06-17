@@ -10,7 +10,7 @@ async function login(page: Page) {
   await page.goto('/login');
   await page.waitForLoadState('networkidle');
   const passwordInput = page.locator('#password');
-  const submitButton = page.getByRole('button', { name: /授权进入工作台|完成设置并登录/ });
+  const submitButton = page.getByRole('button', { name: /授權進入工作臺|完成設定並登入/ });
   await expect(passwordInput).toBeVisible({ timeout: 10_000 });
   await passwordInput.fill(smokePassword!);
   await expect(submitButton).toBeVisible();
@@ -29,7 +29,7 @@ async function openReport(page: Page, symbol: string) {
   await expect(historyItem).toBeVisible({ timeout: 5_000 });
   await historyItem.click();
   await page.waitForTimeout(1000);
-  const detailedButton = page.getByRole('button', { name: '完整分析报告' });
+  const detailedButton = page.getByRole('button', { name: '完整分析報告' });
   await expect(detailedButton).toBeVisible({ timeout: 5_000 });
   await detailedButton.click();
   const dialog = page.getByRole('dialog');

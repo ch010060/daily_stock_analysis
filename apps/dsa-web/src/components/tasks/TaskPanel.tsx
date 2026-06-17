@@ -88,7 +88,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
           ) : null}
         </div>
         <div className="flex-shrink-0">
-          <Badge variant={statusVariant} className="min-w-[4.75rem] justify-center gap-1.5 shadow-none" aria-label={`任务状态：${statusLabel}`}>
+          <Badge variant={statusVariant} className="min-w-[4.75rem] justify-center gap-1.5 shadow-none" aria-label={`任務狀態：${statusLabel}`}>
             <StatusDot tone={statusTone} pulse={isProcessing} className="h-1.5 w-1.5" />
             {statusLabel}
           </Badge>
@@ -153,7 +153,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
       {traceId ? (
         <details className="group/task mt-2 text-xs">
           <summary className="flex cursor-pointer list-none items-center gap-2 text-muted-text">
-            <span>运行诊断</span>
+            <span>執行診斷</span>
             <span className="font-mono text-[11px] text-secondary-text">
               {traceId.length > 18 ? `${traceId.slice(0, 10)}...` : traceId}
             </span>
@@ -178,7 +178,7 @@ interface TaskPanelProps {
 export const TaskPanel: React.FC<TaskPanelProps> = ({
   tasks,
   visible = true,
-      title = '分析任务',
+      title = '分析任務',
   className = '',
 }) => {
   const activeTasks = useMemo(
@@ -207,7 +207,7 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
               {processingCount > 0 && (
                 <span className="flex items-center gap-1">
                   <StatusDot tone="info" pulse className="h-1.5 w-1.5" />
-                  {processingCount} 进行中
+                  {processingCount} 進行中
                 </span>
               )}
               {pendingCount > 0 && (

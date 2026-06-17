@@ -17,7 +17,7 @@ const overview: AnalysisContextPackOverview = {
   createdAt: '2026-04-10T08:30:00+00:00',
   subject: {
     code: '600519',
-    stockName: '贵州茅台',
+    stockName: '貴州茅臺',
     market: 'cn',
   },
   blocks: [
@@ -31,7 +31,7 @@ const overview: AnalysisContextPackOverview = {
     },
     {
       key: 'news',
-      label: '新闻',
+      label: '新聞',
       status: 'missing',
       source: null,
       warnings: ['news_provider_timeout'],
@@ -99,7 +99,7 @@ describe('AnalysisContextSummary', () => {
     expect(panel).toHaveAttribute('open');
     expect(screen.getByText('行情')).toBeInTheDocument();
     expect(screen.getByText('來源: mock_quote')).toBeVisible();
-    expect(screen.getByText('告警:')).toBeInTheDocument();
+    expect(screen.getByText('警告:')).toBeInTheDocument();
     expect(screen.getByText(/intraday_realtime_overlay/)).toBeInTheDocument();
     expect(screen.getByText('資料限制:')).toBeInTheDocument();
     expect(screen.getByText(/基本面：擷取失敗/)).toBeInTheDocument();
@@ -179,7 +179,7 @@ describe('AnalysisContextSummary', () => {
     const unsafeOverview = {
       ...overview,
       value: 'raw trend payload',
-      content: '完整新闻正文不应出现',
+      content: '完整新聞正文不應出現',
       apiKey: 'secret-key',
       blocks: [
         {
@@ -199,7 +199,7 @@ describe('AnalysisContextSummary', () => {
     fireEvent.click(screen.getAllByText('輸入資料塊')[0]);
 
     expect(screen.queryByText('raw trend payload')).not.toBeInTheDocument();
-    expect(screen.queryByText('完整新闻正文不应出现')).not.toBeInTheDocument();
+    expect(screen.queryByText('完整新聞正文不應出現')).not.toBeInTheDocument();
     expect(screen.queryByText('secret-key')).not.toBeInTheDocument();
   });
 });
@@ -220,7 +220,7 @@ describe('ReportSummary analysis context placement', () => {
         id: 1,
         queryId: 'q1',
         stockCode: '600519',
-        stockName: '贵州茅台',
+        stockName: '貴州茅臺',
         reportType: 'detailed',
         reportLanguage: 'zh',
         createdAt: '2026-04-10T12:00:00',
@@ -243,7 +243,7 @@ describe('ReportSummary analysis context placement', () => {
       summary: {
         analysisSummary: 'summary',
         operationAdvice: '持有',
-        trendPrediction: '震荡',
+        trendPrediction: '震盪',
         sentimentScore: 70,
       },
       strategy: {
@@ -256,12 +256,12 @@ describe('ReportSummary analysis context placement', () => {
     const result: AnalysisResult = {
       queryId: 'q1',
       stockCode: '600519',
-      stockName: '贵州茅台',
+      stockName: '貴州茅臺',
       report,
       diagnosticSummary: {
         status: 'normal',
         statusLabel: '正常',
-        reason: '运行正常',
+        reason: '執行正常',
         components: {},
         copyText: '',
       },
@@ -271,18 +271,18 @@ describe('ReportSummary analysis context placement', () => {
     render(<ReportSummary data={result} />);
 
     await waitFor(() => {
-      expect(screen.getByText('暂无相关资讯')).toBeInTheDocument();
+      expect(screen.getByText('暫無相關資訊')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('市场阶段: CN · 盘中')).toBeInTheDocument();
-    expect(screen.getByText('日线未完成')).toBeInTheDocument();
-    expect(screen.getAllByText('质量分 82/100 可用')[0]).toBeInTheDocument();
+    expect(screen.getByText('市場階段: CN · 盤中')).toBeInTheDocument();
+    expect(screen.getByText('日線未完成')).toBeInTheDocument();
+    expect(screen.getAllByText('質量分 82/100 可用')[0]).toBeInTheDocument();
 
-    const strategy = screen.getByText('狙击点位');
-    const news = screen.getByText('相关资讯');
+    const strategy = screen.getByText('狙擊點位');
+    const news = screen.getByText('相關資訊');
     const diagnostics = screen.getByTestId('run-diagnostics');
     const contextSummary = screen.getByTestId('analysis-context-summary');
-    const traceability = screen.getByText('数据追溯');
+    const traceability = screen.getByText('資料追溯');
 
     expect(strategy.compareDocumentPosition(news) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(news.compareDocumentPosition(contextSummary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

@@ -6,7 +6,7 @@ import type { TaskInfo } from '../../../types/analysis';
 const baseTask: TaskInfo = {
   taskId: 'task-1',
   stockCode: '600519',
-  stockName: '贵州茅台',
+  stockName: '貴州茅臺',
   status: 'processing',
   progress: 40,
   message: '正在抓取最新行情',
@@ -35,8 +35,8 @@ describe('TaskPanel', () => {
       />,
     );
 
-    expect(screen.getByLabelText('请求阶段: 盘中')).toBeInTheDocument();
-    expect(screen.getByLabelText('请求阶段: 自动阶段')).toBeInTheDocument();
+    expect(screen.getByLabelText('請求階段: 盤中')).toBeInTheDocument();
+    expect(screen.getByLabelText('請求階段: 自動階段')).toBeInTheDocument();
   });
 
   it('renders active tasks with preserved dashboard panel styling', () => {
@@ -53,21 +53,21 @@ describe('TaskPanel', () => {
             stockCode: 'AAPL',
             stockName: 'Apple',
             status: 'pending',
-            message: '等待分析队列',
+            message: '等待分析佇列',
           },
         ]}
       />,
     );
 
-    expect(screen.getByText('分析任务')).toBeInTheDocument();
-    expect(screen.getByText('1 进行中')).toBeInTheDocument();
+    expect(screen.getByText('分析任務')).toBeInTheDocument();
+    expect(screen.getByText('1 進行中')).toBeInTheDocument();
     expect(screen.getByText('1 等待中')).toBeInTheDocument();
-    expect(screen.getByText('贵州茅台')).toBeInTheDocument();
+    expect(screen.getByText('貴州茅臺')).toBeInTheDocument();
     expect(screen.getByText('AAPL')).toBeInTheDocument();
-    expect(screen.getByLabelText('任务状态：分析中')).toBeInTheDocument();
-    expect(screen.getByText('运行诊断')).toBeInTheDocument();
+    expect(screen.getByLabelText('任務狀態：分析中')).toBeInTheDocument();
+    expect(screen.getByText('執行診斷')).toBeInTheDocument();
     expect(screen.getAllByText('trace-task-1')).toHaveLength(2);
-    expect(screen.queryByText(/请求阶段:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/請求階段:/)).not.toBeInTheDocument();
     expect(container.querySelector('.home-panel-card')).toBeTruthy();
     expect(container.querySelector('.home-subpanel')).toBeTruthy();
   });

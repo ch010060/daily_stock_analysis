@@ -85,46 +85,46 @@ describe('systemConfigI18n required key coverage', () => {
   it('uses a Chinese primary title for SearXNG base URLs', () => {
     const title = getFieldTitleZh('SEARXNG_BASE_URLS', 'SEARXNG_BASE_URLS');
 
-    expect(title).toBe('SearXNG 自建实例地址');
+    expect(title).toBe('SearXNG 自建例項地址');
     expect(title).not.toBe('SearXNG Base URLs');
   });
 });
 
 describe('systemConfigI18n option label localization', () => {
   const realSelectOptionCases = [
-    ['NEWS_STRATEGY_PROFILE', 'ultra_short', undefined, '超短线（1天）'],
+    ['NEWS_STRATEGY_PROFILE', 'ultra_short', undefined, '超短線（1天）'],
     ['NEWS_STRATEGY_PROFILE', 'short', undefined, '短期（3天）'],
     ['NEWS_STRATEGY_PROFILE', 'medium', undefined, '中期（7天）'],
-    ['NEWS_STRATEGY_PROFILE', 'long', undefined, '长期（30天）'],
-    ['REPORT_TYPE', 'simple', undefined, '简洁'],
+    ['NEWS_STRATEGY_PROFILE', 'long', undefined, '長期（30天）'],
+    ['REPORT_TYPE', 'simple', undefined, '簡潔'],
     ['REPORT_TYPE', 'full', undefined, '完整'],
-    ['REPORT_TYPE', 'brief', undefined, '简报'],
+    ['REPORT_TYPE', 'brief', undefined, '簡報'],
     ['REPORT_LANGUAGE', 'zh', 'Chinese', '中文'],
     ['REPORT_LANGUAGE', 'en', 'English', '英文'],
-    ['NOTIFICATION_MIN_SEVERITY', '', 'Not set', '未设置'],
-    ['NOTIFICATION_MIN_SEVERITY', 'info', 'info', '信息'],
+    ['NOTIFICATION_MIN_SEVERITY', '', 'Not set', '未設定'],
+    ['NOTIFICATION_MIN_SEVERITY', 'info', 'info', '資訊'],
     ['NOTIFICATION_MIN_SEVERITY', 'warning', 'warning', '警告'],
-    ['NOTIFICATION_MIN_SEVERITY', 'error', 'error', '错误'],
-    ['NOTIFICATION_MIN_SEVERITY', 'critical', 'critical', '严重'],
-    ['LOG_LEVEL', 'DEBUG', undefined, '调试'],
-    ['LOG_LEVEL', 'INFO', undefined, '信息'],
+    ['NOTIFICATION_MIN_SEVERITY', 'error', 'error', '錯誤'],
+    ['NOTIFICATION_MIN_SEVERITY', 'critical', 'critical', '嚴重'],
+    ['LOG_LEVEL', 'DEBUG', undefined, '除錯'],
+    ['LOG_LEVEL', 'INFO', undefined, '資訊'],
     ['LOG_LEVEL', 'WARNING', undefined, '警告'],
-    ['LOG_LEVEL', 'ERROR', undefined, '错误'],
-    ['LOG_LEVEL', 'CRITICAL', undefined, '严重'],
+    ['LOG_LEVEL', 'ERROR', undefined, '錯誤'],
+    ['LOG_LEVEL', 'CRITICAL', undefined, '嚴重'],
     ['MARKET_REVIEW_REGION', 'cn', undefined, 'A 股'],
     ['MARKET_REVIEW_REGION', 'hk', undefined, '港股'],
     ['MARKET_REVIEW_REGION', 'us', undefined, '美股'],
-    ['MARKET_REVIEW_REGION', 'both', undefined, '全部市场'],
-    ['MARKET_REVIEW_COLOR_SCHEME', 'green_up', 'Green Up / Red Down', '绿涨红跌'],
-    ['MARKET_REVIEW_COLOR_SCHEME', 'red_up', 'Red Up / Green Down', '红涨绿跌'],
-    ['AGENT_ARCH', 'single', 'Single Agent', '单 Agent'],
-    ['AGENT_ARCH', 'multi', 'Multi Agent (Orchestrator)', '多 Agent（编排）'],
+    ['MARKET_REVIEW_REGION', 'both', undefined, '全部市場'],
+    ['MARKET_REVIEW_COLOR_SCHEME', 'green_up', 'Green Up / Red Down', '綠漲紅跌'],
+    ['MARKET_REVIEW_COLOR_SCHEME', 'red_up', 'Red Up / Green Down', '紅漲綠跌'],
+    ['AGENT_ARCH', 'single', 'Single Agent', '單 Agent'],
+    ['AGENT_ARCH', 'multi', 'Multi Agent (Orchestrator)', '多 Agent（編排）'],
     ['AGENT_ORCHESTRATOR_MODE', 'quick', 'Quick', '快速'],
-    ['AGENT_ORCHESTRATOR_MODE', 'standard', 'Standard', '标准'],
+    ['AGENT_ORCHESTRATOR_MODE', 'standard', 'Standard', '標準'],
     ['AGENT_ORCHESTRATOR_MODE', 'full', 'Full', '完整'],
-    ['AGENT_ORCHESTRATOR_MODE', 'specialist', 'Specialist', '专家'],
-    ['AGENT_SKILL_ROUTING', 'auto', 'Auto (Regime-based)', '自动（按市场状态）'],
-    ['AGENT_SKILL_ROUTING', 'manual', 'Manual (Use AGENT_SKILLS)', '手动（使用 AGENT_SKILLS）'],
+    ['AGENT_ORCHESTRATOR_MODE', 'specialist', 'Specialist', '專家'],
+    ['AGENT_SKILL_ROUTING', 'auto', 'Auto (Regime-based)', '自動（按市場狀態）'],
+    ['AGENT_SKILL_ROUTING', 'manual', 'Manual (Use AGENT_SKILLS)', '手動（使用 AGENT_SKILLS）'],
   ] as const;
 
   it('localizes all select options currently exposed by system config schema', () => {

@@ -55,7 +55,7 @@ def _make_analysis_result(code="TW:2330"):
     from src.analyzer import AnalysisResult
     return AnalysisResult(
         code=code,
-        name="台積電",
+        name="臺積電",
         sentiment_score=72,
         trend_prediction="看多",
         operation_advice="持有",
@@ -70,9 +70,9 @@ def _make_analysis_result(code="TW:2330"):
 class TestSnapshotSchema(unittest.TestCase):
 
     def test_make_minimal_snapshot_returns_dict_with_required_keys(self):
-        snap = make_minimal_snapshot("TW:2330", "台積電")
+        snap = make_minimal_snapshot("TW:2330", "臺積電")
         self.assertEqual(snap["code"], "TW:2330")
-        self.assertEqual(snap["name"], "台積電")
+        self.assertEqual(snap["name"], "臺積電")
         for key in ("history", "today", "yesterday", "realtime", "chip", "trend",
                     "fundamental", "market_phase_context"):
             self.assertIn(key, snap)
@@ -225,7 +225,7 @@ class TestLoadLlmFixture(unittest.TestCase):
         result = self.pipeline._load_llm_fixture("TW:2330")
         self.assertTrue(result.success)
         self.assertEqual(result.code, "TW:2330")
-        self.assertEqual(result.name, "台積電")
+        self.assertEqual(result.name, "臺積電")
         self.assertGreater(result.sentiment_score, 0)
 
     def test_missing_fixture_returns_failure_result(self):
@@ -353,7 +353,7 @@ class TestAnalyzeWithPrebuiltQueryId(unittest.TestCase):
         self.assertEqual(returned.query_id, "qid-with-time")
 
     def test_snapshot_name_is_mapped_to_analyzer_stock_name(self):
-        snap = make_minimal_snapshot("TW:2330", "台積電")
+        snap = make_minimal_snapshot("TW:2330", "臺積電")
         fake_result = _make_analysis_result()
         self.pipeline.analyzer.analyze.return_value = fake_result
 
@@ -367,7 +367,7 @@ class TestAnalyzeWithPrebuiltQueryId(unittest.TestCase):
 
         analyzed_context = self.pipeline.analyzer.analyze.call_args.args[0]
         self.assertIsNotNone(returned)
-        self.assertEqual(analyzed_context["stock_name"], "台積電")
+        self.assertEqual(analyzed_context["stock_name"], "臺積電")
         self.assertNotIn("stock_name", snap)
 
     def test_analyzer_exception_returns_failure_result(self):

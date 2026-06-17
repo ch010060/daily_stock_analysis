@@ -28,11 +28,11 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'home', label: '首頁', to: '/', icon: Home, exact: true },
   { key: 'chat', label: '問股', to: '/chat', icon: MessageSquareQuote, badge: 'completion' },
   { key: 'screening', label: '選股', to: '/screening', icon: Search },
-  { key: 'portfolio', label: '持倉', to: '/portfolio', icon: BriefcaseBusiness },
+  { key: 'portfolio', label: '持股', to: '/portfolio', icon: BriefcaseBusiness },
   { key: 'backtest', label: '回測', to: '/backtest', icon: BarChart3 },
-  { key: 'alerts', label: '告警', to: '/alerts', icon: Bell },
+  { key: 'alerts', label: '警告', to: '/alerts', icon: Bell },
   { key: 'usage', label: '用量', to: '/usage', icon: Activity },
-  { key: 'settings', label: '設置', to: '/settings', icon: Settings2 },
+  { key: 'settings', label: '設定', to: '/settings', icon: Settings2 },
 ];
 
 export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNavigate }) => {

@@ -16,7 +16,7 @@ async function login(page: Page) {
   await page.locator('#password').fill(smokePassword!);
 
   // Wait for and click the submit button
-  const submitButton = page.getByRole('button', { name: /授权进入工作台|完成设置并登录/ });
+  const submitButton = page.getByRole('button', { name: /授權進入工作臺|完成設定並登入/ });
   await expect(submitButton).toBeVisible();
 
   await Promise.all([
@@ -31,7 +31,7 @@ async function login(page: Page) {
   await page.waitForURL('/', { timeout: 15_000 });
   await page.waitForLoadState('domcontentloaded');
   // Wait for page to stabilize by checking for stock input
-  const stockInput = page.getByPlaceholder('输入股票代码或名称，如 2330、AAPL');
+  const stockInput = page.getByPlaceholder('輸入股票程式碼或名稱，如 2330、AAPL');
   await expect(stockInput).toBeVisible({ timeout: 10_000 });
 }
 
@@ -43,28 +43,28 @@ test.describe('ReportMarkdown component', () => {
     await login(page);
 
     // Navigate to history page
-    await page.getByRole('link', { name: '首页' }).click();
+    await page.getByRole('link', { name: '首頁' }).click();
     await page.waitForLoadState('domcontentloaded');
     // Wait for history panel to load
-    await expect(page.getByText('历史分析')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('歷史分析')).toBeVisible({ timeout: 10_000 });
 
     // Click on the first history item to select it
     const firstHistoryItem = page.locator('.home-history-item').first();
     await expect(firstHistoryItem).toBeVisible({ timeout: 10_000 });
     await firstHistoryItem.click();
     // Wait for detailed report button to be enabled (indicates selection is complete)
-    const detailedReportButton = page.getByRole('button', { name: '完整分析报告' });
+    const detailedReportButton = page.getByRole('button', { name: '完整分析報告' });
     await expect(detailedReportButton).toBeEnabled({ timeout: 3000 });
 
-    // Click the "完整分析报告" button to open the markdown drawer
+    // Click the "完整分析報告" button to open the markdown drawer
     await expect(detailedReportButton).toBeVisible({ timeout: 5000 });
     await detailedReportButton.click();
 
     // Verify drawer content is visible
-    await expect(page.getByRole('dialog').getByText('完整分析报告')).toBeVisible();
+    await expect(page.getByRole('dialog').getByText('完整分析報告')).toBeVisible();
 
     // Click copy markdown button
-    const copyMarkdownButton = page.getByRole('button', { name: '复制 Markdown 源码' });
+    const copyMarkdownButton = page.getByRole('button', { name: '複製 Markdown 原始碼' });
     await expect(copyMarkdownButton).toBeVisible({ timeout: 5000 });
     await copyMarkdownButton.click();
 
@@ -74,7 +74,7 @@ test.describe('ReportMarkdown component', () => {
     expect(clipboardText.length).toBeGreaterThan(0);
 
     // Verify checkmark icon is shown
-    const checkmarkIcon = page.locator('button[aria-label="复制 Markdown 源码"] svg.text-success');
+    const checkmarkIcon = page.locator('button[aria-label="複製 Markdown 原始碼"] svg.text-success');
     await expect(checkmarkIcon).toBeVisible();
 
     // Wait for icon to revert (icon disappears after 2 seconds)
@@ -88,28 +88,28 @@ test.describe('ReportMarkdown component', () => {
     await login(page);
 
     // Navigate to history page
-    await page.getByRole('link', { name: '首页' }).click();
+    await page.getByRole('link', { name: '首頁' }).click();
     await page.waitForLoadState('domcontentloaded');
     // Wait for history panel to load
-    await expect(page.getByText('历史分析')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('歷史分析')).toBeVisible({ timeout: 10_000 });
 
     // Click on the first history item to select it
     const firstHistoryItem = page.locator('.home-history-item').first();
     await expect(firstHistoryItem).toBeVisible({ timeout: 10_000 });
     await firstHistoryItem.click();
     // Wait for detailed report button to be enabled (indicates selection is complete)
-    const detailedReportButton = page.getByRole('button', { name: '完整分析报告' });
+    const detailedReportButton = page.getByRole('button', { name: '完整分析報告' });
     await expect(detailedReportButton).toBeEnabled({ timeout: 3000 });
 
-    // Click the "完整分析报告" button to open the markdown drawer
+    // Click the "完整分析報告" button to open the markdown drawer
     await expect(detailedReportButton).toBeVisible({ timeout: 5000 });
     await detailedReportButton.click();
 
     // Verify drawer content is visible
-    await expect(page.getByRole('dialog').getByText('完整分析报告')).toBeVisible();
+    await expect(page.getByRole('dialog').getByText('完整分析報告')).toBeVisible();
 
     // Click copy plain text button
-    const copyPlainTextButton = page.getByRole('button', { name: '复制纯文本' });
+    const copyPlainTextButton = page.getByRole('button', { name: '複製純文字' });
     await expect(copyPlainTextButton).toBeVisible({ timeout: 5000 });
     await copyPlainTextButton.click();
 
@@ -129,7 +129,7 @@ test.describe('ReportMarkdown component', () => {
     expect(hasTableSeparators).toBeFalsy();
 
     // Verify checkmark icon is shown
-    const checkmarkIcon = page.locator('button[aria-label="复制纯文本"] svg.text-success');
+    const checkmarkIcon = page.locator('button[aria-label="複製純文字"] svg.text-success');
     await expect(checkmarkIcon).toBeVisible();
 
     // Wait for icon to revert (icon disappears after 2 seconds)
@@ -144,19 +144,19 @@ test.describe('ReportMarkdown component', () => {
 
     // On mobile, a report should already be selected (showing in main content)
     // Wait for main content to load
-    await expect(page.getByPlaceholder('输入股票代码或名称，如 2330、AAPL')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByPlaceholder('輸入股票程式碼或名稱，如 2330、AAPL')).toBeVisible({ timeout: 10_000 });
 
-    // Click the "完整分析报告" button to open the markdown drawer
-    const detailedReportButton = page.getByRole('button', { name: '完整分析报告' });
+    // Click the "完整分析報告" button to open the markdown drawer
+    const detailedReportButton = page.getByRole('button', { name: '完整分析報告' });
     await expect(detailedReportButton).toBeVisible({ timeout: 5000 });
     await detailedReportButton.click();
 
     // Verify drawer content is visible (this ensures drawer is fully open)
-    await expect(page.getByRole('dialog').getByText('完整分析报告')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('dialog').getByText('完整分析報告')).toBeVisible({ timeout: 10000 });
 
     // Verify toolbar buttons are visible and clickable on mobile
-    const copyMarkdownButton = page.getByRole('button', { name: '复制 Markdown 源码' });
-    const copyPlainTextButton = page.getByRole('button', { name: '复制纯文本' });
+    const copyMarkdownButton = page.getByRole('button', { name: '複製 Markdown 原始碼' });
+    const copyPlainTextButton = page.getByRole('button', { name: '複製純文字' });
 
     await expect(copyMarkdownButton).toBeVisible({ timeout: 5000 });
     await expect(copyPlainTextButton).toBeVisible();
@@ -170,26 +170,26 @@ test.describe('ReportMarkdown component', () => {
     await login(page);
 
     // Navigate to history page
-    await page.getByRole('link', { name: '首页' }).click();
+    await page.getByRole('link', { name: '首頁' }).click();
     await page.waitForLoadState('domcontentloaded');
     // Wait for history panel to load
-    await expect(page.getByText('历史分析')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('歷史分析')).toBeVisible({ timeout: 10_000 });
 
     // Click on the first history item to select it
     const firstHistoryItem = page.locator('.home-history-item').first();
     await expect(firstHistoryItem).toBeVisible({ timeout: 10_000 });
     await firstHistoryItem.click();
     // Wait for detailed report button to be enabled (indicates selection is complete)
-    const detailedReportButton = page.getByRole('button', { name: '完整分析报告' });
+    const detailedReportButton = page.getByRole('button', { name: '完整分析報告' });
     await expect(detailedReportButton).toBeEnabled({ timeout: 3000 });
 
-    // Click the "完整分析报告" button to open the markdown drawer
+    // Click the "完整分析報告" button to open the markdown drawer
     await expect(detailedReportButton).toBeVisible({ timeout: 5000 });
     await detailedReportButton.click();
 
     // Immediately check if buttons are disabled (right after drawer opens)
-    const copyMarkdownButton = page.getByRole('button', { name: '复制 Markdown 源码' });
-    const copyPlainTextButton = page.getByRole('button', { name: '复制纯文本' });
+    const copyMarkdownButton = page.getByRole('button', { name: '複製 Markdown 原始碼' });
+    const copyPlainTextButton = page.getByRole('button', { name: '複製純文字' });
 
     // Wait for drawer to open and buttons to appear
     await expect(copyMarkdownButton).toBeVisible({ timeout: 5000 });

@@ -28,9 +28,9 @@ const historyItem = {
   id: 1,
   queryId: 'q-1',
   stockCode: '600519',
-  stockName: '贵州茅台',
+  stockName: '貴州茅臺',
   sentimentScore: 82,
-  operationAdvice: '买入',
+  operationAdvice: '買進',
   createdAt: '2026-03-18T08:00:00Z',
 };
 
@@ -39,14 +39,14 @@ const historyReport = {
     id: 1,
     queryId: 'q-1',
     stockCode: '600519',
-    stockName: '贵州茅台',
+    stockName: '貴州茅臺',
     reportType: 'detailed' as const,
     createdAt: '2026-03-18T08:00:00Z',
   },
   summary: {
-    analysisSummary: '趋势维持强势',
-    operationAdvice: '继续观察买点',
-    trendPrediction: '短线震荡偏强',
+    analysisSummary: '趨勢維持強勢',
+    operationAdvice: '繼續觀察買點',
+    trendPrediction: '短線震盪偏強',
     sentimentScore: 78,
   },
 };
@@ -58,7 +58,7 @@ const marketReviewHistoryReport = {
     id: 10,
     queryId: 'q-10',
     stockCode: '',
-    stockName: '大盘复盘',
+    stockName: '大盤覆盤',
     reportType: 'market_review' as const,
   },
 };
@@ -67,7 +67,7 @@ function createTask(overrides: Partial<TaskInfo> = {}): TaskInfo {
   return {
     taskId: 'task-1',
     stockCode: '600519',
-    stockName: '贵州茅台',
+    stockName: '貴州茅臺',
     status: 'processing',
     progress: 50,
     reportType: 'detailed',
@@ -267,7 +267,7 @@ describe('stockPoolStore', () => {
       id: 10,
       queryId: 'market-review-q-10',
       stockCode: 'MARKET',
-      stockName: '大盘复盘',
+      stockName: '大盤覆盤',
       reportType: 'market_review' as const,
     };
     useStockPoolStore.setState({
@@ -393,7 +393,7 @@ describe('stockPoolStore', () => {
     await useStockPoolStore.getState().submitAnalysis();
 
     const state = useStockPoolStore.getState();
-    expect(state.inputError).toBe('请输入有效的股票代码或股票名称');
+    expect(state.inputError).toBe('請輸入有效的股票程式碼或股票名稱');
     expect(state.isAnalyzing).toBe(false);
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
   });
@@ -408,7 +408,7 @@ describe('stockPoolStore', () => {
 
     await useStockPoolStore.getState().submitAnalysis({
       stockCode: '00700.HK',
-      stockName: '腾讯控股',
+      stockName: '騰訊控股',
       originalQuery: '00700',
       selectionSource: 'autocomplete',
     });
@@ -419,7 +419,7 @@ describe('stockPoolStore', () => {
     expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
       stockCode: '00700.HK',
       reportType: 'detailed',
-      stockName: '腾讯控股',
+      stockName: '騰訊控股',
       originalQuery: '00700',
       selectionSource: 'autocomplete',
       notify: true,
@@ -482,7 +482,7 @@ describe('stockPoolStore', () => {
     const pendingTask = {
       taskId: 'task-1',
       stockCode: '600519',
-      stockName: '贵州茅台',
+      stockName: '貴州茅臺',
       status: 'pending' as const,
       progress: 0,
       reportType: 'detailed',
@@ -532,7 +532,7 @@ describe('stockPoolStore', () => {
     const pendingTask = {
       taskId: 'task-1',
       stockCode: '600519',
-      stockName: '贵州茅台',
+      stockName: '貴州茅臺',
       status: 'pending' as const,
       progress: 0,
       reportType: 'detailed',
@@ -555,7 +555,7 @@ describe('stockPoolStore', () => {
     const pendingTask = {
       taskId: 'task-1',
       stockCode: '600519',
-      stockName: '贵州茅台',
+      stockName: '貴州茅臺',
       status: 'pending' as const,
       progress: 0,
       reportType: 'detailed',
@@ -583,7 +583,7 @@ describe('stockPoolStore', () => {
       progress: 100,
       reportType: 'detailed',
       createdAt: '2026-03-18T08:00:00Z',
-      error: '分析失败',
+      error: '分析失敗',
     });
 
     const state = useStockPoolStore.getState();
@@ -636,11 +636,11 @@ describe('stockPoolStore', () => {
 
   it('upserts pending and processing tasks from the backend snapshot', async () => {
     const existingTask = createTask({ taskId: 'task-existing', progress: 30 });
-    const updatedTask = createTask({ taskId: 'task-existing', progress: 80, message: 'LLM 正在生成分析结果' });
+    const updatedTask = createTask({ taskId: 'task-existing', progress: 80, message: 'LLM 正在生成分析結果' });
     const newTask = createTask({
       taskId: 'task-new',
       stockCode: '000001',
-      stockName: '平安银行',
+      stockName: '平安銀行',
       status: 'pending',
       progress: 0,
     });
@@ -671,7 +671,7 @@ describe('stockPoolStore', () => {
     const staleSnapshot = createDeferred<TaskListResponse>();
     const freshSnapshot = createDeferred<TaskListResponse>();
     const staleTask = createTask({ taskId: 'task-stale' });
-    const freshTask = createTask({ taskId: 'task-fresh', stockCode: '000001', stockName: '平安银行' });
+    const freshTask = createTask({ taskId: 'task-fresh', stockCode: '000001', stockName: '平安銀行' });
     vi.mocked(analysisApi.getTasks)
       .mockReturnValueOnce(staleSnapshot.promise)
       .mockReturnValueOnce(freshSnapshot.promise);
@@ -690,7 +690,7 @@ describe('stockPoolStore', () => {
 
   it('does not prune local tasks when the backend active-task snapshot is incomplete', async () => {
     const localTask = createTask({ taskId: 'task-local' });
-    const remoteTask = createTask({ taskId: 'task-remote', stockCode: '000001', stockName: '平安银行' });
+    const remoteTask = createTask({ taskId: 'task-remote', stockCode: '000001', stockName: '平安銀行' });
     useStockPoolStore.getState().syncTaskCreated(localTask);
     vi.mocked(analysisApi.getTasks).mockResolvedValue(
       createTaskListResponse([remoteTask], { processing: 2, total: 2 }),

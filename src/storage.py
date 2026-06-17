@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自选股智能分析系统 - 存储层
+A股自選股智慧分析系統 - 儲存層
 ===================================
 
-职责：
-1. 管理 SQLite 数据库连接（单例模式）
-2. 定义 ORM 数据模型
-3. 提供数据存取接口
-4. 实现智能更新逻辑（断点续传）
+職責：
+1. 管理 SQLite 資料庫連線（單例模式）
+2. 定義 ORM 資料模型
+3. 提供資料存取介面
+4. 實現智慧更新邏輯（斷點續傳）
 """
 
 import atexit
@@ -59,58 +59,58 @@ from src.config import get_config
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
-# SQLAlchemy ORM 基类
+# SQLAlchemy ORM 基類
 Base = declarative_base()
 
 if TYPE_CHECKING:
     from src.search_service import SearchResponse
 
 
-# === 数据模型定义 ===
+# === 資料模型定義 ===
 
 class StockDaily(Base):
     """
-    股票日线数据模型
+    股票日線資料模型
     
-    存储每日行情数据和计算的技术指标
-    支持多股票、多日期的唯一约束
+    儲存每日行情資料和計算的技術指標
+    支援多股票、多日期的唯一約束
     """
     __tablename__ = 'stock_daily'
     
-    # 主键
+    # 主鍵
     id = Column(Integer, primary_key=True, autoincrement=True)
     
-    # 股票代码（如 600519, 000001）
+    # 股票程式碼（如 600519, 000001）
     code = Column(String(10), nullable=False, index=True)
     
     # 交易日期
     date = Column(Date, nullable=False, index=True)
     
-    # OHLC 数据
+    # OHLC 資料
     open = Column(Float)
     high = Column(Float)
     low = Column(Float)
     close = Column(Float)
     
-    # 成交数据
+    # 成交資料
     volume = Column(Float)  # 成交量（股）
-    amount = Column(Float)  # 成交额（元）
-    pct_chg = Column(Float)  # 涨跌幅（%）
+    amount = Column(Float)  # 成交額（元）
+    pct_chg = Column(Float)  # 漲跌幅（%）
     
-    # 技术指标
+    # 技術指標
     ma5 = Column(Float)
     ma10 = Column(Float)
     ma20 = Column(Float)
     volume_ratio = Column(Float)  # 量比
     
-    # 数据来源
-    data_source = Column(String(50))  # 记录数据来源（如 AkshareFetcher）
+    # 資料來源
+    data_source = Column(String(50))  # 記錄資料來源（如 AkshareFetcher）
     
-    # 更新时间
+    # 更新時間
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     
-    # 唯一约束：同一股票同一日期只能有一条数据
+    # 唯一約束：同一股票同一日期只能有一條資料
     __table_args__ = (
         UniqueConstraint('code', 'date', name='uix_code_date'),
         Index('ix_code_date', 'code', 'date'),
@@ -120,7 +120,7 @@ class StockDaily(Base):
         return f"<StockDaily(code={self.code}, date={self.date}, close={self.close})>"
     
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
+        """轉換為字典"""
         return {
             'code': self.code,
             'date': self.date,
@@ -141,34 +141,34 @@ class StockDaily(Base):
 
 class NewsIntel(Base):
     """
-    新闻情报数据模型
+    新聞情報資料模型
 
-    存储搜索到的新闻情报条目，用于后续分析与查询
+    儲存搜尋到的新聞情報條目，用於後續分析與查詢
     """
     __tablename__ = 'news_intel'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
-    # 关联用户查询操作
+    # 關聯使用者查詢操作
     query_id = Column(String(64), index=True)
 
-    # 股票信息
+    # 股票資訊
     code = Column(String(10), nullable=False, index=True)
     name = Column(String(50))
 
-    # 搜索上下文
+    # 搜尋上下文
     dimension = Column(String(32), index=True)  # latest_news / risk_check / earnings / market_analysis / industry
     query = Column(String(255))
     provider = Column(String(32), index=True)
 
-    # 新闻内容
+    # 新聞內容
     title = Column(String(300), nullable=False)
     snippet = Column(Text)
     url = Column(String(1000), nullable=False)
     source = Column(String(100))
     published_date = Column(DateTime, index=True)
 
-    # 入库时间
+    # 入庫時間
     fetched_at = Column(DateTime, default=datetime.now, index=True)
     query_source = Column(String(32), index=True)  # bot/web/cli/system
     requester_platform = Column(String(20))
@@ -191,7 +191,7 @@ class FundamentalSnapshot(Base):
     """
     基本面上下文快照（P0 write-only）。
 
-    仅用于写入，主链路不依赖读取该表，便于后续回测/画像扩展。
+    僅用於寫入，主鏈路不依賴讀取該表，便於後續回測/畫像擴充套件。
     """
     __tablename__ = 'fundamental_snapshot'
 
@@ -214,34 +214,34 @@ class FundamentalSnapshot(Base):
 
 class AnalysisHistory(Base):
     """
-    分析结果历史记录模型
+    分析結果歷史記錄模型
 
-    保存每次分析结果，支持按 query_id/股票代码检索
+    儲存每次分析結果，支援按 query_id/股票程式碼檢索
     """
     __tablename__ = 'analysis_history'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
-    # 关联查询链路
+    # 關聯查詢鏈路
     query_id = Column(String(64), index=True)
 
-    # 股票信息
+    # 股票資訊
     code = Column(String(10), nullable=False, index=True)
     name = Column(String(50))
     report_type = Column(String(16), index=True)
 
-    # 核心结论
+    # 核心結論
     sentiment_score = Column(Integer)
     operation_advice = Column(String(20))
     trend_prediction = Column(String(50))
     analysis_summary = Column(Text)
 
-    # 详细数据
+    # 詳細資料
     raw_result = Column(Text)
     news_content = Column(Text)
     context_snapshot = Column(Text)
 
-    # 狙击点位（用于回测）
+    # 狙擊點位（用於回測）
     ideal_buy = Column(Float)
     secondary_buy = Column(Float)
     stop_loss = Column(Float)
@@ -254,7 +254,7 @@ class AnalysisHistory(Base):
     )
 
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
+        """轉換為字典"""
         return {
             'id': self.id,
             'query_id': self.query_id,
@@ -277,7 +277,7 @@ class AnalysisHistory(Base):
 
 
 class BacktestResult(Base):
-    """单条分析记录的回测结果。"""
+    """單條分析記錄的回測結果。"""
 
     __tablename__ = 'backtest_results'
 
@@ -290,35 +290,35 @@ class BacktestResult(Base):
         index=True,
     )
 
-    # 冗余字段，便于按股票筛选
+    # 冗餘欄位，便於按股票篩選
     code = Column(String(10), nullable=False, index=True)
     analysis_date = Column(Date, index=True)
 
-    # 回测参数
+    # 回測引數
     eval_window_days = Column(Integer, nullable=False, default=10)
     engine_version = Column(String(16), nullable=False, default='v1')
 
-    # 状态
+    # 狀態
     eval_status = Column(String(16), nullable=False, default='pending')
     evaluated_at = Column(DateTime, default=datetime.now, index=True)
 
-    # 建议快照（避免未来分析字段变化导致回测不可解释）
+    # 建議快照（避免未來分析欄位變化導致回測不可解釋）
     operation_advice = Column(String(20))
     position_recommendation = Column(String(8))  # long/cash
 
-    # 价格与收益
+    # 價格與收益
     start_price = Column(Float)
     end_close = Column(Float)
     max_high = Column(Float)
     min_low = Column(Float)
     stock_return_pct = Column(Float)
 
-    # 方向与结果
+    # 方向與結果
     direction_expected = Column(String(16))  # up/down/flat/not_down
     direction_correct = Column(Boolean, nullable=True)
     outcome = Column(String(16))  # win/loss/neutral
 
-    # 目标价命中（仅 long 且配置了止盈/止损时有意义）
+    # 目標價命中（僅 long 且配置了止盈/止損時有意義）
     stop_loss = Column(Float)
     take_profit = Column(Float)
     hit_stop_loss = Column(Boolean)
@@ -327,7 +327,7 @@ class BacktestResult(Base):
     first_hit_date = Column(Date)
     first_hit_trading_days = Column(Integer)
 
-    # 模拟执行（long-only）
+    # 模擬執行（long-only）
     simulated_entry_price = Column(Float)
     simulated_exit_price = Column(Float)
     simulated_exit_reason = Column(String(24))  # stop_loss/take_profit/window_end/cash/ambiguous_stop_loss
@@ -345,7 +345,7 @@ class BacktestResult(Base):
 
 
 class BacktestSummary(Base):
-    """回测汇总指标（按股票或全局）。"""
+    """回測彙總指標（按股票或全域性）。"""
 
     __tablename__ = 'backtest_summaries'
 
@@ -358,7 +358,7 @@ class BacktestSummary(Base):
     engine_version = Column(String(16), nullable=False, default='v1')
     computed_at = Column(DateTime, default=datetime.now, index=True)
 
-    # 计数
+    # 計數
     total_evaluations = Column(Integer, default=0)
     completed_count = Column(Integer, default=0)
     insufficient_count = Column(Integer, default=0)
@@ -369,7 +369,7 @@ class BacktestSummary(Base):
     loss_count = Column(Integer, default=0)
     neutral_count = Column(Integer, default=0)
 
-    # 准确率/胜率
+    # 準確率/勝率
     direction_accuracy_pct = Column(Float)
     win_rate_pct = Column(Float)
     neutral_rate_pct = Column(Float)
@@ -378,13 +378,13 @@ class BacktestSummary(Base):
     avg_stock_return_pct = Column(Float)
     avg_simulated_return_pct = Column(Float)
 
-    # 目标价触发统计（仅 long 且配置止盈/止损时统计）
+    # 目標價觸發統計（僅 long 且配置止盈/止損時統計）
     stop_loss_trigger_rate = Column(Float)
     take_profit_trigger_rate = Column(Float)
     ambiguous_rate = Column(Float)
     avg_days_to_first_hit = Column(Float)
 
-    # 诊断字段（JSON 字符串）
+    # 診斷欄位（JSON 字串）
     advice_breakdown_json = Column(Text)
     diagnostics_json = Column(Text)
 
@@ -600,7 +600,7 @@ class PortfolioFxRate(Base):
 
 class ConversationMessage(Base):
     """
-    Agent 对话历史记录表
+    Agent 對話歷史記錄表
     """
     __tablename__ = 'conversation_messages'
 
@@ -774,12 +774,12 @@ class _DatabaseManagerMeta(type):
 
 class DatabaseManager(metaclass=_DatabaseManagerMeta):
     """
-    数据库管理器 - 单例模式
+    資料庫管理器 - 單例模式
     
-    职责：
-    1. 管理数据库连接池
+    職責：
+    1. 管理資料庫連線池
     2. 提供 Session 上下文管理
-    3. 封装数据存取操作
+    3. 封裝資料存取操作
     """
     
     _instance: Optional['DatabaseManager'] = None
@@ -787,7 +787,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     _initialized: bool = False
     
     def __new__(cls, *args, **kwargs):
-        """单例模式实现"""
+        """單例模式實現"""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
@@ -795,10 +795,10 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     
     def __init__(self, db_url: Optional[str] = None):
         """
-        初始化数据库管理器
+        初始化資料庫管理器
         
         Args:
-            db_url: 数据库连接 URL（可选，默认从配置读取）
+            db_url: 資料庫連線 URL（可選，預設從配置讀取）
         """
         if getattr(self, '_initialized', False):
             return
@@ -825,7 +825,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                     "timeout": self._sqlite_busy_timeout_ms / 1000,
                 }
 
-            # 创建数据库引擎
+            # 建立資料庫引擎
             created_engine = create_engine(
                 db_url,
                 **engine_kwargs,
@@ -835,20 +835,20 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             self._sqlite_file_db = self._is_sqlite_engine and self._is_file_sqlite_database()
             self._install_sqlite_pragma_handler()
 
-            # 创建 Session 工厂
+            # 建立 Session 工廠
             self._SessionLocal = sessionmaker(
                 bind=self._engine,
                 autocommit=False,
                 autoflush=False,
             )
 
-            # 创建所有表
+            # 建立所有表
             Base.metadata.create_all(self._engine)
 
             self._initialized = True
-            logger.info(f"数据库初始化完成: {db_url}")
+            logger.info(f"資料庫初始化完成: {db_url}")
 
-            # 注册退出钩子，确保程序退出时关闭数据库连接
+            # 註冊退出鉤子，確保程式退出時關閉資料庫連線
             atexit.register(DatabaseManager._cleanup_engine, self._engine)
         except Exception:
             self._initialized = False
@@ -856,7 +856,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 if created_engine is not None:
                     created_engine.dispose()
             except Exception as cleanup_exc:
-                logger.warning("数据库初始化失败后的引擎清理也失败: %s", cleanup_exc)
+                logger.warning("資料庫初始化失敗後的引擎清理也失敗: %s", cleanup_exc)
             self._engine = None
             self._SessionLocal = None
             self.__class__._instance = None
@@ -864,7 +864,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     @classmethod
     def get_instance(cls) -> 'DatabaseManager':
-        """获取单例实例"""
+        """獲取單例例項"""
         with cls._init_lock:
             if cls._instance is None:
                 cls()
@@ -872,7 +872,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     
     @classmethod
     def reset_instance(cls) -> None:
-        """重置单例（用于测试）"""
+        """重置單例（用於測試）"""
         with cls._init_lock:
             if cls._instance is not None:
                 if hasattr(cls._instance, '_engine') and cls._instance._engine is not None:
@@ -883,22 +883,22 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     @classmethod
     def _cleanup_engine(cls, engine) -> None:
         """
-        清理数据库引擎（atexit 钩子）
+        清理資料庫引擎（atexit 鉤子）
 
-        确保程序退出时关闭所有数据库连接，避免 ResourceWarning
+        確保程式退出時關閉所有資料庫連線，避免 ResourceWarning
 
         Args:
-            engine: SQLAlchemy 引擎对象
+            engine: SQLAlchemy 引擎物件
         """
         try:
             if engine is not None:
                 engine.dispose()
-                logger.debug("数据库引擎已清理")
+                logger.debug("資料庫引擎已清理")
         except Exception as e:
-            logger.warning(f"清理数据库引擎时出错: {e}")
+            logger.warning(f"清理資料庫引擎時出錯: {e}")
 
     def _install_sqlite_pragma_handler(self) -> None:
-        """为 SQLite 连接安装竞争保护参数。"""
+        """為 SQLite 連線安裝競爭保護引數。"""
         if not self._is_sqlite_engine:
             return
 
@@ -910,7 +910,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 if self._sqlite_file_db and self._sqlite_wal_enabled:
                     cursor.execute("PRAGMA journal_mode=WAL")
             except Exception as exc:
-                logger.warning("初始化 SQLite PRAGMA 失败: %s", exc)
+                logger.warning("初始化 SQLite PRAGMA 失敗: %s", exc)
             finally:
                 cursor.close()
 
@@ -945,7 +945,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 ):
                     delay = self._sqlite_write_retry_base_delay * (2 ** attempt)
                     logger.warning(
-                        "SQLite 写入锁冲突，准备重试: %s (%s/%s, %.2fs)",
+                        "SQLite 寫入鎖衝突，準備重試: %s (%s/%s, %.2fs)",
                         operation_name,
                         attempt + 1,
                         max_retries,
@@ -989,17 +989,17 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     
     def get_session(self) -> Session:
         """
-        获取数据库 Session
+        獲取資料庫 Session
         
         使用示例:
             with db.get_session() as session:
-                # 执行查询
+                # 執行查詢
                 session.commit()  # 如果需要
         """
         if not getattr(self, '_initialized', False) or not hasattr(self, '_SessionLocal'):
             raise RuntimeError(
-                "DatabaseManager 未正确初始化。"
-                "请确保通过 DatabaseManager.get_instance() 获取实例。"
+                "DatabaseManager 未正確初始化。"
+                "請確保透過 DatabaseManager.get_instance() 獲取例項。"
             )
         session = self._SessionLocal()
         try:
@@ -1023,22 +1023,22 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     
     def has_today_data(self, code: str, target_date: Optional[date] = None) -> bool:
         """
-        检查是否已有指定日期的数据
+        檢查是否已有指定日期的資料
         
-        用于断点续传逻辑：如果已有数据则跳过网络请求
+        用於斷點續傳邏輯：如果已有資料則跳過網路請求
         
         Args:
-            code: 股票代码
-            target_date: 目标日期（默认今天）
+            code: 股票程式碼
+            target_date: 目標日期（預設今天）
             
         Returns:
-            是否存在数据
+            是否存在資料
         """
         if target_date is None:
             target_date = date.today()
-        # 注意：这里的 target_date 语义是“自然日”，而不是“最新交易日”。
-        # 在周末/节假日/非交易日运行时，即使数据库已有最新交易日数据，这里也会返回 False。
-        # 该行为目前保留（按需求不改逻辑）。
+        # 注意：這裡的 target_date 語義是“自然日”，而不是“最新交易日”。
+        # 在週末/節假日/非交易日執行時，即使資料庫已有最新交易日資料，這裡也會返回 False。
+        # 該行為目前保留（按需求不改邏輯）。
         
         with self.get_session() as session:
             result = session.execute(
@@ -1058,16 +1058,16 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         days: int = 2
     ) -> List[StockDaily]:
         """
-        获取最近 N 天的数据
+        獲取最近 N 天的資料
         
-        用于计算"相比昨日"的变化
+        用於計算"相比昨日"的變化
         
         Args:
-            code: 股票代码
-            days: 获取天数
+            code: 股票程式碼
+            days: 獲取天數
             
         Returns:
-            StockDaily 对象列表（按日期降序）
+            StockDaily 物件列表（按日期降序）
         """
         with self.get_session() as session:
             results = session.execute(
@@ -1089,14 +1089,14 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         query_context: Optional[Dict[str, str]] = None
     ) -> int:
         """
-        保存新闻情报到数据库
+        儲存新聞情報到資料庫
 
         去重策略：
-        - 优先按 URL 去重（唯一约束）
-        - URL 缺失时按 title + source + published_date 进行软去重
+        - 優先按 URL 去重（唯一約束）
+        - URL 缺失時按 title + source + published_date 進行軟去重
 
-        关联策略：
-        - query_context 记录用户查询信息（平台、用户、会话、原始指令等）
+        關聯策略：
+        - query_context 記錄使用者查詢資訊（平臺、使用者、會話、原始指令等）
         """
         if not response or not response.results:
             return 0
@@ -1192,7 +1192,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                         session.flush()
                     local_saved_count += 1
                 except IntegrityError:
-                    logger.debug("新闻情报重复（已跳过）: %s %s", code, url_key)
+                    logger.debug("新聞情報重複（已跳過）: %s %s", code, url_key)
 
             return local_saved_count
 
@@ -1201,9 +1201,9 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 f"save_news_intel[{code}]",
                 _write,
             )
-            logger.info(f"保存新闻情报成功: {code}, 新增 {saved_count} 条")
+            logger.info(f"儲存新聞情報成功: {code}, 新增 {saved_count} 條")
         except Exception as e:
-            logger.error(f"保存新闻情报失败: {e}")
+            logger.error(f"儲存新聞情報失敗: {e}")
             raise
 
         return saved_count
@@ -1217,7 +1217,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         coverage: Optional[Any] = None,
     ) -> int:
         """
-        保存基本面快照（P0 write-only）。失败不抛异常，返回写入条数 0/1。
+        儲存基本面快照（P0 write-only）。失敗不拋異常，返回寫入條數 0/1。
         """
         if not query_id or not code or payload is None:
             return 0
@@ -1240,7 +1240,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             )
         except Exception as e:
             logger.debug(
-                "基本面快照写入失败（fail-open）: query_id=%s code=%s err=%s",
+                "基本面快照寫入失敗（fail-open）: query_id=%s code=%s err=%s",
                 query_id,
                 code,
                 e,
@@ -1253,9 +1253,9 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         code: str,
     ) -> Optional[Dict[str, Any]]:
         """
-        获取指定 query_id + code 的最新基本面快照 payload。
+        獲取指定 query_id + code 的最新基本面快照 payload。
 
-        读取失败或不存在时返回 None（fail-open）。
+        讀取失敗或不存在時返回 None（fail-open）。
         """
         if not query_id or not code:
             return None
@@ -1275,7 +1275,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 ).scalar_one_or_none()
             except Exception as e:
                 logger.debug(
-                    "基本面快照读取失败（fail-open）: query_id=%s code=%s err=%s",
+                    "基本面快照讀取失敗（fail-open）: query_id=%s code=%s err=%s",
                     query_id,
                     code,
                     e,
@@ -1292,7 +1292,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def get_recent_news(self, code: str, days: int = 7, limit: int = 20) -> List[NewsIntel]:
         """
-        获取指定股票最近 N 天的新闻情报
+        獲取指定股票最近 N 天的新聞情報
         """
         cutoff_date = datetime.now() - timedelta(days=days)
 
@@ -1313,14 +1313,14 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def get_news_intel_by_query_id(self, query_id: str, limit: int = 20) -> List[NewsIntel]:
         """
-        根据 query_id 获取新闻情报列表
+        根據 query_id 獲取新聞情報列表
 
         Args:
-            query_id: 分析记录唯一标识
-            limit: 返回数量限制
+            query_id: 分析記錄唯一標識
+            limit: 返回數量限制
 
         Returns:
-            NewsIntel 列表（按发布时间或抓取时间倒序）
+            NewsIntel 列表（按釋出時間或抓取時間倒序）
         """
         from sqlalchemy import func
 
@@ -1347,7 +1347,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         save_snapshot: bool = True
     ) -> int:
         """
-        保存分析结果历史记录
+        儲存分析結果歷史記錄
         """
         if result is None:
             return 0
@@ -1386,7 +1386,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 _write,
             )
         except Exception as e:
-            logger.error(f"保存分析历史失败: {e}")
+            logger.error(f"儲存分析歷史失敗: {e}")
             return 0
 
     def update_analysis_history_diagnostics(
@@ -1398,10 +1398,10 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         notification_runs: Optional[List[Dict[str, Any]]] = None,
     ) -> int:
         """
-        更新已保存分析历史的运行诊断快照。
+        更新已儲存分析歷史的執行診斷快照。
 
-        通知结果通常在分析历史落库后才产生，因此这里仅补写
-        context_snapshot.diagnostics，不改变报告正文或其它历史字段。
+        通知結果通常在分析歷史落庫後才產生，因此這裡僅補寫
+        context_snapshot.diagnostics，不改變報告正文或其它歷史欄位。
         """
         if not query_id or (diagnostics is None and not notification_runs):
             return 0
@@ -1461,7 +1461,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             )
         except Exception as e:
             logger.warning(
-                "更新分析历史诊断快照失败（fail-open）: query_id=%s code=%s err=%s",
+                "更新分析歷史診斷快照失敗（fail-open）: query_id=%s code=%s err=%s",
                 query_id,
                 code,
                 e,
@@ -1519,17 +1519,17 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         limit: int = 20
     ) -> Tuple[List[AnalysisHistory], int]:
         """
-        分页查询分析历史记录（带总数）
+        分頁查詢分析歷史記錄（帶總數）
         
         Args:
-            code: 股票代码筛选
-            start_date: 开始日期（含）
-            end_date: 结束日期（含）
-            offset: 偏移量（跳过前 N 条）
-            limit: 每页数量
+            code: 股票程式碼篩選
+            start_date: 開始日期（含）
+            end_date: 結束日期（含）
+            offset: 偏移量（跳過前 N 條）
+            limit: 每頁數量
             
         Returns:
-            Tuple[List[AnalysisHistory], int]: (记录列表, 总数)
+            Tuple[List[AnalysisHistory], int]: (記錄列表, 總數)
         """
         from sqlalchemy import func
         
@@ -1550,14 +1550,14 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 # created_at < end_date+1 00:00:00 (即 <= end_date 23:59:59)
                 conditions.append(AnalysisHistory.created_at < datetime.combine(end_date + timedelta(days=1), datetime.min.time()))
             
-            # 构建 where 子句
+            # 構建 where 子句
             where_clause = and_(*conditions) if conditions else True
             
-            # 查询总数
+            # 查詢總數
             total_query = select(func.count(AnalysisHistory.id)).where(where_clause)
             total = session.execute(total_query).scalar() or 0
             
-            # 查询分页数据
+            # 查詢分頁資料
             data_query = (
                 select(AnalysisHistory)
                 .where(where_clause)
@@ -1571,16 +1571,16 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     
     def get_analysis_history_by_id(self, record_id: int) -> Optional[AnalysisHistory]:
         """
-        根据数据库主键 ID 查询单条分析历史记录
+        根據資料庫主鍵 ID 查詢單條分析歷史記錄
         
-        由于 query_id 可能重复（批量分析时多条记录共享同一 query_id），
-        使用主键 ID 确保精确查询唯一记录。
+        由於 query_id 可能重複（批次分析時多條記錄共享同一 query_id），
+        使用主鍵 ID 確保精確查詢唯一記錄。
         
         Args:
-            record_id: 分析历史记录的主键 ID
+            record_id: 分析歷史記錄的主鍵 ID
             
         Returns:
-            AnalysisHistory 对象，不存在返回 None
+            AnalysisHistory 物件，不存在返回 None
         """
         with self.get_session() as session:
             result = session.execute(
@@ -1590,15 +1590,15 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def delete_analysis_history_records(self, record_ids: List[int]) -> int:
         """
-        删除指定的分析历史记录。
+        刪除指定的分析歷史記錄。
 
-        同时清理依赖这些历史记录的回测结果，避免外键约束失败。
+        同時清理依賴這些歷史記錄的回測結果，避免外來鍵約束失敗。
 
         Args:
-            record_ids: 要删除的历史记录主键 ID 列表
+            record_ids: 要刪除的歷史記錄主鍵 ID 列表
 
         Returns:
-            实际删除的历史记录数量
+            實際刪除的歷史記錄數量
         """
         ids = sorted({int(record_id) for record_id in record_ids if record_id is not None})
         if not ids:
@@ -1620,18 +1620,18 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         limit: int = 200,
     ) -> List[AnalysisHistory]:
         """
-        获取历史记录中的不重复股票列表，每只股票取最新一条记录。
+        獲取歷史記錄中的不重複股票列表，每隻股票取最新一條記錄。
 
-        使用子查询按 code 分组取 MAX(id)，再 JOIN 回查完整记录。
-        大盘复盘（code="MARKET"）始终排在最前。
+        使用子查詢按 code 分組取 MAX(id)，再 JOIN 回查完整記錄。
+        大盤覆盤（code="MARKET"）始終排在最前。
 
         Args:
-            start_date: 开始日期
-            end_date: 结束日期
-            limit: 最大返回数量
+            start_date: 開始日期
+            end_date: 結束日期
+            limit: 最大返回數量
 
         Returns:
-            每条股票最新一条 AnalysisHistory 记录列表
+            每條股票最新一條 AnalysisHistory 記錄列表
         """
         with self.get_session() as session:
             subq = (
@@ -1670,15 +1670,15 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def get_latest_analysis_by_query_id(self, query_id: str) -> Optional[AnalysisHistory]:
         """
-        根据 query_id 查询最新一条分析历史记录
+        根據 query_id 查詢最新一條分析歷史記錄
 
-        query_id 在批量分析时可能重复，故返回最近创建的一条。
+        query_id 在批次分析時可能重複，故返回最近建立的一條。
 
         Args:
-            query_id: 分析记录关联的 query_id
+            query_id: 分析記錄關聯的 query_id
 
         Returns:
-            AnalysisHistory 对象，不存在返回 None
+            AnalysisHistory 物件，不存在返回 None
         """
         with self.get_session() as session:
             result = session.execute(
@@ -1696,15 +1696,15 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         end_date: date
     ) -> List[StockDaily]:
         """
-        获取指定日期范围的数据
+        獲取指定日期範圍的資料
         
         Args:
-            code: 股票代码
-            start_date: 开始日期
-            end_date: 结束日期
+            code: 股票程式碼
+            start_date: 開始日期
+            end_date: 結束日期
             
         Returns:
-            StockDaily 对象列表
+            StockDaily 物件列表
         """
         with self.get_session() as session:
             results = session.execute(
@@ -1728,23 +1728,23 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         data_source: str = "Unknown"
     ) -> int:
         """
-        保存日线数据到数据库
+        儲存日線資料到資料庫
         
         策略：
-        - 按 `(code, date)` 做批量 UPSERT，已存在记录会覆盖更新
-        - 同一批次内若存在重复日期，以最后一条记录为准
-        - SQLite 分支按 chunk 写入以避免绑定参数上限
+        - 按 `(code, date)` 做批次 UPSERT，已存在記錄會覆蓋更新
+        - 同一批次內若存在重複日期，以最後一條記錄為準
+        - SQLite 分支按 chunk 寫入以避免繫結引數上限
         
         Args:
-            df: 包含日线数据的 DataFrame
-            code: 股票代码
-            data_source: 数据来源名称
+            df: 包含日線資料的 DataFrame
+            code: 股票程式碼
+            data_source: 資料來源名稱
             
         Returns:
-            本次实际新增的记录数（不含更新）
+            本次實際新增的記錄數（不含更新）
         """
         if df is None or df.empty:
-            logger.warning(f"保存数据为空，跳过 {code}")
+            logger.warning(f"儲存資料為空，跳過 {code}")
             return 0
 
         now = datetime.now()
@@ -1867,10 +1867,10 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 f"save_daily_data[{code}]",
                 _write,
             )
-            logger.info(f"保存 {code} 数据成功，新增 {saved_count} 条")
+            logger.info(f"儲存 {code} 資料成功，新增 {saved_count} 條")
             return saved_count
         except Exception as e:
-            logger.error(f"保存 {code} 数据失败: {e}")
+            logger.error(f"儲存 {code} 資料失敗: {e}")
             raise
     
     def get_analysis_context(
@@ -1879,29 +1879,29 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         target_date: Optional[date] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        获取分析所需的上下文数据
+        獲取分析所需的上下文資料
         
-        返回今日数据 + 昨日数据的对比信息
+        返回今日資料 + 昨日資料的對比資訊
         
         Args:
-            code: 股票代码
-            target_date: 目标日期（默认今天）
+            code: 股票程式碼
+            target_date: 目標日期（預設今天）
             
         Returns:
-            包含今日数据、昨日对比等信息的字典
+            包含今日資料、昨日對比等資訊的字典
         """
         if target_date is None:
             target_date = date.today()
-        # 注意：尽管入参提供了 target_date，但当前实现实际使用的是“最新两天数据”（get_latest_data），
-        # 并不会按 target_date 精确取当日/前一交易日的上下文。
-        # 因此若未来需要支持“按历史某天复盘/重算”的可解释性，这里需要调整。
-        # 该行为目前保留（按需求不改逻辑）。
+        # 注意：儘管入參提供了 target_date，但當前實現實際使用的是“最新兩天資料”（get_latest_data），
+        # 並不會按 target_date 精確取當日/前一交易日的上下文。
+        # 因此若未來需要支援“按歷史某天覆盤/重算”的可解釋性，這裡需要調整。
+        # 該行為目前保留（按需求不改邏輯）。
         
-        # 获取最近2天数据
+        # 獲取最近2天資料
         recent_data = self.get_latest_data(code, days=2)
         
         if not recent_data:
-            logger.warning(f"未找到 {code} 的数据")
+            logger.warning(f"未找到 {code} 的資料")
             return None
         
         today_data = recent_data[0]
@@ -1916,7 +1916,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         if yesterday_data:
             context['yesterday'] = yesterday_data.to_dict()
             
-            # 计算相比昨日的变化
+            # 計算相比昨日的變化
             if yesterday_data.volume and yesterday_data.volume > 0:
                 context['volume_change_ratio'] = round(
                     today_data.volume / yesterday_data.volume, 2
@@ -1927,43 +1927,43 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                     (today_data.close - yesterday_data.close) / yesterday_data.close * 100, 2
                 )
             
-            # 均线形态判断
+            # 均線形態判斷
             context['ma_status'] = self._analyze_ma_status(today_data)
         
         return context
     
     def _analyze_ma_status(self, data: StockDaily) -> str:
         """
-        分析均线形态
+        分析均線形態
         
-        判断条件：
-        - 多头排列：close > ma5 > ma10 > ma20
-        - 空头排列：close < ma5 < ma10 < ma20
-        - 震荡整理：其他情况
+        判斷條件：
+        - 多頭排列：close > ma5 > ma10 > ma20
+        - 空頭排列：close < ma5 < ma10 < ma20
+        - 震盪整理：其他情況
         """
-        # 注意：这里的均线形态判断基于“close/ma5/ma10/ma20”静态比较，
-        # 未考虑均线拐点、斜率、或不同数据源复权口径差异。
-        # 该行为目前保留（按需求不改逻辑）。
+        # 注意：這裡的均線形態判斷基於“close/ma5/ma10/ma20”靜態比較，
+        # 未考慮均線拐點、斜率、或不同資料來源復權口徑差異。
+        # 該行為目前保留（按需求不改邏輯）。
         close = data.close or 0
         ma5 = data.ma5 or 0
         ma10 = data.ma10 or 0
         ma20 = data.ma20 or 0
         
         if close > ma5 > ma10 > ma20 > 0:
-            return "多头排列 📈"
+            return "多頭排列 📈"
         elif close < ma5 < ma10 < ma20 and ma20 > 0:
-            return "空头排列 📉"
+            return "空頭排列 📉"
         elif close > ma5 and ma5 > ma10:
             return "短期向好 🔼"
         elif close < ma5 and ma5 < ma10:
             return "短期走弱 🔽"
         else:
-            return "震荡整理 ↔️"
+            return "震盪整理 ↔️"
 
     @staticmethod
     def _parse_published_date(value: Optional[str]) -> Optional[datetime]:
         """
-        解析发布时间字符串（失败返回 None）
+        解析釋出時間字串（失敗返回 None）
         """
         if not value:
             return None
@@ -1975,7 +1975,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         if not text:
             return None
 
-        # 优先尝试 ISO 格式
+        # 優先嚐試 ISO 格式
         try:
             return datetime.fromisoformat(text)
         except ValueError:
@@ -1999,7 +1999,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     @staticmethod
     def _safe_json_dumps(data: Any) -> str:
         """
-        安全序列化为 JSON 字符串
+        安全序列化為 JSON 字串
         """
         try:
             return json.dumps(data, ensure_ascii=False, default=str)
@@ -2009,7 +2009,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     @staticmethod
     def _build_raw_result(result: Any) -> Dict[str, Any]:
         """
-        生成完整分析结果字典
+        生成完整分析結果字典
         """
         data = result.to_dict() if hasattr(result, "to_dict") else {}
         data.update({
@@ -2037,24 +2037,24 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         if not text or text == '-' or text == '—' or text == 'N/A':
             return None
 
-        # 尝试直接解析纯数字字符串
+        # 嘗試直接解析純數字字串
         try:
             return float(text)
         except ValueError:
             pass
 
-        # 优先截取 "：" 到 "元" 之间的价格，避免误提取 MA5/MA10 等技术指标数字
+        # 優先擷取 "：" 到 "元" 之間的價格，避免誤提取 MA5/MA10 等技術指標數字
         colon_pos = max(text.rfind("："), text.rfind(":"))
         yuan_pos = text.find("元", colon_pos + 1 if colon_pos != -1 else 0)
         if yuan_pos != -1:
             segment_start = colon_pos + 1 if colon_pos != -1 else 0
             segment = text[segment_start:yuan_pos]
             
-            # 使用 finditer 并过滤掉 MA 开头的数字
+            # 使用 finditer 並過濾掉 MA 開頭的數字
             matches = list(re.finditer(r"-?\d+(?:\.\d+)?", segment))
             valid_numbers = []
             for m in matches:
-                # 检查前面是否是 "MA" (忽略大小写)
+                # 檢查前面是否是 "MA" (忽略大小寫)
                 start_idx = m.start()
                 if start_idx >= 2:
                     prefix = segment[start_idx-2:start_idx].upper()
@@ -2068,14 +2068,14 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 except ValueError:
                     pass
 
-        # 兜底：无"元"字时，先截去第一个括号后的内容，避免误提取括号内技术指标数字
-        # 例如 "1.52-1.53 (回踩MA5/10附近)" → 仅在 "1.52-1.53 " 中搜索
+        # 兜底：無"元"字時，先截去第一個括號後的內容，避免誤提取括號內技術指標數字
+        # 例如 "1.52-1.53 (回踩MA5/10附近)" → 僅在 "1.52-1.53 " 中搜尋
         paren_pos = len(text)
         for paren_char in ('(', '（'):
             pos = text.find(paren_char)
             if pos != -1:
                 paren_pos = min(paren_pos, pos)
-        search_text = text[:paren_pos].strip() or text  # 括号前为空时降级用全文
+        search_text = text[:paren_pos].strip() or text  # 括號前為空時降級用全文
 
         valid_numbers = []
         for m in re.finditer(r"\d+(?:\.\d+)?", search_text):
@@ -2169,7 +2169,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         published_date: Optional[datetime]
     ) -> str:
         """
-        生成无 URL 时的去重键（确保稳定且较短）
+        生成無 URL 時的去重鍵（確保穩定且較短）
         """
         date_str = published_date.isoformat() if published_date else ""
         raw_key = f"{code}|{title}|{source}|{date_str}"
@@ -2178,7 +2178,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def save_conversation_message(self, session_id: str, role: str, content: str) -> int:
         """
-        保存 Agent 对话消息
+        儲存 Agent 對話訊息
         """
         with self.session_scope() as session:
             msg = ConversationMessage(
@@ -2192,7 +2192,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def get_conversation_history(self, session_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         """
-        获取 Agent 对话历史
+        獲取 Agent 對話歷史
         """
         with self.session_scope() as session:
             stmt = select(ConversationMessage).filter(
@@ -2200,7 +2200,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             ).order_by(ConversationMessage.created_at.desc()).limit(limit)
             messages = session.execute(stmt).scalars().all()
 
-            # 倒序返回，保证时间顺序
+            # 倒序返回，保證時間順序
             return [{"role": msg.role, "content": msg.content} for msg in reversed(messages)]
 
     def get_visible_conversation_messages(self, session_id: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -2429,7 +2429,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         extra_session_ids: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """
-        获取聊天会话列表（从 conversation_messages 聚合）
+        獲取聊天會話列表（從 conversation_messages 聚合）
 
         Args:
             limit: Maximum number of sessions to return.
@@ -2440,7 +2440,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 addition to the scoped prefix.
 
         Returns:
-            按最近活跃时间倒序的会话列表，每条包含 session_id, title, message_count, last_active
+            按最近活躍時間倒序的會話列表，每條包含 session_id, title, message_count, last_active
         """
         from sqlalchemy import func
 
@@ -2450,7 +2450,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 normalized_prefix = session_prefix if session_prefix.endswith(":") else f"{session_prefix}:"
             exact_ids = [sid for sid in (extra_session_ids or []) if sid]
 
-            # 聚合每个 session 的消息数和最后活跃时间
+            # 聚合每個 session 的訊息數和最後活躍時間
             base = (
                 select(
                     ConversationMessage.session_id,
@@ -2477,7 +2477,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             results = []
             for row in rows:
                 sid = row.session_id
-                # 取该会话第一条 user 消息作为标题
+                # 取該會話第一條 user 訊息作為標題
                 first_user_msg = session.execute(
                     select(ConversationMessage.content)
                     .where(
@@ -2489,7 +2489,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                     .order_by(ConversationMessage.created_at)
                     .limit(1)
                 ).scalar()
-                title = (first_user_msg or "新对话")[:60]
+                title = (first_user_msg or "新對話")[:60]
 
                 results.append({
                     "session_id": sid,
@@ -2502,7 +2502,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def get_conversation_messages(self, session_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """
-        获取单个会话的完整消息列表（用于前端恢复历史）
+        獲取單個會話的完整訊息列表（用於前端恢復歷史）
         """
         with self.session_scope() as session:
             stmt = (
@@ -2524,10 +2524,10 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def delete_conversation_session(self, session_id: str) -> int:
         """
-        删除指定会话的所有消息
+        刪除指定會話的所有訊息
 
         Returns:
-            删除的消息数
+            刪除的訊息數
         """
         with self.session_scope() as session:
             session.execute(
@@ -2707,9 +2707,9 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         ]
 
 
-# 便捷函数
+# 便捷函式
 def get_db() -> DatabaseManager:
-    """获取数据库管理器实例的快捷方式"""
+    """獲取資料庫管理器例項的快捷方式"""
     return DatabaseManager.get_instance()
 
 
@@ -2735,19 +2735,19 @@ def persist_llm_usage(
 
 
 if __name__ == "__main__":
-    # 测试代码
+    # 測試程式碼
     logging.basicConfig(level=logging.DEBUG)
     
     db = get_db()
     
-    print("=== 数据库测试 ===")
-    print(f"数据库初始化成功")
+    print("=== 資料庫測試 ===")
+    print(f"資料庫初始化成功")
     
-    # 测试检查今日数据
+    # 測試檢查今日資料
     has_data = db.has_today_data('600519')
-    print(f"茅台今日是否有数据: {has_data}")
+    print(f"茅臺今日是否有資料: {has_data}")
     
-    # 测试保存数据
+    # 測試儲存資料
     test_df = pd.DataFrame({
         'date': [date.today()],
         'open': [1800.0],
@@ -2764,8 +2764,8 @@ if __name__ == "__main__":
     })
     
     saved = db.save_daily_data(test_df, '600519', 'TestSource')
-    print(f"保存测试数据: {saved} 条")
+    print(f"儲存測試資料: {saved} 條")
     
-    # 测试获取上下文
+    # 測試獲取上下文
     context = db.get_analysis_context('600519')
     print(f"分析上下文: {context}")

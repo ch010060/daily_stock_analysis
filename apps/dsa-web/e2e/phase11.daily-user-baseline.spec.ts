@@ -35,7 +35,7 @@ test.describe('Phase 11 daily-user baseline', () => {
     // Password form should render (auth is enabled by default)
     await expect(page.locator('#password')).toBeVisible();
     await expect(
-      page.getByRole('button', { name: /授权进入工作台|完成设置并登录/ })
+      page.getByRole('button', { name: /授權進入工作臺|完成設定並登入/ })
     ).toBeVisible();
 
     // No critical console errors so far

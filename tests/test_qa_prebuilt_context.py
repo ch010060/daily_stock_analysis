@@ -35,14 +35,14 @@ def _registry_with_fetch_handlers(*handlers: MagicMock) -> ToolRegistry:
 def _prebuilt_result(**overrides):
     payload = {
         "code": "600519",
-        "name": "贵州茅台",
+        "name": "貴州茅臺",
         "operation_advice": "持有",
-        "trend_prediction": "震荡偏强",
+        "trend_prediction": "震盪偏強",
         "sentiment_score": 72,
         "confidence_level": "中",
-        "analysis_summary": "估值偏高但趋势仍稳。",
-        "risk_warning": "注意高估值与消费复苏不及预期。",
-        "news_summary": "近期新闻情绪中性偏正面。",
+        "analysis_summary": "估值偏高但趨勢仍穩。",
+        "risk_warning": "注意高估值與消費復甦不及預期。",
+        "news_summary": "近期新聞情緒中性偏正面。",
         "report_language": "zh",
     }
     payload.update(overrides)
@@ -73,12 +73,12 @@ class TestQAPrebuiltContext(unittest.TestCase):
             )
 
         prompt_text = "\n\n".join(m["content"] for m in captured["messages"])
-        self.assertIn("[系统提供的只读预构建分析结果]", prompt_text)
+        self.assertIn("[系統提供的只讀預構建分析結果]", prompt_text)
         self.assertIn("code: 600519", prompt_text)
         self.assertIn("operation_advice: 持有", prompt_text)
-        self.assertIn("analysis_summary: 估值偏高但趋势仍稳。", prompt_text)
+        self.assertIn("analysis_summary: 估值偏高但趨勢仍穩。", prompt_text)
         self.assertIn("risk_warning: 注意高估值", prompt_text)
-        self.assertIn("不要为回答本次追问重新获取行情", prompt_text)
+        self.assertIn("不要為回答本次追問重新獲取行情", prompt_text)
 
     def test_qa_prebuilt_result_does_not_fetch(self):
         quote_handler = MagicMock(return_value={"price": 1880})
@@ -87,7 +87,7 @@ class TestQAPrebuiltContext(unittest.TestCase):
         registry = _registry_with_fetch_handlers(quote_handler, history_handler, search_handler)
         adapter = MagicMock()
         adapter.call_with_tools.return_value = LLMResponse(
-            content="基于既有分析，主要风险是估值偏高。",
+            content="基於既有分析，主要風險是估值偏高。",
             tool_calls=[],
             usage={},
             provider="mock",
@@ -123,7 +123,7 @@ class TestQAPrebuiltContext(unittest.TestCase):
             {
                 "pre_built_context": {
                     "code": "600519",
-                    "name": "贵州茅台",
+                    "name": "貴州茅臺",
                     "realtime": {
                         "price": 1880,
                         "api_key": "secret-key-value",
@@ -131,14 +131,14 @@ class TestQAPrebuiltContext(unittest.TestCase):
                         "webhook_url": "https://example.invalid/hook",
                         "password": "secret-password-value",
                     },
-                    "news_context": "公开新闻摘要",
+                    "news_context": "公開新聞摘要",
                 }
             }
         )
 
         self.assertIn("code: 600519", summary)
         self.assertIn("price", summary)
-        self.assertIn("公开新闻摘要", summary)
+        self.assertIn("公開新聞摘要", summary)
         self.assertNotIn("secret-key-value", summary)
         self.assertNotIn("secret-token-value", summary)
         self.assertNotIn("secret-password-value", summary)
@@ -153,7 +153,7 @@ class TestQAPrebuiltContext(unittest.TestCase):
             {
                 "pre_built_context": {
                     "code": "600519",
-                    "name": "贵州茅台",
+                    "name": "貴州茅臺",
                     "news_context": "長" * 5000,
                 }
             }
@@ -169,11 +169,11 @@ class TestQAPrebuiltContext(unittest.TestCase):
             context={"stock_code": "600519", "report_type": "daily"},
         )
 
-        self.assertIn("股票代码: 600519", msg)
-        self.assertIn("报告类型: daily", msg)
-        self.assertIn("请使用可用工具获取缺失的数据", msg)
+        self.assertIn("股票程式碼: 600519", msg)
+        self.assertIn("報告型別: daily", msg)
+        self.assertIn("請使用可用工具獲取缺失的資料", msg)
         self.assertNotIn("prebuilt", msg)
-        self.assertNotIn("预构建分析结果", msg)
+        self.assertNotIn("預構建分析結果", msg)
 
     def test_qa_prebuilt_result_preserves_report_language_zh_TW(self):
         executor = AgentExecutor(ToolRegistry(), MagicMock(), max_steps=1)

@@ -1,11 +1,11 @@
 # ===================================
-# A股自选股智能分析系统 - Docker Compose
+# A股自選股智慧分析系統 - Docker Compose
 # ===================================
 # 
 # 使用方式:
-#   定时模式: docker-compose -f ./docker/docker-compose.yml up -d
+#   定時模式: docker-compose -f ./docker/docker-compose.yml up -d
 #   FastAPI模式: docker-compose -f ./docker/docker-compose.yml up -d server
-#   同时启动: docker-compose -f ./docker/docker-compose.yml up -d analyzer server
+#   同時啟動: docker-compose -f ./docker/docker-compose.yml up -d analyzer server
 
 name: daily-stock-analysis
 version: '3.8'
@@ -16,8 +16,8 @@ x-common: &common
     dockerfile: docker/Dockerfile
   restart: unless-stopped
 
-  # 环境变量（从 .env 文件加载）。不要将 ../.env 作为单文件 volume 挂载到 /app/.env，
-  # 否则 Docker mount point 会阻止配置保存时的 os.replace 原子更新。
+  # 環境變數（從 .env 檔案載入）。不要將 ../.env 作為單檔案 volume 掛載到 /app/.env，
+  # 否則 Docker mount point 會阻止配置儲存時的 os.replace 原子更新。
   env_file:
     - ../.env
 
@@ -29,7 +29,7 @@ x-common: &common
     # Longbridge OAuth token cache persistence; entrypoint repairs container-side ownership for dsa user.
     # Create ../longbridge_tokens on the host before copying an authorized token cache into it.
     - ../longbridge_tokens:/home/dsa/.longbridge
-    # 如需覆盖前端静态资源，可挂载本地 static 目录
+    # 如需覆蓋前端靜態資源，可掛載本地 static 目錄
     # - ../static:/app/static:ro
 
   environment:
@@ -38,9 +38,9 @@ x-common: &common
     # Local-safe server profile binds API/WebUI to loopback only.
     # Public container serving remains deferred for this profile.
     - WEBUI_HOST=127.0.0.1
-    # API_PORT 从 .env 文件读取，无需在此硬编码
+    # API_PORT 從 .env 檔案讀取，無需在此硬編碼
 
-    # 代理设置（如果需要）
+    # 代理設定（如果需要）
     # - http_proxy=http://host.docker.internal:10809
     # - https_proxy=http://host.docker.internal:10809
   logging:
@@ -48,7 +48,7 @@ x-common: &common
     options:
       max-size: "10m"
       max-file: "3"
-  # 资源限制
+  # 資源限制
   deploy:
     resources:
       limits:
@@ -57,7 +57,7 @@ x-common: &common
         memory: 256M
 
 services:
-  # 定时任务模式
+  # 定時任務模式
   analyzer:
     <<: *common
     container_name: stock-analyzer
@@ -67,6 +67,6 @@ services:
     <<: *common
     container_name: stock-server
     command: ["python", "main.py", "--serve-only", "--host", "127.0.0.1", "--port", "${API_PORT:-8000}"]
-    # 若使用 network_mode: host，则以下 ports 映射无效，端口由 command 中的 --port 指定
+    # 若使用 network_mode: host，則以下 ports 對映無效，埠由 command 中的 --port 指定
     ports:
       - "${API_PORT:-8000}:${API_PORT:-8000}"

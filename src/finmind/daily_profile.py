@@ -31,11 +31,11 @@ logger = logging.getLogger(__name__)
 _VALID_MODES = frozenset({"fixture", "no_network", "controlled_live", "production_live"})
 
 _CN_TERMS = frozenset({
-    "A股", "上證", "上证", "深證", "深证", "創業板", "创业板", "科創50", "科创50",
+    "A股", "上證", "上證", "深證", "深證", "創業板", "創業板", "科創50", "科創50",
 })
 
 _BUYSELL_TERMS = frozenset({
-    "買進", "賣出", "買入", "卖出", "推薦買", "推薦賣",
+    "買進", "賣出", "買進", "賣出", "推薦買", "推薦賣",
 })
 
 

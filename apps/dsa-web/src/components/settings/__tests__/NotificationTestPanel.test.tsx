@@ -46,8 +46,8 @@ describe('NotificationTestPanel', () => {
 
     expect(screen.getByRole('option', { name: 'ntfy' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Gotify' })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('渠道'), { target: { value: 'custom' } });
-    fireEvent.click(screen.getByRole('button', { name: /发送测试/ }));
+    fireEvent.change(screen.getByLabelText('通道'), { target: { value: 'custom' } });
+    fireEvent.click(screen.getByRole('button', { name: /傳送測試/ }));
 
     await waitFor(() => expect(testNotificationChannel).toHaveBeenCalledWith(expect.objectContaining({
       channel: 'custom',
@@ -55,7 +55,7 @@ describe('NotificationTestPanel', () => {
       maskToken: '******',
       timeoutSeconds: 20,
     })));
-    expect(await screen.findByText('测试成功')).toBeInTheDocument();
+    expect(await screen.findByText('測試成功')).toBeInTheDocument();
     expect(screen.getByText('HTTP 200')).toBeInTheDocument();
     expect(screen.getByText('https://example.com/hook?token=***')).toBeInTheDocument();
   });
@@ -63,7 +63,7 @@ describe('NotificationTestPanel', () => {
   it('renders custom webhook partial failure attempts', async () => {
     testNotificationChannel.mockResolvedValueOnce({
       success: true,
-      message: '自定义 Webhook 通知测试部分成功（1/2）',
+      message: '自定義 Webhook 通知測試部分成功（1/2）',
       errorCode: null,
       stage: 'notification_send',
       retryable: true,
@@ -101,10 +101,10 @@ describe('NotificationTestPanel', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('渠道'), { target: { value: 'custom' } });
-    fireEvent.click(screen.getByRole('button', { name: /发送测试/ }));
+    fireEvent.change(screen.getByLabelText('通道'), { target: { value: 'custom' } });
+    fireEvent.click(screen.getByRole('button', { name: /傳送測試/ }));
 
-    expect(await screen.findByText('测试成功')).toBeInTheDocument();
+    expect(await screen.findByText('測試成功')).toBeInTheDocument();
     expect(screen.getByText(/部分成功/)).toBeInTheDocument();
     expect(screen.getAllByText('HTTP 500').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('HTTP 200')).toBeInTheDocument();
@@ -115,7 +115,7 @@ describe('NotificationTestPanel', () => {
   it('renders retryable timeout diagnostics', async () => {
     testNotificationChannel.mockResolvedValueOnce({
       success: false,
-      message: '通知测试异常: timeout',
+      message: '通知測試異常: timeout',
       errorCode: 'timeout',
       stage: 'notification_send',
       retryable: true,
@@ -142,9 +142,9 @@ describe('NotificationTestPanel', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /发送测试/ }));
+    fireEvent.click(screen.getByRole('button', { name: /傳送測試/ }));
 
-    expect(await screen.findByText('测试失败')).toBeInTheDocument();
+    expect(await screen.findByText('測試失敗')).toBeInTheDocument();
     const timeoutEntries = screen.getAllByText('timeout');
     expect(timeoutEntries[0]).toBeInTheDocument();
     expect(screen.getByText('https://qyapi.example.com/cgi-bin/webhook/send?key=***')).toBeInTheDocument();

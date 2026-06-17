@@ -83,7 +83,7 @@ function renderFieldControl(
           onChange={onChange}
           options={normalizeSelectOptions(item.key, schema.options)}
           disabled={disabled || !schema.isEditable}
-          placeholder="请选择"
+          placeholder="請選擇"
         />
       );
   }
@@ -99,7 +99,7 @@ function renderFieldControl(
           disabled={disabled || !schema?.isEditable}
           onChange={(event) => onChange(event.target.checked ? 'true' : 'false')}
         />
-        <span className="text-sm text-secondary-text">{checked ? '已启用' : '未启用'}</span>
+        <span className="text-sm text-secondary-text">{checked ? '已啟用' : '未啟用'}</span>
       </label>
     );
   }
@@ -142,7 +142,7 @@ function renderFieldControl(
                   onChange(serializeMultiValues(nextValues.length ? nextValues : ['']));
                 }}
               >
-                删除
+                刪除
               </Button>
             </div>
           ))}
@@ -156,7 +156,7 @@ function renderFieldControl(
               disabled={disabled || !schema?.isEditable}
               onClick={() => onChange(serializeMultiValues([...values, '']))}
             >
-              添加 Key
+              新增 Key
             </Button>
           </div>
         </div>
@@ -232,7 +232,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
         ) : null}
         {!schema?.isEditable ? (
           <Badge variant="default" size="sm">
-            只读
+            只讀
           </Badge>
         ) : null}
       </div>
@@ -257,8 +257,8 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
 
       {schema?.isSensitive ? (
         <p className="mt-3 text-[11px] leading-5 text-secondary-text">
-          敏感内容默认隐藏，可点击眼睛图标查看明文。
-          {isMultiValue ? ' 支持添加多个输入框进行增删。' : ''}
+          敏感內容預設隱藏，可點選眼睛圖示檢視明文。
+          {isMultiValue ? ' 支援新增多個輸入框進行增刪。' : ''}
         </p>
       ) : null}
 

@@ -63,8 +63,8 @@ _MARKET_ROLES = {
 _MARKET_GUIDELINES = {
     "cn": {
         "zh": (
-            "- 本次分析对象为 **A 股**（中国沪深交易所上市股票）。\n"
-            "- 请关注 A 股特有的涨跌停机制（±10%/±20%/±30%）、T+1 交易制度及相关政策因素。"
+            "- 本次分析物件為 **A 股**（中國滬深交易所上市股票）。\n"
+            "- 請關注 A 股特有的漲跌停機制（±10%/±20%/±30%）、T+1 交易制度及相關政策因素。"
         ),
         "en": (
             "- This analysis covers a **China A-share** (listed on Shanghai/Shenzhen exchanges).\n"
@@ -73,8 +73,8 @@ _MARKET_GUIDELINES = {
     },
     "hk": {
         "zh": (
-            "- 本次分析对象为 **港股**（香港交易所上市股票）。\n"
-            "- 港股无涨跌停限制，支持 T+0 交易，需关注港币汇率、南北向资金流及联交所特有规则。"
+            "- 本次分析物件為 **港股**（香港交易所上市股票）。\n"
+            "- 港股無漲跌停限制，支援 T+0 交易，需關注港幣匯率、南北向資金流及聯交所特有規則。"
         ),
         "en": (
             "- This analysis covers a **Hong Kong stock** (listed on HKEX).\n"
@@ -83,8 +83,8 @@ _MARKET_GUIDELINES = {
     },
     "us": {
         "zh": (
-            "- 本次分析对象为 **美股**（美国交易所上市股票）。\n"
-            "- 美股无涨跌停限制（但有熔断机制），支持 T+0 交易和盘前盘后交易，需关注美元汇率、美联储政策及 SEC 监管动态。"
+            "- 本次分析物件為 **美股**（美國交易所上市股票）。\n"
+            "- 美股無漲跌停限制（但有熔斷機制），支援 T+0 交易和盤前盤後交易，需關注美元匯率、美聯儲政策及 SEC 監管動態。"
         ),
         "en": (
             "- This analysis covers a **US stock** (listed on NYSE/NASDAQ).\n"
@@ -102,7 +102,7 @@ def get_market_role(stock_code: Optional[str], lang: str = "zh") -> str:
         lang: 'zh' or 'en'.
 
     Returns:
-        Role string like 'A 股投资分析' or 'US stock investment analysis'.
+        Role string like 'A 股投資分析' or 'US stock investment analysis'.
     """
     market = detect_market(stock_code)
     lang_key = "en" if lang == "en" else "zh"

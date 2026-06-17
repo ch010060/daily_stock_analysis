@@ -1,21 +1,21 @@
-# 运行诊断与数据可靠性 1.0（Phase 1）
+# 執行診斷與資料可靠性 1.0（Phase 1）
 
-本文档记录 #1391 Phase 1 的最小运行时落地范围：统一 `trace_id`，并为首批关键数据链路记录结构化 provider 尝试。
+本文件記錄 #1391 Phase 1 的最小執行時落地範圍：統一 `trace_id`，併為首批關鍵資料鏈路記錄結構化 provider 嘗試。
 
-## 本轮范围
+## 本輪範圍
 
-- API / Web 异步任务创建时，`TaskInfo` 使用 `task_id` 作为默认 `trace_id`。
-- 任务列表、任务状态与 SSE 事件追加 `trace_id` 字段；旧客户端可忽略该字段。
-- 同步分析使用本次 `query_id` 作为默认 `trace_id`。
-- pipeline 运行时建立轻量诊断上下文，贯穿日线准备与单股分析。
-- `data_provider/base.py` 对以下链路记录 `ProviderRun` 风格事件：
+- API / Web 非同步任務建立時，`TaskInfo` 使用 `task_id` 作為預設 `trace_id`。
+- 任務列表、任務狀態與 SSE 事件追加 `trace_id` 欄位；舊客戶端可忽略該欄位。
+- 同步分析使用本次 `query_id` 作為預設 `trace_id`。
+- pipeline 執行時建立輕量診斷上下文，貫穿日線準備與單股分析。
+- `data_provider/base.py` 對以下鏈路記錄 `ProviderRun` 風格事件：
   - `daily_data`
   - `realtime_quote`
-- 诊断记录写入内存上下文，随分析 `context_snapshot.diagnostics` 保存；旧历史记录缺少该字段时保持兼容。
+- 診斷記錄寫入記憶體上下文，隨分析 `context_snapshot.diagnostics` 儲存；舊歷史記錄缺少該欄位時保持相容。
 
-## `ProviderRun` 字段
+## `ProviderRun` 欄位
 
-首版字段保持最小：
+首版欄位保持最小：
 
 - `trace_id`
 - `data_type`
@@ -29,15 +29,15 @@
 - `record_count`
 - `created_at`
 
-错误摘要会做基础脱敏，避免输出 token、API key、Authorization、Cookie、包含敏感参数的 webhook URL 等内容。
+錯誤摘要會做基礎脫敏，避免輸出 token、API key、Authorization、Cookie、包含敏感引數的 webhook URL 等內容。
 
-## 稳定性边界
+## 穩定性邊界
 
-- 诊断记录失败只记录 warning，不影响主分析、数据源 fallback 或历史保存。
-- 本轮不新增配置项，不改变数据源优先级，不改变 fallback 策略。
-- 本轮不新增 Web 展示组件；`trace_id` 和 provider runs 先进入 API/SSE/历史快照，供后续 Phase 2/3 聚合与展示复用。
+- 診斷記錄失敗只記錄 warning，不影響主分析、資料來源 fallback 或歷史儲存。
+- 本輪不新增配置項，不改變資料來源優先順序，不改變 fallback 策略。
+- 本輪不新增 Web 展示元件；`trace_id` 和 provider runs 先進入 API/SSE/歷史快照，供後續 Phase 2/3 聚合與展示覆用。
 
-## 验证建议
+## 驗證建議
 
 ```bash
 python -m pytest tests/test_run_diagnostics_p1.py tests/test_analysis_api_contract.py::AnalysisApiContractTestCase::test_get_analysis_status_normalizes_completed_queue_result_contract

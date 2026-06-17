@@ -1,24 +1,24 @@
-# 交易策略目录 / Trading Strategies
+# 交易策略目錄 / Trading Strategies
 
-本目录存放 **自然语言交易策略文件**（YAML 格式）。系统启动时自动加载此目录下所有 `.yaml` 文件。
+本目錄存放 **自然語言交易策略檔案**（YAML 格式）。系統啟動時自動載入此目錄下所有 `.yaml` 檔案。
 
-对用户和文档，我们继续把这些能力称为“策略”；在代码、配置和 API 字段里，它们统一命名为 `skill`，你可以把它理解为“可复用的策略能力包”。
+對使用者和文件，我們繼續把這些能力稱為“策略”；在程式碼、配置和 API 欄位裡，它們統一命名為 `skill`，你可以把它理解為“可複用的策略能力包”。
 
-## 如何编写自定义策略（Strategy Skill）
+## 如何編寫自定義策略（Strategy Skill）
 
-只需创建一个 `.yaml` 文件，用中文（或任意语言）描述你的交易策略即可，**无需编写任何代码**。
+只需建立一個 `.yaml` 檔案，用中文（或任意語言）描述你的交易策略即可，**無需編寫任何程式碼**。
 
-### 最简模板
+### 最簡模板
 
 ```yaml
-name: my_strategy          # 唯一标识（英文，下划线连接）
-display_name: 我的策略      # 显示名称（中文）
-description: 简短描述策略用途
+name: my_strategy          # 唯一標識（英文，下劃線連線）
+display_name: 我的策略      # 顯示名稱（中文）
+description: 簡短描述策略用途
 
 instructions: |
   你的策略描述...
-  用自然语言写出判断标准、入场条件、出场条件等。
-  可以引用工具名称（如 get_daily_history、analyze_trend）来指导 AI 使用哪些数据。
+  用自然語言寫出判斷標準、入場條件、出場條件等。
+  可以引用工具名稱（如 get_daily_history、analyze_trend）來指導 AI 使用哪些資料。
 ```
 
 ### 完整模板
@@ -26,72 +26,72 @@ instructions: |
 ```yaml
 name: my_strategy
 display_name: 我的策略
-description: 简短描述策略适用的市场场景
+description: 簡短描述策略適用的市場場景
 
-# 策略分类：trend（趋势）、pattern（形态）、reversal（反转）、framework（框架）
+# 策略分類：trend（趨勢）、pattern（形態）、reversal（反轉）、framework（框架）
 category: trend
 
-# 关联的核心交易理念编号（1-7），可选
+# 關聯的核心交易理念編號（1-7），可選
 core_rules: [1, 2]
 
-# 策略需要使用的工具列表，可选
+# 策略需要使用的工具列表，可選
 # 可用工具：get_daily_history, analyze_trend, get_realtime_quote,
 #           get_sector_rankings, search_stock_news, get_stock_info
 required_tools:
   - get_daily_history
   - analyze_trend
 
-# 可选别名（用于 /ask 等自然语言技能选择）
-aliases: [我的战法, 我的模型]
+# 可選別名（用於 /ask 等自然語言技能選擇）
+aliases: [我的戰法, 我的模型]
 
-# 以下元数据用于驱动默认行为（可选）
-# default_active: 是否属于默认激活技能集
-# default_router: 是否属于路由 fallback 技能集
-# default_priority: 默认展示/排序优先级，数值越小越靠前
-# market_regimes: 该技能优先适配的市场状态标签
+# 以下後設資料用於驅動預設行為（可選）
+# default_active: 是否屬於預設啟用技能集
+# default_router: 是否屬於路由 fallback 技能集
+# default_priority: 預設展示/排序優先順序，數值越小越靠前
+# market_regimes: 該技能優先適配的市場狀態標籤
 default_active: true
 default_router: false
 default_priority: 100
 market_regimes: [trending_up]
 
-# 策略详细说明（自然语言，支持 Markdown 格式）
+# 策略詳細說明（自然語言，支援 Markdown 格式）
 instructions: |
-  **我的策略名称**
+  **我的策略名稱**
 
-  判断标准：
+  判斷標準：
 
-  1. **条件一**：
-     - 使用 `analyze_trend` 检查均线排列。
-     - 描述你期望看到的趋势特征...
+  1. **條件一**：
+     - 使用 `analyze_trend` 檢查均線排列。
+     - 描述你期望看到的趨勢特徵...
 
-  2. **条件二**：
+  2. **條件二**：
      - 描述量能要求...
 
-  评分调整：
-  - 满足条件时建议的 sentiment_score 调整
-  - 在 `buy_reason` 中注明策略名称
+  評分調整：
+  - 滿足條件時建議的 sentiment_score 調整
+  - 在 `buy_reason` 中註明策略名稱
 ```
 
-### 核心交易理念参考
+### 核心交易理念參考
 
-| 编号 | 理念 |
+| 編號 | 理念 |
 |------|------|
-| 1 | 严进策略：乖离率 < 5% 才考虑入场 |
-| 2 | 趋势交易：MA5 > MA10 > MA20 多头排列 |
-| 3 | 效率优先：量能确认趋势有效性 |
-| 4 | 买点偏好：优先回踩均线支撑 |
-| 5 | 风险排查：利空新闻一票否决 |
-| 6 | 量价配合：成交量验证价格运动 |
-| 7 | 强势趋势股放宽：龙头股可适当放宽标准 |
+| 1 | 嚴進策略：乖離率 < 5% 才考慮入場 |
+| 2 | 趨勢交易：MA5 > MA10 > MA20 多頭排列 |
+| 3 | 效率優先：量能確認趨勢有效性 |
+| 4 | 買點偏好：優先回踩均線支撐 |
+| 5 | 風險排查：利空新聞一票否決 |
+| 6 | 量價配合：成交量驗證價格運動 |
+| 7 | 強勢趨勢股放寬：龍頭股可適當放寬標準 |
 
-## 自定义策略目录
+## 自定義策略目錄
 
-除了本目录（内置策略），你还可以通过环境变量指定额外的自定义策略目录：
+除了本目錄（內建策略），你還可以透過環境變數指定額外的自定義策略目錄：
 
 ```env
 AGENT_SKILL_DIR=./my_skills
 ```
 
-系统会同时加载内置策略和自定义策略。如果名称冲突，自定义策略覆盖内置策略。
+系統會同時載入內建策略和自定義策略。如果名稱衝突，自定義策略覆蓋內建策略。
 
-环境变量名仍然是 `AGENT_SKILL_DIR`，这是内部统一命名后的配置入口；在产品语义上，它依然表示“自定义策略目录”。
+環境變數名仍然是 `AGENT_SKILL_DIR`，這是內部統一命名後的配置入口；在產品語義上，它依然表示“自定義策略目錄”。

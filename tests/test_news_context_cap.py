@@ -25,7 +25,7 @@ def _analysis_result() -> AnalysisResult:
         code="AAPL",
         name="Apple",
         sentiment_score=62,
-        trend_prediction="震荡",
+        trend_prediction="震盪",
         operation_advice="持有",
         decision_type="hold",
     )

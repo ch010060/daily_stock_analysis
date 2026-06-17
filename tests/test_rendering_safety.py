@@ -66,7 +66,7 @@ def _make_result() -> AnalysisResult:
     payload = _unsafe_text("Route B narrative")
     return AnalysisResult(
         code="TW:2330",
-        name="台積電",
+        name="臺積電",
         sentiment_score=72,
         trend_prediction="看多",
         operation_advice="持有",

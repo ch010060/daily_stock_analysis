@@ -375,7 +375,7 @@ class TestSafetyAndCorrectness(unittest.TestCase):
     def test_no_cn_a_share_terms_in_result(self):
         result = _make_engine().run(_default_config(strategy_name="buy_and_hold"))
         result_str = str(result)
-        cn_terms = ["A股", "上證", "上证", "深證", "深证", "創業板", "创业板"]
+        cn_terms = ["A股", "上證", "上證", "深證", "深證", "創業板", "創業板"]
         found = [t for t in cn_terms if t in result_str]
         self.assertEqual(found, [], f"CN/A-share terms found: {found}")
 

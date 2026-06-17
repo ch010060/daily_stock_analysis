@@ -4,9 +4,9 @@
 API v1 路由聚合
 ===================================
 
-职责：
+職責：
 1. 聚合 v1 版本的所有 endpoint 路由
-2. 统一添加 /api/v1 前缀
+2. 統一新增 /api/v1 字首
 """
 
 import os
@@ -37,7 +37,7 @@ def _env_bool(name: str, *, default: bool = False) -> bool:
 def _alphasift_route_enabled() -> bool:
     return _env_bool("ALPHASIFT_ROUTE_ENABLED", default=False)
 
-# 创建 v1 版本主路由
+# 建立 v1 版本主路由
 router = APIRouter(prefix="/api/v1")
 
 router.include_router(

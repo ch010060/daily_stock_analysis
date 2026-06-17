@@ -143,7 +143,7 @@ export const alphasiftApi = {
         await alphasiftApi.install();
         const installedStatus = await alphasiftApi.getStatus();
         if (!installedStatus.available) {
-          throw new Error('AlphaSift 自动安装完成，但适配层仍不可用。请检查后端 Python 环境和 AlphaSift 安装状态后重试。');
+          throw new Error('AlphaSift 自動安裝完成，但適配層仍不可用。請檢查後端 Python 環境和 AlphaSift 安裝狀態後重試。');
         }
       }
     } catch (error) {

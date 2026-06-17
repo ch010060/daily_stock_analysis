@@ -1,180 +1,180 @@
-# Tushare 股票列表获取工具使用说明
+# Tushare 股票列表獲取工具使用說明
 
 ## 功能概述
 
-从 Tushare Pro 获取 A股、港股、美股列表信息，保存为 CSV 文件到本地。
+從 Tushare Pro 獲取 A股、港股、美股列表資訊，儲存為 CSV 檔案到本地。
 
-## 快速开始
+## 快速開始
 
 ### 1. 配置 Token
 
-在项目根目录的 `.env` 文件中添加 Tushare Token：
+在專案根目錄的 `.env` 檔案中新增 Tushare Token：
 
 ```bash
 TUSHARE_TOKEN=你的tushare_token
 ```
 
-> 获取 Token：访问 [Tushare Pro](https://tushare.pro/weborder/#/login) 注册并获取
+> 獲取 Token：訪問 [Tushare Pro](https://tushare.pro/weborder/#/login) 註冊並獲取
 
-### 2. 运行脚本
+### 2. 執行指令碼
 
 ```bash
 python3 scripts/fetch_tushare_stock_list.py
 ```
 
-如需针对 A 股名称状态做修正，可以加上 `--a-rk`，脚本会保持 `stock_basic` 作为基础来源，再用 `rt_k` 对带 `XD`、`XR`、`DR`、`N`、`C` 前缀的名称进行回填，并覆盖输出到 `data/stock_list_a.csv`：
+如需針對 A 股名稱狀態做修正，可以加上 `--a-rk`，指令碼會保持 `stock_basic` 作為基礎來源，再用 `rt_k` 對帶 `XD`、`XR`、`DR`、`N`、`C` 字首的名稱進行回填，並覆蓋輸出到 `data/stock_list_a.csv`：
 
 ```bash
 python3 scripts/fetch_tushare_stock_list.py --a-rk
 ```
 
-### 3. 查看输出
+### 3. 檢視輸出
 
-数据将保存到 `data/` 目录：
+資料將儲存到 `data/` 目錄：
 
 ```
 data/
-├── stock_list_a.csv       # A股列表（--a-rk 时为修正后名称）
+├── stock_list_a.csv       # A股列表（--a-rk 時為修正後名稱）
 ├── stock_list_hk.csv      # 港股列表
 ├── stock_list_us.csv      # 美股列表
-└── README_stock_list.md   # 数据说明文档
+└── README_stock_list.md   # 資料說明文件
 ```
 
 ## 功能特性
 
-✅ **自动分页**：美股数据自动分页读取（每页5000条）
-✅ **智能限流**：每次请求之间随机休息5-10秒
-✅ **错误处理**：单个市场失败不影响其他市场
-✅ **进度提示**：实时显示读取进度
-✅ **自动文档**：生成详细的数据说明文档
+✅ **自動分頁**：美股資料自動分頁讀取（每頁5000條）
+✅ **智慧限流**：每次請求之間隨機休息5-10秒
+✅ **錯誤處理**：單個市場失敗不影響其他市場
+✅ **進度提示**：實時顯示讀取進度
+✅ **自動文件**：生成詳細的資料說明文件
 
-## 市场说明
+## 市場說明
 
-| 市场 | 接口 | 积分要求 | 数据量 |
+| 市場 | 介面 | 積分要求 | 資料量 |
 |------|------|----------|--------|
-| A股 | stock_basic | 2000积分 | ~5000只 |
-| 港股 | hk_basic | 2000积分 | ~2000只 |
-| 美股 | us_basic | 120试用/5000正式 | ~10000只 |
+| A股 | stock_basic | 2000積分 | ~5000只 |
+| 港股 | hk_basic | 2000積分 | ~2000只 |
+| 美股 | us_basic | 120試用/5000正式 | ~10000只 |
 
-## 输出文件格式
+## 輸出檔案格式
 
 ### A股（stock_list_a.csv）
 
-执行 `--a-rk` 时，这个文件会写入修正后的 A 股名称。
+執行 `--a-rk` 時，這個檔案會寫入修正後的 A 股名稱。
 
 ```csv
 ts_code,symbol,name,area,industry,market,exchange,list_date,...
-000001.SZ,000001,平安银行,深圳,银行,主板,SZSE,19910403,...
-600519.SH,600519,贵州茅台,贵州,白酒,主板,SSE,20010827,...
+000001.SZ,000001,平安銀行,深圳,銀行,主機板,SZSE,19910403,...
+600519.SH,600519,貴州茅臺,貴州,白酒,主機板,SSE,20010827,...
 ```
 
 ### 港股（stock_list_hk.csv）
 
 ```csv
 ts_code,name,fullname,market,list_date,trade_unit,curr_type,...
-00700.HK,腾讯控股,腾讯控股有限公司,主板,20040616,100,HKD,...
-00005.HK,汇丰控股,汇丰控股有限公司,主板,19750401,100,HKD,...
+00700.HK,騰訊控股,騰訊控股有限公司,主機板,20040616,100,HKD,...
+00005.HK,滙豐控股,滙豐控股有限公司,主機板,19750401,100,HKD,...
 ```
 
 ### 美股（stock_list_us.csv）
 
 ```csv
 ts_code,name,enname,classify,list_date,...
-AAPL,苹果,Apple Inc.,EQT,19801212,...
+AAPL,蘋果,Apple Inc.,EQT,19801212,...
 TSLA,特斯拉,Tesla Inc.,EQT,20100629,...
 BABA,阿里巴巴,Alibaba Group,ADR,20140919,...
 ```
 
 ## 使用示例
 
-### Python 读取数据
+### Python 讀取資料
 
 ```python
 import pandas as pd
 
-# 读取 A股
+# 讀取 A股
 a_stocks = pd.read_csv('data/stock_list_a.csv')
-print(f"A股数量: {len(a_stocks)}")
+print(f"A股數量: {len(a_stocks)}")
 
-# 筛选主板股票
-main_board = a_stocks[a_stocks['market'] == '主板']
-print(f"主板数量: {len(main_board)}")
+# 篩選主機板股票
+main_board = a_stocks[a_stocks['market'] == '主機板']
+print(f"主機板數量: {len(main_board)}")
 
-# 查找特定股票
+# 查詢特定股票
 stock = a_stocks[a_stocks['ts_code'] == '600519.SH']
 print(stock[['name', 'industry', 'list_date']])
 ```
 
-### 刷新股票自动补全索引
+### 重新整理股票自動補全索引
 
-推荐直接使用一键刷新脚本，它会默认在抓取 A 股时使用 `--a-rk`，然后生成并同步自动补全索引：
+推薦直接使用一鍵重新整理指令碼，它會預設在抓取 A 股時使用 `--a-rk`，然後生成並同步自動補全索引：
 
 ```bash
 pip install -r requirements.txt
 python3 scripts/refresh_stock_index.py
 ```
 
-生成自动补全索引依赖 `pypinyin` 写入中文股票的完整拼音和拼音首字母字段；缺少该依赖时脚本会直接失败，避免生成无法支持拼音搜索的降级索引。
+生成自動補全索引依賴 `pypinyin` 寫入中文股票的完整拼音和拼音首字母欄位；缺少該依賴時指令碼會直接失敗，避免生成無法支援拼音搜尋的降級索引。
 
-如果你只想单独更新 CSV，可以先抓取数据：
+如果你只想單獨更新 CSV，可以先抓取資料：
 
 ```bash
 python3 scripts/fetch_tushare_stock_list.py --a-rk
 ```
 
-如果已经有新的 CSV，只想重新生成索引：
+如果已經有新的 CSV，只想重新生成索引：
 
 ```bash
-python3 scripts/generate_index_from_csv.py --test  # 先测试
-python3 scripts/generate_index_from_csv.py         # 确认后生成
+python3 scripts/generate_index_from_csv.py --test  # 先測試
+python3 scripts/generate_index_from_csv.py         # 確認後生成
 ```
 
-### 本地客户端自动获取最新索引
+### 本地客戶端自動獲取最新索引
 
-新版客户端默认会从项目 GitHub `main` 分支读取最新的 `apps/dsa-web/public/stocks.index.json`，并缓存到本地 `data/cache/stocks.index.json`。前端仍访问本地 `/stocks.index.json`，不需要直接跨域请求 GitHub。
+新版客戶端預設會從專案 GitHub `main` 分支讀取最新的 `apps/dsa-web/public/stocks.index.json`，並快取到本地 `data/cache/stocks.index.json`。前端仍訪問本地 `/stocks.index.json`，不需要直接跨域請求 GitHub。
 
-远程索引地址、检查频率和网络超时时间为系统内置值，不提供用户配置项；用户只需要决定是否启用：
+遠端索引地址、檢查頻率和網路超時時間為系統內建值，不提供使用者配置項；使用者只需要決定是否啟用：
 
 ```bash
 STOCK_INDEX_REMOTE_UPDATE_ENABLED=true
 ```
 
-默认开启时，系统最多每 48 小时检查一次更新。若运行环境无法访问 GitHub raw、请求超时、返回内容不是合法股票索引，应用会保留已有缓存；如果没有远程缓存，则继续使用随应用打包的内置索引。远程更新失败不会阻断 WebUI 启动、股票自动补全或分析流程；连续失败达到系统内置阈值后，会在本进程内暂停重试直到下一轮 48 小时窗口。
+預設開啟時，系統最多每 48 小時檢查一次更新。若執行環境無法訪問 GitHub raw、請求超時、返回內容不是合法股票索引，應用會保留已有快取；如果沒有遠端快取，則繼續使用隨應用打包的內建索引。遠端更新失敗不會阻斷 WebUI 啟動、股票自動補全或分析流程；連續失敗達到系統內建閾值後，會在本程序內暫停重試直到下一輪 48 小時視窗。
 
-## 注意事项
+## 注意事項
 
-1. **积分要求**：确保账号积分足够（A股/港股2000，美股120试用）
-2. **请求限制**：注意 API 的每分钟请求次数限制
-3. **数据更新**：维护者建议每三天刷新一次并提交到仓库；本地客户端默认最多每 48 小时检查一次 GitHub `main` 上的索引更新。后续可通过 GitHub Actions workflow 自动化刷新与提交 PR
-4. **网络连接**：需要稳定的网络连接
+1. **積分要求**：確保賬號積分足夠（A股/港股2000，美股120試用）
+2. **請求限制**：注意 API 的每分鐘請求次數限制
+3. **資料更新**：維護者建議每三天重新整理一次並提交到倉庫；本地客戶端預設最多每 48 小時檢查一次 GitHub `main` 上的索引更新。後續可透過 GitHub Actions workflow 自動化重新整理與提交 PR
+4. **網路連線**：需要穩定的網路連線
 
-## 常见问题
+## 常見問題
 
 ### Q: 提示"未找到 TUSHARE_TOKEN"？
-**A**: 请在 `.env` 文件中配置 `TUSHARE_TOKEN=你的token`
+**A**: 請在 `.env` 檔案中配置 `TUSHARE_TOKEN=你的token`
 
-### Q: 提示"账号积分不足"？
+### Q: 提示"賬號積分不足"？
 **A**:
-- A股/港股需要2000积分
-- 美股120积分试用，5000积分正式权限
-- 访问 https://tushare.pro 查看积分获取办法
+- A股/港股需要2000積分
+- 美股120積分試用，5000積分正式許可權
+- 訪問 https://tushare.pro 檢視積分獲取辦法
 
-### Q: 读取失败怎么办？
+### Q: 讀取失敗怎麼辦？
 **A**:
-1. 检查网络连接
-2. 检查 Token 是否正确
-3. 查看账号积分是否足够
-4. 当前脚本不会自动重试；单次请求失败后会输出错误并结束，请排查原因后重新运行
+1. 檢查網路連線
+2. 檢查 Token 是否正確
+3. 檢視賬號積分是否足夠
+4. 當前指令碼不會自動重試；單次請求失敗後會輸出錯誤並結束，請排查原因後重新執行
 
-### Q: 数据更新频率？
-**A**: 对维护者本地 CSV 与仓库索引，建议每三天更新一次并提交到仓库；遇到摘帽/更名等高影响事件可临时刷新。未来可通过 GitHub Actions workflow 自动化刷新与提交 PR。对普通本地客户端，系统默认最多每 48 小时从 GitHub `main` 检查一次最新索引。
+### Q: 資料更新頻率？
+**A**: 對維護者本地 CSV 與倉庫索引，建議每三天更新一次並提交到倉庫；遇到摘帽/更名等高影響事件可臨時重新整理。未來可透過 GitHub Actions workflow 自動化重新整理與提交 PR。對普通本地客戶端，系統預設最多每 48 小時從 GitHub `main` 檢查一次最新索引。
 
-### Q: 无法访问 GitHub raw 会影响使用吗？
-**A**: 不会。远程索引更新是 best-effort：失败时会继续使用已有远程缓存或随应用打包的内置索引；如果索引完全不可用，Web 自动补全会进入现有 fallback，股票代码仍可手动输入。
+### Q: 無法訪問 GitHub raw 會影響使用嗎？
+**A**: 不會。遠端索引更新是 best-effort：失敗時會繼續使用已有遠端快取或隨應用打包的內建索引；如果索引完全不可用，Web 自動補全會進入現有 fallback，股票程式碼仍可手動輸入。
 
-## 相关链接
+## 相關連結
 
-- [Tushare 官网](https://tushare.pro)
-- [Tushare 文档](https://tushare.pro/document/2)
-- [积分获取办法](https://tushare.pro/document/1)
-- [API 数据调试](https://tushare.pro/document/2)
+- [Tushare 官網](https://tushare.pro)
+- [Tushare 文件](https://tushare.pro/document/2)
+- [積分獲取辦法](https://tushare.pro/document/1)
+- [API 資料除錯](https://tushare.pro/document/2)

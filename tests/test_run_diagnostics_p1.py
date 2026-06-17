@@ -66,7 +66,7 @@ class _SuccessfulDailyFetcher(BaseFetcher):
 
 
 class _Quote:
-    name = "贵州茅台"
+    name = "貴州茅臺"
     price = 100
     change_pct = 1.2
     volume_ratio = 1.1

@@ -124,12 +124,12 @@ describe('systemConfigApi', () => {
         checks: [
           {
             key: 'llm_primary',
-            title: 'LLM 主渠道',
+            title: 'LLM 主通道',
             category: 'ai_model',
             required: true,
             status: 'needs_action',
             message: '缺少主模型配置',
-            next_step: '打开系统设置',
+            next_step: '開啟系統設定',
           },
         ],
       },
@@ -140,6 +140,6 @@ describe('systemConfigApi', () => {
     expect(get).toHaveBeenCalledWith('/api/v1/system/config/setup/status');
     expect(result.isComplete).toBe(false);
     expect(result.nextStepKey).toBe('llm_primary');
-    expect(result.checks[0].nextStep).toBe('打开系统设置');
+    expect(result.checks[0].nextStep).toBe('開啟系統設定');
   });
 });
