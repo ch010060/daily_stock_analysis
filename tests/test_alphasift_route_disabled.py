@@ -54,6 +54,13 @@ class AlphaSiftRouteDisabledTestCase(unittest.TestCase):
 
         return collected
 
+    @staticmethod
+    def _router_paths(app) -> set[str]:
+        return {
+            r.path for r in app.router.routes
+            if hasattr(r, "path") and isinstance(r.path, str)
+        }
+
     def tearDown(self) -> None:
         os.environ.pop("ALPHASIFT_ROUTE_ENABLED", None)
         module = sys.modules.get("api.v1.router")
@@ -75,7 +82,7 @@ class AlphaSiftRouteDisabledTestCase(unittest.TestCase):
     def test_default_route_list_excludes_alphasift(self) -> None:
         app = self._app_with_route_flag(None)
 
-        paths = self._route_paths(app.routes)
+        paths = self._router_paths(app)
 
         self.assertFalse(
             any(path.startswith(ALPHASIFT_PREFIX) for path in paths),
@@ -148,7 +155,7 @@ class AlphaSiftRouteDisabledTestCase(unittest.TestCase):
     def test_explicit_route_flag_registers_alphasift_routes(self) -> None:
         app = self._app_with_route_flag("true")
 
-        paths = self._route_paths(app.routes)
+        paths = self._router_paths(app)
 
         self.assertIn(f"{ALPHASIFT_PREFIX}/status", paths)
         self.assertIn(f"{ALPHASIFT_PREFIX}/screen", paths)
