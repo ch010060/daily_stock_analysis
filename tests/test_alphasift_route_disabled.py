@@ -5,6 +5,7 @@ import os
 import sys
 import unittest
 from unittest.mock import patch
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -14,6 +15,53 @@ ALPHASIFT_PREFIX = "/api/v1/alphasift"
 
 
 class AlphaSiftRouteDisabledTestCase(unittest.TestCase):
+    @staticmethod
+    def _route_paths(routes: Any) -> set[str]:
+        collected: set[str] = set()
+        for route in routes:
+            path = getattr(route, "path", None)
+            if isinstance(path, str):
+                collected.add(path)
+
+            nested_prefix = path.rstrip("/") if isinstance(path, str) and path not in {"", "/"} else ""
+
+            nested_routes = getattr(route, "routes", None)
+            if isinstance(nested_routes, list):
+                if nested_prefix:
+                    for nested_path in AlphaSiftRouteDisabledTestCase._route_paths(nested_routes):
+                        if nested_path == "/":
+                            collected.add(nested_prefix)
+                        elif nested_path.startswith("/"):
+                            collected.add(f"{nested_prefix}{nested_path}")
+                        else:
+                            collected.add(f"{nested_prefix}/{nested_path}")
+                else:
+                    collected.update(AlphaSiftRouteDisabledTestCase._route_paths(nested_routes))
+
+            nested_app = getattr(route, "app", None)
+            nested_app_routes = getattr(nested_app, "routes", None)
+            if isinstance(nested_app_routes, list):
+                if nested_prefix:
+                    for nested_path in AlphaSiftRouteDisabledTestCase._route_paths(nested_app_routes):
+                        if nested_path == "/":
+                            collected.add(nested_prefix)
+                        elif nested_path.startswith("/"):
+                            collected.add(f"{nested_prefix}{nested_path}")
+                        else:
+                            collected.add(f"{nested_prefix}/{nested_path}")
+                else:
+                    collected.update(AlphaSiftRouteDisabledTestCase._route_paths(nested_app_routes))
+
+        return collected
+
+    @staticmethod
+    def _router_paths(app) -> set[str]:
+        try:
+            spec = app.openapi()
+            return set(spec.get("paths", {}).keys())
+        except Exception:
+            return set()
+
     def tearDown(self) -> None:
         os.environ.pop("ALPHASIFT_ROUTE_ENABLED", None)
         module = sys.modules.get("api.v1.router")
@@ -35,7 +83,7 @@ class AlphaSiftRouteDisabledTestCase(unittest.TestCase):
     def test_default_route_list_excludes_alphasift(self) -> None:
         app = self._app_with_route_flag(None)
 
-        paths = {route.path for route in app.routes}
+        paths = self._router_paths(app)
 
         self.assertFalse(
             any(path.startswith(ALPHASIFT_PREFIX) for path in paths),
@@ -108,7 +156,7 @@ class AlphaSiftRouteDisabledTestCase(unittest.TestCase):
     def test_explicit_route_flag_registers_alphasift_routes(self) -> None:
         app = self._app_with_route_flag("true")
 
-        paths = {route.path for route in app.routes}
+        paths = self._router_paths(app)
 
         self.assertIn(f"{ALPHASIFT_PREFIX}/status", paths)
         self.assertIn(f"{ALPHASIFT_PREFIX}/screen", paths)

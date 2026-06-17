@@ -3,6 +3,7 @@
 Regression tests for Tavily news-mode date mapping (Issue #782).
 """
 
+import os
 import sys
 import unittest
 from datetime import datetime, timezone
@@ -46,6 +47,19 @@ def _fake_tavily_module() -> ModuleType:
 
 class TestTavilySearchProvider(unittest.TestCase):
     """Tests for Tavily provider-specific request and mapping behavior."""
+
+    classlevel_env = patch.dict(
+        os.environ,
+        {"DSA_ALLOW_EXTERNAL_NETWORK": "true", "DSA_FIXTURE_MODE": "false"},
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        cls.classlevel_env.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.classlevel_env.stop()
 
     def _patch_tavily(self, payload):
         _FakeTavilyClient.reset()

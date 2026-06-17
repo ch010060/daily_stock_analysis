@@ -66,6 +66,15 @@ class _ThreadUnsafeStockListFetcher:
 
 
 class TestPrefetchStockNames(unittest.TestCase):
+    classlevel_env = patch.dict(os.environ, {"DSA_ALLOW_EXTERNAL_NETWORK": "true", "DSA_FIXTURE_MODE": "false"})
+
+    @classmethod
+    def setUpClass(cls):
+        cls.classlevel_env.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.classlevel_env.stop()
     def test_prefetch_stock_names_calls_get_stock_name_without_realtime(self):
         manager = DataFetcherManager.__new__(DataFetcherManager)
         manager.get_stock_name = MagicMock(return_value="")

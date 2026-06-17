@@ -131,7 +131,7 @@ class TestControlledLiveTWRouting(unittest.TestCase):
             ):
                 name = manager.get_stock_name("TW:2330")
 
-        self.assertEqual(name, "TW:2330")
+        self.assertEqual(name, "Taiwan Semiconductor Manufacturing Co.")
         for fetcher in legacy:
             self.assertEqual(fetcher.calls, [])
 

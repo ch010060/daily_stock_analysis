@@ -51,7 +51,8 @@ class TestIsCodeLike:
 
     def test_rejects_non_code(self):
         assert _is_code_like("贵州茅台") is False
-        assert _is_code_like("1234") is False  # too short
+        assert _is_code_like("1234") is True  # 4-digit: valid TW stock code
+        assert _is_code_like("123") is False  # 3-digit: too short
         assert _is_code_like("1234567") is False  # too long
         assert _is_code_like("") is False
         assert _is_code_like("   ") is False

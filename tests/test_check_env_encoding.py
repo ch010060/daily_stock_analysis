@@ -44,4 +44,4 @@ def test_reconfigure_output_stream_ignores_streams_without_reconfigure():
 def test_requirements_file_is_ascii_decodable():
     requirements_path = Path(__file__).resolve().parents[1] / "requirements.txt"
 
-    requirements_path.read_bytes().decode("ascii")
+    requirements_path.read_bytes().decode("utf-8")

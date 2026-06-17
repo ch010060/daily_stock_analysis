@@ -7,9 +7,49 @@ is mounted with a non-empty prefix (e.g. /history prefix + "" path).
 import importlib
 import sys
 import unittest
+from typing import Any
 
 
 class TestApiRouteRegistration(unittest.TestCase):
+    @staticmethod
+    def _route_paths(routes: Any) -> set[str]:
+        collected: set[str] = set()
+        for route in routes:
+            path = getattr(route, "path", None)
+            if isinstance(path, str):
+                collected.add(path)
+
+            nested_prefix = path.rstrip("/") if isinstance(path, str) and path not in {"", "/"} else ""
+
+            nested_routes = getattr(route, "routes", None)
+            if isinstance(nested_routes, list):
+                if nested_prefix:
+                    for nested_path in TestApiRouteRegistration._route_paths(nested_routes):
+                        if nested_path == "/":
+                            collected.add(nested_prefix)
+                        elif nested_path.startswith("/"):
+                            collected.add(f"{nested_prefix}{nested_path}")
+                        else:
+                            collected.add(f"{nested_prefix}/{nested_path}")
+                else:
+                    collected.update(TestApiRouteRegistration._route_paths(nested_routes))
+
+            nested_app = getattr(route, "app", None)
+            nested_app_routes = getattr(nested_app, "routes", None)
+            if isinstance(nested_app_routes, list):
+                if nested_prefix:
+                    for nested_path in TestApiRouteRegistration._route_paths(nested_app_routes):
+                        if nested_path == "/":
+                            collected.add(nested_prefix)
+                        elif nested_path.startswith("/"):
+                            collected.add(f"{nested_prefix}{nested_path}")
+                        else:
+                            collected.add(f"{nested_prefix}/{nested_path}")
+                else:
+                    collected.update(TestApiRouteRegistration._route_paths(nested_app_routes))
+
+        return collected
+
     def setUp(self):
         # Evict cached api modules so each test starts clean.
         for mod in list(sys.modules):
@@ -25,7 +65,10 @@ class TestApiRouteRegistration(unittest.TestCase):
     def test_history_list_route_registered_with_trailing_slash(self):
         from api.app import create_app
         app = create_app()
-        paths = {route.path for route in app.routes}
+        try:
+            paths = set(app.openapi().get("paths", {}).keys())
+        except Exception:
+            paths = set()
         self.assertIn("/api/v1/history/", paths,
                       "History list route /api/v1/history/ must be registered")
 

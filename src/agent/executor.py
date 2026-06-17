@@ -917,6 +917,7 @@ class AgentExecutor:
     def _build_user_message(self, task: str, context: Optional[Dict[str, Any]] = None) -> str:
         """Build the initial user message."""
         parts = [task]
+        prebuilt_context_summary = None
         if context:
             report_language = normalize_report_language(
                 context.get("report_language") or get_prebuilt_report_language(context) or "zh"
