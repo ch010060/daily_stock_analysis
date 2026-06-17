@@ -136,7 +136,7 @@ class TestTWMarketReviewRequiredKeywords(unittest.TestCase):
 
     def test_contains_2330_label(self):
         text = render_tw_market_review_text(self._snapshot)
-        self.assertIn("台積電", text)
+        self.assertIn("臺積電", text)
 
 
 class TestTWMarketReviewMissingData(unittest.TestCase):
