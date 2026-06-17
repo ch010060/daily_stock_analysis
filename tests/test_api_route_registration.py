@@ -65,7 +65,10 @@ class TestApiRouteRegistration(unittest.TestCase):
     def test_history_list_route_registered_with_trailing_slash(self):
         from api.app import create_app
         app = create_app()
-        paths = {r.path for r in app.router.routes if hasattr(r, "path")}
+        try:
+            paths = set(app.openapi().get("paths", {}).keys())
+        except Exception:
+            paths = set()
         self.assertIn("/api/v1/history/", paths,
                       "History list route /api/v1/history/ must be registered")
 

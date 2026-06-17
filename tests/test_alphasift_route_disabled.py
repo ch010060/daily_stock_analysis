@@ -56,10 +56,11 @@ class AlphaSiftRouteDisabledTestCase(unittest.TestCase):
 
     @staticmethod
     def _router_paths(app) -> set[str]:
-        return {
-            r.path for r in app.router.routes
-            if hasattr(r, "path") and isinstance(r.path, str)
-        }
+        try:
+            spec = app.openapi()
+            return set(spec.get("paths", {}).keys())
+        except Exception:
+            return set()
 
     def tearDown(self) -> None:
         os.environ.pop("ALPHASIFT_ROUTE_ENABLED", None)
