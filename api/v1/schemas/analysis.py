@@ -263,6 +263,8 @@ class TaskStatus(BaseModel):
         ge=0,
         le=100
     )
+    stage: Optional[str] = Field(None, description="当前分析阶段")
+    stage_label: Optional[str] = Field(None, description="当前阶段显示文本")
     result: Optional[AnalysisResultResponse] = Field(
         None, 
         description="分析结果（仅在 completed 时存在）"

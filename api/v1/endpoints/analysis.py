@@ -884,6 +884,8 @@ def get_analysis_status(task_id: str) -> TaskStatus:
             trace_id=_get_task_trace_id(task),
             status=task.status.value,
             progress=task.progress,
+            stage=getattr(task, "stage", None),
+            stage_label=getattr(task, "stage_label", None),
             result=result,
             market_review_report=market_review_report,
             error=task.error,
