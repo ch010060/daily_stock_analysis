@@ -7,50 +7,50 @@ import { markdownToPlainText } from '../markdown';
  */
 describe('markdownToPlainText - Stock Report Scenarios', () => {
   it('handles typical Chinese stock report with tables and indicators', () => {
-    const stockReport = `# 贵州茅台 (600519) 分析报告
+    const stockReport = `# 貴州茅臺 (600519) 分析報告
 
-## 技术分析
+## 技術分析
 
-| 指标 | 当前值 | 信号 |
+| 指標 | 當前值 | 訊號 |
 |------|--------|------|
 | MA5 | 1680.50 | 🟢 |
 | MA10 | 1675.30 | 🟢 |
 | MA20 | 1665.80 | 🟢 |
 
-**MACD**: 金叉信号，买入参考
-**RSI**: 56.8，处于中性区域
+**MACD**: 金叉訊號，買進參考
+**RSI**: 56.8，處於中性區域
 
 ## 基本面分析
 
 - **市盈率**: 28.5
-- **市净率**: 8.2
-- **营收增长**: +15.3% YoY
+- **市淨率**: 8.2
+- **營收增長**: +15.3% YoY
 
-> 风险提示：短期波动加大，建议控制仓位
+> 風險提示：短期波動加大，建議控制部位
 
-## 操作建议
+## 操作建議
 
 \`\`\`python
-# 推荐买入区间
+# 推薦買進區間
 entry_zone = [1650, 1680]
 stop_loss = 1620
 target = 1750
 \`\`\`
 
-[查看详细数据](https://example.com/stock/600519)`;
+[檢視詳細資料](https://example.com/stock/600519)`;
 
     const result = markdownToPlainText(stockReport);
 
     // Verify key content is preserved
-    expect(result).toContain('贵州茅台');
+    expect(result).toContain('貴州茅臺');
     expect(result).toContain('600519');
-    expect(result).toContain('技术分析');
+    expect(result).toContain('技術分析');
     expect(result).toContain('MACD');
-    expect(result).toContain('金叉信号');
+    expect(result).toContain('金叉訊號');
     expect(result).toContain('市盈率');
-    expect(result).toContain('风险提示');
+    expect(result).toContain('風險提示');
     expect(result).toContain('entry_zone');
-    expect(result).toContain('查看详细数据');
+    expect(result).toContain('檢視詳細資料');
 
     // Verify markdown symbols are removed
     expect(result).not.toMatch(/^#{1,6}\s+/m);
@@ -74,11 +74,11 @@ target = 1750
 2. **Resistance 2**: HKD 380.00
 3. **Support 1**: HKD 365.00
 
-> 建议在回调至 365-368 区间关注
+> 建議在回撥至 365-368 區間關注
 
 \`\`\`
-MA5 > MA10 > MA20 (多头排列)
-RSI(14) = 58.3 (中性偏强)
+MA5 > MA10 > MA20 (多頭排列)
+RSI(14) = 58.3 (中性偏強)
 \`\`\`
 
 [Click for more details](https://finance.qq.com/q/go.php/vInvestConsult/stock/00700)`;
@@ -90,7 +90,7 @@ RSI(14) = 58.3 (中性偏强)
     expect(result).toContain('368.20');
     expect(result).toContain('Resistance 1');
     expect(result).toContain('Support 1');
-    expect(result).toContain('建议在回调');
+    expect(result).toContain('建議在回撥');
     expect(result).toContain('MA5 > MA10');
     expect(result).toContain('Click for more details');
   });
@@ -142,58 +142,58 @@ const riskReward = (targetPrice - entryPrice) / (entryPrice - stopLoss);
   });
 
   it('handles market review report with multiple stocks', () => {
-    const marketReview = `# A股市场复盘
+    const marketReview = `# A股市場覆盤
 
-## 指数表现
+## 指數表現
 
-| 指数 | 收盘 | 涨跌幅 | 成交额 |
+| 指數 | 收盤 | 漲跌幅 | 成交額 |
 |------|------|--------|--------|
-| 上证指数 | 3050.32 | +0.85% | 4285亿 |
-| 深证成指 | 9850.45 | +1.12% | 5250亿 |
-| 创业板指 | 1950.28 | +1.45% | 2180亿 |
+| 上證指數 | 3050.32 | +0.85% | 4285億 |
+| 深證成指 | 9850.45 | +1.12% | 5250億 |
+| 創業板指 | 1950.28 | +1.45% | 2180億 |
 
-## 热点板块
+## 熱點板塊
 
-1. **人工智能** 🤖
-   - 原因：大模型技术突破
-   - 龙头：科大讯飞、寒武纪
+1. **人工智慧** 🤖
+   - 原因：大模型技術突破
+   - 龍頭：科大訊飛、寒武紀
 
-2. **新能源汽车** 🚗
-   - 原因：销量数据超预期
-   - 龙头：比亚迪、理想汽车
+2. **新能源汽車** 🚗
+   - 原因：銷量資料超預期
+   - 龍頭：比亞迪、理想汽車
 
-3. **半导体** 💾
-   - 原因：国产替代加速
-   - 龙头：中芯国际、北方华创
+3. **半導體** 💾
+   - 原因：國產替代加速
+   - 龍頭：中芯國際、北方華創
 
-## 资金流向
+## 資金流向
 
-- **北向资金**: +85.5亿
-- **融资融券**: +32.8亿
-- **主力资金**: 净流入 156.8亿
+- **北向資金**: +85.5億
+- **融資融券**: +32.8億
+- **主力資金**: 淨流入 156.8億
 
-## 后市展望
+## 後市展望
 
-> 预期明日震荡区间：3040-3065
+> 預期明日震盪區間：3040-3065
 
-**策略**：关注科技主线，控制仓位`;
+**策略**：關注科技主線，控制部位`;
 
     const result = markdownToPlainText(marketReview);
 
-    expect(result).toContain('A股市场复盘');
-    expect(result).toContain('上证指数');
+    expect(result).toContain('A股市場覆盤');
+    expect(result).toContain('上證指數');
     expect(result).toContain('3050.32');
-    expect(result).toContain('人工智能');
-    expect(result).toContain('科大讯飞');
-    expect(result).toContain('北向资金');
-    expect(result).toContain('85.5亿');
+    expect(result).toContain('人工智慧');
+    expect(result).toContain('科大訊飛');
+    expect(result).toContain('北向資金');
+    expect(result).toContain('85.5億');
     expect(result).toContain('3040-3065');
   });
 
   it('handles report with special characters and formulas', () => {
-    const report = `# 技术指标计算
+    const report = `# 技術指標計算
 
-## MACD 计算
+## MACD 計算
 
 \`\`\`python
 # MACD = EMA(12) - EMA(26)
@@ -213,29 +213,29 @@ def calculate_macd(prices, fast=12, slow=26, signal=9):
 $$RSI = 100 - \frac{100}{1 + RS}$$
 
 其中：
-- RS = 平均涨幅 / 平均跌幅
-- 周期：默认 14 天
+- RS = 平均漲幅 / 平均跌幅
+- 週期：預設 14 天
 
-## 布林带
+## 布林帶
 
-- **中轨** = MA(20)
-- **上轨** = MA(20) + 2 × STD(20)
-- **下轨** = MA(20) - 2 × STD(20)
+- **中軌** = MA(20)
+- **上軌** = MA(20) + 2 × STD(20)
+- **下軌** = MA(20) - 2 × STD(20)
 
-> 当前股价在上轨附近，注意回调风险`;
+> 當前股價在上軌附近，注意回撥風險`;
 
     const result = markdownToPlainText(report);
 
-    expect(result).toContain('MACD 计算');
+    expect(result).toContain('MACD 計算');
     expect(result).toContain('EMA(12) - EMA(26)');
     expect(result).toContain('RSI');
-    expect(result).toContain('布林带');
+    expect(result).toContain('布林帶');
     expect(result).toContain('MA(20)');
-    expect(result).toContain('注意回调风险');
+    expect(result).toContain('注意回撥風險');
   });
 
   it('handles report with code snippets in multiple languages', () => {
-    const report = `# 策略回测代码
+    const report = `# 策略回測程式碼
 
 ## Python 策略
 
@@ -256,14 +256,14 @@ def moving_average_strategy(data, short=5, long=20):
     return signals
 \`\`\`
 
-以上代码可直接用于策略回测。`;
+以上程式碼可直接用於策略回測。`;
 
     const result = markdownToPlainText(report);
 
     // Verify key content is preserved
-    expect(result).toContain('策略回测代码');
+    expect(result).toContain('策略回測程式碼');
     expect(result).toContain('Python 策略');
-    expect(result).toContain('以上代码可直接用于策略回测');
+    expect(result).toContain('以上程式碼可直接用於策略回測');
 
     // Verify code content is preserved
     expect(result).toContain('import pandas');
@@ -273,27 +273,27 @@ def moving_average_strategy(data, short=5, long=20):
   it('handles edge case: very long stock code list', () => {
     const stockList = `# 股票池列表
 
-## 沪深300成分股（部分）
+## 滬深300成分股（部分）
 
-| 代码 | 名称 | 现价 | 涨跌幅 |
+| 程式碼 | 名稱 | 現價 | 漲跌幅 |
 |------|------|------|--------|
-| 600519 | 贵州茅台 | 1680.50 | +0.85% |
-| 000858 | 五粮液 | 125.30 | +1.20% |
-| 600036 | 招商银行 | 32.50 | -0.25% |
-| 000001 | 平安银行 | 11.85 | +0.42% |
-| 601318 | 中国平安 | 45.20 | +0.15% |
-| 000333 | 美的集团 | 58.80 | +1.80% |
-| 600276 | 恒瑞医药 | 42.50 | +2.10% |
-| 300750 | 宁德时代 | 185.30 | +3.20% |
-| 688981 | 中芯国际 | 52.80 | +4.50% |
-| 601012 | 隆基绿能 | 25.60 | -1.20% |
+| 600519 | 貴州茅臺 | 1680.50 | +0.85% |
+| 000858 | 五糧液 | 125.30 | +1.20% |
+| 600036 | 招商銀行 | 32.50 | -0.25% |
+| 000001 | 平安銀行 | 11.85 | +0.42% |
+| 601318 | 中國平安 | 45.20 | +0.15% |
+| 000333 | 美的集團 | 58.80 | +1.80% |
+| 600276 | 恆瑞醫藥 | 42.50 | +2.10% |
+| 300750 | 寧德時代 | 185.30 | +3.20% |
+| 688981 | 中芯國際 | 52.80 | +4.50% |
+| 601012 | 隆基綠能 | 25.60 | -1.20% |
 
-## 筛选条件
+## 篩選條件
 
-- **市值**: > 500亿
+- **市值**: > 500億
 - **PE**: 10-50
 - **ROE**: > 15%
-- **负债率**: < 60%`;
+- **負債率**: < 60%`;
 
     const result = markdownToPlainText(stockList);
 
@@ -301,56 +301,56 @@ def moving_average_strategy(data, short=5, long=20):
     expect(result).toContain('600519');
     expect(result).toContain('000858');
     expect(result).toContain('601012');
-    expect(result).toContain('贵州茅台');
-    expect(result).toContain('宁德时代');
-    expect(result).toContain('筛选条件');
+    expect(result).toContain('貴州茅臺');
+    expect(result).toContain('寧德時代');
+    expect(result).toContain('篩選條件');
     expect(result).toContain('ROE');
   });
 
   it('handles mixed Chinese and English punctuation correctly', () => {
-    const text = `# 报告摘要
+    const text = `# 報告摘要
 
-**主要观点**：
-1. 短期看涨，目标价 $195.00
-2. 支撑位：$168.50-172.00
-3. 压力位：$180.50-185.00
+**主要觀點**：
+1. 短期看漲，目標價 $195.00
+2. 支撐位：$168.50-172.00
+3. 壓力位：$180.50-185.00
 
 "Risk: Trade war impact"
 
-> 风险提示：中美贸易摩擦可能影响出口
+> 風險提示：中美貿易摩擦可能影響出口
 
-*关注点*：AI chip business growth`;
+*關注點*：AI chip business growth`;
 
     const result = markdownToPlainText(text);
 
-    expect(result).toContain('主要观点');
-    expect(result).toContain('短期看涨');
+    expect(result).toContain('主要觀點');
+    expect(result).toContain('短期看漲');
     expect(result).toContain('195.00');
     expect(result).toContain('Risk: Trade war impact');
-    expect(result).toContain('风险提示');
-    expect(result).toContain('关注点');
+    expect(result).toContain('風險提示');
+    expect(result).toContain('關注點');
     expect(result).toContain('AI chip business');
   });
 
   it('preserves numerical data and percentages accurately', () => {
-    const report = `# 数据报告
+    const report = `# 資料包告
 
-## 关键指标
+## 關鍵指標
 
-- 营收: 1,234.56亿
-- 净利润: +23.45%
-- 市占率: 15.67%
+- 營收: 1,234.56億
+- 淨利潤: +23.45%
+- 市佔率: 15.67%
 - ROE: 18.9%
-- 负债率: 45.2%
+- 負債率: 45.2%
 
-## 价格区间
+## 價格區間
 
-| 日期 | 开盘 | 最高 | 最低 | 收盘 |
+| 日期 | 開盤 | 最高 | 最低 | 收盤 |
 |------|------|------|------|------|
 | 2024-01-15 | 1680.50 | 1695.30 | 1675.20 | 1688.80 |
 | 2024-01-16 | 1688.80 | 1702.50 | 1685.30 | 1698.20 |
 
-涨跌幅: +1.23% (今日)`;
+漲跌幅: +1.23% (今日)`;
 
     const result = markdownToPlainText(report);
 

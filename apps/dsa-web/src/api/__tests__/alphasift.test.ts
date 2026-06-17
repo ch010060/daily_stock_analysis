@@ -170,7 +170,7 @@ describe('alphasiftApi', () => {
       },
     });
 
-    await expect(alphasiftApi.enable()).rejects.toThrow('自动安装完成');
+    await expect(alphasiftApi.enable()).rejects.toThrow('自動安裝完成');
 
     expect(post).toHaveBeenCalledWith('/api/v1/alphasift/install', {}, { timeout: 300000 });
     expect(updateConfig).toHaveBeenNthCalledWith(2, {

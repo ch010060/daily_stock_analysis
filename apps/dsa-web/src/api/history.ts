@@ -11,7 +11,7 @@ import type {
   StockBarResponse,
 } from '../types/analysis';
 
-// ============ API 接口 ============
+// ============ API 介面 ============
 
 export interface GetHistoryListParams extends HistoryFilters {
   page?: number;
@@ -21,8 +21,8 @@ export interface GetHistoryListParams extends HistoryFilters {
 
 export const historyApi = {
   /**
-   * 获取历史分析列表
-   * @param params 筛选和分页参数
+   * 獲取歷史分析列表
+   * @param params 篩選和分頁引數
    */
   getList: async (params: GetHistoryListParams = {}): Promise<HistoryListResponse> => {
     const { stockCode, startDate, endDate, page = 1, limit = 20, reportType } = params;
@@ -47,8 +47,8 @@ export const historyApi = {
   },
 
   /**
-   * 获取历史报告详情
-   * @param recordId 分析历史记录主键 ID（使用 ID 而非 query_id，因为 query_id 在批量分析时可能重复）
+   * 獲取歷史報告詳情
+   * @param recordId 分析歷史記錄主鍵 ID（使用 ID 而非 query_id，因為 query_id 在批次分析時可能重複）
    */
   getDetail: async (recordId: number): Promise<AnalysisReport> => {
     const response = await apiClient.get<Record<string, unknown>>(`/api/v1/history/${recordId}`);
@@ -56,9 +56,9 @@ export const historyApi = {
   },
 
   /**
-   * 获取历史报告关联新闻
-   * @param recordId 分析历史记录主键 ID
-   * @param limit 返回数量限制
+   * 獲取歷史報告關聯新聞
+   * @param recordId 分析歷史記錄主鍵 ID
+   * @param limit 返回數量限制
    */
   getNews: async (recordId: number, limit = 20): Promise<NewsIntelResponse> => {
     const response = await apiClient.get<Record<string, unknown>>(`/api/v1/history/${recordId}/news`, {
@@ -73,9 +73,9 @@ export const historyApi = {
   },
 
   /**
-   * 获取历史报告的 Markdown 格式内容
-   * @param recordId 分析历史记录主键 ID
-   * @returns Markdown 格式的完整报告内容
+   * 獲取歷史報告的 Markdown 格式內容
+   * @param recordId 分析歷史記錄主鍵 ID
+   * @returns Markdown 格式的完整報告內容
    */
   getMarkdown: async (recordId: number): Promise<string> => {
     const response = await apiClient.get<{ content: string }>(`/api/v1/history/${recordId}/markdown`);
@@ -83,8 +83,8 @@ export const historyApi = {
   },
 
   /**
-   * 获取历史报告运行诊断摘要
-   * @param recordId 分析历史记录主键 ID
+   * 獲取歷史報告執行診斷摘要
+   * @param recordId 分析歷史記錄主鍵 ID
    */
   getDiagnostics: async (recordId: number): Promise<RunDiagnosticSummary> => {
     const response = await apiClient.get<Record<string, unknown>>(`/api/v1/history/${recordId}/diagnostics`);
@@ -92,8 +92,8 @@ export const historyApi = {
   },
 
   /**
-   * 批量删除历史记录
-   * @param recordIds 分析历史记录主键 ID 列表
+   * 批次刪除歷史記錄
+   * @param recordIds 分析歷史記錄主鍵 ID 列表
    */
   deleteRecords: async (recordIds: number[]): Promise<{ deleted: number }> => {
     const response = await apiClient.delete<Record<string, unknown>>('/api/v1/history/', {
@@ -104,8 +104,8 @@ export const historyApi = {
   },
 
   /**
-   * 按股票代码删除所有历史记录
-   * @param stockCode 股票代码
+   * 按股票程式碼刪除所有歷史記錄
+   * @param stockCode 股票程式碼
    */
   deleteByCode: async (stockCode: string): Promise<{ deleted: number }> => {
     const response = await apiClient.delete<Record<string, unknown>>(`/api/v1/history/by-code/${encodeURIComponent(stockCode)}`);
@@ -113,7 +113,7 @@ export const historyApi = {
   },
 
   /**
-   * 获取个股栏列表（不重复个股，大盘复盘置顶）
+   * 獲取個股欄列表（不重複個股，大盤覆盤置頂）
    */
   getStockBarList: async (params: {
     startDate?: string;

@@ -374,7 +374,7 @@ def test_over_trigger_generates_summary_and_updates_covered_message_id() -> None
     )
     adapter = MagicMock()
     adapter.call_text.return_value = SimpleNamespace(
-        content="## 会话摘要\n新摘要",
+        content="## 會話摘要\n新摘要",
         provider="openai",
         model="openai/test-model",
         usage={"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},

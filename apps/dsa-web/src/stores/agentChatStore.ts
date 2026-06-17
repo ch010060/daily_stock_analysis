@@ -277,14 +277,14 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
           if (event.type === 'done') {
             const doneEvent = event as unknown as StreamFailureEvent;
             if (doneEvent.success === false) {
-              throw getStreamFailureError(doneEvent, '大模型调用出错，请检查 API Key 配置');
+              throw getStreamFailureError(doneEvent, '大模型呼叫出錯，請檢查 API Key 配置');
             }
             finalContent = doneEvent.content ?? '';
             return;
           }
 
           if (event.type === 'error') {
-            throw getStreamFailureError(event as unknown as StreamFailureEvent, '分析出错');
+            throw getStreamFailureError(event as unknown as StreamFailureEvent, '分析出錯');
           }
 
         currentProgressSteps.push(event);
@@ -330,7 +330,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
             {
               id: (Date.now() + 1).toString(),
               role: 'assistant',
-              content: finalContent || '（无内容）',
+              content: finalContent || '（無內容）',
               skills: payload.skills,
               skill: payload.skills?.[0],
               skillNames,

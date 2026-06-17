@@ -137,7 +137,7 @@ class TestValidateStructuredStockList:
         warning = next(i for i in issues if i.field == "STOCK_GROUP_N")
         assert warning.severity == "warning"
         assert "000001" in warning.message
-        assert "邮件路由" in warning.message
+        assert "郵件路由" in warning.message
         assert "STOCK_LIST" in warning.message
 
     def test_stock_email_groups_subset_of_stock_list_has_no_warning(self):
@@ -375,12 +375,12 @@ class TestValidateStructuredNotification:
         cfg = _make_config(wechat_webhook_url=None)
         issues = cfg.validate_structured()
         warn = [i for i in issues if i.severity == "warning"]
-        assert any("通知渠道" in i.message for i in warn)
+        assert any("通知通道" in i.message for i in warn)
 
     def test_notification_configured_no_warning(self):
         cfg = _make_config(wechat_webhook_url="https://example.com/wh")
         issues = cfg.validate_structured()
-        assert not any(i.severity == "warning" and "通知渠道" in i.message for i in issues)
+        assert not any(i.severity == "warning" and "通知通道" in i.message for i in issues)
 
     @pytest.mark.parametrize(
         ("kwargs", "missing_field"),
@@ -414,7 +414,7 @@ class TestValidateStructuredNotification:
         assert any(
             i.severity == "error"
             and i.field == missing_field
-            and "邮件通知配置不完整" in i.message
+            and "郵件通知配置不完整" in i.message
             for i in issues
         )
 
@@ -443,28 +443,28 @@ class TestValidateStructuredNotification:
             astrbot_url="https://astrbot.example/webhook",
         )
         issues = cfg.validate_structured()
-        assert not any(i.severity == "warning" and "通知渠道" in i.message for i in issues)
+        assert not any(i.severity == "warning" and "通知通道" in i.message for i in issues)
 
     def test_ntfy_url_without_topic_reports_error_and_does_not_count_as_channel(self):
         cfg = _make_config(wechat_webhook_url=None, ntfy_url="https://ntfy.sh")
         issues = cfg.validate_structured()
 
         assert any(i.severity == "error" and i.field == "NTFY_URL" for i in issues)
-        assert any(i.severity == "warning" and "通知渠道" in i.message for i in issues)
+        assert any(i.severity == "warning" and "通知通道" in i.message for i in issues)
 
     def test_ntfy_encoded_blank_topic_reports_error_and_does_not_count_as_channel(self):
         cfg = _make_config(wechat_webhook_url=None, ntfy_url="https://ntfy.sh/%20")
         issues = cfg.validate_structured()
 
         assert any(i.severity == "error" and i.field == "NTFY_URL" for i in issues)
-        assert any(i.severity == "warning" and "通知渠道" in i.message for i in issues)
+        assert any(i.severity == "warning" and "通知通道" in i.message for i in issues)
 
     def test_ntfy_topic_endpoint_counts_as_notification_channel(self):
         cfg = _make_config(wechat_webhook_url=None, ntfy_url="https://ntfy.sh/dsa-topic")
         issues = cfg.validate_structured()
 
         assert not any(i.field == "NTFY_URL" for i in issues)
-        assert not any(i.severity == "warning" and "通知渠道" in i.message for i in issues)
+        assert not any(i.severity == "warning" and "通知通道" in i.message for i in issues)
 
     def test_gotify_url_and_token_count_as_notification_channel(self):
         cfg = _make_config(
@@ -475,7 +475,7 @@ class TestValidateStructuredNotification:
         issues = cfg.validate_structured()
 
         assert not any(i.field == "GOTIFY_URL" for i in issues)
-        assert not any(i.severity == "warning" and "通知渠道" in i.message for i in issues)
+        assert not any(i.severity == "warning" and "通知通道" in i.message for i in issues)
 
     def test_gotify_blank_token_does_not_count_as_notification_channel(self):
         cfg = _make_config(
@@ -485,7 +485,7 @@ class TestValidateStructuredNotification:
         )
         issues = cfg.validate_structured()
 
-        assert any(i.severity == "warning" and "通知渠道" in i.message for i in issues)
+        assert any(i.severity == "warning" and "通知通道" in i.message for i in issues)
         assert any(i.severity == "warning" and i.field == "GOTIFY_TOKEN" for i in issues)
 
     def test_gotify_message_endpoint_reports_error_and_does_not_count_as_channel(self):
@@ -497,7 +497,7 @@ class TestValidateStructuredNotification:
         issues = cfg.validate_structured()
 
         assert any(i.severity == "error" and i.field == "GOTIFY_URL" for i in issues)
-        assert any(i.severity == "warning" and "通知渠道" in i.message for i in issues)
+        assert any(i.severity == "warning" and "通知通道" in i.message for i in issues)
 
     def test_feishu_app_credentials_without_webhook_warns_mode_mismatch(self):
         cfg = _make_config(
@@ -551,8 +551,8 @@ class TestValidateStructuredNotification:
         cfg = _make_config(searxng_public_instances_enabled=False)
         issues = cfg.validate_structured()
         info = [i for i in issues if i.severity == "info"]
-        assert any("搜索引擎" in i.message for i in info)
-        search_issue = next(i for i in info if "搜索引擎" in i.message)
+        assert any("搜尋引擎" in i.message for i in info)
+        search_issue = next(i for i in info if "搜尋引擎" in i.message)
         assert search_issue.field == "BOCHA_API_KEYS"
 
     def test_searxng_configured_no_search_info(self):
@@ -560,14 +560,14 @@ class TestValidateStructuredNotification:
         cfg = _make_config(searxng_base_urls=["https://searx.example.org"])
         issues = cfg.validate_structured()
         info = [i for i in issues if i.severity == "info"]
-        assert not any("搜索引擎" in i.message and "未配置" in i.message for i in info)
+        assert not any("搜尋引擎" in i.message and "未配置" in i.message for i in info)
 
     def test_public_searxng_enabled_no_search_info(self):
         """Public SearXNG mode also counts as search capability."""
         cfg = _make_config(searxng_public_instances_enabled=True)
         issues = cfg.validate_structured()
         info = [i for i in issues if i.severity == "info"]
-        assert not any("搜索引擎" in i.message and "未配置" in i.message for i in info)
+        assert not any("搜尋引擎" in i.message and "未配置" in i.message for i in info)
 
 
 # ---------------------------------------------------------------------------

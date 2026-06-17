@@ -57,8 +57,8 @@ describe('IntelligentImport', () => {
       configurable: true,
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '选择图片' }));
-    fireEvent.click(screen.getByRole('button', { name: '选择文件' }));
+    fireEvent.click(screen.getByRole('button', { name: '選擇圖片' }));
+    fireEvent.click(screen.getByRole('button', { name: '選擇檔案' }));
 
     expect(imageClick).toHaveBeenCalledTimes(1);
     expect(dataClick).toHaveBeenCalledTimes(1);
@@ -90,8 +90,8 @@ describe('IntelligentImport', () => {
       configurable: true,
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '选择图片' }));
-    fireEvent.click(screen.getByRole('button', { name: '选择文件' }));
+    fireEvent.click(screen.getByRole('button', { name: '選擇圖片' }));
+    fireEvent.click(screen.getByRole('button', { name: '選擇檔案' }));
 
     expect(imageClick).not.toHaveBeenCalled();
     expect(dataClick).not.toHaveBeenCalled();
@@ -103,7 +103,7 @@ describe('IntelligentImport', () => {
       codes: [],
     });
     update.mockRejectedValue(
-      new SystemConfigConflictError('配置版本冲突', 'v2'),
+      new SystemConfigConflictError('配置版本衝突', 'v2'),
     );
 
     render(
@@ -115,14 +115,14 @@ describe('IntelligentImport', () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText('或粘贴 CSV/Excel 复制的文本...'), {
+    fireEvent.change(screen.getByPlaceholderText('或貼上 CSV/Excel 複製的文字...'), {
       target: { value: '000001' },
     });
     fireEvent.click(screen.getByRole('button', { name: '解析' }));
 
     await screen.findByText('SZ000001');
 
-    fireEvent.click(screen.getByRole('button', { name: '合并到自选股' }));
+    fireEvent.click(screen.getByRole('button', { name: '合併到自選股' }));
 
     await waitFor(() => {
       expect(update).toHaveBeenCalled();
@@ -130,6 +130,6 @@ describe('IntelligentImport', () => {
     await waitFor(() => {
       expect(onMerged).toHaveBeenCalledWith('SH600000,SZ000001');
     });
-    expect(await screen.findByText('配置已更新，请再次点击「合并到自选股」')).toBeInTheDocument();
+    expect(await screen.findByText('配置已更新，請再次點選「合併到自選股」')).toBeInTheDocument();
   });
 });

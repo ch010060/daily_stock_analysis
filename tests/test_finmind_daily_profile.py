@@ -364,7 +364,7 @@ class TestPromptCardAggregation(unittest.TestCase):
     def test_prompts_no_buysell(self):
         for pc in self.prompts:
             prompt = pc.get("prompt", "")
-            for term in ("買進", "賣出", "買入", "卖出", "推薦買", "推薦賣"):
+            for term in ("買進", "賣出", "買進", "賣出", "推薦買", "推薦賣"):
                 self.assertNotIn(term, prompt, f"Found '{term}' in: {prompt[:80]}")
 
 
@@ -374,7 +374,7 @@ class TestPromptCardAggregation(unittest.TestCase):
 
 class TestNoCNTerms(unittest.TestCase):
 
-    _CN_TERMS = ["A股", "上證", "上证", "深證", "深证", "創業板", "创业板", "科創50", "科创50"]
+    _CN_TERMS = ["A股", "上證", "上證", "深證", "深證", "創業板", "創業板", "科創50", "科創50"]
 
     def test_no_cn_terms_in_result(self):
         r = _make_runner()

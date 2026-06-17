@@ -56,19 +56,19 @@ describe('StockScreeningPage', () => {
         available: false,
         installSpecIsDefault: true,
       });
-    enableAlphaSift.mockRejectedValueOnce(new Error('安装 AlphaSift 失败'));
+    enableAlphaSift.mockRejectedValueOnce(new Error('安裝 AlphaSift 失敗'));
 
     render(<StockScreeningPage />);
 
-    expect(await screen.findByText('选股未开启')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /运行选股/ })).toBeDisabled();
+    expect(await screen.findByText('選股未開啟')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /執行選股/ })).toBeDisabled();
 
-    fireEvent.click(screen.getByRole('button', { name: '开启 AlphaSift' }));
+    fireEvent.click(screen.getByRole('button', { name: '開啟 AlphaSift' }));
 
     await waitFor(() => expect(getAlphaSiftStatus).toHaveBeenCalledTimes(2));
-    expect(screen.getByText('选股已开启')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /运行选股/ })).not.toBeDisabled();
-    expect(screen.getByText('安装 AlphaSift 失败')).toBeInTheDocument();
+    expect(screen.getByText('選股已開啟')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /執行選股/ })).not.toBeDisabled();
+    expect(screen.getByText('安裝 AlphaSift 失敗')).toBeInTheDocument();
   });
 
   it('shows input strategy when strategy is not in preset list', async () => {
@@ -85,27 +85,27 @@ describe('StockScreeningPage', () => {
 
     render(<StockScreeningPage />);
 
-    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('策略参数'), {
+    expect(await screen.findByText('選股已開啟')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('策略引數'), {
       target: { value: 'custom_strategy_alpha' },
     });
 
     expect(screen.getByDisplayValue('custom_strategy_alpha')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+    fireEvent.click(screen.getByRole('button', { name: /執行選股/ }));
     await waitFor(() => expect(screenStocks).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.getByText(/自定义策略 \(custom_strategy_alpha\)/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/自定義策略 \(custom_strategy_alpha\)/)).toBeInTheDocument());
   });
 
   it('uses supported AlphaSift strategy ids and cn market', async () => {
     getStrategies.mockResolvedValueOnce({
       enabled: true,
       strategies: [
-        { id: 'balanced_alpha', name: '平衡选股', description: 'desc', category: '框架' },
-        { id: 'capital_heat', name: '资金热度', description: 'desc', category: '动量' },
-        { id: 'dual_low', name: '双低', description: 'desc', category: '价值' },
-        { id: 'oversold_reversal', name: '超跌', description: 'desc', category: '反转' },
-        { id: 'shrink_pullback', name: '缩量回踩', description: 'desc', category: '趋势' },
+        { id: 'balanced_alpha', name: '平衡選股', description: 'desc', category: '框架' },
+        { id: 'capital_heat', name: '資金熱度', description: 'desc', category: '動量' },
+        { id: 'dual_low', name: '雙低', description: 'desc', category: '價值' },
+        { id: 'oversold_reversal', name: '超跌', description: 'desc', category: '反轉' },
+        { id: 'shrink_pullback', name: '縮量回踩', description: 'desc', category: '趨勢' },
       ],
       strategyCount: 5,
     });
@@ -122,22 +122,22 @@ describe('StockScreeningPage', () => {
 
     render(<StockScreeningPage />);
 
-    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    expect(await screen.findByText('選股已開啟')).toBeInTheDocument();
 
-    const marketSelect = screen.getByLabelText('市场') as HTMLSelectElement;
+    const marketSelect = screen.getByLabelText('市場') as HTMLSelectElement;
     expect(Array.from(marketSelect.options).map((option) => option.value)).toEqual(['cn']);
 
     [
-      ['平衡选股', 'balanced_alpha'],
-      ['资金热度', 'capital_heat'],
+      ['平衡選股', 'balanced_alpha'],
+      ['資金熱度', 'capital_heat'],
       ['超跌', 'oversold_reversal'],
-      ['缩量回踩', 'shrink_pullback'],
+      ['縮量回踩', 'shrink_pullback'],
     ].forEach(([label, id]) => {
       fireEvent.click(screen.getByRole('button', { name: new RegExp(label) }));
       expect(screen.getByDisplayValue(id)).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+    fireEvent.click(screen.getByRole('button', { name: /執行選股/ }));
     await waitFor(() => expect(screenStocks).toHaveBeenCalledTimes(1));
     expect(screenStocks).toHaveBeenCalledWith({
       market: 'cn',
@@ -150,8 +150,8 @@ describe('StockScreeningPage', () => {
     getStrategies.mockResolvedValueOnce({
       enabled: true,
       strategies: [
-        { id: 'dual_low', name: '双低选股', description: 'desc', category: '价值' },
-        { id: 'capital_heat', name: '资金热度', description: 'desc', category: '动量' },
+        { id: 'dual_low', name: '雙低選股', description: 'desc', category: '價值' },
+        { id: 'capital_heat', name: '資金熱度', description: 'desc', category: '動量' },
       ],
       strategyCount: 2,
     });
@@ -166,7 +166,7 @@ describe('StockScreeningPage', () => {
         {
           rank: 1,
           code: '000001',
-          name: '旧策略股票',
+          name: '舊策略股票',
           score: 88.5,
           reason: 'old result',
           raw: {},
@@ -177,17 +177,17 @@ describe('StockScreeningPage', () => {
 
     render(<StockScreeningPage />);
 
-    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+    expect(await screen.findByText('選股已開啟')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /執行選股/ }));
 
-    expect(await screen.findByText('旧策略股票')).toBeInTheDocument();
-    expect(screen.getByText('选股完成')).toBeInTheDocument();
+    expect(await screen.findByText('舊策略股票')).toBeInTheDocument();
+    expect(screen.getByText('選股完成')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /资金热度/ }));
+    fireEvent.click(screen.getByRole('button', { name: /資金熱度/ }));
 
-    expect(screen.queryByText('旧策略股票')).not.toBeInTheDocument();
-    expect(screen.getByText('等待运行')).toBeInTheDocument();
-    expect(screen.getByText('当前策略：资金热度 · A 股')).toBeInTheDocument();
+    expect(screen.queryByText('舊策略股票')).not.toBeInTheDocument();
+    expect(screen.getByText('等待執行')).toBeInTheDocument();
+    expect(screen.getByText('當前策略：資金熱度 · A 股')).toBeInTheDocument();
   });
 
   it('surfaces AlphaSift LLM fallback instead of showing empty LLM fields as normal', async () => {
@@ -202,9 +202,9 @@ describe('StockScreeningPage', () => {
         {
           rank: 1,
           code: '000001',
-          name: '平安银行',
+          name: '平安銀行',
           score: 88.5,
-          reason: '本地后置评分: value_quality',
+          reason: '本地後置評分: value_quality',
           amount: 1042000000,
           factorScores: {
             value: 87.44,
@@ -222,15 +222,15 @@ describe('StockScreeningPage', () => {
 
     render(<StockScreeningPage />);
 
-    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+    expect(await screen.findByText('選股已開啟')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /執行選股/ }));
 
-    expect(await screen.findByText('LLM 已降级')).toBeInTheDocument();
+    expect(await screen.findByText('LLM 已降級')).toBeInTheDocument();
     expect(screen.getByText(/Missing gemini_api_key/)).toBeInTheDocument();
     expect(screen.getByText('未重排')).toBeInTheDocument();
-    expect(screen.getByText('本次 LLM 重排失败或未返回判断，当前展示的是本地因子评分结果。')).toBeInTheDocument();
-    expect(screen.getByText('LLM 元数据未返回')).toBeInTheDocument();
-    expect(screen.getAllByText('未返回（LLM 已降级）')).toHaveLength(2);
+    expect(screen.getByText('本次 LLM 重排失敗或未返回判斷，當前展示的是本地因子評分結果。')).toBeInTheDocument();
+    expect(screen.getByText('LLM 後設資料未返回')).toBeInTheDocument();
+    expect(screen.getAllByText('未返回（LLM 已降級）')).toHaveLength(2);
   });
 
   it('deduplicates AlphaSift snapshot fallback warnings and source errors', async () => {
@@ -245,7 +245,7 @@ describe('StockScreeningPage', () => {
         {
           rank: 1,
           code: '601919',
-          name: '中远海控',
+          name: '中遠海控',
           score: 82.88,
           llmScore: 82,
           riskLevel: 'low',
@@ -260,11 +260,11 @@ describe('StockScreeningPage', () => {
 
     render(<StockScreeningPage />);
 
-    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+    expect(await screen.findByText('選股已開啟')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /執行選股/ }));
 
     expect(await screen.findByText('AlphaSift 提示')).toBeInTheDocument();
     expect(screen.getAllByText(/tushare trade_cal returned no open trading days/)).toHaveLength(1);
-    expect(screen.getByText(/数据源降级：tushare/)).toBeInTheDocument();
+    expect(screen.getByText(/資料來源降級：tushare/)).toBeInTheDocument();
   });
 });

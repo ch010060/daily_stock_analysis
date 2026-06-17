@@ -191,7 +191,7 @@ def render_tw_market_review_text(
 
     sections.append("## 融資融券觀察\n\n" + "\n".join(margin_lines))
 
-    # 0050 / 台積電參考
+    # 0050 / 臺積電參考
     ref_lines: List[str] = []
     if ctx["ref_0050_ok"] and ctx["last_0050"]:
         close = ctx["last_0050"].get("close", "N/A")
@@ -203,11 +203,11 @@ def render_tw_market_review_text(
     if ctx["ref_2330_ok"] and ctx["last_2330"]:
         close = ctx["last_2330"].get("close", "N/A")
         date = ctx["last_2330"].get("date", "")
-        ref_lines.append(f"- 台積電（2330）：收盤 {close}（{date}）")
+        ref_lines.append(f"- 臺積電（2330）：收盤 {close}（{date}）")
     else:
-        ref_lines.append("- 台積電（2330）：資料暫不可用")
+        ref_lines.append("- 臺積電（2330）：資料暫不可用")
 
-    sections.append("## 0050 / 台積電參考\n\n" + "\n".join(ref_lines))
+    sections.append("## 0050 / 臺積電參考\n\n" + "\n".join(ref_lines))
 
     # 風險與注意事項
     sections.append(

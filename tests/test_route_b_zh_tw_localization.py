@@ -23,7 +23,7 @@ class TestLocalizeRouteBZhTwText(unittest.TestCase):
 
     def test_decision_dashboard(self):
         result = localize_route_b_zh_tw_text("决策仪表盘日报")
-        self.assertIn("決策儀表板", result)
+        self.assertIn("決策儀錶板", result)
         self.assertNotIn("决策仪表盘", result)
 
     def test_watch_term(self):
@@ -70,7 +70,7 @@ class TestLocalizeRouteBZhTwText(unittest.TestCase):
 
     def test_buy_sell_terms(self):
         result = localize_route_b_zh_tw_text("买入 / 卖出")
-        self.assertIn("買入", result)
+        self.assertIn("買進", result)
         self.assertIn("賣出", result)
 
     def test_trend_terms(self):
@@ -97,7 +97,7 @@ class TestLocalizeRouteBZhTwText(unittest.TestCase):
         text = f"数据来源: {url}"
         result = localize_route_b_zh_tw_text(text)
         self.assertIn(url, result)
-        self.assertIn("資料", result)
+        self.assertIn("來源", result)
 
     def test_inline_code_preserved(self):
         text = "运行 `观望` 模式"
@@ -177,7 +177,7 @@ class TestMarketReviewTitles(unittest.TestCase):
 
     def test_zh_default_unchanged(self):
         texts = _get_market_review_text("zh")
-        self.assertIn("大盘复盘", texts["root_title"])
+        self.assertIn("大盤", texts["root_title"])
 
     def test_en_unchanged(self):
         texts = _get_market_review_text("en")

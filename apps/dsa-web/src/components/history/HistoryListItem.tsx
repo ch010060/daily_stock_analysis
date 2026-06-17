@@ -18,21 +18,21 @@ interface HistoryListItemProps {
 const getOperationBadgeLabel = (advice?: string) => {
   const normalized = advice?.trim();
   if (!normalized) {
-    return '情绪';
+    return '情緒';
   }
-  if (normalized.includes('减仓')) {
-    return '减仓';
+  if (normalized.includes('減倉')) {
+    return '減倉';
   }
-  if (normalized.includes('卖')) {
-    return '卖出';
+  if (normalized.includes('賣')) {
+    return '賣出';
   }
-  if (normalized.includes('观望') || normalized.includes('等待')) {
-    return '观望';
+  if (normalized.includes('觀望') || normalized.includes('等待')) {
+    return '觀望';
   }
-  if (normalized.includes('买') || normalized.includes('布局')) {
-    return '买入';
+  if (normalized.includes('買') || normalized.includes('佈局')) {
+    return '買進';
   }
-  return normalized.split(/[，。；、\s]/)[0] || '建议';
+  return normalized.split(/[，。；、\s]/)[0] || '建議';
 };
 
 export const HistoryListItem: React.FC<HistoryListItemProps> = ({
@@ -45,7 +45,7 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
 }) => {
   const sentimentColor = item.sentimentScore !== undefined ? getSentimentColor(item.sentimentScore) : null;
   const stockName = item.stockName || item.stockCode;
-  const phaseLabel = getMarketPhaseSummaryLabel(item.marketPhaseSummary, undefined)?.replace('市场阶段: ', '').replace('市场阶段：', '').replace('市場階段: ', '').replace('市場階段：', '');
+  const phaseLabel = getMarketPhaseSummaryLabel(item.marketPhaseSummary, undefined)?.replace('市場階段: ', '').replace('市場階段：', '').replace('市場階段: ', '').replace('市場階段：', '');
 
   return (
     <div className="flex items-start gap-2 group">
@@ -61,7 +61,7 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
       <button
         type="button"
         onClick={() => onClick(item.id)}
-        aria-label={`${stockName} ${item.stockCode} 历史记录`}
+        aria-label={`${stockName} ${item.stockCode} 歷史記錄`}
         className={`home-history-item w-full min-w-0 flex-1 text-left p-2.5 group/item ${
           isViewing ? 'home-history-item-selected' : ''
         }`}

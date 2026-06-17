@@ -49,14 +49,14 @@ describe('RouteOutletBoundary', () => {
       );
 
       expect(screen.getByRole('navigation', { name: '主導覽' })).toBeInTheDocument();
-      expect(await screen.findByRole('heading', { name: '页面加载失败' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '重新加载页面' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '返回首页' })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: '頁面載入失敗' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '重新載入頁面' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '返回首頁' })).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('link', { name: '持倉' }));
+      fireEvent.click(screen.getByRole('link', { name: '持股' }));
 
       expect(await screen.findByTestId('portfolio-page')).toBeInTheDocument();
-      expect(screen.queryByRole('heading', { name: '页面加载失败' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: '頁面載入失敗' })).not.toBeInTheDocument();
     } finally {
       consoleError.mockRestore();
     }

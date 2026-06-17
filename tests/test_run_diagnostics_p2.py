@@ -85,15 +85,15 @@ def _history_record(*, context_snapshot: dict | None) -> SimpleNamespace:
         id=1,
         query_id="query-p2",
         code="600519",
-        name="贵州茅台",
+        name="貴州茅臺",
         report_type="detailed",
         created_at=datetime(2026, 5, 24, 12, 0, 0),
         raw_result=json.dumps(
             {
                 "success": True,
                 "model_used": "deepseek-chat",
-                "analysis_summary": "测试摘要",
-                "news_summary": "新闻摘要",
+                "analysis_summary": "測試摘要",
+                "news_summary": "新聞摘要",
             },
             ensure_ascii=False,
         ),
@@ -105,8 +105,8 @@ def _history_record(*, context_snapshot: dict | None) -> SimpleNamespace:
         sentiment_score=60,
         operation_advice="持有",
         trend_prediction="看多",
-        analysis_summary="测试摘要",
-        news_content="新闻摘要",
+        analysis_summary="測試摘要",
+        news_content="新聞摘要",
         ideal_buy=None,
         secondary_buy=None,
         stop_loss=None,
@@ -162,8 +162,8 @@ class RunDiagnosticsP2TestCase(unittest.TestCase):
             raw_result={
                 "success": True,
                 "model_used": "deepseek-chat",
-                "analysis_summary": "测试摘要",
-                "news_summary": "模型生成的新闻摘要",
+                "analysis_summary": "測試摘要",
+                "news_summary": "模型生成的新聞摘要",
             },
             report_saved=True,
         )
@@ -177,13 +177,13 @@ class RunDiagnosticsP2TestCase(unittest.TestCase):
         summary = build_run_diagnostic_summary(
             context_snapshot={
                 "diagnostics": diagnostics,
-                "news_content": "模型生成的新闻摘要",
+                "news_content": "模型生成的新聞摘要",
             },
             raw_result={
                 "success": True,
                 "model_used": "deepseek-chat",
-                "analysis_summary": "测试摘要",
-                "news_summary": "模型生成的新闻摘要",
+                "analysis_summary": "測試摘要",
+                "news_summary": "模型生成的新聞摘要",
             },
             report_saved=True,
         )
@@ -196,14 +196,14 @@ class RunDiagnosticsP2TestCase(unittest.TestCase):
         summary = build_run_diagnostic_summary(
             context_snapshot={
                 "diagnostics": diagnostics,
-                "news_content": "【贵州茅台 情报搜索结果】\n  未找到相关信息",
+                "news_content": "【貴州茅臺 情報搜尋結果】\n  未找到相關資訊",
                 "news_result_count": 0,
             },
             raw_result={
                 "success": True,
                 "model_used": "deepseek-chat",
-                "analysis_summary": "测试摘要",
-                "news_summary": "模型生成的新闻摘要",
+                "analysis_summary": "測試摘要",
+                "news_summary": "模型生成的新聞摘要",
             },
             report_saved=True,
         )
@@ -215,18 +215,18 @@ class RunDiagnosticsP2TestCase(unittest.TestCase):
         summary = build_run_diagnostic_summary(
             context_snapshot={
                 "diagnostics": _diagnostic_snapshot(),
-                "news_content": "新闻摘要",
+                "news_content": "新聞摘要",
             },
             raw_result={
                 "success": True,
                 "model_used": "deepseek-chat",
-                "analysis_summary": "测试摘要",
+                "analysis_summary": "測試摘要",
             },
             report_saved=True,
         )
 
         self.assertEqual(summary["status"], "degraded")
-        self.assertEqual(summary["status_label"], "部分降级")
+        self.assertEqual(summary["status_label"], "部分降級")
         self.assertEqual(summary["components"]["realtime_quote"]["status"], "degraded")
         self.assertEqual(summary["components"]["daily_data"]["status"], "ok")
         self.assertEqual(summary["components"]["llm"]["status"], "ok")
@@ -249,7 +249,7 @@ class RunDiagnosticsP2TestCase(unittest.TestCase):
         summary = build_run_diagnostic_summary(
             context_snapshot={
                 "diagnostics": diagnostics,
-                "news_content": "新闻摘要",
+                "news_content": "新聞摘要",
             },
             raw_result={"success": False, "error_message": "api_key=secret-value"},
             report_saved=True,
@@ -257,7 +257,7 @@ class RunDiagnosticsP2TestCase(unittest.TestCase):
 
         self.assertEqual(summary["status"], "failed")
         self.assertEqual(summary["components"]["llm"]["status"], "failed")
-        self.assertIn("LLM 失败", summary["reason"])
+        self.assertIn("LLM 失敗", summary["reason"])
         self.assertNotIn("secret-value", summary["copy_text"])
 
     def test_copy_text_redacts_authorization_bearer_tokens(self) -> None:
@@ -277,7 +277,7 @@ class RunDiagnosticsP2TestCase(unittest.TestCase):
         summary = build_run_diagnostic_summary(
             context_snapshot={
                 "diagnostics": diagnostics,
-                "news_content": "新闻摘要",
+                "news_content": "新聞摘要",
             },
             raw_result={
                 "success": False,
@@ -380,7 +380,7 @@ class RunDiagnosticsP2TestCase(unittest.TestCase):
     def test_history_service_and_endpoint_return_diagnostic_summary(self) -> None:
         context_snapshot = {
             "diagnostics": _diagnostic_snapshot(),
-            "news_content": "新闻摘要",
+            "news_content": "新聞摘要",
         }
         db = _FakeHistoryDb(_history_record(context_snapshot=context_snapshot))
 

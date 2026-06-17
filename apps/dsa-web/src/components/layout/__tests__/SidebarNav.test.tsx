@@ -6,7 +6,7 @@ import { SidebarNav } from '../SidebarNav';
 const mockLogout = vi.fn().mockResolvedValue(undefined);
 const mockGetAlphaSiftStatus = vi.fn().mockResolvedValue({ enabled: false, available: false, installSpecIsDefault: false });
 const mockThemeToggle = vi.fn(({ collapsed }: { collapsed?: boolean }) => (
-  <button type="button">{collapsed ? '切换主题(折叠)' : '切换主题'}</button>
+  <button type="button">{collapsed ? '切換主題(摺疊)' : '切換主題'}</button>
 ));
 
 const completionBadgeState = { value: true };
@@ -124,7 +124,7 @@ describe('SidebarNav', () => {
     expect(mockThemeToggle).toHaveBeenCalledWith(
       expect.objectContaining({ variant: 'nav', collapsed: true }),
     );
-    expect(screen.getByRole('button', { name: '切换主题(折叠)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '切換主題(摺疊)' })).toBeInTheDocument();
   });
 
   it('renders the alerts navigation item and marks it active', () => {
@@ -134,7 +134,7 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    const alertsLink = screen.getByRole('link', { name: '告警' });
+    const alertsLink = screen.getByRole('link', { name: '警告' });
     expect(alertsLink).toHaveAttribute('href', '/alerts');
     expect(alertsLink).toHaveClass('font-medium');
   });

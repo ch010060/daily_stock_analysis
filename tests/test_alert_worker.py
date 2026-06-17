@@ -101,7 +101,7 @@ class AlertIndicatorHelperTestCase(unittest.TestCase):
             "rsi_threshold",
             "TEST",
             rsi_params,
-            pd.DataFrame({"日期": pd.date_range("2026-01-01", periods=3), "收盘": [10, 9, 11]}),
+            pd.DataFrame({"日期": pd.date_range("2026-01-01", periods=3), "收盤": [10, 9, 11]}),
         )
 
         macd_params = normalize_indicator_parameters("macd_cross", {

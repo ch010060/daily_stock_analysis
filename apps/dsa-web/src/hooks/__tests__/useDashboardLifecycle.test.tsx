@@ -10,7 +10,7 @@ vi.mock('../useTaskStream', () => ({
 const createTask = () => ({
   taskId: 'task-1',
   stockCode: '600519',
-  stockName: '贵州茅台',
+  stockName: '貴州茅臺',
   status: 'completed' as const,
   progress: 100,
   reportType: 'detailed',
@@ -159,7 +159,7 @@ describe('useDashboardLifecycle', () => {
       ...createTask(),
       status: 'processing' as const,
       progress: 72,
-      message: 'LLM 正在生成分析结果',
+      message: 'LLM 正在生成分析結果',
     };
 
     act(() => {
@@ -190,7 +190,7 @@ describe('useDashboardLifecycle', () => {
     const failedTask = {
       ...createTask(),
       status: 'failed' as const,
-      error: '分析失败',
+      error: '分析失敗',
     };
 
     act(() => {

@@ -1046,7 +1046,7 @@
       },
       "fallback": [],
       "caveats": [
-        "data_id: TXF (台指期), TMF, CDF, etc."
+        "data_id: TXF (臺指期), TMF, CDF, etc."
       ]
     },
     {
@@ -1092,7 +1092,7 @@
       },
       "fallback": [],
       "caveats": [
-        "data_id: TXO (台指選), TX1-TX5, etc."
+        "data_id: TXO (臺指選), TX1-TX5, etc."
       ]
     },
     {

@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # ──────────────────────────────────────────────────────────────────────────────
 
 _FORBIDDEN_PROMPT_TERMS = frozenset({
-    "買進", "賣出", "買入", "卖出", "推薦買", "推薦賣",
+    "買進", "賣出", "買進", "賣出", "推薦買", "推薦賣",
     "保證", "必漲", "必跌", "請上網查", "即時搜尋",
 })
 
@@ -135,7 +135,7 @@ def _build_latest_info_panel(
     missing_str = f" 缺少資料集：{', '.join(missing)}。" if missing else ""
     summary = (
         f"最新資訊 panel：{symbol} 共 {event_count} 個事件，"
-        f"類型：{', '.join(event_types) or '無'}，"
+        f"型別：{', '.join(event_types) or '無'}，"
         f"資料截止 {end_date}。{missing_str}"
     )
 
@@ -175,7 +175,7 @@ def _build_latest_info_panel(
                 title="資料缺口說明",
                 prompt=(
                     f"請只根據本 latest_info panel（資料截止 {end_date}），指出因資料缺口"
-                    f"（{', '.join(missing)}）無法作為強結論依據的項目，不得引用外部資訊。"
+                    f"（{', '.join(missing)}）無法作為強結論依據的專案，不得引用外部資訊。"
                 ),
                 allowed_context=["latest_info_panel"],
                 data_freshness=data_freshness,
@@ -409,7 +409,7 @@ def _build_strategy_analysis_panel(
         f"策略分析 panel：{symbol} 共 {strategy_count} 個策略，"
         f"風險旗標 {risk_count} 個，"
         f"歷史回報最高策略（僅供參考）：{best_historical or '無'}，"
-        f"歷史最低回撤：{lowest_drawdown or '無'}。{overfit_note}"
+        f"歷史最低迴撤：{lowest_drawdown or '無'}。{overfit_note}"
     )
 
     data_freshness: Dict[str, Any] = {"as_of": end_date}
@@ -508,7 +508,7 @@ def _build_data_quality_panel(
             title="資料缺口分析",
             prompt=(
                 f"請只根據本 data_quality panel（截至 {end_date}），"
-                f"列出 {symbol} 不能支持強結論的資料缺口，不得引用外部資訊。"
+                f"列出 {symbol} 不能支援強結論的資料缺口，不得引用外部資訊。"
             ),
             allowed_context=["data_quality_panel"],
             data_freshness=data_freshness,

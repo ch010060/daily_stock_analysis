@@ -308,8 +308,8 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
             DatabaseManager.reset_instance()
             try:
                 saved = market_review_module._persist_market_review_history(
-                    review_report="## 今日大盘\n\n复盘正文",
-                    markdown_report="# 🎯 大盘复盘\n\n## 今日大盘\n\n复盘正文",
+                    review_report="## 今日大盤\n\n覆盤正文",
+                    markdown_report="# 🎯 大盤覆盤\n\n## 今日大盤\n\n覆盤正文",
                     region="cn",
                     config=SimpleNamespace(report_language="zh"),
                     query_id="market-task-001",
@@ -341,10 +341,10 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                     ).first()
                     self.assertIsNotNone(row)
                     self.assertEqual(row.code, market_review_module.MARKET_REVIEW_HISTORY_CODE)
-                    self.assertEqual(row.name, "大盘复盘")
+                    self.assertEqual(row.name, "大盤覆盤")
                     self.assertEqual(row.report_type, market_review_module.MARKET_REVIEW_REPORT_TYPE)
-                    self.assertEqual(row.news_content, "## 今日大盘\n\n复盘正文")
-                    self.assertIn("# 🎯 大盘复盘", row.raw_result)
+                    self.assertEqual(row.news_content, "## 今日大盤\n\n覆盤正文")
+                    self.assertIn("# 🎯 大盤覆盤", row.raw_result)
                     self.assertIn('"market_light_snapshots"', row.context_snapshot)
                     self.assertIn('"trade_date": "2026-03-06"', row.context_snapshot)
             finally:

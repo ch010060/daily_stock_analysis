@@ -43,7 +43,7 @@ def _make_adapter_module(
 ) -> SimpleNamespace:
     return SimpleNamespace(
         screen=screen or MagicMock(return_value=[]),
-        list_strategies=list_strategies or (lambda: [{"id": "dual_low", "name": "双低选股", "description": "", "category": "价值"}]),
+        list_strategies=list_strategies or (lambda: [{"id": "dual_low", "name": "雙低選股", "description": "", "category": "價值"}]),
         get_status=get_status or (lambda: {"supported_markets": ["cn"], "contract_version": "1", "version": "0.2.0", "strategy_count": 1}),
     )
 
@@ -219,8 +219,8 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         config = self._config(enabled=True)
         fake_module = _make_adapter_module(
             list_strategies=lambda: [
-                {"id": "dual_low", "name": "双低选股", "description": "value", "category": "价值"},
-                {"id": "trend_quality", "title": "趋势质量", "description": "trend", "tag": "框架"},
+                {"id": "dual_low", "name": "雙低選股", "description": "value", "category": "價值"},
+                {"id": "trend_quality", "title": "趨勢質量", "description": "trend", "tag": "框架"},
             ],
         )
 
@@ -230,8 +230,8 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(payload["enabled"], True)
         self.assertEqual(payload["strategy_count"], 2)
         self.assertEqual(payload["strategies"][0]["id"], "dual_low")
-        self.assertEqual(payload["strategies"][0]["name"], "双低选股")
-        self.assertEqual(payload["strategies"][1]["name"], "趋势质量")
+        self.assertEqual(payload["strategies"][0]["name"], "雙低選股")
+        self.assertEqual(payload["strategies"][1]["name"], "趨勢質量")
 
     def test_strategies_installs_when_enabled_but_adapter_missing(self) -> None:
         config = self._config(enabled=True)
@@ -351,7 +351,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(caught.exception.detail.get("diagnostics", {}).get("resolution"), "no_auto_install")
         self.assertEqual(
             caught.exception.detail.get("diagnostics", {}).get("message"),
-            "请先检查后端日志并修复运行时异常，当前未触发自动安装。",
+            "請先檢查後端日誌並修復執行時異常，當前未觸發自動安裝。",
         )
         install_mock.assert_not_called()
 
@@ -754,7 +754,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
     def test_screen_allows_non_listed_strategy_as_custom(self) -> None:
         config = self._config(enabled=True)
         fake_module = _make_adapter_module(
-            list_strategies=lambda: [{"id": "dual_low", "name": "双低选股"}],
+            list_strategies=lambda: [{"id": "dual_low", "name": "雙低選股"}],
             screen=MagicMock(return_value={"candidates": []}),
         )
 

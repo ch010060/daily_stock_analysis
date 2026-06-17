@@ -1,24 +1,24 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Daily Stock Analysis - FastAPI 后端服务入口
+Daily Stock Analysis - FastAPI 後端服務入口
 ===================================
 
-职责：
-1. 提供 RESTful API 服务
-2. 配置 CORS 跨域支持
-3. 健康检查接口
-4. 托管前端静态文件（生产模式）
+職責：
+1. 提供 RESTful API 服務
+2. 配置 CORS 跨域支援
+3. 健康檢查介面
+4. 託管前端靜態檔案（生產模式）
 
-启动方式（本地安全模式，支持的入口）：
-    python server.py                 # 直接运行，触发安全检查后启动 uvicorn
+啟動方式（本地安全模式，支援的入口）：
+    python server.py                 # 直接執行，觸發安全檢查後啟動 uvicorn
 
     或使用 main.py:
-    python main.py --serve-only      # 仅启动 API 服务
-    python main.py --serve           # API 服务 + 执行分析
+    python main.py --serve-only      # 僅啟動 API 服務
+    python main.py --serve           # API 服務 + 執行分析
 
-注意：`uvicorn server:app` 直接启动会跳过 validate_server_startup_safety()
-安全检查，不属于本地安全模式的支持启动路径。
+注意：`uvicorn server:app` 直接啟動會跳過 validate_server_startup_safety()
+安全檢查，不屬於本地安全模式的支援啟動路徑。
 """
 
 import logging
@@ -26,7 +26,7 @@ import logging
 from src.config import setup_env, get_config
 from src.logging_config import setup_logging
 
-# 初始化环境变量与日志
+# 初始化環境變數與日誌
 setup_env()
 
 config = get_config()
@@ -39,11 +39,11 @@ setup_logging(
     extra_quiet_loggers=['uvicorn', 'fastapi'],
 )
 
-# 从 api.app 导入应用实例
+# 從 api.app 匯入應用例項
 from api.app import app  # noqa: E402
 from api.app import validate_server_startup_safety  # noqa: E402
 
-# 导出 app 供 uvicorn 使用
+# 匯出 app 供 uvicorn 使用
 __all__ = ['app']
 
 

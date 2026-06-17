@@ -2,7 +2,7 @@
   "symbol": "TW:2454",
   "market": "TW",
   "fetched_at": "fixture",
-  "news_context_text": "【聯發科 2454 最新情報】\n1. 天璣 9400 旗艦 SoC 出貨強勁，三星、小米、OPPO 均已採用。\n2. Q1 2025 毛利率 51.2%，受惠 AI 手機換機潮需求回升。\n3. 車用晶片業務占比提升至 12%，年增 35%。\n4. 風險：中低階智慧機市場競爭激烈（高通 Snapdragon）、中國市場需求不確定性。",
+  "news_context_text": "【聯發科 2454 最新情報】\n1. 天璣 9400 旗艦 SoC 出貨強勁，三星、小米、OPPO 均已採用。\n2. Q1 2025 毛利率 51.2%，受惠 AI 手機換機潮需求回升。\n3. 車用晶片業務佔比提升至 12%，年增 35%。\n4. 風險：中低階智慧機市場競爭激烈（高通 Snapdragon）、中國市場需求不確定性。",
   "dimensions": {
     "latest_news": {
       "success": true,

@@ -78,7 +78,7 @@ def _build_analysis_context_pack_summary(
 ) -> str:
     artifacts = PipelineAnalysisArtifacts(
         code="600519",
-        stock_name="贵州茅台",
+        stock_name="貴州茅臺",
         market="cn",
         phase=None,
         base_context={
@@ -99,7 +99,7 @@ def _build_analysis_context_pack_summary(
             "coverage": {"valuation": "ok"},
             "source_chain": [{"provider": "fundamental_pipeline"}],
         },
-        news_context="新闻摘要",
+        news_context="新聞摘要",
         news_result_count=1,
         metadata={"trigger_source": "api"},
     )
@@ -110,7 +110,7 @@ def _build_analysis_context_pack_summary(
 
 
 SAMPLE_DASHBOARD = {
-    "stock_name": "贵州茅台",
+    "stock_name": "貴州茅臺",
     "sentiment_score": 75,
     "trend_prediction": "看多",
     "operation_advice": "持有",
@@ -118,8 +118,8 @@ SAMPLE_DASHBOARD = {
     "confidence_level": "中",
     "dashboard": {
         "core_conclusion": {
-            "one_sentence": "茅台近期震荡走强",
-            "signal_type": "🟡持有观望",
+            "one_sentence": "茅臺近期震盪走強",
+            "signal_type": "🟡持有觀望",
         },
     },
     "analysis_summary": "Overall bullish trend",
@@ -137,7 +137,7 @@ def test_agent_system_prompts_require_phase_decision_contract() -> None:
         assert '"watch_conditions"' in prompt
         assert '"data_limitations"' in prompt
         assert "quote/daily_bars/technical 存在 stale、fallback、missing、fetch_failed、partial 或 estimated" in prompt
-        assert "`confidence_level` 不得为高" in prompt
+        assert "`confidence_level` 不得為高" in prompt
 
 
 # ============================================================
@@ -159,8 +159,8 @@ class TestAgentExecutor(unittest.TestCase):
             return AgentResult(success=True, content="assistant reply")
 
         compressed_history = [
-            {"role": "user", "content": "[系统生成的历史对话摘要，仅供延续本会话]\n旧摘要"},
-            {"role": "assistant", "content": "最近回复"},
+            {"role": "user", "content": "[系統生成的歷史對話摘要，僅供延續本會話]\n舊摘要"},
+            {"role": "assistant", "content": "最近回覆"},
         ]
 
         with patch.object(executor, "_run_loop", side_effect=fake_run_loop):
@@ -171,11 +171,11 @@ class TestAgentExecutor(unittest.TestCase):
                 with patch("src.agent.conversation.conversation_manager.get_or_create"):
                     with patch("src.agent.conversation.conversation_manager.add_message"):
                         executor.chat(
-                            "当前问题",
+                            "當前問題",
                             "session-1",
                             context={
                                 "stock_code": "600519",
-                                "stock_name": "贵州茅台",
+                                "stock_name": "貴州茅臺",
                                 "previous_price": 1800,
                             },
                         )
@@ -184,9 +184,9 @@ class TestAgentExecutor(unittest.TestCase):
         assert messages[0]["role"] == "system"
         assert messages[1:3] == compressed_history
         assert messages[3]["role"] == "user"
-        assert messages[3]["content"].startswith("[系统提供的历史分析上下文，可供参考对比]")
+        assert messages[3]["content"].startswith("[系統提供的歷史分析上下文，可供參考對比]")
         assert messages[4]["role"] == "assistant"
-        assert messages[-1] == {"role": "user", "content": "当前问题"}
+        assert messages[-1] == {"role": "user", "content": "當前問題"}
 
     def test_prompt_omits_hardcoded_trend_baseline_when_default_policy_is_empty(self):
         """Explicit skill runs should not silently keep the legacy trend baseline."""
@@ -202,7 +202,7 @@ class TestAgentExecutor(unittest.TestCase):
         executor = AgentExecutor(
             registry,
             adapter,
-            skill_instructions="### 技能 1: 缠论\n- 关注中枢与背驰",
+            skill_instructions="### 技能 1: 纏論\n- 關注中樞與背馳",
             default_skill_policy="",
             max_steps=2,
         )
@@ -210,9 +210,9 @@ class TestAgentExecutor(unittest.TestCase):
 
         self.assertTrue(result.success)
         prompt = adapter.call_with_tools.call_args.args[0][0]["content"]
-        self.assertIn("### 技能 1: 缠论", prompt)
-        self.assertNotIn("专注于趋势交易", prompt)
-        self.assertNotIn("多头排列：MA5 > MA10 > MA20", prompt)
+        self.assertIn("### 技能 1: 纏論", prompt)
+        self.assertNotIn("專注於趨勢交易", prompt)
+        self.assertNotIn("多頭排列：MA5 > MA10 > MA20", prompt)
 
     def test_prompt_keeps_injected_default_policy_for_implicit_default_run(self):
         """Implicit default runs can still inject the default bull-trend baseline explicitly."""
@@ -228,8 +228,8 @@ class TestAgentExecutor(unittest.TestCase):
         executor = AgentExecutor(
             registry,
             adapter,
-            skill_instructions="### 技能 1: 默认多头趋势",
-            default_skill_policy="## 默认技能基线（必须严格遵守）\n- **多头排列必须条件**：MA5 > MA10 > MA20",
+            skill_instructions="### 技能 1: 預設多頭趨勢",
+            default_skill_policy="## 預設技能基線（必須嚴格遵守）\n- **多頭排列必須條件**：MA5 > MA10 > MA20",
             use_legacy_default_prompt=True,
             max_steps=2,
         )
@@ -237,10 +237,10 @@ class TestAgentExecutor(unittest.TestCase):
 
         self.assertTrue(result.success)
         prompt = adapter.call_with_tools.call_args.args[0][0]["content"]
-        self.assertIn("### 技能 1: 默认多头趋势", prompt)
-        self.assertIn("专注于趋势交易", prompt)
-        self.assertIn("多头排列必须条件", prompt)
-        self.assertIn("多头排列：MA5 > MA10 > MA20", prompt)
+        self.assertIn("### 技能 1: 預設多頭趨勢", prompt)
+        self.assertIn("專注於趨勢交易", prompt)
+        self.assertIn("多頭排列必須條件", prompt)
+        self.assertIn("多頭排列：MA5 > MA10 > MA20", prompt)
 
     def test_simple_text_response(self):
         """Agent returns text immediately (no tool calls) with JSON dashboard."""
@@ -966,15 +966,15 @@ class TestBuildUserMessage(unittest.TestCase):
     def test_basic_message(self):
         msg = self.executor._build_user_message("Analyze 600519")
         self.assertIn("Analyze 600519", msg)
-        self.assertIn("决策仪表盘", msg)
+        self.assertIn("決策儀表盤", msg)
 
     def test_message_with_context(self):
         msg = self.executor._build_user_message(
             "Analyze",
             context={"stock_code": "600519", "report_type": "daily"},
         )
-        self.assertIn("股票代码: 600519", msg)
-        self.assertIn("报告类型: daily", msg)
+        self.assertIn("股票程式碼: 600519", msg)
+        self.assertIn("報告型別: daily", msg)
 
     def test_message_renders_readable_market_phase_context_without_raw_keys(self):
         summary = _build_analysis_context_pack_summary(
@@ -1000,16 +1000,16 @@ class TestBuildUserMessage(unittest.TestCase):
                 "realtime_quote": {"price": 1880.0},
             },
         )
-        self.assertIn("股票代码: 600519", msg)
-        self.assertIn("市场阶段上下文", msg)
+        self.assertIn("股票程式碼: 600519", msg)
+        self.assertIn("市場階段上下文", msg)
         self.assertIn("分析上下文包摘要", msg)
-        self.assertIn("数据限制", msg)
-        self.assertIn("已知限制：行情：降级", msg)
-        self.assertIn("confidence_level 不得为高", msg)
-        self.assertIn("盘中", msg)
-        self.assertIn("不得当作完整日线复盘", msg)
-        self.assertLess(msg.index("市场阶段上下文"), msg.index("分析上下文包摘要"))
-        self.assertLess(msg.index("分析上下文包摘要"), msg.index("[系统已获取的实时行情]"))
+        self.assertIn("資料限制", msg)
+        self.assertIn("已知限制：行情：降級", msg)
+        self.assertIn("confidence_level 不得為高", msg)
+        self.assertIn("盤中", msg)
+        self.assertIn("不得當作完整日線覆盤", msg)
+        self.assertLess(msg.index("市場階段上下文"), msg.index("分析上下文包摘要"))
+        self.assertLess(msg.index("分析上下文包摘要"), msg.index("[系統已獲取的實時行情]"))
         self.assertNotIn("market_phase_context", msg)
         self.assertNotIn("analysis_context_pack_summary", msg)
         self.assertNotIn("is_partial_bar", msg)

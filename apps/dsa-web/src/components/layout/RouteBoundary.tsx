@@ -62,9 +62,9 @@ class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBo
         }
       >
         <div className="w-full max-w-md rounded-2xl border border-border bg-card/94 p-6 text-center shadow-soft-card">
-          <h1 className="text-xl font-semibold text-foreground">页面加载失败</h1>
+          <h1 className="text-xl font-semibold text-foreground">頁面載入失敗</h1>
           <p className="mt-3 text-sm leading-6 text-secondary-text">
-            当前页面资源或组件未能正常加载，可能是网络中断或页面版本已更新。请重新加载页面，或返回首页后再试。
+            當前頁面資源或元件未能正常載入，可能是網路中斷或頁面版本已更新。請重新載入頁面，或返回首頁後再試。
           </p>
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <button
@@ -72,14 +72,14 @@ class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBo
               className="btn-primary"
               onClick={() => window.location.reload()}
             >
-              重新加载页面
+              重新載入頁面
             </button>
             <button
               type="button"
               className="rounded-xl border border-border/70 bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-hover"
               onClick={() => window.location.assign('/')}
             >
-              返回首页
+              返回首頁
             </button>
           </div>
         </div>

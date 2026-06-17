@@ -46,10 +46,10 @@ const mockIndex: StockIndexItem[] = [
   {
     canonicalCode: "600519.SH",
     displayCode: "600519",
-    nameZh: "贵州茅台",
+    nameZh: "貴州茅臺",
     pinyinFull: "guizhoumaotai",
     pinyinAbbr: "gzmt",
-    aliases: ["茅台"],
+    aliases: ["茅臺"],
     market: "CN",
     assetType: "stock",
     active: true,
@@ -61,7 +61,7 @@ const mockSuggestions = [
   {
     canonicalCode: "600519.SH",
     displayCode: "600519",
-    nameZh: "贵州茅台",
+    nameZh: "貴州茅臺",
     market: "CN",
     matchType: "exact" as const,
     matchField: "code" as const,
@@ -72,7 +72,7 @@ const mockSuggestions = [
 const hkSuggestion = {
   canonicalCode: "00700.HK",
   displayCode: "00700",
-  nameZh: "腾讯控股",
+  nameZh: "騰訊控股",
   market: "HK" as const,
   matchType: "exact" as const,
   matchField: "code" as const,
@@ -130,7 +130,7 @@ describe('StockAutocomplete', () => {
       />
     );
 
-    const input = screen.getByPlaceholderText(/输入股票代码或名称/);
+    const input = screen.getByPlaceholderText(/輸入股票程式碼或名稱/);
     expect(input).toBeInTheDocument();
   });
 
@@ -140,11 +140,11 @@ describe('StockAutocomplete', () => {
         value=""
         onChange={mockOnChange}
         onSubmit={mockOnSubmit}
-        placeholder="请输入代码"
+        placeholder="請輸入程式碼"
       />
     );
 
-    const input = screen.getByPlaceholderText(/请输入代码/);
+    const input = screen.getByPlaceholderText(/請輸入程式碼/);
     expect(input).toBeInTheDocument();
   });
 
@@ -236,7 +236,7 @@ describe('StockAutocomplete', () => {
         />
       );
 
-      const input = screen.getByPlaceholderText(/输入股票代码或名称/);
+      const input = screen.getByPlaceholderText(/輸入股票程式碼或名稱/);
       expect(input).toHaveAttribute('data-autocomplete-mode', 'fallback');
     });
 
@@ -267,7 +267,7 @@ describe('StockAutocomplete', () => {
         />
       );
 
-      const input = screen.getByPlaceholderText(/输入股票代码或名称/);
+      const input = screen.getByPlaceholderText(/輸入股票程式碼或名稱/);
       expect(input).toHaveAttribute('data-autocomplete-mode', 'fallback');
     });
 
@@ -390,7 +390,7 @@ describe('StockAutocomplete', () => {
       fireEvent.keyDown(input, { key: 'Enter' });
 
       expect(mockOnChange).toHaveBeenCalledWith('600519');
-      expect(mockOnSubmit).toHaveBeenCalledWith('600519.SH', '贵州茅台', 'autocomplete');
+      expect(mockOnSubmit).toHaveBeenCalledWith('600519.SH', '貴州茅臺', 'autocomplete');
     });
 
     it('submits the highlighted HK suggestion using the canonical .HK code', () => {
@@ -424,7 +424,7 @@ describe('StockAutocomplete', () => {
       fireEvent.keyDown(input, { key: 'Enter' });
 
       expect(mockOnChange).toHaveBeenCalledWith('00700');
-      expect(mockOnSubmit).toHaveBeenCalledWith('00700.HK', '腾讯控股', 'autocomplete');
+      expect(mockOnSubmit).toHaveBeenCalledWith('00700.HK', '騰訊控股', 'autocomplete');
     });
 
     it('submits the highlighted BSE suggestion using the canonical .BJ code', () => {
@@ -489,7 +489,7 @@ describe('StockAutocomplete', () => {
           {
             canonicalCode: 'TEST.OTC',
             displayCode: 'TEST',
-            nameZh: '测试市场',
+            nameZh: '測試市場',
             market: 'OTC' as never,
             matchType: 'exact' as const,
             matchField: 'code' as const,

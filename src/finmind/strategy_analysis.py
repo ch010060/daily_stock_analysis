@@ -340,7 +340,7 @@ def detect_risk_flags(
                 "severity": "medium",
                 "strategy_label": label,
                 "strategy_name": name,
-                "message": "策略未產生任何訊號，資料不足或窗口過短。",
+                "message": "策略未產生任何訊號，資料不足或視窗過短。",
                 "evidence": {"signal_count": 0},
             })
 
@@ -362,7 +362,7 @@ def detect_risk_flags(
                     "strategy_label": "parameter_sweep",
                     "strategy_name": "parameter_sweep",
                     "message": (
-                        f"最佳參數組合報酬 ({best:.1%}) 遠高於中位數 ({median_r:.1%})，"
+                        f"最佳引數組合報酬 ({best:.1%}) 遠高於中位數 ({median_r:.1%})，"
                         "可能存在過度擬合風險。"
                     ),
                     "evidence": {"best_return": best, "median_return": median_r,
@@ -392,14 +392,14 @@ def _generate_analysis_prompts(
         f"請只根據本次策略分析結果（截至 {end_date}），"
         "比較各策略的超額報酬與最大回撤，不要使用外部資料。",
 
-        "請列出本次策略分析有哪些資料限制（例如未調整股價、資料缺口、窗口過短），"
+        "請列出本次策略分析有哪些資料限制（例如未調整股價、資料缺口、視窗過短），"
         "以及這些限制如何影響結果的可信度（勿作投資建議）。",
     ]
 
     if has_sweep:
         prompts.append(
-            "請只根據本次參數掃描結果，"
-            "檢查是否有過度擬合風險，並說明哪個參數範圍最為穩健。"
+            "請只根據本次引數掃描結果，"
+            "檢查是否有過度擬合風險，並說明哪個引數範圍最為穩健。"
         )
 
     high_flags = [f for f in risk_flags if f.get("severity") == "high"]
@@ -412,7 +412,7 @@ def _generate_analysis_prompts(
 
     prompts.append(
         "請列出本次策略分析下一輪應驗證的三個假設，"
-        "例如流動性、除息調整、時間窗口選擇等。"
+        "例如流動性、除息調整、時間視窗選擇等。"
     )
 
     return prompts

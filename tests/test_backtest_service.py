@@ -37,10 +37,10 @@ class BacktestServiceTestCase(unittest.TestCase):
                 AnalysisHistory(
                     query_id="q1",
                     code="600519",
-                    name="贵州茅台",
+                    name="貴州茅臺",
                     report_type="simple",
                     sentiment_score=80,
-                    operation_advice="买入",
+                    operation_advice="買進",
                     trend_prediction="看多",
                     analysis_summary="test",
                     stop_loss=95.0,
@@ -88,7 +88,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                 AnalysisHistory(
                     query_id=query_id,
                     code="600519",
-                    name="贵州茅台",
+                    name="貴州茅臺",
                     report_type="simple",
                     sentiment_score=60,
                     operation_advice=operation_advice,
@@ -152,7 +152,7 @@ class BacktestServiceTestCase(unittest.TestCase):
         self.assertEqual(result.eval_status, "completed")
         self.assertEqual(result.code, "600519")
         self.assertEqual(result.analysis_date, date(2024, 1, 1))
-        self.assertEqual(result.operation_advice, "买入")
+        self.assertEqual(result.operation_advice, "買進")
         self.assertEqual(result.position_recommendation, "long")
         self.assertEqual(result.direction_expected, "up")
 
@@ -261,7 +261,7 @@ class BacktestServiceTestCase(unittest.TestCase):
             query_id="q2",
             analysis_date=date(2024, 1, 10),
             created_at=datetime(2024, 1, 10, 0, 0, 0),
-            operation_advice="买入",
+            operation_advice="買進",
             trend_prediction="看多",
             start_close=100.0,
             forward_bars=[
@@ -282,7 +282,7 @@ class BacktestServiceTestCase(unittest.TestCase):
         )
         self.assertEqual(data["total"], 1)
         item = data["items"][0]
-        self.assertEqual(item["stock_name"], "贵州茅台")
+        self.assertEqual(item["stock_name"], "貴州茅臺")
         self.assertEqual(item["trend_prediction"], "看多")
         self.assertEqual(item["actual_movement"], "down")
         self.assertAlmostEqual(item["actual_return_pct"], -4.0)
@@ -293,7 +293,7 @@ class BacktestServiceTestCase(unittest.TestCase):
             query_id="q2",
             analysis_date=date(2024, 1, 10),
             created_at=datetime(2024, 1, 10, 0, 0, 0),
-            operation_advice="买入",
+            operation_advice="買進",
             trend_prediction="看多",
             start_close=100.0,
             forward_bars=[
@@ -338,7 +338,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                     engine_version="v1",
                     eval_status="completed",
                     evaluated_at=datetime(2024, 1, 5, 0, 0, 0),
-                    operation_advice="买入",
+                    operation_advice="買進",
                     position_recommendation="long",
                     start_price=100.0,
                     end_close=96.0,
@@ -356,7 +356,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                     engine_version="v2",
                     eval_status="completed",
                     evaluated_at=datetime(2024, 1, 6, 0, 0, 0),
-                    operation_advice="买入",
+                    operation_advice="買進",
                     position_recommendation="long",
                     start_price=100.0,
                     end_close=96.0,
@@ -450,10 +450,10 @@ class BacktestServiceTestCase(unittest.TestCase):
                 AnalysisHistory(
                     query_id="q2",
                     code="000001",
-                    name="平安银行",
+                    name="平安銀行",
                     report_type="simple",
                     sentiment_score=30,
-                    operation_advice="卖出",
+                    operation_advice="賣出",
                     trend_prediction="看空",
                     analysis_summary="test2",
                     stop_loss=None,
@@ -506,11 +506,11 @@ class BacktestServiceTestCase(unittest.TestCase):
                 AnalysisHistory(
                     query_id="q-market-review",
                     code="MARKET",
-                    name="大盘复盘",
+                    name="大盤覆盤",
                     report_type="market_review",
                     sentiment_score=50,
-                    operation_advice="查看复盘",
-                    trend_prediction="大盘复盘",
+                    operation_advice="檢視覆盤",
+                    trend_prediction="大盤覆盤",
                     analysis_summary="market review summary",
                     stop_loss=None,
                     take_profit=None,
@@ -538,11 +538,11 @@ class BacktestServiceTestCase(unittest.TestCase):
                 AnalysisHistory(
                     query_id="q-null-report-type",
                     code="000858",
-                    name="五粮液",
+                    name="五糧液",
                     report_type=None,
                     sentiment_score=60,
                     operation_advice="持有",
-                    trend_prediction="震荡",
+                    trend_prediction="震盪",
                     analysis_summary="legacy null report_type row",
                     stop_loss=None,
                     take_profit=None,

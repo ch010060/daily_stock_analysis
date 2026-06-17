@@ -114,7 +114,7 @@ const HomePage: React.FC = () => {
   } = useHomeDashboardState();
 
   useEffect(() => {
-    document.title = '每日选股分析 - DSA';
+    document.title = '每日選股分析 - DSA';
   }, []);
 
   useEffect(() => {
@@ -200,7 +200,7 @@ const HomePage: React.FC = () => {
   );
   const strategyOptions = useMemo(
     () => [
-      { id: '', name: '默认策略', description: '沿用系统默认分析框架' },
+      { id: '', name: '預設策略', description: '沿用系統預設分析框架' },
       ...analysisSkills.map((skill) => ({
         id: skill.id,
         name: skill.name,
@@ -402,8 +402,8 @@ const HomePage: React.FC = () => {
           setMarketReviewReport(null);
           setMarketReviewNotice({
             variant: 'danger',
-            title: '大盘复盘已超时',
-            message: '任务长时间未返回最终结果，请在任务列表/历史中查看。',
+            title: '大盤覆盤已超時',
+            message: '任務長時間未返回最終結果，請在任務列表/歷史中檢視。',
           });
           scrollMarketReviewFeedbackIntoView();
           return false;
@@ -417,11 +417,11 @@ const HomePage: React.FC = () => {
             setMarketReviewReport(null);
             const progress = typeof status.progress === 'number'
               ? `${status.progress}%`
-              : '进行中';
+              : '進行中';
             setMarketReviewNotice({
               variant: 'warning',
-              title: '大盘复盘进行中',
-              message: `任务状态：${status.status}（${progress}）`,
+              title: '大盤覆盤進行中',
+              message: `任務狀態：${status.status}（${progress}）`,
             });
             return true;
           }
@@ -434,8 +434,8 @@ const HomePage: React.FC = () => {
             setMarketReviewReport(marketReviewText ? marketReviewText.trim() : null);
             setMarketReviewNotice({
               variant: 'success',
-              title: '大盘复盘已完成',
-              message: marketReviewText ? '大盘复盘任务已完成，结果如下：' : '大盘复盘任务已完成，结果已生成并按配置推送。',
+              title: '大盤覆盤已完成',
+              message: marketReviewText ? '大盤覆盤任務已完成，結果如下：' : '大盤覆盤任務已完成，結果已生成並按配置推送。',
             });
             setMarketReviewError(null);
             scrollMarketReviewFeedbackIntoView();
@@ -451,7 +451,7 @@ const HomePage: React.FC = () => {
                   status: 500,
                   data: {
                     error: 'market_review_failed',
-                    message: status.error || '大盘复盘执行失败。',
+                    message: status.error || '大盤覆盤執行失敗。',
                   },
                 },
               }),
@@ -465,8 +465,8 @@ const HomePage: React.FC = () => {
           setMarketReviewReport(null);
           setMarketReviewNotice({
             variant: 'danger',
-            title: '大盘复盘状态异常',
-            message: `收到未知任务状态：${status.status}`,
+            title: '大盤覆盤狀態異常',
+            message: `收到未知任務狀態：${status.status}`,
           });
           scrollMarketReviewFeedbackIntoView();
           return false;
@@ -509,7 +509,7 @@ const HomePage: React.FC = () => {
       const result = await analysisApi.triggerMarketReview({ sendNotification: notify });
       setMarketReviewNotice({
         variant: 'success',
-        title: '大盘复盘已提交',
+        title: '大盤覆盤已提交',
         message: result.message,
       });
       scrollMarketReviewFeedbackIntoView();
@@ -537,7 +537,7 @@ const HomePage: React.FC = () => {
         setTimeout(() => setMarketReviewReportCopied(false), 2000);
       },
       (err) => {
-        console.error('复制失败:', err);
+        console.error('複製失敗:', err);
       },
     );
   }, [marketReviewReport]);
@@ -552,7 +552,7 @@ const HomePage: React.FC = () => {
     const marketReviewItem: StockBarItem = {
       id: latestMarketReview.id,
       stockCode: 'MARKET',
-      stockName: latestMarketReview.stockName || '大盘复盘',
+      stockName: latestMarketReview.stockName || '大盤覆盤',
       reportType: 'market_review',
       sentimentScore: latestMarketReview.sentimentScore,
       operationAdvice: latestMarketReview.operationAdvice,
@@ -609,7 +609,7 @@ const HomePage: React.FC = () => {
               <button
                 onClick={() => setSidebarOpen(true)}
                 className="md:hidden -ml-1 flex-shrink-0 rounded-lg p-1.5 text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
-                aria-label="历史记录"
+                aria-label="歷史記錄"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -622,7 +622,7 @@ const HomePage: React.FC = () => {
                   onSubmit={(stockCode, stockName, selectionSource) => {
                     handleSubmitAnalysis(stockCode, stockName, selectionSource);
                   }}
-                  placeholder="输入股票代码或名称，如 2330、AAPL"
+                  placeholder="輸入股票程式碼或名稱，如 2330、AAPL"
                   disabled={isAnalyzing}
                   className={inputError ? 'border-danger/50' : undefined}
                 />
@@ -700,7 +700,7 @@ const HomePage: React.FC = () => {
                 className="h-10 flex-1 whitespace-nowrap md:flex-none"
               >
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
-                大盘复盘
+                大盤覆盤
               </Button>
               <button
                 type="button"
@@ -729,7 +729,7 @@ const HomePage: React.FC = () => {
             {inputError ? (
               <InlineAlert
                 variant="danger"
-                title="输入有误"
+                title="輸入有誤"
                 message={inputError}
                 className="rounded-xl px-3 py-2 text-xs shadow-none"
               />
@@ -737,7 +737,7 @@ const HomePage: React.FC = () => {
             {!inputError && duplicateError ? (
               <InlineAlert
                 variant="warning"
-                title="任务已存在"
+                title="任務已存在"
                 message={duplicateError}
                 className="rounded-xl px-3 py-2 text-xs shadow-none"
               />
@@ -816,14 +816,14 @@ const HomePage: React.FC = () => {
             {marketReviewReport ? (
               <div className="mb-3 rounded-xl border border-subtle bg-surface/70 px-3 py-3 text-xs text-secondary-text shadow-sm">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="font-semibold text-foreground">大盘复盘报告</p>
+                  <p className="font-semibold text-foreground">大盤覆盤報告</p>
                   <button
                     type="button"
                     className="home-surface-button h-7 rounded-md px-3 py-1 text-xs text-foreground"
                     disabled={marketReviewReportCopied}
                     onClick={() => void handleCopyMarketReviewReport()}
                   >
-                    {marketReviewReportCopied ? '已复制' : '复制'}
+                    {marketReviewReportCopied ? '已複製' : '複製'}
                   </button>
                 </div>
                 <pre
@@ -844,7 +844,7 @@ const HomePage: React.FC = () => {
             ) : null}
             {isLoadingReport ? (
               <div className="flex h-full flex-col items-center justify-center">
-                <DashboardStateBlock title="加载报告中..." loading />
+                <DashboardStateBlock title="載入報告中..." loading />
               </div>
             ) : selectedReport ? (
               <div className={isHistoryTrendOpen ? 'max-w-6xl space-y-4 pb-8' : 'max-w-4xl space-y-4 pb-8'}>
@@ -871,7 +871,7 @@ const HomePage: React.FC = () => {
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
-                        追问 AI
+                        追問 AI
                       </Button>
                     </>
                   ) : (
@@ -884,7 +884,7 @@ const HomePage: React.FC = () => {
                       onClick={() => void handleTriggerMarketReview()}
                     >
                       <BarChart3 className="h-4 w-4" />
-                      重新复盘
+                      重新覆盤
                     </Button>
                   )}
                   <Button
@@ -901,7 +901,7 @@ const HomePage: React.FC = () => {
                     }}
                   >
                     <BarChart3 className="h-4 w-4" />
-                    历史趋势
+                    歷史趨勢
                   </Button>
                   <Button
                     variant="home-action-ai"
@@ -948,8 +948,8 @@ const HomePage: React.FC = () => {
             ) : (
               <div className="flex h-full items-center justify-center">
                 <EmptyState
-                  title="开始分析"
-                  description="输入股票代码进行分析，或从左侧选择历史报告查看。"
+                  title="開始分析"
+                  description="輸入股票程式碼進行分析，或從左側選擇歷史報告檢視。"
                   className="max-w-xl border-dashed"
                   icon={(
                     <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

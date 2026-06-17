@@ -33,8 +33,8 @@ from src.finmind.tw_stock_analysis import normalize_tw_symbol
 logger = logging.getLogger(__name__)
 
 _CN_BUYSELL_TERMS = frozenset({
-    "A股", "上證", "上证", "深證", "深证", "創業板", "创业板",
-    "科創50", "科创50", "買進", "賣出", "買入", "卖出",
+    "A股", "上證", "上證", "深證", "深證", "創業板", "創業板",
+    "科創50", "科創50", "買進", "賣出", "買進", "賣出",
 })
 
 

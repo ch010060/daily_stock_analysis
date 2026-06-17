@@ -40,10 +40,10 @@ class ZhTwLanguageTestCase(unittest.TestCase):
         self.assertEqual(set(zh_tw_labels), set(zh_labels))
         self.assertEqual(zh_tw_labels["core_conclusion_heading"], "核心結論")
         self.assertEqual(zh_tw_labels["risk_alerts_label"], "風險提示")
-        self.assertEqual(zh_tw_labels["buy_label"], "買入")
+        self.assertEqual(zh_tw_labels["buy_label"], "買進")
 
     def test_zh_tw_localized_values_use_traditional_chinese(self) -> None:
-        self.assertEqual(localize_operation_advice("buy", "zh_TW"), "買入")
+        self.assertEqual(localize_operation_advice("buy", "zh_TW"), "買進")
         self.assertEqual(localize_operation_advice("sell", "zh_TW"), "賣出")
         self.assertEqual(localize_trend_prediction("sideways", "zh_TW"), "震盪")
         self.assertEqual(get_sentiment_label(80, "zh_TW"), "極度樂觀")
@@ -100,7 +100,7 @@ class ZhTwLanguageTestCase(unittest.TestCase):
         self.assertEqual(normalize_report_language("zh-cn"), "zh")
         self.assertEqual(normalize_report_language("en"), "en")
         self.assertEqual(normalize_report_language("english"), "en")
-        self.assertEqual(get_report_labels("zh")["buy_label"], "买入")
+        self.assertEqual(get_report_labels("zh")["buy_label"], "買進")
         self.assertEqual(get_report_labels("en")["buy_label"], "Buy")
 
 

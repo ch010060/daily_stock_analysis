@@ -18,15 +18,15 @@ const diagnosticSummary: RunDiagnosticSummary = {
   stockCode: '600519',
   triggerSource: 'web',
   status: 'degraded',
-  statusLabel: '部分降级',
-  reason: '实时行情 baostock 成功，前置数据源失败后已继续',
+  statusLabel: '部分降級',
+  reason: '實時行情 baostock 成功，前置資料來源失敗後已繼續',
   copyText: 'trace_id: trace-1234567890abcdef\ndata_status: degraded',
   components: {
     realtimeQuote: {
       key: 'realtime_quote',
-      label: '实时行情',
+      label: '實時行情',
       status: 'degraded',
-      message: '实时行情 baostock 成功，前置数据源失败后已继续',
+      message: '實時行情 baostock 成功，前置資料來源失敗後已繼續',
       details: {
         provider: 'baostock',
         attempts: 2,
@@ -36,7 +36,7 @@ const diagnosticSummary: RunDiagnosticSummary = {
       key: 'notification',
       label: '通知',
       status: 'not_configured',
-      message: '通知未配置或本次跳过',
+      message: '通知未配置或本次跳過',
     },
   },
 };
@@ -58,24 +58,24 @@ describe('ReportDiagnostics', () => {
     render(<ReportDiagnostics recordId={1} />);
 
     expect(historyApi.getDiagnostics).toHaveBeenCalledWith(1);
-    expect(await screen.findByText('运行状态')).toBeInTheDocument();
+    expect(await screen.findByText('執行狀態')).toBeInTheDocument();
     const panel = screen.getByTestId('run-diagnostics');
     expect(panel).not.toHaveAttribute('open');
-    expect(screen.getByText('部分降级')).toBeInTheDocument();
+    expect(screen.getByText('部分降級')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText('运行状态'));
+    fireEvent.click(screen.getByText('執行狀態'));
 
     expect(panel).toHaveAttribute('open');
-    expect(screen.getByText('最近失败后已降级')).toBeInTheDocument();
+    expect(screen.getByText('最近失敗後已降級')).toBeInTheDocument();
     expect(screen.getByText('未配置')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '复制排障信息' }));
+    fireEvent.click(screen.getByRole('button', { name: '複製排障資訊' }));
 
     await waitFor(() => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(diagnosticSummary.copyText);
     });
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '已复制' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '已複製' })).toBeInTheDocument();
     });
   });
 
@@ -83,8 +83,8 @@ describe('ReportDiagnostics', () => {
     render(<ReportDiagnostics summary={diagnosticSummary} />);
 
     expect(historyApi.getDiagnostics).not.toHaveBeenCalled();
-    expect(screen.getByText('运行状态')).toBeInTheDocument();
-    expect(screen.getByText('部分降级')).toBeInTheDocument();
+    expect(screen.getByText('執行狀態')).toBeInTheDocument();
+    expect(screen.getByText('部分降級')).toBeInTheDocument();
   });
 
   it('refetches diagnostics after StrictMode cleans up the first effect run', async () => {
@@ -99,6 +99,6 @@ describe('ReportDiagnostics', () => {
     await waitFor(() => {
       expect(historyApi.getDiagnostics).toHaveBeenCalledTimes(2);
     });
-    expect(await screen.findByText('运行状态')).toBeInTheDocument();
+    expect(await screen.findByText('執行狀態')).toBeInTheDocument();
   });
 });

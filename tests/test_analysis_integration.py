@@ -114,7 +114,7 @@ class TestAnalysisIntegration:
         )
 
         assert response.status_code == 400
-        assert "最多支持" in response.json()["message"]
+        assert "最多支援" in response.json()["message"]
 
     def test_trigger_analysis_metadata_isolation_in_batch(self, client, mock_task_queue):
         """Test that single-stock metadata isn't applied to batch tasks."""
@@ -124,8 +124,8 @@ class TestAnalysisIntegration:
             "/api/v1/analysis/analyze",
             json={
                 "stock_codes": ["2330", "2454"],
-                "stock_name": "贵州茅台",
-                "original_query": "茅台",
+                "stock_name": "貴州茅臺",
+                "original_query": "茅臺",
                 "async_mode": True
             }
         )

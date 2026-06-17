@@ -19,8 +19,8 @@ describe('ReportNews', () => {
       total: 1,
       items: [
         {
-          title: '茅台发布最新经营数据',
-          snippet: '公司披露季度经营情况，市场关注度提升。',
+          title: '茅臺釋出最新經營資料',
+          snippet: '公司披露季度經營情況，市場關注度提升。',
           url: 'https://example.com/news',
         },
       ],
@@ -28,12 +28,12 @@ describe('ReportNews', () => {
 
     const { container } = render(<ReportNews recordId={1} />);
 
-    expect(await screen.findByText('茅台发布最新经营数据')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '跳转' })).toHaveAttribute('href', 'https://example.com/news');
+    expect(await screen.findByText('茅臺釋出最新經營資料')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '跳轉' })).toHaveAttribute('href', 'https://example.com/news');
     expect(container.querySelector('.home-panel-card')).toBeTruthy();
     expect(container.querySelector('.home-subpanel')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
+    fireEvent.click(screen.getByRole('button', { name: '重新整理' }));
 
     await waitFor(() => {
       expect(historyApi.getNews).toHaveBeenCalledTimes(2);
@@ -48,8 +48,8 @@ describe('ReportNews', () => {
 
     render(<ReportNews recordId={1} />);
 
-    expect(await screen.findByText('暂无相关资讯')).toBeInTheDocument();
-    expect(screen.getByText('可稍后刷新以获取最新资讯。')).toBeInTheDocument();
+    expect(await screen.findByText('暫無相關資訊')).toBeInTheDocument();
+    expect(screen.getByText('可稍後重新整理以獲取最新資訊。')).toBeInTheDocument();
   });
 
   it('localizes the empty state description for english reports', async () => {
@@ -71,8 +71,8 @@ describe('ReportNews', () => {
         total: 1,
         items: [
           {
-            title: '重试成功',
-            snippet: '第二次请求成功返回。',
+            title: '重試成功',
+            snippet: '第二次請求成功返回。',
             url: 'https://example.com/retry',
           },
         ],
@@ -82,8 +82,8 @@ describe('ReportNews', () => {
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    fireEvent.click(screen.getByRole('button', { name: '重試' }));
 
-    expect(await screen.findByText('重试成功')).toBeInTheDocument();
+    expect(await screen.findByText('重試成功')).toBeInTheDocument();
   });
 });
