@@ -211,8 +211,13 @@ class StockAnalysisPipeline:
         except TypeError:
             try:
                 callback(progress, message)
-            except Exception:
-                pass
+            except Exception as exc:
+                query_id = getattr(self, "query_id", None)
+                logger.warning(
+                    "[pipeline] progress callback failed (fallback): %s (progress=%s, message=%r, query_id=%s)",
+                    exc, progress, message, query_id,
+                    extra={"progress": progress, "progress_message": message, "query_id": query_id},
+                )
         except Exception as exc:
             query_id = getattr(self, "query_id", None)
             logger.warning(
