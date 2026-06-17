@@ -60,13 +60,13 @@ def _get_market_review_text(language: str) -> dict[str, str]:
             "separator": "> 以下為下一市場大盤回顧",
         }
     return {
-        "root_title": "# 🎯 大盤覆盤",
-        "push_title": "🎯 大盤覆盤",
-        "cn_title": "# A股大盤覆盤",
-        "us_title": "# 美股大盤覆盤",
-        "hk_title": "# 港股大盤覆盤",
+        "root_title": "# 🎯 大盤回顧",
+        "push_title": "🎯 大盤回顧",
+        "cn_title": "# A股大盤回顧",
+        "us_title": "# 美股大盤回顧",
+        "hk_title": "# 港股大盤回顧",
         "tw_title": "# 台股大盤回顧",
-        "separator": "> 以下為下一市場大盤覆盤",
+        "separator": "> 以下為下一市場大盤回顧",
     }
 
 
