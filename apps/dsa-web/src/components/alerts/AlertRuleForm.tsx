@@ -410,7 +410,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
           label="标的代码"
           value={target}
           onChange={(event) => setTarget(event.target.value)}
-          placeholder="600519 / AAPL / hk00700"
+          placeholder="2330 / AAPL"
           disabled={isSubmitting}
         />
       );

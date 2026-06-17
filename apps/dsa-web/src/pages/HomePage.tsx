@@ -622,7 +622,7 @@ const HomePage: React.FC = () => {
                   onSubmit={(stockCode, stockName, selectionSource) => {
                     handleSubmitAnalysis(stockCode, stockName, selectionSource);
                   }}
-                  placeholder="输入股票代码或名称，如 600519、贵州茅台、AAPL"
+                  placeholder="输入股票代码或名称，如 2330、AAPL"
                   disabled={isAnalyzing}
                   className={inputError ? 'border-danger/50' : undefined}
                 />
@@ -704,8 +704,8 @@ const HomePage: React.FC = () => {
               </Button>
               <button
                 type="button"
-                onClick={() => handleSubmitAnalysis()}
-                disabled={!query || isAnalyzing}
+                onClick={setupNeedsAction ? undefined : () => handleSubmitAnalysis()}
+                  disabled={!query || isAnalyzing || setupNeedsAction}
                 className="btn-primary flex h-10 flex-1 items-center justify-center gap-1.5 whitespace-nowrap md:flex-none"
               >
                 {isAnalyzing ? (
@@ -749,11 +749,11 @@ const HomePage: React.FC = () => {
           <div className="px-3 pb-2 md:px-4">
             <InlineAlert
               variant="warning"
-              title="基础配置未完成"
+              title="基礎設定未完成"
               message={
                 setupMissingLabels
-                  ? `还缺少 ${setupMissingLabels}，完成后即可开始最小可用分析。`
-                  : '还缺少基础配置，完成后即可开始最小可用分析。'
+                  ? `目前缺少 ${setupMissingLabels}，完成後即可開始分析。`
+                  : '目前缺少必要設定，完成後即可開始分析。'
               }
               action={(
                 <Button
