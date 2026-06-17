@@ -892,8 +892,8 @@ class Config:
     schedule_run_immediately: bool = True     # 啟動時是否立即執行一次
     run_immediately: bool = True              # 啟動時是否立即執行一次（非定時模式）
     market_review_enabled: bool = True        # 是否啟用大盤覆盤
-    # 大盤覆盤市場區域：cn(A股)、hk(港股)、us(美股)、both(三市場)，us 適合僅關注美股的使用者
-    market_review_region: str = "cn"
+    # 大盤覆盤市場區域：tw(台股)、us(美股)、cn(A股)、hk(港股)、both(多市場)
+    market_review_region: str = "tw"
     # 多市場大盤覆盤區域列表（MARKET_REVIEW_REGIONS=TW,US）；優先順序高於 market_review_region
     # 內部使用小寫區域碼：tw / us / cn / hk；空列表表示回退到 market_review_region
     market_review_regions: List[str] = field(default_factory=list)
@@ -1705,7 +1705,7 @@ class Config:
             run_immediately=legacy_run_immediately,
             market_review_enabled=os.getenv('MARKET_REVIEW_ENABLED', 'true').lower() == 'true',
             market_review_region=cls._parse_market_review_region(
-                os.getenv('MARKET_REVIEW_REGION', 'cn')
+                os.getenv('MARKET_REVIEW_REGION', 'tw')
             ),
             market_review_regions=cls._parse_market_review_regions_multi(
                 os.getenv('MARKET_REVIEW_REGIONS', '')
@@ -2264,15 +2264,15 @@ class Config:
 
     @classmethod
     def _parse_market_review_region(cls, value: str) -> str:
-        """解析大盤覆盤市場區域，非法值記錄警告後回退為 cn"""
+        """解析大盤覆盤市場區域，非法值記錄警告後回退為 tw"""
         import logging
-        v = (value or 'cn').strip().lower()
-        if v in ('cn', 'us', 'hk', 'tw', 'both'):
+        v = (value or 'tw').strip().lower()
+        if v in ('tw', 'us', 'cn', 'hk', 'both'):
             return v
         logging.getLogger(__name__).warning(
-            f"MARKET_REVIEW_REGION 配置值 '{value}' 無效，已回退為預設值 'cn'（合法值：cn / hk / us / tw / both）"
+            f"MARKET_REVIEW_REGION 配置值 '{value}' 無效，已回退為預設值 'tw'（合法值：tw / us / cn / hk / both）"
         )
-        return 'cn'
+        return 'tw'
 
     @classmethod
     def _parse_market_review_regions_multi(cls, value: str) -> List[str]:
