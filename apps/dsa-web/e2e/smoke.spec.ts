@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const smokePassword = process.env.DSA_WEB_SMOKE_PASSWORD;
+const LIVE_AGENT_SMOKE_ENABLED = process.env.DSA_WEB_LIVE_AGENT_SMOKE === 'true';
 
 async function login(page: Page) {
   test.skip(!smokePassword, 'Set DSA_WEB_SMOKE_PASSWORD to run authenticated smoke tests.');
@@ -57,18 +58,19 @@ test.describe('web smoke', () => {
   test('home page shows analysis entry and history panel after login', async ({ page }) => {
     await login(page);
 
-    const stockInput = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
+    const stockInput = page.getByPlaceholder('输入股票代码或名称，如 2330、AAPL');
     await expect(stockInput).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('link', { name: '首页' })).toBeVisible();
     await expect(page.getByRole('link', { name: '问股' })).toBeVisible();
     await expect(page.getByText('历史分析')).toBeVisible();
 
-    await stockInput.fill('600519');
+    await stockInput.fill('2330');
     const analyzeButton = page.getByRole('button', { name: '分析', exact: true });
     await expect(analyzeButton).toBeVisible();
   });
 
   test('chat page allows entering a question and starts a request', async ({ page }) => {
+    test.skip(!LIVE_AGENT_SMOKE_ENABLED, 'live agent smoke requires DSA_WEB_LIVE_AGENT_SMOKE=true');
     await login(page);
 
     // Navigate to chat page by clicking the link
@@ -80,11 +82,11 @@ test.describe('web smoke', () => {
     await expect(page.getByTestId('chat-session-list-scroll')).toBeVisible();
     await expect(page.getByTestId('chat-message-scroll')).toBeVisible();
 
-    const input = page.getByPlaceholder(/分析 600519/);
+    const input = page.getByPlaceholder(/分析 2330/);
     await expect(input).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('策略', { exact: true })).toBeVisible();
 
-    const prompt = '请简要分析 600519';
+    const prompt = '请简要分析 2330';
     await input.fill(prompt);
     await page.getByRole('button', { name: '发送' }).click();
 
@@ -98,7 +100,7 @@ test.describe('web smoke', () => {
     await page.waitForLoadState('domcontentloaded');
 
     const sendButton = page.getByRole('button', { name: '发送' });
-    const composer = page.getByPlaceholder(/分析 600519/);
+    const composer = page.getByPlaceholder(/分析 2330/);
 
     await expect(page.getByTestId('chat-workspace')).toBeVisible({ timeout: 10_000 });
     await expect(sendButton).toBeVisible({ timeout: 10_000 });
