@@ -852,6 +852,7 @@ describe('SettingsPage', () => {
   it('runs AlphaSift enable flow from the settings card', async () => {
     const configState = buildSystemConfigState();
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'data_source',
       itemsByCategory: {
         ...configState.itemsByCategory,
         data_source: [
@@ -909,6 +910,7 @@ describe('SettingsPage', () => {
     const privateInstallSpec = 'git+https://user:token@example.com/internal/alphasift.git';
     const configState = buildSystemConfigState();
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'data_source',
       itemsByCategory: {
         ...configState.itemsByCategory,
         data_source: [
@@ -954,9 +956,78 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    expect(screen.getByText('啟用第三方專案 AlphaSift 提供的選股能力。')).toBeInTheDocument();
+    expect(screen.getByText(/不影響 TW\/US 每日報告與自選股分析/)).toBeInTheDocument();
     expect(screen.queryByText(privateInstallSpec)).not.toBeInTheDocument();
     expect(screen.queryByText(/安裝來源/)).not.toBeInTheDocument();
+  });
+
+  it('does not render the AlphaSift card outside the data_source category', () => {
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'base',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        data_source: [
+          {
+            key: 'ALPHASIFT_ENABLED',
+            value: 'false',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'ALPHASIFT_ENABLED',
+              category: 'data_source',
+              dataType: 'boolean',
+              uiControl: 'switch',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 16,
+            },
+          },
+        ],
+      },
+    }));
+
+    render(<SettingsPage />);
+
+    expect(screen.queryByText('AlphaSift 選股')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '開啟選股' })).not.toBeInTheDocument();
+  });
+
+  it('describes AlphaSift as an optional advanced feature that does not affect TW/US daily reports', () => {
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'data_source',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        data_source: [
+          {
+            key: 'ALPHASIFT_ENABLED',
+            value: 'false',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'ALPHASIFT_ENABLED',
+              category: 'data_source',
+              dataType: 'boolean',
+              uiControl: 'switch',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 16,
+            },
+          },
+        ],
+      },
+    }));
+
+    render(<SettingsPage />);
+
+    expect(screen.getByText(/不影響 TW\/US 每日報告與自選股分析/)).toBeInTheDocument();
   });
 
   it('maps ALPHASIFT_ENABLED to the AlphaSift card instead of a generic settings field', () => {
@@ -1017,6 +1088,7 @@ describe('SettingsPage', () => {
     const configState = buildSystemConfigState();
     alphasiftEnable.mockRejectedValueOnce(new Error('config update failed'));
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'data_source',
       itemsByCategory: {
         ...configState.itemsByCategory,
         data_source: [

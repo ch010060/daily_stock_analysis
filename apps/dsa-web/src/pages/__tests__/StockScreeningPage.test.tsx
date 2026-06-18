@@ -71,6 +71,21 @@ describe('StockScreeningPage', () => {
     expect(screen.getByText('安裝 AlphaSift 失敗')).toBeInTheDocument();
   });
 
+  it('shows optional non-blocking wording instead of a blocker-style alert when AlphaSift is disabled', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: false,
+      available: false,
+      installSpecIsDefault: true,
+    });
+
+    render(<StockScreeningPage />);
+
+    expect(await screen.findByText('選股未開啟')).toBeInTheDocument();
+    expect(screen.getByText('AlphaSift 選股發現功能目前未啟用')).toBeInTheDocument();
+    expect(screen.getByText(/此頁面屬於選用的進階探索功能，不影響一般 TW\/US 自選股分析/)).toBeInTheDocument();
+    expect(screen.queryByText(/點選後寫入 ALPHASIFT_ENABLED/)).not.toBeInTheDocument();
+  });
+
   it('shows input strategy when strategy is not in preset list', async () => {
     getAlphaSiftStatus.mockResolvedValueOnce({
       enabled: true,
