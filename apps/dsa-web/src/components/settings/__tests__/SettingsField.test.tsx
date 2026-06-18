@@ -330,7 +330,7 @@ describe('SettingsField', () => {
       <SettingsField
         item={{
           key: 'STOCK_LIST',
-          value: '600519,300750',
+          value: '2330,2454',
           rawValueExists: true,
           isMasked: false,
           schema: {
@@ -345,7 +345,7 @@ describe('SettingsField', () => {
             validation: {},
             displayOrder: 1,
             helpKey: 'settings.base.STOCK_LIST',
-            examples: ['STOCK_LIST=600519,300750,002594'],
+            examples: ['STOCK_LIST=2330,2454,AAPL,NVDA'],
             docs: [
               {
                 label: '完整指南',
@@ -355,7 +355,7 @@ describe('SettingsField', () => {
             warningCodes: [],
           },
         }}
-        value="600519,300750"
+        value="2330,2454"
         onChange={() => undefined}
       />
     );
@@ -363,7 +363,7 @@ describe('SettingsField', () => {
     fireEvent.click(screen.getByRole('button', { name: '檢視 自選股列表 配置說明' }));
 
     expect(screen.getByRole('dialog', { name: '自選股列表' })).toBeInTheDocument();
-    expect(screen.getByText('STOCK_LIST=600519,300750,002594')).toBeInTheDocument();
+    expect(screen.getByText('STOCK_LIST=2330,2454,AAPL,NVDA')).toBeInTheDocument();
     const docLink = screen.getByRole('link', { name: /完整指南/ });
     expect(docLink).toHaveAttribute('href', 'https://example.com/full-guide');
 
