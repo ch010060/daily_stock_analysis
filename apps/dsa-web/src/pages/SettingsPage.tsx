@@ -671,10 +671,10 @@ const SettingsPage: React.FC = () => {
           </aside>
 
           <section className="space-y-4">
-            {alphasiftItem ? (
+            {activeCategory === 'data_source' && alphasiftItem ? (
               <SettingsSectionCard
                 title="AlphaSift 選股"
-                description="啟用第三方專案 AlphaSift 提供的選股能力。"
+                description="選用的進階選股發現功能，由第三方專案 AlphaSift 提供；不影響 TW/US 每日報告與自選股分析。"
               >
                 <div className="flex flex-col gap-4 rounded-2xl border settings-border bg-background/35 px-4 py-4 md:flex-row md:items-center md:justify-between">
                   <div>

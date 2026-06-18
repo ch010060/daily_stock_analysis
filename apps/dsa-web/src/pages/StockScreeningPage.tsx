@@ -266,8 +266,8 @@ const StockScreeningPage: React.FC = () => {
       {!enabled ? (
         <InlineAlert
           variant="info"
-          title="AlphaSift 未開啟"
-          message="點選後寫入 ALPHASIFT_ENABLED=true；若適配層缺失，會使用受信任來源嘗試自動安裝。"
+          title="AlphaSift 選股發現功能目前未啟用"
+          message="此頁面屬於選用的進階探索功能，不影響一般 TW/US 自選股分析。"
           action={
             <Button size="sm" isLoading={enabling} loadingText="開啟中..." onClick={() => void handleEnable()}>
               開啟 AlphaSift
