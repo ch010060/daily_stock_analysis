@@ -628,5 +628,28 @@ class TestMarketReviewFieldsRegistered(unittest.TestCase):
         self.assertIn("MARKET_REVIEW_COLOR_SCHEME", field_keys)
 
 
+class TestStockListDefaultIsTwUsOnly(unittest.TestCase):
+    """STOCK_LIST's active default/examples must stay TW/US-only (Route B scope)."""
+
+    _FORBIDDEN_CODES = ("600519", "300750", "002594", "hk00700")
+
+    def test_default_value_excludes_cn_and_hk_codes(self):
+        field = get_field_definition("STOCK_LIST")
+        default_value = field["default_value"]
+        for code in self._FORBIDDEN_CODES:
+            self.assertNotIn(code, default_value, f"{code} should not appear in STOCK_LIST default_value")
+
+    def test_default_value_uses_tw_us_examples(self):
+        field = get_field_definition("STOCK_LIST")
+        codes = [item.strip() for item in field["default_value"].split(",")]
+        self.assertEqual(codes, ["2330", "2454", "AAPL", "NVDA"])
+
+    def test_examples_exclude_cn_and_hk_codes(self):
+        field = get_field_definition("STOCK_LIST")
+        for example in field["examples"]:
+            for code in self._FORBIDDEN_CODES:
+                self.assertNotIn(code, example, f"{code} should not appear in STOCK_LIST examples: {example}")
+
+
 if __name__ == "__main__":
     unittest.main()
