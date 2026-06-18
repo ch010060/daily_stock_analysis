@@ -651,5 +651,27 @@ class TestStockListDefaultIsTwUsOnly(unittest.TestCase):
                 self.assertNotIn(code, example, f"{code} should not appear in STOCK_LIST examples: {example}")
 
 
+class TestOtherActiveExamplesAreTwUsOnly(unittest.TestCase):
+    """EMAIL_RECEIVERS' STOCK_GROUP_1 example and AGENT_EVENT_ALERT_RULES_JSON's
+    stock_code examples must stay TW/US-only (Route B scope), same as STOCK_LIST."""
+
+    _FORBIDDEN_CODES = ("600519", "300750", "002594", "hk00700")
+
+    def test_email_receivers_examples_exclude_cn_and_hk_codes(self):
+        field = get_field_definition("EMAIL_RECEIVERS")
+        for example in field["examples"]:
+            for code in self._FORBIDDEN_CODES:
+                self.assertNotIn(code, example, f"{code} should not appear in EMAIL_RECEIVERS examples: {example}")
+
+    def test_agent_event_alert_rules_json_examples_exclude_cn_and_hk_codes(self):
+        field = get_field_definition("AGENT_EVENT_ALERT_RULES_JSON")
+        for example in field["examples"]:
+            for code in self._FORBIDDEN_CODES:
+                self.assertNotIn(
+                    code, example,
+                    f"{code} should not appear in AGENT_EVENT_ALERT_RULES_JSON examples: {example}",
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

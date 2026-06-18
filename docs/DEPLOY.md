@@ -414,7 +414,7 @@ git push -u origin main
 | `EMAIL_PASSWORD` | 郵箱授權碼 | 可選* |
 | `SERVERCHAN3_SENDKEY` | Server醬³ Sendkey | 可選* |
 | `CUSTOM_WEBHOOK_URLS` | 自定義 Webhook（多個逗號分隔） | 可選* |
-| `STOCK_LIST` | 自選股列表，如 `600519,300750` | ✅ |
+| `STOCK_LIST` | 自選股列表，如 `2330,2454` | ✅ |
 | `SERPAPI_API_KEYS` | SerpAPI Key | 推薦 |
 | `TAVILY_API_KEYS` | Tavily 搜尋 API Key | 可選 |
 | `BOCHA_API_KEYS` | 博查搜尋 API Key | 可選 |

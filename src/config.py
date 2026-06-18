@@ -2477,7 +2477,7 @@ class Config:
         if not self.stock_list:
             issues.append(ConfigIssue(
                 severity="error",
-                message="未配置 STOCK_LIST。請設定至少一個股票程式碼，例如：600519,hk00700,AAPL。",
+                message="未配置 STOCK_LIST。請設定至少一個股票程式碼，例如：2330,2454,AAPL,NVDA。",
                 field="STOCK_LIST",
             ))
         elif self.stock_email_groups:
