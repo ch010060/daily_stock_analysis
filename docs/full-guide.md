@@ -144,7 +144,7 @@ daily_stock_analysis/
 
 | Secret 名稱 | 說明 | 必填 |
 |------------|------|:----:|
-| `STOCK_LIST` | 自選股程式碼，如 `600519,300750,002594` | ✅ |
+| `STOCK_LIST` | 自選股程式碼，如 `2330,2454,AAPL,NVDA` | ✅ |
 | `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/) 針對中文內容特別最佳化；同一 Key 可用於搜尋與 Anspire 大模型閘道器的兜底示例（是否可用以控制檯與賬號許可權為準） | 推薦 |
 | `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis) 搜尋引擎結果補強，適合實時金融新聞 | 推薦 |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) 搜尋 API（新聞搜尋） | 可選 |
@@ -628,7 +628,7 @@ python scripts/check_env.py --config
 python main.py                        # 完整分析（個股 + 大盤覆盤）
 python main.py --market-review        # 僅大盤覆盤
 python main.py --no-market-review     # 僅個股分析
-python main.py --stocks 600519,300750 # 指定股票
+python main.py --stocks 2330,AAPL     # 指定股票
 python main.py --dry-run              # 僅獲取資料，不 AI 分析
 python main.py --no-notify            # 不傳送推送
 python main.py --schedule             # 定時任務模式
@@ -912,10 +912,10 @@ FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/your_hook_token
 > GitHub Actions 限制：截至 2026-03-29，倉庫自帶 `00-daily-analysis.yml` 不會自動匯入任意編號的 `STOCK_GROUP_N` / `EMAIL_GROUP_N`。因此如果你只在倉庫 Secrets / Variables 中新增這些變數，而沒有修改 workflow 顯式對映，它們不會進入執行程序，看起來就像“分組配置不生效”。
 
 ```bash
-STOCK_LIST=600519,300750,002594,AAPL
-STOCK_GROUP_1=600519,300750
+STOCK_LIST=2330,2454,AAPL,NVDA
+STOCK_GROUP_1=2330,2454
 EMAIL_GROUP_1=user1@example.com
-STOCK_GROUP_2=002594,AAPL
+STOCK_GROUP_2=AAPL,NVDA
 EMAIL_GROUP_2=user2@example.com
 ```
 
@@ -1388,15 +1388,15 @@ FastAPI 提供 RESTful API 服務，支援配置管理和觸發分析。
 # 健康檢查
 curl http://127.0.0.1:8000/api/health
 
-# 觸發分析（A股）
+# 觸發分析（TW/US）
 curl -X POST http://127.0.0.1:8000/api/v1/analysis/analyze \
   -H 'Content-Type: application/json' \
-  -d '{"stock_code": "600519"}'
+  -d '{"stock_code": "2330"}'
 
 # 透傳策略（可選）
 curl -X POST http://127.0.0.1:8000/api/v1/analysis/analyze \
   -H 'Content-Type: application/json' \
-  -d '{"stock_code": "600519", "skills": ["bull_trend", "growth_quality"]}'
+  -d '{"stock_code": "AAPL", "skills": ["bull_trend", "growth_quality"]}'
 
 # 查詢任務狀態
 curl http://127.0.0.1:8000/api/v1/analysis/status/<task_id>
@@ -1412,13 +1412,13 @@ curl -X POST http://127.0.0.1:8000/api/v1/backtest/run \
 # 觸發回測（指定股票）
 curl -X POST http://127.0.0.1:8000/api/v1/backtest/run \
   -H 'Content-Type: application/json' \
-  -d '{"code": "600519", "force": false}'
+  -d '{"code": "2330", "force": false}'
 
 # 查詢整體回測表現
 curl http://127.0.0.1:8000/api/v1/backtest/performance
 
 # 查詢單股回測表現
-curl http://127.0.0.1:8000/api/v1/backtest/performance/600519
+curl http://127.0.0.1:8000/api/v1/backtest/performance/2330
 
 # 分頁查詢回測結果
 curl "http://127.0.0.1:8000/api/v1/backtest/results?page=1&limit=20"
@@ -1506,7 +1506,7 @@ A: 檢查是否啟用了 Actions，以及 cron 表示式是否正確（注意是
 ```env
 AGENT_EVENT_MONITOR_ENABLED=true
 AGENT_EVENT_MONITOR_INTERVAL_MINUTES=5
-AGENT_EVENT_ALERT_RULES_JSON=[{"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800},{"stock_code":"300750","alert_type":"price_change_percent","direction":"down","change_pct":3.0},{"stock_code":"000858","alert_type":"volume_spike","multiplier":2.5}]
+AGENT_EVENT_ALERT_RULES_JSON=[{"stock_code":"2330","alert_type":"price_cross","direction":"above","price":1000},{"stock_code":"AAPL","alert_type":"price_change_percent","direction":"down","change_pct":3.0},{"stock_code":"NVDA","alert_type":"volume_spike","multiplier":2.5}]
 ```
 
 worker 會把 `triggered`、`skipped`、`degraded`、`failed` 寫入 `alert_triggers` 作為評估歷史；正常未觸發不寫歷史。DB 持久化規則的 `triggered` 歷史按 `rule_id + target + data_source + data_timestamp` 對同一資料點做 best-effort 去重，重複命中會複用最早一條觸發記錄，`data_timestamp` 缺失時不去重。真實觸發後會把每個通知通道的 attempt 寫入 `alert_notifications`，併為 Alert API 建立的持久化規則寫入 `alert_cooldowns` 業務冷卻狀態；若讀取持久化冷卻失敗，worker 會臨時使用程序內 fingerprint 防止 DB 異常期間重複推送。legacy `AGENT_EVENT_ALERT_RULES_JSON` 規則繼續使用程序內 fingerprint 抑制，不寫持久化冷卻；通知基礎設施的 `notification_noise.py` 降噪仍獨立生效。Web 規則列表使用後端返回的 `cooldown_active` 判斷冷卻狀態，避免瀏覽器本地時區解析影響展示。

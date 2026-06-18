@@ -1832,7 +1832,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "help_key": "settings.notification.email",
         "examples": [
             "EMAIL_RECEIVERS=user1@example.com,user2@example.com",
-            "STOCK_GROUP_1=600519,300750",
+            "STOCK_GROUP_1=2330,2454",
             "EMAIL_GROUP_1=user1@example.com",
         ],
         "docs": [
@@ -3863,8 +3863,8 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "display_order": 71,
         "help_key": "settings.agent.EVENT_ALERT_RULES_JSON",
         "examples": [
-            'AGENT_EVENT_ALERT_RULES_JSON=[{"alert_type":"price_cross","stock_code":"600519","direction":"above","price":1800}]',
-            'AGENT_EVENT_ALERT_RULES_JSON=[{"alert_type":"volume_spike","stock_code":"300750","multiplier":2.5}]',
+            'AGENT_EVENT_ALERT_RULES_JSON=[{"alert_type":"price_cross","stock_code":"2330","direction":"above","price":1000}]',
+            'AGENT_EVENT_ALERT_RULES_JSON=[{"alert_type":"volume_spike","stock_code":"NVDA","multiplier":2.5}]',
         ],
         "docs": [
             {

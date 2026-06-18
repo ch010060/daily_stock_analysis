@@ -139,7 +139,7 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 
 | Secret Name | Description | Required |
 |------------|------|:----:|
-| `STOCK_LIST` | Watchlist codes, e.g., `600519,300750,002594` | ✅ |
+| `STOCK_LIST` | Watchlist codes, e.g., `2330,2454,AAPL,NVDA` | ✅ |
 | `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/) optimized for Chinese content; the same key can also be used for Anspire LLM fallback scenarios (example model: `Doubao-Seed-2.0-lite`) | Recommended |
 | `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis) search-engine results for realtime financial news | Recommended |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) Search API (for news search) | Optional |
@@ -565,7 +565,7 @@ python scripts/check_env.py --config
 python main.py                        # Full analysis (stocks + market review)
 python main.py --market-review        # Market review only
 python main.py --no-market-review     # Stock analysis only
-python main.py --stocks 600519,300750 # Specify stocks
+python main.py --stocks 2330,AAPL     # Specify stocks
 python main.py --dry-run              # Fetch data only, no AI analysis
 python main.py --no-notify            # Don't send notifications
 python main.py --schedule             # Scheduled task mode
@@ -781,10 +781,10 @@ Configure `STOCK_GROUP_N` and `EMAIL_GROUP_N` to route different stock groups to
 > GitHub Actions limitation: as of 2026-03-29, the repository's default `00-daily-analysis.yml` does not auto-import arbitrary numbered `STOCK_GROUP_N` / `EMAIL_GROUP_N` variables. If you only add them in repository Secrets / Variables without extending the workflow `env:` block, they will not reach the runtime process.
 
 ```bash
-STOCK_LIST=600519,300750,002594,AAPL
-STOCK_GROUP_1=600519,300750
+STOCK_LIST=2330,2454,AAPL,NVDA
+STOCK_GROUP_1=2330,2454
 EMAIL_GROUP_1=user1@example.com
-STOCK_GROUP_2=002594,AAPL
+STOCK_GROUP_2=AAPL,NVDA
 EMAIL_GROUP_2=user2@example.com
 ```
 
@@ -1220,15 +1220,15 @@ FastAPI provides RESTful API service for configuration management and triggering
 # Health check
 curl http://127.0.0.1:8000/api/health
 
-# Trigger analysis (A-shares)
+# Trigger analysis (TW/US)
 curl -X POST http://127.0.0.1:8000/api/v1/analysis/analyze \
   -H 'Content-Type: application/json' \
-  -d '{"stock_code": "600519"}'
+  -d '{"stock_code": "2330"}'
 
 # pass strategy list (optional)
 curl -X POST http://127.0.0.1:8000/api/v1/analysis/analyze \
   -H 'Content-Type: application/json' \
-  -d '{"stock_code": "600519", "skills": ["bull_trend", "growth_quality"]}'
+  -d '{"stock_code": "AAPL", "skills": ["bull_trend", "growth_quality"]}'
 
 # Query task status
 curl http://127.0.0.1:8000/api/v1/analysis/status/<task_id>
@@ -1244,13 +1244,13 @@ curl -X POST http://127.0.0.1:8000/api/v1/backtest/run \
 # Trigger backtest (specific stock)
 curl -X POST http://127.0.0.1:8000/api/v1/backtest/run \
   -H 'Content-Type: application/json' \
-  -d '{"code": "600519", "force": false}'
+  -d '{"code": "2330", "force": false}'
 
 # Query overall backtest performance
 curl http://127.0.0.1:8000/api/v1/backtest/performance
 
 # Query per-stock backtest performance
-curl http://127.0.0.1:8000/api/v1/backtest/performance/600519
+curl http://127.0.0.1:8000/api/v1/backtest/performance/2330
 
 # Paginated backtest results
 curl "http://127.0.0.1:8000/api/v1/backtest/results?page=1&limit=20"
@@ -1343,7 +1343,7 @@ Example:
 ```env
 AGENT_EVENT_MONITOR_ENABLED=true
 AGENT_EVENT_MONITOR_INTERVAL_MINUTES=5
-AGENT_EVENT_ALERT_RULES_JSON=[{"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800},{"stock_code":"300750","alert_type":"price_change_percent","direction":"down","change_pct":3.0},{"stock_code":"000858","alert_type":"volume_spike","multiplier":2.5}]
+AGENT_EVENT_ALERT_RULES_JSON=[{"stock_code":"2330","alert_type":"price_cross","direction":"above","price":1000},{"stock_code":"AAPL","alert_type":"price_change_percent","direction":"down","change_pct":3.0},{"stock_code":"NVDA","alert_type":"volume_spike","multiplier":2.5}]
 ```
 
 The worker writes `triggered`, `skipped`, `degraded`, and `failed` rows to `alert_triggers` as evaluation history; normal non-triggered checks do not write history. For DB-persisted rules, `triggered` history is best-effort deduplicated by `rule_id + target + data_source + data_timestamp`: repeated hits for the same data point reuse the earliest trigger row, while records without `data_timestamp` are not deduplicated. Real triggers write per-channel attempts to `alert_notifications`, and Alert API persisted rules write business cooldown state to `alert_cooldowns`; if the persisted cooldown read fails, the worker temporarily falls back to the in-process fingerprint guard to avoid repeated notifications during the DB failure. Legacy `AGENT_EVENT_ALERT_RULES_JSON` rules continue to use the in-process fingerprint suppressor and do not write persisted cooldown state; the notification infrastructure `notification_noise.py` guard remains independent. The Web rule list uses the backend-provided `cooldown_active` flag instead of browser-local timezone parsing to decide whether a rule is cooling down.

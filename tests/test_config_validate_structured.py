@@ -121,7 +121,7 @@ class TestValidateStructuredStockList:
         stock_errors = [i for i in errors if i.field == "STOCK_LIST"]
         assert stock_errors
         assert "未配置 STOCK_LIST" in stock_errors[0].message
-        assert "600519,hk00700,AAPL" in stock_errors[0].message
+        assert "2330,2454,AAPL,NVDA" in stock_errors[0].message
 
     def test_configured_stock_list_no_stock_error(self):
         cfg = _make_config(stock_list=["600519", "000001"])
