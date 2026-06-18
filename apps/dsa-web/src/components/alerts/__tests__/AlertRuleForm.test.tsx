@@ -25,18 +25,18 @@ describe('AlertRuleForm', () => {
   it('submits a price_cross rule payload', async () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('規則名稱'), { target: { value: '茅臺價格突破' } });
-    fireEvent.change(screen.getByLabelText('標的程式碼'), { target: { value: '600519' } });
-    fireEvent.change(screen.getByLabelText('價格閾值'), { target: { value: '1800' } });
+    fireEvent.change(screen.getByLabelText('規則名稱'), { target: { value: '台積電突破壓力' } });
+    fireEvent.change(screen.getByLabelText('標的程式碼'), { target: { value: '2330' } });
+    fireEvent.change(screen.getByLabelText('價格閾值'), { target: { value: '800' } });
     fireEvent.click(screen.getByRole('button', { name: '建立規則' }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith({
-        name: '茅臺價格突破',
+        name: '台積電突破壓力',
         targetScope: 'single_symbol',
-        target: '600519',
+        target: '2330',
         alertType: 'price_cross',
-        parameters: { direction: 'above', price: 1800 },
+        parameters: { direction: 'above', price: 800 },
         severity: 'warning',
         enabled: true,
       });

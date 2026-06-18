@@ -7,6 +7,7 @@ interface ValidationResult {
 const SUPPORTED_QUERY_CHARACTERS = /^[A-Z0-9.\u3400-\u9FFF\s]+$/;
 
 const STOCK_CODE_PATTERNS = [
+  /^\d{4}$/, // TW 4-digit code, for example 2330
   /^\d{6}$/, // A-share 6-digit code
   /^(SH|SZ|BJ)\d{6}$/, // A-share code with exchange prefix
   /^\d{6}\.(SH|SZ|SS|BJ)$/, // A-share code with exchange suffix

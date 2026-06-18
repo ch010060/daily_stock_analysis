@@ -67,7 +67,7 @@ function getTodayIso(): string {
   return toDateInputValue(new Date());
 }
 
-function formatMoney(value: number | undefined | null, currency = 'CNY'): string {
+function formatMoney(value: number | undefined | null, currency = 'TWD'): string {
   if (value == null || Number.isNaN(value)) return '--';
   return `${currency} ${Number(value).toLocaleString('zh-CN', {
     minimumFractionDigits: 2,
@@ -197,8 +197,8 @@ const PortfolioPage: React.FC = () => {
   const [accountForm, setAccountForm] = useState({
     name: '',
     broker: 'Demo',
-    market: 'cn' as 'cn' | 'hk' | 'us',
-    baseCurrency: 'CNY',
+    market: 'tw' as 'tw' | 'us' | 'cn' | 'hk',
+    baseCurrency: 'TWD',
   });
   const [costMethod, setCostMethod] = useState<PortfolioCostMethod>('fifo');
   const [snapshot, setSnapshot] = useState<PortfolioSnapshotResponse | null>(null);
@@ -659,7 +659,7 @@ const PortfolioPage: React.FC = () => {
         name,
         broker: accountForm.broker.trim() || undefined,
         market: accountForm.market,
-        baseCurrency: accountForm.baseCurrency.trim() || 'CNY',
+        baseCurrency: accountForm.baseCurrency.trim() || 'TWD',
       });
       await loadAccounts();
       setSelectedAccount(created.id);
@@ -920,18 +920,19 @@ const PortfolioPage: React.FC = () => {
             />
             <input
               className={PORTFOLIO_INPUT_CLASS}
-              placeholder="基準幣（如 CNY/USD/HKD）"
+              placeholder="基準幣（如 TWD/USD）"
               value={accountForm.baseCurrency}
               onChange={(e) => setAccountForm((prev) => ({ ...prev, baseCurrency: e.target.value.toUpperCase() }))}
             />
             <select
               className={PORTFOLIO_SELECT_CLASS}
               value={accountForm.market}
-              onChange={(e) => setAccountForm((prev) => ({ ...prev, market: e.target.value as 'cn' | 'hk' | 'us' }))}
+              onChange={(e) => setAccountForm((prev) => ({ ...prev, market: e.target.value as 'tw' | 'us' | 'cn' | 'hk' }))}
             >
-              <option value="cn">市場：A 股（cn）</option>
-              <option value="hk">市場：港股（hk）</option>
+              <option value="tw">市場：台股（tw）</option>
               <option value="us">市場：美股（us）</option>
+              <option value="cn">市場：A 股（cn，舊資料）</option>
+              <option value="hk">市場：港股（hk，舊資料）</option>
             </select>
             <button type="submit" className="btn-secondary text-sm" disabled={accountCreating}>
               {accountCreating ? '建立中...' : '建立帳戶'}
@@ -943,15 +944,15 @@ const PortfolioPage: React.FC = () => {
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
         <Card variant="gradient" padding="md">
           <p className="text-xs text-secondary">總權益</p>
-          <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalEquity, snapshot?.currency || 'CNY')}</p>
+          <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalEquity, snapshot?.currency || 'TWD')}</p>
         </Card>
         <Card variant="gradient" padding="md">
           <p className="text-xs text-secondary">總市值</p>
-          <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalMarketValue, snapshot?.currency || 'CNY')}</p>
+          <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalMarketValue, snapshot?.currency || 'TWD')}</p>
         </Card>
         <Card variant="gradient" padding="md">
           <p className="text-xs text-secondary">總現金</p>
-          <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalCash, snapshot?.currency || 'CNY')}</p>
+          <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalCash, snapshot?.currency || 'TWD')}</p>
         </Card>
         <Card variant="gradient" padding="md">
           <div className="flex items-start justify-between gap-3">
@@ -1108,7 +1109,7 @@ const PortfolioPage: React.FC = () => {
           <h3 className="text-sm font-semibold text-foreground mb-2">口徑</h3>
           <div className="text-xs text-secondary space-y-1">
             <div>帳戶數: {snapshot?.accountCount ?? 0}</div>
-            <div>計價幣種: {snapshot?.currency || 'CNY'}</div>
+            <div>計價幣種: {snapshot?.currency || 'TWD'}</div>
             <div>成本法: {(snapshot?.costMethod || costMethod).toUpperCase()}</div>
           </div>
         </Card>

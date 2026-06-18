@@ -7,11 +7,11 @@ import type { AlertRuleItem } from '../../../types/alerts';
 const rules: AlertRuleItem[] = [
   {
     id: 1,
-    name: '茅臺價格突破',
+    name: '台積電突破壓力',
     targetScope: 'single_symbol',
-    target: '600519',
+    target: '2330',
     alertType: 'price_cross',
-    parameters: { direction: 'above', price: 1800 },
+    parameters: { direction: 'above', price: 800 },
     severity: 'warning',
     enabled: true,
     source: 'api',
@@ -85,10 +85,10 @@ describe('AlertRuleList', () => {
   it('renders rules, filters, and pagination', () => {
     renderList();
 
-    expect(screen.getByText('茅臺價格突破')).toBeInTheDocument();
-    expect(screen.getByText('600519')).toBeInTheDocument();
+    expect(screen.getByText('台積電突破壓力')).toBeInTheDocument();
+    expect(screen.getByText('2330')).toBeInTheDocument();
     expect(screen.getAllByText('價格突破').length).toBeGreaterThan(0);
-    expect(screen.getByText('上破 1800')).toBeInTheDocument();
+    expect(screen.getByText('上破 800')).toBeInTheDocument();
     expect(screen.getAllByText('MACD 金叉/死叉').length).toBeGreaterThan(0);
     expect(screen.getByText('MACD(12,26,9) 金叉')).toBeInTheDocument();
     expect(screen.getByText('KDJ(9,3,3) 死叉')).toBeInTheDocument();
@@ -217,7 +217,7 @@ describe('AlertRuleList', () => {
   it('confirms deletion before calling onDelete', async () => {
     renderList();
 
-    fireEvent.click(screen.getByLabelText('刪除 茅臺價格突破'));
+    fireEvent.click(screen.getByLabelText('刪除 台積電突破壓力'));
     expect(await screen.findByRole('heading', { name: '刪除警告規則' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '刪除' }));
 

@@ -118,7 +118,7 @@ def _compute_market_review_override_region(config: Config) -> Optional[str]:
 
         open_markets = get_open_markets_today()
         return compute_effective_region(
-            getattr(config, "market_review_region", "cn") or "cn",
+            getattr(config, "market_review_region", "tw") or "tw",
             open_markets,
         )
     except Exception as exc:

@@ -30,12 +30,12 @@ import { normalizeStockCode } from '../utils/stockCode';
 
 // Quick question examples shown on empty state
 const QUICK_QUESTIONS = [
-  { label: '用纏論分析茅臺', skill: 'chan_theory' },
-  { label: '波浪理論看寧德時代', skill: 'wave_theory' },
-  { label: '分析比亞迪趨勢', skill: 'bull_trend' },
-  { label: '箱體震盪技能看中芯國際', skill: 'box_oscillation' },
-  { label: '分析騰訊 hk00700', skill: 'bull_trend' },
-  { label: '用情緒週期分析東方財富', skill: 'emotion_cycle' },
+  { label: '用纏論分析台積電 2330', skill: 'chan_theory' },
+  { label: '波浪理論看聯發科 2454', skill: 'wave_theory' },
+  { label: '分析 AAPL 近期趨勢', skill: 'bull_trend' },
+  { label: '箱體震盪技能看 NVDA', skill: 'box_oscillation' },
+  { label: '比較 2330 與 2454 相對強弱', skill: 'bull_trend' },
+  { label: '用情緒週期分析 AAPL', skill: 'emotion_cycle' },
 ];
 
 const MAX_SELECTED_SKILLS = 3;
@@ -400,7 +400,7 @@ const ChatPage: React.FC = () => {
     setDeleteConfirmId(null);
   }, [deleteConfirmId, sessionId, loadSessions, handleStartNewChat]);
 
-  // Handle follow-up from report page: ?stock=600519&name=貴州茅臺&recordId=xxx
+  // Handle follow-up from report page: ?stock=2330&name=台積電&recordId=xxx
   useEffect(() => {
     const stock = sanitizeFollowUpStockCode(searchParams.get('stock'));
     const name = sanitizeFollowUpStockName(searchParams.get('name'));

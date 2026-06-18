@@ -981,9 +981,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.system.market_review': {
     title: '大盤分析',
     summary: '控制大盤分析功能的開關、覆蓋市場和配色方案。',
-    usage: 'MARKET_REVIEW_ENABLED 開啟大盤分析；MARKET_REVIEW_REGION 選擇市場（cn/hk/us/both）；MARKET_REVIEW_COLOR_SCHEME 選擇配色。',
+    usage: 'MARKET_REVIEW_ENABLED 開啟大盤分析；MARKET_REVIEW_REGION 選擇市場（tw/us）；MARKET_REVIEW_COLOR_SCHEME 選擇配色。',
     valueNotes: [
-      'cn 覆蓋 A 股，hk 覆蓋港股，us 覆蓋美股，both 覆蓋全部。',
+      'tw 覆蓋台股，us 覆蓋美股；cn/hk 僅供舊資料相容，不建議作為新帳戶預設。',
       '配色方案影響大盤報告中指數漲跌的顏色顯示：green_up 為綠漲紅跌，red_up 為紅漲綠跌。',
     ],
     impact: ['影響分析報告中大盤概覽部分的內容和視覺呈現。'],
@@ -1911,9 +1911,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'settings.system.market_review': {
     title: 'Market Review',
     summary: 'Controls the market review feature: on/off, coverage region, and color scheme.',
-    usage: 'MARKET_REVIEW_ENABLED toggles market review; MARKET_REVIEW_REGION selects markets (cn/hk/us/both); MARKET_REVIEW_COLOR_SCHEME selects colors.',
+    usage: 'MARKET_REVIEW_ENABLED toggles market review; MARKET_REVIEW_REGION selects markets (tw/us); MARKET_REVIEW_COLOR_SCHEME selects colors.',
     valueNotes: [
-      'cn covers A-shares, hk covers Hong Kong, us covers US stocks, both covers all.',
+      'tw covers Taiwan stocks, us covers US stocks; cn/hk are legacy-compatible only and not recommended as active defaults.',
       'Color scheme affects how index changes are displayed: green_up = green for gains/red for losses; red_up = red for gains/green for losses.',
     ],
     impact: ['Affects the market overview section in analysis reports.'],
