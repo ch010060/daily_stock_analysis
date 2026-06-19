@@ -150,8 +150,8 @@ describe('SettingsField', () => {
       {
         key: 'MARKET_REVIEW_REGION',
         category: 'system',
-        options: ['cn', 'hk', 'us', 'both'],
-        expectedLabels: ['A 股', '港股', '美股', '全部市場'],
+        options: ['tw', 'us', 'all'],
+        expectedLabels: ['台股', '美股', '全部市場'],
       },
     ] as const;
 

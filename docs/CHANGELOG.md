@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修復] 持股混合 TWD/USD 總額改為必須使用有效匯率換算；缺少匯率時顯示不可用警告與分幣別小計，匯率刷新後顯示實際 USD/TWD 換算總額與匯率資訊。
+- [修復] Web 持股手工錄入交易、資金流水、公司行為表單新增 TWD/USD 幣別下拉選單，並依選定帳戶基準幣別預設為 TWD 或 USD。
+- [修復] 系統設定的大盤覆盤市場改為台股、美股、全部市場（tw/us/all），移除 A 股 / 港股作為活躍選項並同步配置 schema 預設值。
 - [修復] Web 個股欄和歷史卡片在窄佈局下不再讓市場階段標籤遮擋股票名稱。
 - [修復] 問股自由文字追問不再將 TTM、PE、YOY 等金融縮寫誤識別為新股票程式碼。
 - [修復] GitHub Actions 每日分析工作流讀取 SearXNG 自建例項地址時支援 Variables 優先、Secrets 回退，修復僅配置 Variables 時 URL 不生效的問題。

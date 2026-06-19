@@ -611,6 +611,19 @@ class TestReportDisplayFieldsRegistered(unittest.TestCase):
 class TestMarketReviewFieldsRegistered(unittest.TestCase):
     """Market review behavior toggles should be visible in settings schema."""
 
+    def test_market_review_region_uses_active_tw_us_all_options(self):
+        field = get_field_definition("MARKET_REVIEW_REGION")
+        self.assertEqual(field["category"], "system")
+        self.assertEqual(field["data_type"], "string")
+        self.assertEqual(field["ui_control"], "select")
+        self.assertEqual(field["default_value"], "tw")
+        self.assertEqual(field["options"], ["tw", "us", "all"])
+        self.assertEqual(field["validation"]["enum"], ["tw", "us", "all"])
+        self.assertIn("MARKET_REVIEW_REGION=tw", field["examples"])
+        self.assertIn("MARKET_REVIEW_REGION=all", field["examples"])
+        self.assertNotIn("cn", field["options"])
+        self.assertNotIn("hk", field["options"])
+
     def test_market_review_color_scheme_field_definition_exists(self):
         field = get_field_definition("MARKET_REVIEW_COLOR_SCHEME")
         self.assertEqual(field["category"], "system")

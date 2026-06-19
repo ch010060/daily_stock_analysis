@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
+from urllib import request as urllib_request
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -78,6 +79,23 @@ class _ResolvedPositionPrice:
     is_stale: bool
     is_available: bool
     provider: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class _FxConversionResult:
+    amount: Optional[float]
+    available: bool
+    is_stale: bool
+    reason: str
+    from_currency: str
+    to_currency: str
+    rate: Optional[float] = None
+    rate_date: Optional[date] = None
+    source: Optional[str] = None
+    conversion_from_currency: Optional[str] = None
+    conversion_to_currency: Optional[str] = None
+    conversion_rate: Optional[float] = None
+    direction: str = "identity"
 
 
 class PortfolioService:
@@ -459,7 +477,16 @@ class PortfolioService:
             account_rows = self.repo.list_accounts(include_inactive=False)
 
         accounts_payload: List[Dict[str, Any]] = []
-        aggregate_currency = account_rows[0].base_currency if account_rows else "TWD"
+        account_currencies = [self._normalize_currency(account.base_currency) for account in account_rows]
+        distinct_account_currencies = set(account_currencies)
+        if not account_rows:
+            aggregate_currency = "TWD"
+        elif account_id is not None or len(distinct_account_currencies) == 1:
+            aggregate_currency = account_currencies[0]
+        elif distinct_account_currencies.issubset({"TWD", "USD"}) and "TWD" in distinct_account_currencies:
+            aggregate_currency = "TWD"
+        else:
+            aggregate_currency = account_currencies[0]
         aggregate = {
             "total_cash": 0.0,
             "total_market_value": 0.0,
@@ -470,6 +497,44 @@ class PortfolioService:
             "tax_total": 0.0,
             "fx_stale": False,
         }
+        totals_by_currency: Dict[str, Dict[str, Any]] = {}
+        converted_total_available = True
+        fx_missing = False
+        fx_warnings: List[str] = []
+        fx_warning_set: Set[str] = set()
+        fx_rates_used_map: Dict[Tuple[str, str, float, str, bool, str], Dict[str, Any]] = {}
+
+        def add_fx_warning(message: str) -> None:
+            if message not in fx_warning_set:
+                fx_warning_set.add(message)
+                fx_warnings.append(message)
+
+        def remember_fx_rate(result: _FxConversionResult) -> None:
+            if result.rate is None or result.rate_date is None:
+                return
+            key = (
+                result.from_currency,
+                result.to_currency,
+                round(float(result.rate), 12),
+                result.rate_date.isoformat(),
+                bool(result.is_stale),
+                result.direction,
+            )
+            fx_rates_used_map.setdefault(
+                key,
+                {
+                    "from_currency": result.from_currency,
+                    "to_currency": result.to_currency,
+                    "rate": float(result.rate),
+                    "rate_date": result.rate_date.isoformat(),
+                    "is_stale": bool(result.is_stale),
+                    "source": result.source,
+                    "conversion_from_currency": result.conversion_from_currency,
+                    "conversion_to_currency": result.conversion_to_currency,
+                    "conversion_rate": result.conversion_rate,
+                    "direction": result.direction,
+                },
+            )
 
         for account in account_rows:
             account_snapshot = self._replay_account(account=account, as_of_date=as_of_date, cost_method=method)
@@ -495,82 +560,104 @@ class PortfolioService:
 
             accounts_payload.append(account_snapshot["public"])
 
-            cash_cny, stale_cash, _ = self._convert_amount(
-                amount=account_snapshot["total_cash"],
-                from_currency=account.base_currency,
-                to_currency=aggregate_currency,
-                as_of_date=as_of_date,
+            currency_bucket = totals_by_currency.setdefault(
+                account.base_currency,
+                {
+                    "currency": account.base_currency,
+                    "account_count": 0,
+                    "total_cash": 0.0,
+                    "total_market_value": 0.0,
+                    "total_equity": 0.0,
+                    "realized_pnl": 0.0,
+                    "unrealized_pnl": 0.0,
+                    "fee_total": 0.0,
+                    "tax_total": 0.0,
+                },
             )
-            mv_cny, stale_mv, _ = self._convert_amount(
-                amount=account_snapshot["total_market_value"],
-                from_currency=account.base_currency,
-                to_currency=aggregate_currency,
-                as_of_date=as_of_date,
-            )
-            eq_cny, stale_eq, _ = self._convert_amount(
-                amount=account_snapshot["total_equity"],
-                from_currency=account.base_currency,
-                to_currency=aggregate_currency,
-                as_of_date=as_of_date,
-            )
-            realized_cny, stale_realized, _ = self._convert_amount(
-                amount=account_snapshot["realized_pnl"],
-                from_currency=account.base_currency,
-                to_currency=aggregate_currency,
-                as_of_date=as_of_date,
-            )
-            unrealized_cny, stale_unrealized, _ = self._convert_amount(
-                amount=account_snapshot["unrealized_pnl"],
-                from_currency=account.base_currency,
-                to_currency=aggregate_currency,
-                as_of_date=as_of_date,
-            )
-            fee_cny, stale_fee, _ = self._convert_amount(
-                amount=account_snapshot["fee_total"],
-                from_currency=account.base_currency,
-                to_currency=aggregate_currency,
-                as_of_date=as_of_date,
-            )
-            tax_cny, stale_tax, _ = self._convert_amount(
-                amount=account_snapshot["tax_total"],
-                from_currency=account.base_currency,
-                to_currency=aggregate_currency,
-                as_of_date=as_of_date,
-            )
+            currency_bucket["account_count"] += 1
+            currency_bucket["total_cash"] += account_snapshot["total_cash"]
+            currency_bucket["total_market_value"] += account_snapshot["total_market_value"]
+            currency_bucket["total_equity"] += account_snapshot["total_equity"]
+            currency_bucket["realized_pnl"] += account_snapshot["realized_pnl"]
+            currency_bucket["unrealized_pnl"] += account_snapshot["unrealized_pnl"]
+            currency_bucket["fee_total"] += account_snapshot["fee_total"]
+            currency_bucket["tax_total"] += account_snapshot["tax_total"]
 
-            aggregate["total_cash"] += cash_cny
-            aggregate["total_market_value"] += mv_cny
-            aggregate["total_equity"] += eq_cny
-            aggregate["realized_pnl"] += realized_cny
-            aggregate["unrealized_pnl"] += unrealized_cny
-            aggregate["fee_total"] += fee_cny
-            aggregate["tax_total"] += tax_cny
-            aggregate["fx_stale"] = aggregate["fx_stale"] or any(
-                [
-                    stale_cash,
-                    stale_mv,
-                    stale_eq,
-                    stale_realized,
-                    stale_unrealized,
-                    stale_fee,
-                    stale_tax,
-                ]
-            )
+            for field_name in [
+                "total_cash",
+                "total_market_value",
+                "total_equity",
+                "realized_pnl",
+                "unrealized_pnl",
+                "fee_total",
+                "tax_total",
+            ]:
+                result = self._convert_amount_detail(
+                    amount=account_snapshot[field_name],
+                    from_currency=account.base_currency,
+                    to_currency=aggregate_currency,
+                    as_of_date=as_of_date,
+                )
+                remember_fx_rate(result)
+                aggregate["fx_stale"] = aggregate["fx_stale"] or result.is_stale
+                if result.available:
+                    aggregate[field_name] += float(result.amount or 0.0)
+                    continue
+
+                converted_total_available = False
+                aggregate["fx_stale"] = True
+                add_fx_warning("匯率不可用，無法計算換算總額。")
+                if result.reason == "missing_rate":
+                    fx_missing = True
+                    add_fx_warning(
+                        f"缺少 {result.conversion_from_currency}/{result.conversion_to_currency} 匯率，"
+                        f"無法換算 {result.conversion_from_currency} 金額。"
+                    )
+                elif result.is_stale:
+                    add_fx_warning(
+                        f"{result.from_currency}/{result.to_currency} 匯率已過期，無法計算換算總額。"
+                    )
+
+        aggregate_is_stale = bool(aggregate["fx_stale"] or not converted_total_available)
+
+        def aggregate_value(field_name: str) -> Optional[float]:
+            if not converted_total_available:
+                return None
+            return round(aggregate[field_name], 6)
 
         return {
             "as_of": as_of_date.isoformat(),
             "cost_method": method,
             "currency": aggregate_currency,
             "account_count": len(account_rows),
-            "total_cash": round(aggregate["total_cash"], 6),
-            "total_market_value": round(aggregate["total_market_value"], 6),
-            "total_equity": round(aggregate["total_equity"], 6),
-            "realized_pnl": round(aggregate["realized_pnl"], 6),
-            "unrealized_pnl": round(aggregate["unrealized_pnl"], 6),
-            "fee_total": round(aggregate["fee_total"], 6),
-            "tax_total": round(aggregate["tax_total"], 6),
-            "fx_stale": aggregate["fx_stale"],
+            "total_cash": aggregate_value("total_cash"),
+            "total_market_value": aggregate_value("total_market_value"),
+            "total_equity": aggregate_value("total_equity"),
+            "realized_pnl": aggregate_value("realized_pnl"),
+            "unrealized_pnl": aggregate_value("unrealized_pnl"),
+            "fee_total": aggregate_value("fee_total"),
+            "tax_total": aggregate_value("tax_total"),
+            "fx_stale": aggregate_is_stale,
+            "converted_total_available": converted_total_available,
+            "aggregate_is_stale": aggregate_is_stale,
+            "fx_missing": fx_missing,
+            "fx_warnings": fx_warnings,
+            "fx_rates_used": list(fx_rates_used_map.values()),
             "accounts": accounts_payload,
+            "totals_by_currency": {
+                currency: {
+                    "currency": bucket["currency"],
+                    "account_count": bucket["account_count"],
+                    "total_cash": round(bucket["total_cash"], 6),
+                    "total_market_value": round(bucket["total_market_value"], 6),
+                    "total_equity": round(bucket["total_equity"], 6),
+                    "realized_pnl": round(bucket["realized_pnl"], 6),
+                    "unrealized_pnl": round(bucket["unrealized_pnl"], 6),
+                    "fee_total": round(bucket["fee_total"], 6),
+                    "tax_total": round(bucket["tax_total"], 6),
+                }
+                for currency, bucket in totals_by_currency.items()
+            },
         }
 
     def refresh_fx_rates(
@@ -608,6 +695,56 @@ class PortfolioService:
             summary["updated_count"] += item["updated_count"]
             summary["stale_count"] += item["stale_count"]
             summary["error_count"] += item["error_count"]
+        if account_id is None:
+            base_currencies = {self._normalize_currency(account.base_currency) for account in account_rows}
+            reporting_currency = "TWD"
+            for base_currency in sorted(base_currencies - {reporting_currency}):
+                summary["pair_count"] += 1
+                if not refresh_enabled:
+                    continue
+                try:
+                    rate_from_reporting = self._fetch_fx_rate_from_yfinance(
+                        from_currency=reporting_currency,
+                        to_currency=base_currency,
+                        as_of_date=as_of_date,
+                    )
+                    if rate_from_reporting is not None and rate_from_reporting > EPS:
+                        self.repo.save_fx_rate(
+                            from_currency=reporting_currency,
+                            to_currency=base_currency,
+                            rate_date=as_of_date,
+                            rate=float(rate_from_reporting),
+                            source="yfinance",
+                            is_stale=False,
+                        )
+                        summary["updated_count"] += 1
+                        continue
+                except Exception as exc:
+                    logger.warning(
+                        "Mixed portfolio FX online fetch failed for %s/%s on %s: %s",
+                        base_currency,
+                        reporting_currency,
+                        as_of_date.isoformat(),
+                        exc,
+                    )
+
+                fallback = self.repo.get_latest_fx_rate(
+                    from_currency=reporting_currency,
+                    to_currency=base_currency,
+                    as_of=as_of_date,
+                )
+                if fallback is not None and float(fallback.rate or 0.0) > 0:
+                    self.repo.save_fx_rate(
+                        from_currency=reporting_currency,
+                        to_currency=base_currency,
+                        rate_date=as_of_date,
+                        rate=float(fallback.rate),
+                        source=(fallback.source or "cache_fallback"),
+                        is_stale=True,
+                    )
+                    summary["stale_count"] += 1
+                else:
+                    summary["error_count"] += 1
         return summary
 
     # ------------------------------------------------------------------
@@ -1299,31 +1436,145 @@ class PortfolioService:
         to_currency: str,
         as_of_date: date,
     ) -> Tuple[float, bool, str]:
+        result = self._convert_amount_detail(
+            amount=amount,
+            from_currency=from_currency,
+            to_currency=to_currency,
+            as_of_date=as_of_date,
+        )
+        if result.available:
+            return float(result.amount or 0.0), bool(result.is_stale), result.reason
+        return 0.0, True, result.reason
+
+    def _convert_amount_detail(
+        self,
+        *,
+        amount: float,
+        from_currency: str,
+        to_currency: str,
+        as_of_date: date,
+    ) -> _FxConversionResult:
         from_norm = self._normalize_currency(from_currency)
         to_norm = self._normalize_currency(to_currency)
         if abs(amount) <= EPS:
-            return 0.0, False, "zero"
+            return _FxConversionResult(
+                amount=0.0,
+                available=True,
+                is_stale=False,
+                reason="zero",
+                from_currency=from_norm,
+                to_currency=to_norm,
+                conversion_from_currency=from_norm,
+                conversion_to_currency=to_norm,
+                conversion_rate=1.0,
+                direction="identity",
+            )
         if from_norm == to_norm:
-            return float(amount), False, "identity"
+            return _FxConversionResult(
+                amount=float(amount),
+                available=True,
+                is_stale=False,
+                reason="identity",
+                from_currency=from_norm,
+                to_currency=to_norm,
+                conversion_from_currency=from_norm,
+                conversion_to_currency=to_norm,
+                conversion_rate=1.0,
+                direction="identity",
+            )
 
         direct = self.repo.get_latest_fx_rate(
             from_currency=from_norm,
             to_currency=to_norm,
             as_of=as_of_date,
         )
-        if direct is not None and direct.rate > 0:
-            return float(amount) * float(direct.rate), bool(direct.is_stale), "direct_rate"
-
         inverse = self.repo.get_latest_fx_rate(
             from_currency=to_norm,
             to_currency=from_norm,
             as_of=as_of_date,
         )
+        if direct is not None and direct.rate > 0 and not bool(direct.is_stale):
+            rate = float(direct.rate)
+            return _FxConversionResult(
+                amount=float(amount) * rate,
+                available=True,
+                is_stale=False,
+                reason="direct_rate",
+                from_currency=from_norm,
+                to_currency=to_norm,
+                rate=rate,
+                rate_date=direct.rate_date,
+                source=direct.source,
+                conversion_from_currency=from_norm,
+                conversion_to_currency=to_norm,
+                conversion_rate=rate,
+                direction="direct",
+            )
+        if inverse is not None and inverse.rate > 0 and not bool(inverse.is_stale):
+            stored_rate = float(inverse.rate)
+            conversion_rate = 1.0 / stored_rate
+            return _FxConversionResult(
+                amount=float(amount) * conversion_rate,
+                available=True,
+                is_stale=False,
+                reason="inverse_rate",
+                from_currency=to_norm,
+                to_currency=from_norm,
+                rate=stored_rate,
+                rate_date=inverse.rate_date,
+                source=inverse.source,
+                conversion_from_currency=from_norm,
+                conversion_to_currency=to_norm,
+                conversion_rate=conversion_rate,
+                direction="inverse",
+            )
+        if direct is not None and direct.rate > 0:
+            rate = float(direct.rate)
+            return _FxConversionResult(
+                amount=None,
+                available=False,
+                is_stale=True,
+                reason="stale_direct_rate",
+                from_currency=from_norm,
+                to_currency=to_norm,
+                rate=rate,
+                rate_date=direct.rate_date,
+                source=direct.source,
+                conversion_from_currency=from_norm,
+                conversion_to_currency=to_norm,
+                conversion_rate=rate,
+                direction="direct",
+            )
         if inverse is not None and inverse.rate > 0:
-            return float(amount) / float(inverse.rate), bool(inverse.is_stale), "inverse_rate"
+            stored_rate = float(inverse.rate)
+            conversion_rate = 1.0 / stored_rate
+            return _FxConversionResult(
+                amount=None,
+                available=False,
+                is_stale=True,
+                reason="stale_inverse_rate",
+                from_currency=to_norm,
+                to_currency=from_norm,
+                rate=stored_rate,
+                rate_date=inverse.rate_date,
+                source=inverse.source,
+                conversion_from_currency=from_norm,
+                conversion_to_currency=to_norm,
+                conversion_rate=conversion_rate,
+                direction="inverse",
+            )
 
-        # P0 fallback: keep pipeline available even when FX cache is missing.
-        return float(amount), True, "fallback_1_to_1"
+        return _FxConversionResult(
+            amount=None,
+            available=False,
+            is_stale=True,
+            reason="missing_rate",
+            from_currency=from_norm,
+            to_currency=to_norm,
+            conversion_from_currency=from_norm,
+            conversion_to_currency=to_norm,
+            direction="missing",
+        )
 
     def convert_amount(
         self,
@@ -1452,25 +1703,46 @@ class PortfolioService:
         as_of_date: date,
     ) -> Optional[float]:
         """Fetch latest available FX close rate around as_of date."""
-        if yf is None:
-            return None
         symbol = f"{from_currency}{to_currency}=X"
-        ticker = yf.Ticker(symbol)
-        history = ticker.history(
-            start=(as_of_date - timedelta(days=7)).isoformat(),
-            end=(as_of_date + timedelta(days=1)).isoformat(),
-            interval="1d",
-            auto_adjust=False,
-        )
-        if history is None or history.empty or "Close" not in history:
+        if yf is not None:
+            try:
+                ticker = yf.Ticker(symbol)
+                history = ticker.history(
+                    start=(as_of_date - timedelta(days=7)).isoformat(),
+                    end=(as_of_date + timedelta(days=1)).isoformat(),
+                    interval="1d",
+                    auto_adjust=False,
+                )
+                if history is not None and not history.empty and "Close" in history:
+                    close = history["Close"].dropna()
+                    if not close.empty:
+                        value = float(close.iloc[-1])
+                        if value > 0:
+                            return value
+            except Exception as exc:
+                logger.warning("yfinance FX fetch failed for %s: %s", symbol, exc)
+        return PortfolioService._fetch_fx_rate_from_yahoo_chart(symbol=symbol)
+
+    @staticmethod
+    def _fetch_fx_rate_from_yahoo_chart(*, symbol: str) -> Optional[float]:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=5d&interval=1d"
+        request = urllib_request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib_request.urlopen(request, timeout=8) as response:  # nosec B310 - fixed Yahoo Finance URL
+            payload = json.loads(response.read().decode("utf-8"))
+        result = (payload.get("chart", {}).get("result") or [None])[0]
+        if not result:
             return None
-        close = history["Close"].dropna()
-        if close.empty:
-            return None
-        value = float(close.iloc[-1])
-        if value <= 0:
-            return None
-        return value
+        meta = result.get("meta") or {}
+        market_price = meta.get("regularMarketPrice")
+        if market_price is not None:
+            value = float(market_price)
+            return value if value > 0 else None
+        closes = (((result.get("indicators") or {}).get("quote") or [{}])[0]).get("close") or []
+        for close in reversed(closes):
+            if close is not None:
+                value = float(close)
+                return value if value > 0 else None
+        return None
 
     def _require_active_account(self, account_id: int) -> Any:
         account = self.repo.get_account(account_id, include_inactive=False)

@@ -3017,7 +3017,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "help_key": "settings.system.market_review",
         "examples": [
             "MARKET_REVIEW_ENABLED=true",
-            "MARKET_REVIEW_REGION=cn",
+            "MARKET_REVIEW_REGION=tw",
         ],
         "docs": [
             {
@@ -3029,21 +3029,21 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "MARKET_REVIEW_REGION": {
         "title": "Market Review Region",
-        "description": "Market region for review: cn (A-shares), hk (Hong Kong), us (US stocks), or both (all markets).",
+        "description": "Market region for review: tw (Taiwan stocks), us (US stocks), or all (Taiwan and US markets).",
         "category": "system",
         "data_type": "string",
         "ui_control": "select",
         "is_sensitive": False,
         "is_required": False,
         "is_editable": True,
-        "default_value": "cn",
-        "options": ["cn", "hk", "us", "both"],
-        "validation": {"enum": ["cn", "hk", "us", "both"]},
+        "default_value": "tw",
+        "options": ["tw", "us", "all"],
+        "validation": {"enum": ["tw", "us", "all"]},
         "display_order": 47,
         "help_key": "settings.system.market_review",
         "examples": [
-            "MARKET_REVIEW_REGION=cn",
-            "MARKET_REVIEW_REGION=both",
+            "MARKET_REVIEW_REGION=tw",
+            "MARKET_REVIEW_REGION=all",
         ],
         "docs": [
             {

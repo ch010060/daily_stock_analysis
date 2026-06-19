@@ -408,7 +408,7 @@ daily_stock_analysis/
 | `TRUST_X_FORWARDED_FOR` | 單層可信反向代理部署時設為 `true`，取 `X-Forwarded-For` 最右值作為真實客戶端 IP（用於登入限流等）；直連公網時保持 `false` 防偽造。多級代理/CDN 場景下限流 key 可能退化為邊緣代理 IP，需額外評估 | `false` |
 | `MAX_WORKERS` | 併發執行緒數 | `3` |
 | `MARKET_REVIEW_ENABLED` | 啟用大盤覆盤 | `true` |
-| `MARKET_REVIEW_REGION` | 大盤覆盤市場區域：cn(A股)、hk(港股)、us(美股)、both(三市場)，us 適合僅關注美股的使用者 | `cn` |
+| `MARKET_REVIEW_REGION` | 大盤覆盤市場區域：tw(台股)、us(美股)、all(台股+美股)，tw 為 Route B 預設值 | `tw` |
 | `MARKET_REVIEW_COLOR_SCHEME` | 大盤覆盤指數漲跌顏色：`green_up`=綠漲紅跌（預設），`red_up`=紅漲綠跌 | `green_up` |
 | `TRADING_DAY_CHECK_ENABLED` | 交易日檢查：預設 `true`，非交易日跳過執行；設為 `false` 或使用 `--force-run` 可強制執行（Issue #373） | `true` |
 | `SCHEDULE_ENABLED` | 啟用定時任務 | `false` |

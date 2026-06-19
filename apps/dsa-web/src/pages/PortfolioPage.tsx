@@ -56,12 +56,14 @@ type FxRefreshContext = {
 };
 
 type PortfolioAlertVariant = 'info' | 'success' | 'warning' | 'danger';
+type ManualEntryCurrency = 'TWD' | 'USD';
 
 const PORTFOLIO_INPUT_CLASS =
   'input-surface input-focus-glow h-11 w-full rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60';
 const PORTFOLIO_SELECT_CLASS = `${PORTFOLIO_INPUT_CLASS} appearance-none pr-10`;
 const PORTFOLIO_FILE_PICKER_CLASS =
   'input-surface input-focus-glow flex h-11 w-full cursor-pointer items-center justify-center rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60';
+const MANUAL_ENTRY_CURRENCY_OPTIONS: ManualEntryCurrency[] = ['TWD', 'USD'];
 
 function getTodayIso(): string {
   return toDateInputValue(new Date());
@@ -121,6 +123,10 @@ function formatCashDirectionLabel(value: PortfolioCashDirection): string {
 
 function formatCorporateActionLabel(value: PortfolioCorporateActionType): string {
   return value === 'cash_dividend' ? '現金分紅' : '拆並股調整';
+}
+
+function getManualEntryCurrency(baseCurrency?: string | null): ManualEntryCurrency {
+  return baseCurrency?.toUpperCase() === 'USD' ? 'USD' : 'TWD';
 }
 
 function formatBrokerLabel(value: string, displayName?: string): string {
@@ -240,6 +246,7 @@ const PortfolioPage: React.FC = () => {
     symbol: '',
     tradeDate: getTodayIso(),
     side: 'buy' as PortfolioSide,
+    currency: 'TWD' as ManualEntryCurrency,
     quantity: '',
     price: '',
     fee: '',
@@ -251,13 +258,14 @@ const PortfolioPage: React.FC = () => {
     eventDate: getTodayIso(),
     direction: 'in' as PortfolioCashDirection,
     amount: '',
-    currency: '',
+    currency: 'TWD' as ManualEntryCurrency,
     note: '',
   });
   const [corpForm, setCorpForm] = useState({
     symbol: '',
     effectiveDate: getTodayIso(),
     actionType: 'cash_dividend' as PortfolioCorporateActionType,
+    currency: 'TWD' as ManualEntryCurrency,
     cashDividendPerShare: '',
     splitRatio: '',
     note: '',
@@ -270,6 +278,7 @@ const PortfolioPage: React.FC = () => {
   const writableAccount = selectedAccount === 'all' ? undefined : accounts.find((item) => item.id === selectedAccount);
   const writableAccountId = writableAccount?.id;
   const writeBlocked = !writableAccountId;
+  const manualEntryCurrency = getManualEntryCurrency(writableAccount?.baseCurrency);
   const totalEventPages = Math.max(1, Math.ceil(eventTotal / DEFAULT_PAGE_SIZE));
   const currentEventCount = eventType === 'trade'
     ? tradeEvents.length
@@ -283,6 +292,12 @@ const PortfolioPage: React.FC = () => {
       && refreshContextRef.current.requestId === requestedRequestId
     );
   };
+
+  useEffect(() => {
+    setTradeForm((prev) => ({ ...prev, currency: manualEntryCurrency }));
+    setCashForm((prev) => ({ ...prev, currency: manualEntryCurrency }));
+    setCorpForm((prev) => ({ ...prev, currency: manualEntryCurrency }));
+  }, [manualEntryCurrency]);
 
   const loadAccounts = useCallback(async () => {
     try {
@@ -468,6 +483,13 @@ const PortfolioPage: React.FC = () => {
     return rows;
   }, [snapshot]);
 
+  const currencySubtotals = useMemo(() => {
+    const byCurrency = snapshot?.totalsByCurrency ?? {};
+    return Object.values(byCurrency).sort((a, b) => a.currency.localeCompare(b.currency));
+  }, [snapshot]);
+  const fxWarnings = snapshot?.fxWarnings ?? [];
+  const fxRatesUsed = snapshot?.fxRatesUsed ?? [];
+
   const sectorPieData = useMemo(() => {
     const sectors = risk?.sectorConcentration?.topSectors || [];
     return sectors
@@ -508,6 +530,7 @@ const PortfolioPage: React.FC = () => {
         symbol: tradeForm.symbol,
         tradeDate: tradeForm.tradeDate,
         side: tradeForm.side,
+        currency: tradeForm.currency,
         quantity: Number(tradeForm.quantity),
         price: Number(tradeForm.price),
         fee: Number(tradeForm.fee || 0),
@@ -535,7 +558,7 @@ const PortfolioPage: React.FC = () => {
         eventDate: cashForm.eventDate,
         direction: cashForm.direction,
         amount: Number(cashForm.amount),
-        currency: cashForm.currency || undefined,
+        currency: cashForm.currency,
         note: cashForm.note || undefined,
       });
       await refreshPortfolioData();
@@ -558,6 +581,7 @@ const PortfolioPage: React.FC = () => {
         symbol: corpForm.symbol,
         effectiveDate: corpForm.effectiveDate,
         actionType: corpForm.actionType,
+        currency: corpForm.currency,
         cashDividendPerShare: corpForm.cashDividendPerShare ? Number(corpForm.cashDividendPerShare) : undefined,
         splitRatio: corpForm.splitRatio ? Number(corpForm.splitRatio) : undefined,
         note: corpForm.note || undefined,
@@ -964,7 +988,44 @@ const PortfolioPage: React.FC = () => {
               {fxRefreshing ? '重新整理中...' : '重新整理匯率'}
             </button>
           </div>
-          <div className="mt-2">{snapshot?.fxStale ? <Badge variant="warning">過期</Badge> : <Badge variant="success">最新</Badge>}</div>
+          <div className="mt-2">
+            {snapshot?.convertedTotalAvailable === false ? (
+              <Badge variant="warning">不可用</Badge>
+            ) : snapshot?.fxStale ? (
+              <Badge variant="warning">過期</Badge>
+            ) : (
+              <Badge variant="success">最新</Badge>
+            )}
+          </div>
+          {fxWarnings.length > 0 ? (
+            <InlineAlert
+              variant="warning"
+              message={fxWarnings.join(' ')}
+              className="mt-3 rounded-xl px-3 py-2 text-xs shadow-none"
+            />
+          ) : null}
+          {fxRatesUsed.length > 0 ? (
+            <div className="mt-3 space-y-1 text-xs text-secondary">
+              {fxRatesUsed.map((rate, index) => (
+                <p key={`${rate.fromCurrency}-${rate.toCurrency}-${rate.rateDate}-${index}`}>
+                  {rate.conversionFromCurrency && rate.conversionToCurrency && rate.conversionRate ? (
+                    <span>
+                      {rate.conversionFromCurrency}/{rate.conversionToCurrency} = {Number(rate.conversionRate).toFixed(4)}
+                      {' '}
+                      <span className="text-tertiary">
+                        (quote {rate.fromCurrency}/{rate.toCurrency} = {Number(rate.rate).toPrecision(6)})
+                      </span>
+                    </span>
+                  ) : (
+                    <span>
+                      {rate.fromCurrency}/{rate.toCurrency} = {Number(rate.rate).toFixed(4)}
+                    </span>
+                  )}
+                  {' '}as of {rate.rateDate}
+                </p>
+              ))}
+            </div>
+          ) : null}
           {fxRefreshFeedback ? (
             <InlineAlert
               variant={getFxRefreshFeedbackVariant(fxRefreshFeedback.tone)}
@@ -975,6 +1036,23 @@ const PortfolioPage: React.FC = () => {
           ) : null}
         </Card>
       </section>
+
+      {currencySubtotals.length > 1 ? (
+        <section>
+          <p className="text-xs text-secondary mb-2">分幣別小計</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            {currencySubtotals.map((subtotal) => (
+              <Card key={subtotal.currency} variant="bordered" padding="md">
+                <p className="text-xs text-secondary">{subtotal.currency}</p>
+                <p className="mt-1 text-lg font-semibold text-foreground">{formatMoney(subtotal.totalEquity, subtotal.currency)}</p>
+                <p className="mt-1 text-xs text-secondary">
+                  市值 {formatMoney(subtotal.totalMarketValue, subtotal.currency)} ・ 現金 {formatMoney(subtotal.totalCash, subtotal.currency)}
+                </p>
+              </Card>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-3">
         <Card className="xl:col-span-2" padding="md">
@@ -1128,6 +1206,15 @@ const PortfolioPage: React.FC = () => {
                 <option value="sell">賣出</option>
               </select>
             </div>
+            <label className="block text-xs text-secondary">
+              幣別
+              <select aria-label="交易幣別" className={`${PORTFOLIO_SELECT_CLASS} mt-1`} value={tradeForm.currency}
+                onChange={(e) => setTradeForm((prev) => ({ ...prev, currency: e.target.value as ManualEntryCurrency }))}>
+                {MANUAL_ENTRY_CURRENCY_OPTIONS.map((currency) => (
+                  <option key={currency} value={currency}>{currency}</option>
+                ))}
+              </select>
+            </label>
             <div className="grid grid-cols-2 gap-2">
               <input className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.0001" placeholder="數量（必填）" value={tradeForm.quantity}
                 onChange={(e) => setTradeForm((prev) => ({ ...prev, quantity: e.target.value }))} required />
@@ -1159,8 +1246,15 @@ const PortfolioPage: React.FC = () => {
             </div>
             <input className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.0001" placeholder="金額"
               value={cashForm.amount} onChange={(e) => setCashForm((prev) => ({ ...prev, amount: e.target.value }))} required />
-            <input className={PORTFOLIO_INPUT_CLASS} placeholder={`幣種（可選，預設 ${writableAccount?.baseCurrency || '帳戶基準幣'}）`} value={cashForm.currency}
-              onChange={(e) => setCashForm((prev) => ({ ...prev, currency: e.target.value }))} />
+            <label className="block text-xs text-secondary">
+              幣別
+              <select aria-label="資金流水幣別" className={`${PORTFOLIO_SELECT_CLASS} mt-1`} value={cashForm.currency}
+                onChange={(e) => setCashForm((prev) => ({ ...prev, currency: e.target.value as ManualEntryCurrency }))}>
+                {MANUAL_ENTRY_CURRENCY_OPTIONS.map((currency) => (
+                  <option key={currency} value={currency}>{currency}</option>
+                ))}
+              </select>
+            </label>
             <button type="submit" className="btn-secondary w-full" disabled={!writableAccountId}>提交資金流水</button>
           </form>
         </Card>
@@ -1188,6 +1282,15 @@ const PortfolioPage: React.FC = () => {
                 value={corpForm.splitRatio}
                 onChange={(e) => setCorpForm((prev) => ({ ...prev, splitRatio: e.target.value, cashDividendPerShare: '' }))} required />
             )}
+            <label className="block text-xs text-secondary">
+              幣別
+              <select aria-label="公司行為幣別" className={`${PORTFOLIO_SELECT_CLASS} mt-1`} value={corpForm.currency}
+                onChange={(e) => setCorpForm((prev) => ({ ...prev, currency: e.target.value as ManualEntryCurrency }))}>
+                {MANUAL_ENTRY_CURRENCY_OPTIONS.map((currency) => (
+                  <option key={currency} value={currency}>{currency}</option>
+                ))}
+              </select>
+            </label>
             <button type="submit" className="btn-secondary w-full" disabled={!writableAccountId}>提交企業行為</button>
           </form>
         </Card>

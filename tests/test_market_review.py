@@ -55,15 +55,16 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
 
     def test_resolve_market_review_regions_returns_ordered_non_empty_list(self) -> None:
         cases = [
-            (None, ["cn"]),
-            ("", ["cn"]),
+            (None, ["tw"]),
+            ("", ["tw"]),
+            ("all", ["tw", "us"]),
             ("both", ["cn", "hk", "us", "tw"]),
             (" CN,US,cn ", ["cn", "us"]),
             ("us,cn,us", ["cn", "us"]),
-            ("eu,apac", ["cn"]),
-            (",,", ["cn"]),
+            ("eu,apac", ["tw"]),
+            (",,", ["tw"]),
             ("HK", ["hk"]),
-            ("invalid", ["cn"]),
+            ("invalid", ["tw"]),
         ]
 
         for raw_region, expected in cases:
@@ -266,39 +267,30 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
         self.assertEqual(set(snapshots), {"cn"})
         self.assertEqual(snapshots["cn"]["trade_date"], "2026-03-06")
 
-    def test_run_market_review_invalid_comma_subset_falls_back_to_cn(self) -> None:
+    def test_run_market_review_invalid_comma_subset_falls_back_to_tw(self) -> None:
         notifier = self._make_notifier()
-        market_analyzer = MagicMock()
-        market_analyzer.run_daily_review_with_snapshot.return_value = SimpleNamespace(
-            report="CN body",
-            market_light_snapshot={
-                "region": "cn",
-                "trade_date": "2026-03-06",
-                "score": 60,
-            },
-        )
 
         with patch.object(
             market_review_module,
             "get_config",
-            return_value=SimpleNamespace(report_language="zh", market_review_region="cn"),
+            return_value=SimpleNamespace(report_language="zh", market_review_region="tw"),
         ), patch.object(
             market_review_module,
-            "MarketAnalyzer",
-            return_value=market_analyzer,
-        ) as analyzer_cls, patch.object(
+            "_run_tw_market_review_section",
+            return_value=("TW body", {"region": "tw", "trade_date": "2026-03-06", "score": 60}),
+        ) as tw_section, patch.object(
             market_review_module, "_persist_market_review_history"
         ) as persist_history:
             result = run_market_review(
                 notifier, send_notification=False, override_region="eu,apac"
             )
 
-        self.assertEqual(result, "CN body")
-        self.assertEqual(analyzer_cls.call_args.kwargs["region"], "cn")
+        self.assertEqual(result, "TW body")
+        tw_section.assert_called_once()
         persist_history.assert_called_once()
-        self.assertEqual(persist_history.call_args.kwargs["region"], "cn")
+        self.assertEqual(persist_history.call_args.kwargs["region"], "tw")
         snapshots = persist_history.call_args.kwargs["market_light_snapshots"]
-        self.assertEqual(set(snapshots), {"cn"})
+        self.assertEqual(set(snapshots), {"tw"})
 
     def test_persist_market_review_history_saves_markdown_report(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
