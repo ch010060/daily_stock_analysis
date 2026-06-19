@@ -324,6 +324,11 @@ export interface PortfolioImportBrokerItem {
   broker: string;
   aliases: string[];
   displayName?: string;
+  market?: 'tw' | 'us' | 'multi' | 'cn' | 'hk' | string;
+  status?: 'supported' | 'planned' | 'legacy_hidden' | string;
+  enabled?: boolean;
+  requiresSample?: boolean;
+  description?: string;
 }
 
 export interface PortfolioImportBrokerListResponse {

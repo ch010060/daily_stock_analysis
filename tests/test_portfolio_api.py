@@ -613,10 +613,31 @@ class PortfolioApiTestCase(unittest.TestCase):
         resp = self.client.get("/api/v1/portfolio/imports/csv/brokers")
         self.assertEqual(resp.status_code, 200)
         payload = resp.json()
-        brokers = {item["broker"] for item in payload["brokers"]}
-        self.assertIn("huatai", brokers)
-        self.assertIn("citic", brokers)
-        self.assertIn("cmb", brokers)
+        broker_map = {item["broker"]: item for item in payload["brokers"]}
+
+        for broker, market in [("kgi", "tw"), ("firstrade", "us"), ("ibkr", "multi")]:
+            self.assertIn(broker, broker_map)
+            self.assertEqual(broker_map[broker]["status"], "planned")
+            self.assertFalse(broker_map[broker]["enabled"])
+            self.assertTrue(broker_map[broker]["requires_sample"])
+            self.assertEqual(broker_map[broker]["market"], market)
+
+        for broker in ["huatai", "citic", "cmb"]:
+            self.assertIn(broker, broker_map)
+            self.assertEqual(broker_map[broker]["status"], "legacy_hidden")
+            self.assertFalse(broker_map[broker]["enabled"])
+
+    def test_csv_parse_rejects_planned_broker_profile(self) -> None:
+        csv_text = "trade_date,symbol,side,quantity,price\n2026-01-02,AAPL,buy,1,100\n"
+        resp = self.client.post(
+            "/api/v1/portfolio/imports/csv/parse",
+            data={"broker": "firstrade"},
+            files={"file": ("firstrade.csv", csv_text.encode("utf-8"), "text/csv")},
+        )
+        self.assertEqual(resp.status_code, 400)
+        payload = resp.json()
+        message = payload.get("message") or payload.get("detail", {}).get("message", "")
+        self.assertIn("此券商匯入設定檔尚未啟用", message)
 
     def test_event_list_invalid_page_size_returns_422(self) -> None:
         resp = self.client.get("/api/v1/portfolio/trades", params={"page_size": 101})

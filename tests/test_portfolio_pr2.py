@@ -166,11 +166,31 @@ class PortfolioPr2TestCase(unittest.TestCase):
     def test_import_supported_broker_registry(self) -> None:
         items = self.import_service.list_supported_brokers()
         broker_map = {item["broker"]: item for item in items}
-        self.assertIn("huatai", broker_map)
-        self.assertIn("citic", broker_map)
-        self.assertIn("cmb", broker_map)
+        self.assertEqual(broker_map["huatai"]["status"], "legacy_hidden")
+        self.assertEqual(broker_map["citic"]["status"], "legacy_hidden")
+        self.assertEqual(broker_map["cmb"]["status"], "legacy_hidden")
+        self.assertFalse(broker_map["huatai"]["enabled"])
         self.assertIn("zhongxin", broker_map["citic"]["aliases"])
         self.assertIn("zhaoshang", broker_map["cmb"]["aliases"])
+        self.assertEqual(broker_map["kgi"]["status"], "planned")
+        self.assertEqual(broker_map["kgi"]["market"], "tw")
+        self.assertFalse(broker_map["kgi"]["enabled"])
+        self.assertTrue(broker_map["kgi"]["requires_sample"])
+        self.assertEqual(broker_map["firstrade"]["status"], "planned")
+        self.assertEqual(broker_map["firstrade"]["market"], "us")
+        self.assertEqual(broker_map["ibkr"]["status"], "planned")
+        self.assertEqual(broker_map["ibkr"]["market"], "multi")
+
+    def test_import_rejects_planned_broker_profile(self) -> None:
+        csv_text = (
+            "trade_date,symbol,side,quantity,price\n"
+            "2026-01-02,AAPL,buy,1,100\n"
+        )
+        with self.assertRaisesRegex(ValueError, "此券商匯入設定檔尚未啟用"):
+            self.import_service.parse_trade_csv(
+                broker="kgi",
+                content=csv_text.encode("utf-8"),
+            )
 
     def test_import_preserves_leading_zero_symbol(self) -> None:
         csv_text = (

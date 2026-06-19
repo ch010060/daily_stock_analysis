@@ -271,6 +271,11 @@ class PortfolioImportBrokerItem(BaseModel):
     broker: str
     aliases: List[str] = Field(default_factory=list)
     display_name: Optional[str] = None
+    market: Optional[str] = None
+    status: Literal["supported", "planned", "legacy_hidden"] = "supported"
+    enabled: bool = True
+    requires_sample: bool = False
+    description: Optional[str] = None
 
 
 class PortfolioImportBrokerListResponse(BaseModel):

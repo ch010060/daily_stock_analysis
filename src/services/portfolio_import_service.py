@@ -31,6 +31,47 @@ class CsvParserSpec:
     aliases: Tuple[str, ...]
     display_name: str
     column_hints: Dict[str, Tuple[str, ...]]
+    market: str = "cn"
+    status: str = "legacy_hidden"
+    enabled: bool = False
+    requires_sample: bool = False
+    description: str = ""
+
+
+PLANNED_PROFILE_DISABLED_MESSAGE = "此券商匯入設定檔尚未啟用，需提供 CSV 樣本後建立解析器。"
+
+PLANNED_BROKER_PROFILES: Tuple[Dict[str, Any], ...] = (
+    {
+        "broker": "kgi",
+        "aliases": (),
+        "display_name": "凱基證券 / KGI",
+        "market": "tw",
+        "status": "planned",
+        "enabled": False,
+        "requires_sample": True,
+        "description": "Planned TW broker import profile; CSV sample required before parser support.",
+    },
+    {
+        "broker": "firstrade",
+        "aliases": (),
+        "display_name": "Firstrade",
+        "market": "us",
+        "status": "planned",
+        "enabled": False,
+        "requires_sample": True,
+        "description": "Planned US broker import profile; CSV sample required before parser support.",
+    },
+    {
+        "broker": "ibkr",
+        "aliases": ("interactive_brokers", "interactivebrokers"),
+        "display_name": "Interactive Brokers / IBKR",
+        "market": "multi",
+        "status": "planned",
+        "enabled": False,
+        "requires_sample": True,
+        "description": "Planned cross-market import profile; CSV sample required before parser support.",
+    },
+)
 
 
 DEFAULT_PARSER_SPECS: Tuple[CsvParserSpec, ...] = (
@@ -122,6 +163,11 @@ class PortfolioImportService:
             aliases=new_aliases,
             display_name=spec.display_name or broker,
             column_hints=dict(spec.column_hints or {}),
+            market=(spec.market or "").strip().lower() or "cn",
+            status=(spec.status or "").strip().lower() or "legacy_hidden",
+            enabled=bool(spec.enabled),
+            requires_sample=bool(spec.requires_sample),
+            description=spec.description or "",
         )
         for alias in self._parser_registry[broker].aliases:
             self._broker_alias_map[alias] = broker
@@ -129,13 +175,20 @@ class PortfolioImportService:
     def list_supported_brokers(self) -> List[Dict[str, Any]]:
         """List canonical broker ids and aliases for frontend selector."""
         items: List[Dict[str, Any]] = []
+        items.extend(dict(profile) for profile in PLANNED_BROKER_PROFILES)
         for broker in sorted(self._parser_registry.keys()):
             aliases = sorted(alias for alias, target in self._broker_alias_map.items() if target == broker)
+            spec = self._parser_registry[broker]
             items.append(
                 {
                     "broker": broker,
                     "aliases": aliases,
-                    "display_name": self._parser_registry[broker].display_name,
+                    "display_name": spec.display_name,
+                    "market": spec.market,
+                    "status": spec.status,
+                    "enabled": spec.enabled,
+                    "requires_sample": spec.requires_sample,
+                    "description": spec.description,
                 }
             )
         return items
@@ -271,11 +324,24 @@ class PortfolioImportService:
 
     def _normalize_broker(self, value: str) -> str:
         broker = (value or "").strip().lower()
+        if self._planned_profile_for(broker) is not None:
+            raise ValueError(PLANNED_PROFILE_DISABLED_MESSAGE)
         broker = self._broker_alias_map.get(broker, broker)
         if broker not in self._parser_registry:
-            supported = ", ".join(sorted(self._parser_registry.keys()))
+            known = set(self._parser_registry.keys())
+            for profile in PLANNED_BROKER_PROFILES:
+                known.add(str(profile["broker"]))
+                known.update(str(alias) for alias in profile.get("aliases", ()))
+            supported = ", ".join(sorted(known))
             raise ValueError(f"broker must be one of: {supported}")
         return broker
+
+    @staticmethod
+    def _planned_profile_for(broker: str) -> Optional[Dict[str, Any]]:
+        for profile in PLANNED_BROKER_PROFILES:
+            if broker == profile["broker"] or broker in profile.get("aliases", ()):
+                return profile
+        return None
 
     @staticmethod
     def _read_csv(content: bytes) -> pd.DataFrame:
