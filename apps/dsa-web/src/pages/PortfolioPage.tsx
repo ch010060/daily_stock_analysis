@@ -27,9 +27,36 @@ import type {
 const PIE_COLORS = ['#00d4ff', '#00ff88', '#ffaa00', '#ff7a45', '#7f8cff', '#ff4466'];
 const DEFAULT_PAGE_SIZE = 20;
 const FALLBACK_BROKERS: PortfolioImportBrokerItem[] = [
-  { broker: 'huatai', aliases: [], displayName: '華泰' },
-  { broker: 'citic', aliases: ['zhongxin'], displayName: '中信' },
-  { broker: 'cmb', aliases: ['cmbchina', 'zhaoshang'], displayName: '招商' },
+  {
+    broker: 'kgi',
+    aliases: [],
+    displayName: '凱基證券 / KGI',
+    market: 'tw',
+    status: 'planned',
+    enabled: false,
+    requiresSample: true,
+    description: 'Planned TW broker import profile; CSV sample required before parser support.',
+  },
+  {
+    broker: 'firstrade',
+    aliases: [],
+    displayName: 'Firstrade',
+    market: 'us',
+    status: 'planned',
+    enabled: false,
+    requiresSample: true,
+    description: 'Planned US broker import profile; CSV sample required before parser support.',
+  },
+  {
+    broker: 'ibkr',
+    aliases: ['interactive_brokers'],
+    displayName: 'Interactive Brokers / IBKR',
+    market: 'multi',
+    status: 'planned',
+    enabled: false,
+    requiresSample: true,
+    description: 'Planned cross-market import profile; CSV sample required before parser support.',
+  },
 ];
 
 type AccountOption = 'all' | number;
@@ -131,10 +158,29 @@ function getManualEntryCurrency(baseCurrency?: string | null): ManualEntryCurren
 
 function formatBrokerLabel(value: string, displayName?: string): string {
   if (displayName && displayName.trim()) return `${value}（${displayName.trim()}）`;
-  if (value === 'huatai') return 'huatai（華泰）';
-  if (value === 'citic') return 'citic（中信）';
-  if (value === 'cmb') return 'cmb（招商）';
   return value;
+}
+
+function isLegacyHiddenBroker(item: PortfolioImportBrokerItem): boolean {
+  return item.status === 'legacy_hidden';
+}
+
+function isBrokerImportEnabled(item: PortfolioImportBrokerItem | undefined): boolean {
+  if (!item) return false;
+  return item.status === 'supported' && item.enabled !== false;
+}
+
+function getVisibleImportBrokers(items: PortfolioImportBrokerItem[]): PortfolioImportBrokerItem[] {
+  return items.filter((item) => !isLegacyHiddenBroker(item));
+}
+
+function getFirstEnabledBroker(items: PortfolioImportBrokerItem[]): string {
+  return getVisibleImportBrokers(items).find((item) => isBrokerImportEnabled(item))?.broker ?? '';
+}
+
+function formatBrokerStatusLabel(item: PortfolioImportBrokerItem): string {
+  if (item.status === 'planned') return '（規劃中，需 CSV 樣本）';
+  return '';
 }
 
 function buildFxRefreshFeedback(data: PortfolioFxRefreshResponse): FxRefreshFeedback {
@@ -217,7 +263,7 @@ const PortfolioPage: React.FC = () => {
   const [writeWarning, setWriteWarning] = useState<string | null>(null);
 
   const [brokers, setBrokers] = useState<PortfolioImportBrokerItem[]>([]);
-  const [selectedBroker, setSelectedBroker] = useState('huatai');
+  const [selectedBroker, setSelectedBroker] = useState('');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvDryRun, setCsvDryRun] = useState(true);
   const [csvParsing, setCsvParsing] = useState(false);
@@ -279,6 +325,10 @@ const PortfolioPage: React.FC = () => {
   const writableAccountId = writableAccount?.id;
   const writeBlocked = !writableAccountId;
   const manualEntryCurrency = getManualEntryCurrency(writableAccount?.baseCurrency);
+  const visibleImportBrokers = useMemo(() => getVisibleImportBrokers(brokers), [brokers]);
+  const selectedBrokerItem = visibleImportBrokers.find((item) => item.broker === selectedBroker);
+  const brokerImportEnabled = isBrokerImportEnabled(selectedBrokerItem);
+  const hasPlannedBrokerProfiles = visibleImportBrokers.some((item) => item.status === 'planned' || item.requiresSample);
   const totalEventPages = Math.max(1, Math.ceil(eventTotal / DEFAULT_PAGE_SIZE));
   const currentEventCount = eventType === 'trade'
     ? tradeEvents.length
@@ -321,22 +371,22 @@ const PortfolioPage: React.FC = () => {
       const brokerItems = response.brokers || [];
       if (brokerItems.length === 0) {
         setBrokers(FALLBACK_BROKERS);
-        setBrokerLoadWarning('券商列表介面返回為空，已回退為內建券商列表（華泰/中信/招商）。');
-        if (!FALLBACK_BROKERS.some((item) => item.broker === selectedBroker)) {
-          setSelectedBroker(FALLBACK_BROKERS[0].broker);
+        setBrokerLoadWarning('券商列表介面返回為空，已顯示規劃中的 TW/US 券商設定檔。');
+        if (!isBrokerImportEnabled(FALLBACK_BROKERS.find((item) => item.broker === selectedBroker))) {
+          setSelectedBroker(getFirstEnabledBroker(FALLBACK_BROKERS));
         }
         return;
       }
       setBrokers(brokerItems);
       setBrokerLoadWarning(null);
-      if (!brokerItems.some((item) => item.broker === selectedBroker)) {
-        setSelectedBroker(brokerItems[0].broker);
+      if (!isBrokerImportEnabled(brokerItems.find((item) => item.broker === selectedBroker))) {
+        setSelectedBroker(getFirstEnabledBroker(brokerItems));
       }
     } catch {
       setBrokers(FALLBACK_BROKERS);
-      setBrokerLoadWarning('券商列表介面不可用，已回退為內建券商列表（華泰/中信/招商）。');
-      if (!FALLBACK_BROKERS.some((item) => item.broker === selectedBroker)) {
-        setSelectedBroker(FALLBACK_BROKERS[0].broker);
+      setBrokerLoadWarning('券商列表介面不可用，已顯示規劃中的 TW/US 券商設定檔。');
+      if (!isBrokerImportEnabled(FALLBACK_BROKERS.find((item) => item.broker === selectedBroker))) {
+        setSelectedBroker(getFirstEnabledBroker(FALLBACK_BROKERS));
       }
     }
   }, [selectedBroker]);
@@ -1308,11 +1358,23 @@ const PortfolioPage: React.FC = () => {
               />
             ) : null}
             <div className="grid grid-cols-2 gap-2">
-              <select className={PORTFOLIO_SELECT_CLASS} value={selectedBroker} onChange={(e) => setSelectedBroker(e.target.value)}>
-                {brokers.length > 0 ? (
-                  brokers.map((item) => <option key={item.broker} value={item.broker}>{formatBrokerLabel(item.broker, item.displayName)}</option>)
+              {hasPlannedBrokerProfiles ? (
+                <InlineAlert
+                  variant="info"
+                  className="rounded-lg px-3 py-2 text-xs shadow-none"
+                  message="匯入設定檔尚未啟用。請提供去識別化 CSV 樣本以建立解析器。"
+                />
+              ) : null}
+              <select aria-label="CSV 匯入券商" className={PORTFOLIO_SELECT_CLASS} value={selectedBroker} onChange={(e) => setSelectedBroker(e.target.value)}>
+                <option value="" disabled>選擇券商設定檔</option>
+                {visibleImportBrokers.length > 0 ? (
+                  visibleImportBrokers.map((item) => (
+                    <option key={item.broker} value={item.broker} disabled={!isBrokerImportEnabled(item)}>
+                      {formatBrokerLabel(item.broker, item.displayName)}{formatBrokerStatusLabel(item)}
+                    </option>
+                  ))
                 ) : (
-                  <option value="huatai">huatai（華泰）</option>
+                  <option value="" disabled>尚無可用券商設定檔</option>
                 )}
               </select>
               <label className={PORTFOLIO_FILE_PICKER_CLASS}>
@@ -1326,11 +1388,11 @@ const PortfolioPage: React.FC = () => {
               <label htmlFor="csv-dry-run">僅預演（不寫入）</label>
             </div>
             <div className="flex gap-2">
-              <button type="button" className="btn-secondary flex-1" disabled={!csvFile || csvParsing} onClick={() => void handleParseCsv()}>
+              <button type="button" className="btn-secondary flex-1" disabled={!csvFile || !brokerImportEnabled || csvParsing} onClick={() => void handleParseCsv()}>
                 {csvParsing ? '解析中...' : '解析檔案'}
               </button>
               <button type="button" className="btn-secondary flex-1"
-                disabled={!csvFile || !writableAccountId || csvCommitting} onClick={() => void handleCommitCsv()}>
+                disabled={!csvFile || !brokerImportEnabled || !writableAccountId || csvCommitting} onClick={() => void handleCommitCsv()}>
                 {csvCommitting ? '提交中...' : '提交匯入'}
               </button>
             </div>

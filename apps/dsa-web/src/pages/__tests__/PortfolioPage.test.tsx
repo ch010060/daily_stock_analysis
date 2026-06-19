@@ -864,4 +864,76 @@ describe('PortfolioPage manual-entry currency selectors', () => {
     expect(screen.getByLabelText('資金流水幣別')).toHaveValue('USD');
     expect(screen.getByLabelText('公司行為幣別')).toHaveValue('USD');
   });
+
+  it('shows planned TW/US broker profiles disabled and does not default to CN brokers', async () => {
+    listImportBrokers.mockResolvedValueOnce({
+      brokers: [
+        {
+          broker: 'kgi',
+          aliases: [],
+          displayName: '凱基證券 / KGI',
+          market: 'tw',
+          status: 'planned',
+          enabled: false,
+          requiresSample: true,
+          description: 'Planned TW broker import profile; CSV sample required before parser support.',
+        },
+        {
+          broker: 'firstrade',
+          aliases: [],
+          displayName: 'Firstrade',
+          market: 'us',
+          status: 'planned',
+          enabled: false,
+          requiresSample: true,
+          description: 'Planned US broker import profile; CSV sample required before parser support.',
+        },
+        {
+          broker: 'ibkr',
+          aliases: ['interactive_brokers'],
+          displayName: 'Interactive Brokers / IBKR',
+          market: 'multi',
+          status: 'planned',
+          enabled: false,
+          requiresSample: true,
+          description: 'Planned cross-market import profile; CSV sample required before parser support.',
+        },
+        {
+          broker: 'huatai',
+          aliases: [],
+          displayName: '華泰',
+          market: 'cn',
+          status: 'legacy_hidden',
+          enabled: false,
+          requiresSample: false,
+        },
+      ],
+    });
+
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+
+    const brokerSelect = screen.getAllByRole('combobox').find((select) =>
+      within(select).queryByRole('option', { name: /凱基|KGI/i }),
+    ) as HTMLSelectElement | undefined;
+
+    expect(brokerSelect).toBeDefined();
+    expect(brokerSelect).not.toHaveValue('huatai');
+    expect(within(brokerSelect!).getByRole('option', { name: /凱基|KGI/i })).toBeDisabled();
+    expect(within(brokerSelect!).getByRole('option', { name: /Firstrade/i })).toBeDisabled();
+    expect(within(brokerSelect!).getByRole('option', { name: /IBKR|Interactive Brokers/i })).toBeDisabled();
+    expect(within(brokerSelect!).queryByRole('option', { name: /華泰|huatai/i })).not.toBeInTheDocument();
+    expect(screen.getByText('匯入設定檔尚未啟用。請提供去識別化 CSV 樣本以建立解析器。')).toBeInTheDocument();
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(['trade_date,symbol,side,quantity,price'], 'planned.csv', { type: 'text/csv' })],
+      },
+    });
+
+    expect(screen.getByRole('button', { name: '解析檔案' })).toBeDisabled();
+    expect(parseCsvImport).not.toHaveBeenCalled();
+  });
 });
