@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-股票智慧分析系統 - 大盤覆盤模組（支援 A 股 / 港股 / 美股）
+股票智慧分析系統 - 大盤覆盤模組（支援台股 / 美股，保留舊 CN/HK 路徑）
 ===================================
 
 職責：
-1. 根據 MARKET_REVIEW_REGION 配置選擇市場區域（cn / hk / us / both）
+1. 根據 MARKET_REVIEW_REGION 配置選擇市場區域（tw / us / all；舊 cn / hk / both 路徑保留）
 2. 執行大盤覆盤分析並生成覆盤報告
 3. 儲存和傳送覆盤報告
 """
@@ -73,7 +73,9 @@ def _get_market_review_text(language: str) -> dict[str, str]:
 def _resolve_market_review_regions(raw_region: Optional[str]) -> list[str]:
     """Normalize MARKET_REVIEW_REGION into an ordered, non-empty region list."""
 
-    region = str(raw_region or 'cn').strip().lower()
+    region = str(raw_region or 'tw').strip().lower()
+    if region == 'all':
+        return ['tw', 'us']
     if region == 'both':
         return list(_MARKET_REVIEW_REGION_ORDER)
     if ',' in region:
@@ -82,10 +84,10 @@ def _resolve_market_review_regions(raw_region: Optional[str]) -> list[str]:
             for item in region.split(',')
             if item.strip().lower() in _VALID_MARKET_REVIEW_REGIONS
         }
-        return [market for market in _MARKET_REVIEW_REGION_ORDER if market in requested] or ['cn']
+        return [market for market in _MARKET_REVIEW_REGION_ORDER if market in requested] or ['tw']
     if region in _VALID_MARKET_REVIEW_REGIONS:
         return [region]
-    return ['cn']
+    return ['tw']
 
 
 def _run_tw_market_review_section():
@@ -157,7 +159,7 @@ def run_market_review(
         else (
             ','.join(_plural)
             if _plural
-            else (getattr(config, 'market_review_region', 'cn') or 'cn')
+            else (getattr(config, 'market_review_region', 'tw') or 'tw')
         )
     )
     run_markets = _resolve_market_review_regions(raw_region)

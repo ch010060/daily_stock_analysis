@@ -753,3 +753,15 @@ class TestValidateBackwardCompat:
         structured = cfg.validate_structured()
         plain = cfg.validate()
         assert plain == [i.message for i in structured]
+
+
+class TestMarketReviewRegionParsing:
+    def test_market_review_region_allows_active_tw_us_all_values(self):
+        assert Config._parse_market_review_region("tw") == "tw"
+        assert Config._parse_market_review_region("US") == "us"
+        assert Config._parse_market_review_region("all") == "all"
+        assert Config._parse_market_review_region(" both ") == "all"
+
+    def test_market_review_region_rejects_cn_hk_as_active_values(self):
+        assert Config._parse_market_review_region("cn") == "tw"
+        assert Config._parse_market_review_region("hk") == "tw"

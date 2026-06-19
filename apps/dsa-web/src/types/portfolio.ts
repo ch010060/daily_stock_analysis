@@ -66,9 +66,7 @@ export interface PortfolioAccountSnapshot {
   positions: PortfolioPositionItem[];
 }
 
-export interface PortfolioSnapshotResponse {
-  asOf: string;
-  costMethod: PortfolioCostMethod;
+export interface PortfolioCurrencySubtotal {
   currency: string;
   accountCount: number;
   totalCash: number;
@@ -78,8 +76,47 @@ export interface PortfolioSnapshotResponse {
   unrealizedPnl: number;
   feeTotal: number;
   taxTotal: number;
+}
+
+export interface PortfolioSnapshotResponse {
+  asOf: string;
+  costMethod: PortfolioCostMethod;
+  currency: string;
+  accountCount: number;
+  totalCash: number | null;
+  totalMarketValue: number | null;
+  totalEquity: number | null;
+  realizedPnl: number | null;
+  unrealizedPnl: number | null;
+  feeTotal: number | null;
+  taxTotal: number | null;
   fxStale: boolean;
+  convertedTotalAvailable: boolean;
+  aggregateIsStale: boolean;
+  fxMissing: boolean;
+  fxWarnings: string[];
+  fxRatesUsed: PortfolioFxRateUsed[];
   accounts: PortfolioAccountSnapshot[];
+  /**
+   * Keyed by currency code, but the key casing is not reliable (the generic
+   * snake_case->camelCase response mapper lowercases all-caps dict keys, e.g.
+   * "TWD" becomes "twd"). Always read the canonical code from each entry's
+   * own `currency` field, never from the object key.
+   */
+  totalsByCurrency: Record<string, PortfolioCurrencySubtotal>;
+}
+
+export interface PortfolioFxRateUsed {
+  fromCurrency: string;
+  toCurrency: string;
+  rate: number;
+  rateDate: string;
+  isStale: boolean;
+  source?: string | null;
+  conversionFromCurrency?: string | null;
+  conversionToCurrency?: string | null;
+  conversionRate?: number | null;
+  direction: string;
 }
 
 export interface PortfolioConcentrationItem {

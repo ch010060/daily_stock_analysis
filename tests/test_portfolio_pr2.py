@@ -441,6 +441,117 @@ class PortfolioPr2TestCase(unittest.TestCase):
         self.assertIn("AAPL", positions)
         self.assertAlmostEqual(positions["AAPL"]["market_value_base"], 700.0, places=6)
 
+    def test_concentration_uses_reporting_currency_not_hardcoded_cny(self) -> None:
+        us_account = self.service.create_account(name="US", broker="Demo", market="us", base_currency="USD")
+        us_id = us_account["id"]
+        self.service.record_cash_ledger(
+            account_id=us_id,
+            event_date=date(2026, 1, 1),
+            direction="in",
+            amount=100.0,
+            currency="USD",
+        )
+        self.service.record_trade(
+            account_id=us_id,
+            symbol="AAPL",
+            trade_date=date(2026, 1, 1),
+            side="buy",
+            quantity=1,
+            price=100,
+            market="us",
+            currency="USD",
+        )
+        self._save_close("AAPL", date(2026, 1, 1), 100.0)
+        self.service.repo.save_fx_rate(
+            from_currency="USD",
+            to_currency="CNY",
+            rate_date=date(2026, 1, 1),
+            rate=7.0,
+            source="manual",
+            is_stale=False,
+        )
+
+        report = self.risk_service.get_risk_report(account_id=us_id, as_of=date(2026, 1, 1), cost_method="fifo")
+
+        self.assertEqual(report["currency"], "USD")
+        positions = {item["symbol"]: item for item in report["concentration"]["top_positions"]}
+        self.assertAlmostEqual(positions["AAPL"]["market_value_base"], 100.0, places=6)
+        self.assertAlmostEqual(positions["AAPL"]["weight_pct"], 100.0, places=4)
+
+    def test_sector_concentration_uses_reporting_currency_not_hardcoded_cny(self) -> None:
+        us_account = self.service.create_account(name="US", broker="Demo", market="us", base_currency="USD")
+        us_id = us_account["id"]
+        self.service.record_cash_ledger(
+            account_id=us_id,
+            event_date=date(2026, 1, 1),
+            direction="in",
+            amount=100.0,
+            currency="USD",
+        )
+        self.service.record_trade(
+            account_id=us_id,
+            symbol="AAPL",
+            trade_date=date(2026, 1, 1),
+            side="buy",
+            quantity=1,
+            price=100,
+            market="us",
+            currency="USD",
+        )
+        self._save_close("AAPL", date(2026, 1, 1), 100.0)
+        self.service.repo.save_fx_rate(
+            from_currency="USD",
+            to_currency="CNY",
+            rate_date=date(2026, 1, 1),
+            rate=7.0,
+            source="manual",
+            is_stale=False,
+        )
+
+        report = self.risk_service.get_risk_report(account_id=us_id, as_of=date(2026, 1, 1), cost_method="fifo")
+
+        sectors = {item["sector"]: item for item in report["sector_concentration"]["top_sectors"]}
+        self.assertAlmostEqual(sectors["UNCLASSIFIED"]["market_value_base"], 100.0, places=6)
+        self.assertAlmostEqual(sectors["UNCLASSIFIED"]["weight_pct"], 100.0, places=4)
+
+    def test_drawdown_uses_reporting_currency_not_hardcoded_cny(self) -> None:
+        us_account = self.service.create_account(name="US", broker="Demo", market="us", base_currency="USD")
+        us_id = us_account["id"]
+        self.service.record_cash_ledger(
+            account_id=us_id,
+            event_date=date(2026, 1, 1),
+            direction="in",
+            amount=100.0,
+            currency="USD",
+        )
+
+        self.service.repo.save_fx_rate(
+            from_currency="USD",
+            to_currency="CNY",
+            rate_date=date(2026, 1, 1),
+            rate=7.0,
+            source="manual",
+            is_stale=False,
+        )
+        self.service.get_portfolio_snapshot(account_id=us_id, as_of=date(2026, 1, 1), cost_method="fifo")
+
+        self.service.repo.save_fx_rate(
+            from_currency="USD",
+            to_currency="CNY",
+            rate_date=date(2026, 1, 2),
+            rate=6.0,
+            source="manual",
+            is_stale=False,
+        )
+        self.service.get_portfolio_snapshot(account_id=us_id, as_of=date(2026, 1, 2), cost_method="fifo")
+
+        report = self.risk_service.get_risk_report(account_id=us_id, as_of=date(2026, 1, 2), cost_method="fifo")
+
+        self.assertEqual(report["currency"], "USD")
+        self.assertEqual(report["drawdown"]["series_points"], 2)
+        self.assertAlmostEqual(report["drawdown"]["max_drawdown_pct"], 0.0, places=4)
+        self.assertAlmostEqual(report["drawdown"]["current_drawdown_pct"], 0.0, places=4)
+
     def test_sector_concentration_uses_unclassified_for_non_cn(self) -> None:
         us_account = self.service.create_account(name="US", broker="Demo", market="us", base_currency="USD")
         us_id = us_account["id"]
@@ -674,6 +785,51 @@ class PortfolioPr2TestCase(unittest.TestCase):
         self.assertEqual(payload["updated_count"], 0)
         self.assertEqual(payload["stale_count"], 0)
         self.assertEqual(payload["error_count"], 1)
+
+    def test_fx_refresh_endpoint_updates_mixed_tw_us_reporting_pair(self) -> None:
+        tw_account = self.service.create_account(name="TW Co", broker="Demo", market="tw", base_currency="TWD")
+        us_account = self.service.create_account(name="US Co", broker="Demo", market="us", base_currency="USD")
+        self.service.record_cash_ledger(
+            account_id=tw_account["id"],
+            event_date=date(2026, 1, 1),
+            direction="in",
+            amount=10000.0,
+            currency="TWD",
+        )
+        self.service.record_cash_ledger(
+            account_id=us_account["id"],
+            event_date=date(2026, 1, 1),
+            direction="in",
+            amount=5000.0,
+            currency="USD",
+        )
+
+        with patch.object(PortfolioService, "_fetch_fx_rate_from_yfinance", return_value=0.03125) as fetch_rate:
+            response = self.client.post(
+                "/api/v1/portfolio/fx/refresh",
+                params={"as_of": "2026-01-05"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["pair_count"], 1)
+        self.assertEqual(payload["updated_count"], 1)
+        fetch_rate.assert_called_once_with(from_currency="TWD", to_currency="USD", as_of_date=date(2026, 1, 5))
+
+        snapshot_response = self.client.get(
+            "/api/v1/portfolio/snapshot",
+            params={"as_of": "2026-01-05"},
+        )
+        self.assertEqual(snapshot_response.status_code, 200)
+        snapshot = snapshot_response.json()
+        self.assertTrue(snapshot["converted_total_available"])
+        self.assertAlmostEqual(snapshot["total_cash"], 170000.0, places=6)
+        self.assertEqual(snapshot["fx_rates_used"][0]["from_currency"], "TWD")
+        self.assertEqual(snapshot["fx_rates_used"][0]["to_currency"], "USD")
+        self.assertAlmostEqual(snapshot["fx_rates_used"][0]["rate"], 0.03125, places=8)
+        self.assertEqual(snapshot["fx_rates_used"][0]["conversion_from_currency"], "USD")
+        self.assertEqual(snapshot["fx_rates_used"][0]["conversion_to_currency"], "TWD")
+        self.assertAlmostEqual(snapshot["fx_rates_used"][0]["conversion_rate"], 32.0, places=6)
 
     def test_import_and_risk_endpoints(self) -> None:
         create_resp = self.client.post(

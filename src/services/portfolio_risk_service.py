@@ -49,15 +49,19 @@ class PortfolioRiskService:
             "lookback_days": int(getattr(self.config, "portfolio_risk_lookback_days", 180)),
         }
 
+        reporting_currency = snapshot["currency"]
+
         concentration = self._build_concentration(
             snapshot,
             thresholds["concentration_alert_pct"],
             as_of_date=as_of_date,
+            reporting_currency=reporting_currency,
         )
         sector_concentration = self._build_sector_concentration(
             snapshot,
             thresholds["concentration_alert_pct"],
             as_of_date=as_of_date,
+            reporting_currency=reporting_currency,
         )
         self._ensure_drawdown_snapshot_window(
             account_id=account_id,
@@ -71,6 +75,7 @@ class PortfolioRiskService:
             cost_method=cost_method,
             threshold_pct=thresholds["drawdown_alert_pct"],
             lookback_days=thresholds["lookback_days"],
+            reporting_currency=reporting_currency,
         )
         stop_loss = self._build_stop_loss(snapshot, thresholds)
 
@@ -162,7 +167,14 @@ class PortfolioRiskService:
             return as_of_date
         return max(window_start, min(first_activity_candidates))
 
-    def _build_concentration(self, snapshot: Dict[str, Any], threshold_pct: float, *, as_of_date: date) -> Dict[str, Any]:
+    def _build_concentration(
+        self,
+        snapshot: Dict[str, Any],
+        threshold_pct: float,
+        *,
+        as_of_date: date,
+        reporting_currency: str,
+    ) -> Dict[str, Any]:
         total_mv = float(snapshot.get("total_market_value", 0.0) or 0.0)
         exposure_by_symbol: Dict[str, float] = {}
         for account in snapshot.get("accounts", []):
@@ -171,11 +183,11 @@ class PortfolioRiskService:
                 if not symbol:
                     continue
                 market_value = float(pos.get("market_value_base") or 0.0)
-                valuation_currency = str(pos.get("valuation_currency") or account.get("base_currency") or "CNY")
+                valuation_currency = str(pos.get("valuation_currency") or account.get("base_currency") or "TWD")
                 converted, _, _ = self.portfolio_service.convert_amount(
                     amount=market_value,
                     from_currency=valuation_currency,
-                    to_currency="CNY",
+                    to_currency=reporting_currency,
                     as_of_date=as_of_date,
                 )
                 exposure_by_symbol[symbol] = exposure_by_symbol.get(symbol, 0.0) + converted
@@ -207,6 +219,7 @@ class PortfolioRiskService:
         threshold_pct: float,
         *,
         as_of_date: date,
+        reporting_currency: str,
     ) -> Dict[str, Any]:
         total_mv = float(snapshot.get("total_market_value", 0.0) or 0.0)
         sector_exposure: Dict[str, float] = {}
@@ -227,11 +240,11 @@ class PortfolioRiskService:
                     continue
 
                 market_value = float(pos.get("market_value_base") or 0.0)
-                valuation_currency = str(pos.get("valuation_currency") or account.get("base_currency") or "CNY")
+                valuation_currency = str(pos.get("valuation_currency") or account.get("base_currency") or "TWD")
                 converted, _, _ = self.portfolio_service.convert_amount(
                     amount=market_value,
                     from_currency=valuation_currency,
-                    to_currency="CNY",
+                    to_currency=reporting_currency,
                     as_of_date=as_of_date,
                 )
 
@@ -354,6 +367,7 @@ class PortfolioRiskService:
         cost_method: str,
         threshold_pct: float,
         lookback_days: int,
+        reporting_currency: str,
     ) -> Dict[str, Any]:
         rows = self.repo.list_daily_snapshots_for_risk(
             as_of=as_of_date,
@@ -376,8 +390,8 @@ class PortfolioRiskService:
             key = row.snapshot_date.isoformat()
             converted, stale, _ = self.portfolio_service.convert_amount(
                 amount=float(row.total_equity or 0.0),
-                from_currency=str(row.base_currency or "CNY"),
-                to_currency="CNY",
+                from_currency=str(row.base_currency or "TWD"),
+                to_currency=reporting_currency,
                 as_of_date=row.snapshot_date,
             )
             grouped[key] = grouped.get(key, 0.0) + converted

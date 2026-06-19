@@ -1266,5 +1266,250 @@ class PortfolioTwUsCurrencyDefaultsTestCase(unittest.TestCase):
             session.close()
 
 
+class PortfolioHybridLiteCurrencySummaryTestCase(unittest.TestCase):
+    """Phase 15.2B — snapshot must expose per-currency native subtotals without forced conversion."""
+
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.env_path = Path(self.temp_dir.name) / ".env"
+        self.db_path = Path(self.temp_dir.name) / "portfolio_test.db"
+        self.env_path.write_text(
+            "\n".join(
+                [
+                    "STOCK_LIST=2330",
+                    "GEMINI_API_KEY=test",
+                    "ADMIN_AUTH_ENABLED=false",
+                    f"DATABASE_PATH={self.db_path}",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        os.environ["ENV_FILE"] = str(self.env_path)
+        os.environ["DATABASE_PATH"] = str(self.db_path)
+        Config.reset_instance()
+        DatabaseManager.reset_instance()
+        self.db = DatabaseManager.get_instance()
+        self.service = PortfolioService()
+
+    def tearDown(self) -> None:
+        DatabaseManager.reset_instance()
+        Config.reset_instance()
+        os.environ.pop("ENV_FILE", None)
+        os.environ.pop("DATABASE_PATH", None)
+        self.temp_dir.cleanup()
+
+    def test_single_tw_account_totals_by_currency_has_twd_only(self) -> None:
+        account = self.service.create_account(name="TW Co", broker="Demo", market="tw", base_currency="TWD")
+        aid = account["id"]
+        self.service.record_cash_ledger(account_id=aid, event_date=date(2026, 1, 1), direction="in", amount=10000, currency="TWD")
+
+        snapshot = self.service.get_portfolio_snapshot(account_id=aid, as_of=date(2026, 1, 5), cost_method="fifo")
+
+        self.assertTrue(snapshot["converted_total_available"])
+        self.assertFalse(snapshot["aggregate_is_stale"])
+        self.assertFalse(snapshot["fx_missing"])
+        self.assertEqual(set(snapshot["totals_by_currency"].keys()), {"TWD"})
+        twd = snapshot["totals_by_currency"]["TWD"]
+        self.assertEqual(twd["currency"], "TWD")
+        self.assertEqual(twd["account_count"], 1)
+        self.assertAlmostEqual(twd["total_cash"], 10000.0, places=6)
+        self.assertAlmostEqual(twd["total_cash"], snapshot["total_cash"], places=6)
+
+    def test_single_us_account_totals_by_currency_has_usd_only(self) -> None:
+        account = self.service.create_account(name="US Co", broker="Demo", market="us", base_currency="USD")
+        aid = account["id"]
+        self.service.record_cash_ledger(account_id=aid, event_date=date(2026, 1, 1), direction="in", amount=5000, currency="USD")
+
+        snapshot = self.service.get_portfolio_snapshot(account_id=aid, as_of=date(2026, 1, 5), cost_method="fifo")
+
+        self.assertTrue(snapshot["converted_total_available"])
+        self.assertFalse(snapshot["aggregate_is_stale"])
+        self.assertFalse(snapshot["fx_missing"])
+        self.assertEqual(set(snapshot["totals_by_currency"].keys()), {"USD"})
+        usd = snapshot["totals_by_currency"]["USD"]
+        self.assertEqual(usd["currency"], "USD")
+        self.assertAlmostEqual(usd["total_cash"], 5000.0, places=6)
+        self.assertAlmostEqual(snapshot["total_cash"], 5000.0, places=6)
+
+    def test_mixed_tw_us_accounts_totals_by_currency_has_both_native_currencies(self) -> None:
+        tw_account = self.service.create_account(name="TW Co", broker="Demo", market="tw", base_currency="TWD")
+        us_account = self.service.create_account(name="US Co", broker="Demo", market="us", base_currency="USD")
+        self.service.record_cash_ledger(account_id=tw_account["id"], event_date=date(2026, 1, 1), direction="in", amount=10000, currency="TWD")
+        self.service.record_cash_ledger(account_id=us_account["id"], event_date=date(2026, 1, 1), direction="in", amount=5000, currency="USD")
+
+        snapshot = self.service.get_portfolio_snapshot(as_of=date(2026, 1, 5), cost_method="fifo")
+
+        by_currency = snapshot["totals_by_currency"]
+        self.assertEqual(set(by_currency.keys()), {"TWD", "USD"})
+        self.assertAlmostEqual(by_currency["TWD"]["total_cash"], 10000.0, places=6)
+        self.assertAlmostEqual(by_currency["USD"]["total_cash"], 5000.0, places=6)
+        self.assertEqual(by_currency["TWD"]["account_count"], 1)
+        self.assertEqual(by_currency["USD"]["account_count"], 1)
+
+    def test_mixed_tw_us_accounts_with_valid_inverse_twd_usd_fx_converts_aggregate_to_twd(self) -> None:
+        tw_account = self.service.create_account(name="TW Co", broker="Demo", market="tw", base_currency="TWD")
+        us_account = self.service.create_account(name="US Co", broker="Demo", market="us", base_currency="USD")
+        self.service.record_cash_ledger(account_id=tw_account["id"], event_date=date(2026, 1, 1), direction="in", amount=10000, currency="TWD")
+        self.service.record_cash_ledger(account_id=us_account["id"], event_date=date(2026, 1, 1), direction="in", amount=5000, currency="USD")
+        self.service.repo.save_fx_rate(
+            from_currency="TWD",
+            to_currency="USD",
+            rate_date=date(2026, 1, 5),
+            rate=0.03125,
+            source="manual_test",
+            is_stale=False,
+        )
+
+        snapshot = self.service.get_portfolio_snapshot(as_of=date(2026, 1, 5), cost_method="fifo")
+
+        self.assertEqual(snapshot["currency"], "TWD")
+        self.assertTrue(snapshot["converted_total_available"])
+        self.assertFalse(snapshot["aggregate_is_stale"])
+        self.assertFalse(snapshot["fx_missing"])
+        self.assertEqual(snapshot["fx_warnings"], [])
+        self.assertAlmostEqual(snapshot["total_cash"], 170000.0, places=6)
+        self.assertAlmostEqual(snapshot["total_equity"], 170000.0, places=6)
+        self.assertEqual(len(snapshot["fx_rates_used"]), 1)
+        rate = snapshot["fx_rates_used"][0]
+        self.assertEqual(rate["from_currency"], "TWD")
+        self.assertEqual(rate["to_currency"], "USD")
+        self.assertAlmostEqual(rate["rate"], 0.03125, places=8)
+        self.assertEqual(rate["conversion_from_currency"], "USD")
+        self.assertEqual(rate["conversion_to_currency"], "TWD")
+        self.assertAlmostEqual(rate["conversion_rate"], 32.0, places=6)
+        self.assertEqual(rate["direction"], "inverse")
+        self.assertEqual(rate["rate_date"], "2026-01-05")
+        self.assertFalse(rate["is_stale"])
+
+    def test_refresh_fx_rates_for_mixed_account_bases_caches_decimal_twd_usd_quote(self) -> None:
+        tw_account = self.service.create_account(name="TW Co", broker="Demo", market="tw", base_currency="TWD")
+        us_account = self.service.create_account(name="US Co", broker="Demo", market="us", base_currency="USD")
+        self.service.record_cash_ledger(account_id=tw_account["id"], event_date=date(2026, 1, 1), direction="in", amount=10000, currency="TWD")
+        self.service.record_cash_ledger(account_id=us_account["id"], event_date=date(2026, 1, 1), direction="in", amount=5000, currency="USD")
+
+        with patch.object(PortfolioService, "_fetch_fx_rate_from_yfinance", return_value=0.03125) as fetch_rate:
+            summary = self.service.refresh_fx_rates(as_of=date(2026, 1, 5))
+
+        self.assertEqual(summary["pair_count"], 1)
+        self.assertEqual(summary["updated_count"], 1)
+        fetch_rate.assert_called_once_with(from_currency="TWD", to_currency="USD", as_of_date=date(2026, 1, 5))
+        cached = self.service.repo.get_latest_fx_rate(from_currency="TWD", to_currency="USD", as_of=date(2026, 1, 5))
+        self.assertIsNotNone(cached)
+        self.assertAlmostEqual(cached.rate, 0.03125, places=8)
+        self.assertEqual(cached.source, "yfinance")
+        self.assertFalse(cached.is_stale)
+
+        snapshot = self.service.get_portfolio_snapshot(as_of=date(2026, 1, 5), cost_method="fifo")
+        self.assertTrue(snapshot["converted_total_available"])
+        self.assertAlmostEqual(snapshot["total_cash"], 170000.0, places=6)
+        self.assertEqual(snapshot["fx_rates_used"][0]["from_currency"], "TWD")
+        self.assertEqual(snapshot["fx_rates_used"][0]["to_currency"], "USD")
+        self.assertAlmostEqual(snapshot["fx_rates_used"][0]["rate"], 0.03125, places=8)
+
+    def test_fetch_fx_rate_uses_yahoo_chart_fallback_when_yfinance_unavailable(self) -> None:
+        class _Response:
+            def __enter__(self) -> "_Response":
+                return self
+
+            def __exit__(self, *_args: object) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return (
+                    b'{"chart":{"result":[{"meta":{"symbol":"USDTWD=X",'
+                    b'"regularMarketPrice":32.125,"currency":"TWD"}}],"error":null}}'
+                )
+
+        with patch("src.services.portfolio_service.yf", None), patch(
+            "src.services.portfolio_service.urllib_request.urlopen",
+            return_value=_Response(),
+        ) as urlopen:
+            rate = PortfolioService._fetch_fx_rate_from_yfinance(
+                from_currency="USD",
+                to_currency="TWD",
+                as_of_date=date(2026, 1, 5),
+            )
+
+        self.assertAlmostEqual(rate, 32.125, places=6)
+        request_arg = urlopen.call_args.args[0]
+        self.assertIn("USDTWD=X", request_arg.full_url)
+
+    def test_fetch_fx_rate_uses_yahoo_chart_fallback_when_yfinance_errors(self) -> None:
+        class _Ticker:
+            def history(self, **_kwargs: object) -> object:
+                raise RuntimeError("yfinance unavailable")
+
+        class _Yf:
+            @staticmethod
+            def Ticker(_symbol: str) -> _Ticker:
+                return _Ticker()
+
+        class _Response:
+            def __enter__(self) -> "_Response":
+                return self
+
+            def __exit__(self, *_args: object) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return (
+                    b'{"chart":{"result":[{"indicators":{"quote":[{"close":[null,32.25]}]}}],'
+                    b'"error":null}}'
+                )
+
+        with patch("src.services.portfolio_service.yf", _Yf), patch(
+            "src.services.portfolio_service.urllib_request.urlopen",
+            return_value=_Response(),
+        ):
+            rate = PortfolioService._fetch_fx_rate_from_yfinance(
+                from_currency="USD",
+                to_currency="TWD",
+                as_of_date=date(2026, 1, 5),
+            )
+
+        self.assertAlmostEqual(rate, 32.25, places=6)
+
+    def test_mixed_tw_us_accounts_without_fx_marks_converted_total_unavailable(self) -> None:
+        tw_account = self.service.create_account(name="TW Co", broker="Demo", market="tw", base_currency="TWD")
+        us_account = self.service.create_account(name="US Co", broker="Demo", market="us", base_currency="USD")
+        self.service.record_cash_ledger(account_id=tw_account["id"], event_date=date(2026, 1, 1), direction="in", amount=10000, currency="TWD")
+        self.service.record_cash_ledger(account_id=us_account["id"], event_date=date(2026, 1, 1), direction="in", amount=5000, currency="USD")
+
+        snapshot = self.service.get_portfolio_snapshot(as_of=date(2026, 1, 5), cost_method="fifo")
+
+        self.assertEqual(snapshot["currency"], "TWD")
+        self.assertFalse(snapshot["converted_total_available"])
+        self.assertTrue(snapshot["aggregate_is_stale"])
+        self.assertTrue(snapshot["fx_stale"])
+        self.assertTrue(snapshot["fx_missing"])
+        self.assertIn("匯率不可用，無法計算換算總額。", snapshot["fx_warnings"])
+        self.assertIsNone(snapshot["total_cash"])
+        self.assertIsNone(snapshot["total_equity"])
+        self.assertNotEqual(snapshot["total_cash"], 15000.0)
+        by_currency = snapshot["totals_by_currency"]
+        self.assertAlmostEqual(by_currency["TWD"]["total_cash"], 10000.0, places=6)
+        self.assertAlmostEqual(by_currency["USD"]["total_cash"], 5000.0, places=6)
+
+    def test_mixed_accounts_existing_aggregate_fields_still_present(self) -> None:
+        tw_account = self.service.create_account(name="TW Co", broker="Demo", market="tw", base_currency="TWD")
+        us_account = self.service.create_account(name="US Co", broker="Demo", market="us", base_currency="USD")
+        self.service.record_cash_ledger(account_id=tw_account["id"], event_date=date(2026, 1, 1), direction="in", amount=10000, currency="TWD")
+        self.service.record_cash_ledger(account_id=us_account["id"], event_date=date(2026, 1, 1), direction="in", amount=5000, currency="USD")
+
+        snapshot = self.service.get_portfolio_snapshot(as_of=date(2026, 1, 5), cost_method="fifo")
+
+        self.assertIn("currency", snapshot)
+        self.assertIn("total_cash", snapshot)
+        self.assertIn("total_market_value", snapshot)
+        self.assertIn("total_equity", snapshot)
+        self.assertIn("totals_by_currency", snapshot)
+        self.assertEqual(snapshot["account_count"], 2)
+
+    def test_no_accounts_totals_by_currency_is_empty(self) -> None:
+        snapshot = self.service.get_portfolio_snapshot(as_of=date(2026, 1, 5), cost_method="fifo")
+        self.assertEqual(snapshot["totals_by_currency"], {})
+
+
 if __name__ == "__main__":
     unittest.main()

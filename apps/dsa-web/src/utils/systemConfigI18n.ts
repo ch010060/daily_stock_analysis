@@ -275,7 +275,7 @@ const fieldDescriptionMap: Record<string, string> = {
   TRUST_X_FORWARDED_FOR: '啟用後信任反向代理透傳的 X-Forwarded-For 源 IP。',
   RUN_IMMEDIATELY: '程式啟動後立即執行一次分析任務。',
   MARKET_REVIEW_ENABLED: '是否啟用大盤覆盤流程。',
-  MARKET_REVIEW_REGION: '大盤覆盤預設市場區域（如 cn/us/hk）。',
+  MARKET_REVIEW_REGION: '大盤覆盤預設市場區域（tw/us/all）。',
   MARKET_REVIEW_COLOR_SCHEME: '控制大盤覆盤指數漲跌幅圖示顏色：green_up 為綠漲紅跌，red_up 為紅漲綠跌。',
   ANALYSIS_DELAY: '啟動任務前的延遲秒數，可用於等待依賴服務就緒。',
   SCHEDULE_TIME: '每日定時任務執行時間，格式為 HH:MM。',
@@ -354,10 +354,9 @@ const fieldOptionLabelMap: Record<string, Record<string, string>> = {
     critical: '嚴重',
   },
   MARKET_REVIEW_REGION: {
-    cn: 'A 股',
-    hk: '港股',
+    tw: '台股',
     us: '美股',
-    both: '全部市場',
+    all: '全部市場',
   },
   AGENT_ARCH: {
     single: '單 Agent',

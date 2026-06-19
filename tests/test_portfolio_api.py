@@ -144,6 +144,82 @@ class PortfolioApiTestCase(unittest.TestCase):
         self.assertAlmostEqual(account_snapshot["total_market_value"], 11000.0, places=6)
         self.assertAlmostEqual(account_snapshot["total_equity"], 11000.0, places=6)
 
+    def test_snapshot_exposes_totals_by_currency_for_tw_account(self) -> None:
+        create_resp = self.client.post(
+            "/api/v1/portfolio/accounts",
+            json={"name": "TW Co", "broker": "Demo", "market": "tw", "base_currency": "TWD"},
+        )
+        self.assertEqual(create_resp.status_code, 200)
+        account_id = create_resp.json()["id"]
+
+        cash_resp = self.client.post(
+            "/api/v1/portfolio/cash-ledger",
+            json={
+                "account_id": account_id,
+                "event_date": "2026-01-01",
+                "direction": "in",
+                "amount": 10000,
+                "currency": "TWD",
+            },
+        )
+        self.assertEqual(cash_resp.status_code, 200)
+
+        snapshot_resp = self.client.get(
+            "/api/v1/portfolio/snapshot",
+            params={"account_id": account_id, "as_of": "2026-01-01"},
+        )
+        self.assertEqual(snapshot_resp.status_code, 200)
+        payload = snapshot_resp.json()
+        self.assertIn("totals_by_currency", payload)
+        self.assertEqual(set(payload["totals_by_currency"].keys()), {"TWD"})
+        self.assertAlmostEqual(payload["totals_by_currency"]["TWD"]["total_cash"], 10000.0, places=6)
+
+    def test_snapshot_marks_mixed_currency_aggregate_unavailable_without_fx(self) -> None:
+        tw_resp = self.client.post(
+            "/api/v1/portfolio/accounts",
+            json={"name": "TW Co", "broker": "Demo", "market": "tw", "base_currency": "TWD"},
+        )
+        self.assertEqual(tw_resp.status_code, 200)
+        us_resp = self.client.post(
+            "/api/v1/portfolio/accounts",
+            json={"name": "US Co", "broker": "Demo", "market": "us", "base_currency": "USD"},
+        )
+        self.assertEqual(us_resp.status_code, 200)
+
+        for account_id, amount, currency in [
+            (tw_resp.json()["id"], 10000, "TWD"),
+            (us_resp.json()["id"], 5000, "USD"),
+        ]:
+            cash_resp = self.client.post(
+                "/api/v1/portfolio/cash-ledger",
+                json={
+                    "account_id": account_id,
+                    "event_date": "2026-01-01",
+                    "direction": "in",
+                    "amount": amount,
+                    "currency": currency,
+                },
+            )
+            self.assertEqual(cash_resp.status_code, 200)
+
+        snapshot_resp = self.client.get(
+            "/api/v1/portfolio/snapshot",
+            params={"as_of": "2026-01-05"},
+        )
+        self.assertEqual(snapshot_resp.status_code, 200)
+        payload = snapshot_resp.json()
+        self.assertEqual(payload["currency"], "TWD")
+        self.assertFalse(payload["converted_total_available"])
+        self.assertTrue(payload["aggregate_is_stale"])
+        self.assertTrue(payload["fx_missing"])
+        self.assertIn("匯率不可用，無法計算換算總額。", payload["fx_warnings"])
+        self.assertIsNone(payload["total_cash"])
+        self.assertIsNone(payload["total_equity"])
+        self.assertNotEqual(payload["total_cash"], 15000.0)
+        self.assertEqual(set(payload["totals_by_currency"].keys()), {"TWD", "USD"})
+        self.assertAlmostEqual(payload["totals_by_currency"]["TWD"]["total_cash"], 10000.0, places=6)
+        self.assertAlmostEqual(payload["totals_by_currency"]["USD"]["total_cash"], 5000.0, places=6)
+
     def test_snapshot_invalid_cost_method_returns_400(self) -> None:
         resp = self.client.get("/api/v1/portfolio/snapshot", params={"cost_method": "bad"})
         self.assertEqual(resp.status_code, 400)

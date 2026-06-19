@@ -188,9 +188,7 @@ class PortfolioAccountSnapshot(BaseModel):
     positions: List[PortfolioPositionItem] = Field(default_factory=list)
 
 
-class PortfolioSnapshotResponse(BaseModel):
-    as_of: str
-    cost_method: str
+class PortfolioCurrencySubtotal(BaseModel):
     currency: str
     account_count: int
     total_cash: float
@@ -200,8 +198,41 @@ class PortfolioSnapshotResponse(BaseModel):
     unrealized_pnl: float
     fee_total: float
     tax_total: float
+
+
+class PortfolioFxRateUsed(BaseModel):
+    from_currency: str
+    to_currency: str
+    rate: float
+    rate_date: str
+    is_stale: bool
+    source: Optional[str] = None
+    conversion_from_currency: Optional[str] = None
+    conversion_to_currency: Optional[str] = None
+    conversion_rate: Optional[float] = None
+    direction: str
+
+
+class PortfolioSnapshotResponse(BaseModel):
+    as_of: str
+    cost_method: str
+    currency: str
+    account_count: int
+    total_cash: Optional[float] = None
+    total_market_value: Optional[float] = None
+    total_equity: Optional[float] = None
+    realized_pnl: Optional[float] = None
+    unrealized_pnl: Optional[float] = None
+    fee_total: Optional[float] = None
+    tax_total: Optional[float] = None
     fx_stale: bool
+    converted_total_available: bool = True
+    aggregate_is_stale: bool = False
+    fx_missing: bool = False
+    fx_warnings: List[str] = Field(default_factory=list)
+    fx_rates_used: List[PortfolioFxRateUsed] = Field(default_factory=list)
     accounts: List[PortfolioAccountSnapshot] = Field(default_factory=list)
+    totals_by_currency: Dict[str, PortfolioCurrencySubtotal] = Field(default_factory=dict)
 
 
 class PortfolioImportTradeItem(BaseModel):
