@@ -45,6 +45,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修復] fixture/no-network 模式下股票名稱現在從 `tests/fixtures/market/<market>/<symbol>/company_profile.json` 的 `name` 欄位讀取，不再回退到原始程式碼符號（如 `TW:2330`、`US:AAPL`）。
 - [修復] `DSA_ALLOW_EXTERNAL_NETWORK` 空值或未設定時現在正確視為禁用（fail-closed），僅 `1/true/yes/on` 等顯式允許值才開放外網；原錯誤邏輯導致空字串被誤判為允許外網。
 - [修復] 釋出說明生成查詢 PR 作者失敗時保留降級並輸出包含 PR 編號和異常型別的 warning，便於排查 token、許可權、網路或 GitHub API 異常。
+- [修復] 修正 `VALID_MARKETS` 缺少 `tw`，導致台股持股帳戶建立時回傳 400 錯誤。
+- [修復] 修正 `_default_currency_for_market("tw")` 回傳 CNY 的問題，台股交易未指定幣種時現正確預設為 TWD；未知市場的兜底值由 CNY 改為 TWD，既有 CN 市場資料維持 CNY 不變。
+- [修復] 修正持股組合彙總幣種 `aggregate_currency` 硬編碼 CNY 的問題，現依帳戶基準幣種或預設 TWD 顯示，不再於空帳戶或台股/美股帳戶情境下誤顯示 CNY。
+- [修復] 持股帳戶與每日快照資料庫欄位預設值由 `cn`/`CNY` 改為 `tw`/`TWD`，與既有 Pydantic schema 預設值對齊。
+- [改進] Web 持股頁面新建帳戶市場下拉選單移除 A 股 / 港股選項，僅保留台股、美股。
+- [改進] AlphaSift 篩選請求的 `market` 欄位移除隱式 `cn` 預設值，改為必填欄位；AlphaSift 維持預設停用，不影響主流程。
 
 ## [3.22.0] - 2026-06-13
 

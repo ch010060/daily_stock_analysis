@@ -35,7 +35,7 @@ _ALPHASIFT_RUNTIME_ENV_LOCK = threading.RLock()
 
 
 class AlphaSiftScreenRequest(BaseModel):
-    market: str = Field("cn", min_length=1, max_length=16)
+    market: str = Field(..., min_length=1, max_length=16)
     strategy: str = Field("dual_low", min_length=1, max_length=64)
     max_results: int = Field(20, ge=1, le=100)
 

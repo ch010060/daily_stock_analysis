@@ -12,6 +12,7 @@ from typing import Any, Dict
 from unittest.mock import ANY, MagicMock, patch
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 try:
     import litellm  # noqa: F401
@@ -86,6 +87,10 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             DEFAULT_ALPHASIFT_TEST_SPEC,
             r"^git\+https://github\.com/ZhuLinsen/alphasift\.git@[0-9a-f]{40}$",
         )
+
+    def test_screen_request_has_no_implicit_cn_market_default(self) -> None:
+        with self.assertRaises(ValidationError):
+            alphasift_endpoint.AlphaSiftScreenRequest(strategy="dual_low", max_results=5)
 
     def test_status_defaults_to_disabled(self) -> None:
         config = self._config(enabled=False)
@@ -305,7 +310,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         config = self._config(enabled=False)
 
         with self.assertRaises(HTTPException) as caught:
-            self._screen(config)
+            self._screen(config, market="us")
 
         self.assertEqual(caught.exception.status_code, 403)
         self.assertEqual(caught.exception.detail["error"], "alphasift_disabled")
@@ -322,7 +327,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             patch("api.v1.endpoints.alphasift._install_alphasift", side_effect=lambda _config: _raise_alphasift_unavailable()) as install_mock,
         ):
             with self.assertRaises(HTTPException) as caught:
-                self._screen(config)
+                self._screen(config, market="us")
 
         self.assertEqual(caught.exception.status_code, 424)
         self.assertEqual(caught.exception.detail["error"], "alphasift_unavailable")
@@ -344,7 +349,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             patch("api.v1.endpoints.alphasift._install_alphasift") as install_mock,
         ):
             with self.assertRaises(HTTPException) as caught:
-                self._screen(config)
+                self._screen(config, market="us")
 
         self.assertEqual(caught.exception.status_code, 424)
         self.assertEqual(caught.exception.detail["error"], "alphasift_unavailable")

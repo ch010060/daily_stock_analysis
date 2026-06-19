@@ -29,7 +29,7 @@ except Exception:  # pragma: no cover - optional dependency path
     yf = None
 
 EPS = 1e-8
-VALID_MARKETS = {"cn", "hk", "us"}
+VALID_MARKETS = {"tw", "us", "cn", "hk"}
 VALID_COST_METHODS = {"fifo", "avg"}
 VALID_SIDES = {"buy", "sell"}
 VALID_CASH_DIRECTIONS = {"in", "out"}
@@ -459,7 +459,7 @@ class PortfolioService:
             account_rows = self.repo.list_accounts(include_inactive=False)
 
         accounts_payload: List[Dict[str, Any]] = []
-        aggregate_currency = "CNY"
+        aggregate_currency = account_rows[0].base_currency if account_rows else "TWD"
         aggregate = {
             "total_cash": 0.0,
             "total_market_value": 0.0,
@@ -1584,7 +1584,7 @@ class PortfolioService:
     def _normalize_market(value: str) -> str:
         market = (value or "").strip().lower()
         if market not in VALID_MARKETS:
-            raise ValueError("market must be one of: cn, hk, us")
+            raise ValueError("market must be one of: tw, us, cn, hk")
         return market
 
     @staticmethod
@@ -1607,4 +1607,8 @@ class PortfolioService:
             return "HKD"
         if market == "us":
             return "USD"
-        return "CNY"
+        if market == "tw":
+            return "TWD"
+        if market == "cn":
+            return "CNY"
+        return "TWD"

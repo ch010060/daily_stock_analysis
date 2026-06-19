@@ -197,7 +197,7 @@ const PortfolioPage: React.FC = () => {
   const [accountForm, setAccountForm] = useState({
     name: '',
     broker: 'Demo',
-    market: 'tw' as 'tw' | 'us' | 'cn' | 'hk',
+    market: 'tw' as 'tw' | 'us',
     baseCurrency: 'TWD',
   });
   const [costMethod, setCostMethod] = useState<PortfolioCostMethod>('fifo');
@@ -927,12 +927,10 @@ const PortfolioPage: React.FC = () => {
             <select
               className={PORTFOLIO_SELECT_CLASS}
               value={accountForm.market}
-              onChange={(e) => setAccountForm((prev) => ({ ...prev, market: e.target.value as 'tw' | 'us' | 'cn' | 'hk' }))}
+              onChange={(e) => setAccountForm((prev) => ({ ...prev, market: e.target.value as 'tw' | 'us' }))}
             >
               <option value="tw">市場：台股（tw）</option>
               <option value="us">市場：美股（us）</option>
-              <option value="cn">市場：A 股（cn，舊資料）</option>
-              <option value="hk">市場：港股（hk，舊資料）</option>
             </select>
             <button type="submit" className="btn-secondary text-sm" disabled={accountCreating}>
               {accountCreating ? '建立中...' : '建立帳戶'}
