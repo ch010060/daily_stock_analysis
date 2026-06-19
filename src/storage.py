@@ -408,8 +408,8 @@ class PortfolioAccount(Base):
     owner_id = Column(String(64), index=True)
     name = Column(String(64), nullable=False)
     broker = Column(String(64))
-    market = Column(String(8), nullable=False, default='cn', index=True)  # cn/hk/us
-    base_currency = Column(String(8), nullable=False, default='CNY')
+    market = Column(String(8), nullable=False, default='tw', index=True)  # tw/us/cn/hk
+    base_currency = Column(String(8), nullable=False, default='TWD')
     is_active = Column(Boolean, nullable=False, default=True, index=True)
     created_at = Column(DateTime, default=datetime.now, index=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
@@ -551,7 +551,7 @@ class PortfolioDailySnapshot(Base):
     account_id = Column(Integer, ForeignKey('portfolio_accounts.id'), nullable=False, index=True)
     snapshot_date = Column(Date, nullable=False, index=True)
     cost_method = Column(String(8), nullable=False, default='fifo')  # fifo/avg
-    base_currency = Column(String(8), nullable=False, default='CNY')
+    base_currency = Column(String(8), nullable=False, default='TWD')
     total_cash = Column(Float, nullable=False, default=0.0)
     total_market_value = Column(Float, nullable=False, default=0.0)
     total_equity = Column(Float, nullable=False, default=0.0)

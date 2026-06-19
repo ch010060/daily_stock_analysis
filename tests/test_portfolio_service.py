@@ -21,7 +21,14 @@ from sqlalchemy import select
 from src.config import Config
 from src.repositories.portfolio_repo import PortfolioBusyError, PortfolioRepository
 from src.services.portfolio_service import _AvgState, PortfolioConflictError, PortfolioOversellError, PortfolioService
-from src.storage import DatabaseManager, PortfolioDailySnapshot, PortfolioPosition, PortfolioPositionLot, PortfolioTrade
+from src.storage import (
+    DatabaseManager,
+    PortfolioAccount as PortfolioAccountModel,
+    PortfolioDailySnapshot,
+    PortfolioPosition,
+    PortfolioPositionLot,
+    PortfolioTrade,
+)
 
 
 class PortfolioServiceTestCase(unittest.TestCase):
@@ -1168,6 +1175,95 @@ class PortfolioServiceTestCase(unittest.TestCase):
                 with self.assertRaises(PortfolioBusyError):
                     with repo.portfolio_write_session():
                         pass
+
+
+class PortfolioTwUsCurrencyDefaultsTestCase(unittest.TestCase):
+    """Phase 15.1 — TW accounts must be creatable and default to TWD, not CNY."""
+
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.env_path = Path(self.temp_dir.name) / ".env"
+        self.db_path = Path(self.temp_dir.name) / "portfolio_test.db"
+        self.env_path.write_text(
+            "\n".join(
+                [
+                    "STOCK_LIST=2330",
+                    "GEMINI_API_KEY=test",
+                    "ADMIN_AUTH_ENABLED=false",
+                    f"DATABASE_PATH={self.db_path}",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        os.environ["ENV_FILE"] = str(self.env_path)
+        os.environ["DATABASE_PATH"] = str(self.db_path)
+        Config.reset_instance()
+        DatabaseManager.reset_instance()
+        self.db = DatabaseManager.get_instance()
+        self.service = PortfolioService()
+
+    def tearDown(self) -> None:
+        DatabaseManager.reset_instance()
+        Config.reset_instance()
+        os.environ.pop("ENV_FILE", None)
+        os.environ.pop("DATABASE_PATH", None)
+        self.temp_dir.cleanup()
+
+    def test_create_account_accepts_tw_market(self) -> None:
+        account = self.service.create_account(name="TW Co", broker="Demo", market="tw", base_currency="TWD")
+        self.assertEqual(account["market"], "tw")
+        self.assertEqual(account["base_currency"], "TWD")
+
+    def test_record_trade_on_tw_account_defaults_currency_to_twd(self) -> None:
+        account = self.service.create_account(name="TW Co", broker="Demo", market="tw", base_currency="TWD")
+        aid = account["id"]
+        self.service.record_trade(
+            account_id=aid,
+            symbol="2330",
+            trade_date=date(2026, 1, 5),
+            side="buy",
+            quantity=10,
+            price=1000,
+        )
+        trades = self.service.list_trade_events(account_id=aid, symbol="2330", page=1, page_size=20)
+        self.assertEqual(trades["items"][0]["currency"], "TWD")
+
+    def test_record_trade_on_us_account_still_defaults_currency_to_usd(self) -> None:
+        account = self.service.create_account(name="US Co", broker="Demo", market="us", base_currency="USD")
+        aid = account["id"]
+        self.service.record_trade(
+            account_id=aid,
+            symbol="AAPL",
+            trade_date=date(2026, 1, 5),
+            side="buy",
+            quantity=10,
+            price=200,
+        )
+        trades = self.service.list_trade_events(account_id=aid, symbol="AAPL", page=1, page_size=20)
+        self.assertEqual(trades["items"][0]["currency"], "USD")
+
+    def test_snapshot_with_single_tw_account_reports_twd_not_cny(self) -> None:
+        account = self.service.create_account(name="TW Co", broker="Demo", market="tw", base_currency="TWD")
+        aid = account["id"]
+        snapshot = self.service.get_portfolio_snapshot(account_id=aid, as_of=date(2026, 1, 5), cost_method="fifo")
+        self.assertEqual(snapshot["currency"], "TWD")
+
+    def test_snapshot_with_no_accounts_defaults_to_twd_not_cny(self) -> None:
+        snapshot = self.service.get_portfolio_snapshot(as_of=date(2026, 1, 5), cost_method="fifo")
+        self.assertEqual(snapshot["currency"], "TWD")
+
+    def test_portfolio_account_db_column_defaults_to_tw_twd(self) -> None:
+        session = self.db.get_session()
+        try:
+            row = PortfolioAccountModel(name="Raw Row")
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+            self.assertEqual(row.market, "tw")
+            self.assertEqual(row.base_currency, "TWD")
+        finally:
+            session.close()
 
 
 if __name__ == "__main__":

@@ -245,6 +245,22 @@ describe('PortfolioPage FX refresh', () => {
     expect(screen.getByRole('button', { name: '重新整理匯率' })).toBeInTheDocument();
   });
 
+  it('only offers TW/US in the new-account market dropdown', async () => {
+    getAccounts.mockResolvedValueOnce({ accounts: [] });
+    getSnapshot.mockResolvedValueOnce(makeSnapshot({ accountCount: 0 }));
+
+    render(<PortfolioPage />);
+
+    await waitFor(() => expect(getAccounts).toHaveBeenCalledTimes(1));
+
+    const marketSelect = await screen.findByDisplayValue('市場：台股（tw）');
+    const optionValues = within(marketSelect as HTMLSelectElement)
+      .getAllByRole('option')
+      .map((option) => (option as HTMLOptionElement).value);
+
+    expect(optionValues).toEqual(['tw', 'us']);
+  });
+
   it('refreshes FX for a single selected account and only reloads snapshot/risk', async () => {
     getSnapshot
       .mockResolvedValueOnce(makeSnapshot({ fxStale: true }))
