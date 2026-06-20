@@ -29,6 +29,7 @@ describe('ReportNews', () => {
     const { container } = render(<ReportNews recordId={1} />);
 
     expect(await screen.findByText('茅臺釋出最新經營資料')).toBeInTheDocument();
+    expect(screen.queryByText('暫無相關資訊')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '跳轉' })).toHaveAttribute('href', 'https://example.com/news');
     expect(container.querySelector('.home-panel-card')).toBeTruthy();
     expect(container.querySelector('.home-subpanel')).toBeTruthy();
