@@ -1079,6 +1079,250 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         parsed = SearchService._normalize_news_publish_date(rfc_text)
         self.assertEqual(parsed, expected_local_date)
 
+    def test_tw_news_query_variants_continue_until_results(self) -> None:
+        """TW related-info search should try required variants instead of stopping at the first empty query."""
+        fresh = datetime.now().date().isoformat()
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(
+                side_effect=[
+                    _response([]),
+                    _response([
+                        _result(
+                            "台積電 2330 財報法說重點",
+                            fresh,
+                            snippet="台積電法說會聚焦 AI 需求與先進製程。",
+                        )
+                    ]),
+                ]
+            ),
+        )
+        service._providers = [provider]
+
+        resp = service.search_stock_news("2330", "台積電", max_results=3)
+
+        self.assertEqual([item.title for item in resp.results], ["台積電 2330 財報法說重點"])
+        queries = [call.args[0] for call in provider.search.call_args_list]
+        self.assertGreaterEqual(len(queries), 2)
+        self.assertEqual(queries[:2], ["2330 台積電 新聞", "台積電 最新消息"])
+
+    def test_us_news_query_variants_continue_until_results(self) -> None:
+        """US related-info search should try stock/earnings/market variants."""
+        fresh = datetime.now().date().isoformat()
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(
+                side_effect=[
+                    _response([]),
+                    _response([
+                        _result(
+                            "Apple earnings lift AAPL stock",
+                            fresh,
+                            snippet="Apple earnings and services revenue supported shares.",
+                        )
+                    ]),
+                ]
+            ),
+        )
+        service._providers = [provider]
+
+        resp = service.search_stock_news("AAPL", "Apple", max_results=3)
+
+        self.assertEqual([item.title for item in resp.results], ["Apple earnings lift AAPL stock"])
+        queries = [call.args[0] for call in provider.search.call_args_list]
+        self.assertGreaterEqual(len(queries), 2)
+        self.assertEqual(queries[:2], ["AAPL Apple stock news", "Apple earnings stock news"])
+
+    def test_news_provider_error_does_not_stop_query_variants(self) -> None:
+        """Provider errors should keep trying remaining variants/providers before giving up."""
+        fresh = datetime.now().date().isoformat()
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(
+                side_effect=[
+                    SearchResponse(
+                        query="AAPL Apple stock news",
+                        results=[],
+                        provider="MockProvider",
+                        success=False,
+                        error_message="請求超時",
+                    ),
+                    _response([
+                        _result(
+                            "Apple iPhone services market news",
+                            fresh,
+                            snippet="Apple services growth and iPhone demand remain in focus.",
+                        )
+                    ]),
+                ]
+            ),
+        )
+        service._providers = [provider]
+
+        resp = service.search_stock_news("AAPL", "Apple", max_results=3)
+
+        self.assertEqual([item.title for item in resp.results], ["Apple iPhone services market news"])
+        self.assertGreaterEqual(provider.search.call_count, 2)
+
+    def test_primary_provider_error_uses_next_provider(self) -> None:
+        """A failing primary provider should fall through to the next configured provider."""
+        fresh = datetime.now().date().isoformat()
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        failing_provider = SimpleNamespace(
+            is_available=True,
+            name="PrimaryProvider",
+            search=MagicMock(
+                return_value=SearchResponse(
+                    query="AAPL Apple stock news",
+                    results=[],
+                    provider="PrimaryProvider",
+                    success=False,
+                    error_message="請求超時",
+                )
+            ),
+        )
+        fallback_provider = SimpleNamespace(
+            is_available=True,
+            name="FallbackProvider",
+            search=MagicMock(
+                return_value=_response([
+                    _result(
+                        "AAPL Apple Reuters market update",
+                        fresh,
+                        snippet="Apple stock news returned by fallback provider.",
+                    )
+                ])
+            ),
+        )
+        service._providers = [failing_provider, fallback_provider]
+
+        resp = service.search_stock_news("AAPL", "Apple", max_results=3)
+
+        self.assertEqual([item.title for item in resp.results], ["AAPL Apple Reuters market update"])
+        failing_provider.search.assert_called_once()
+        fallback_provider.search.assert_called_once()
+
+    def test_unknown_publish_date_results_are_last_resort_news_fallback(self) -> None:
+        """SearXNG-style results without publishedDate should be usable after strict-date variants are exhausted."""
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="SearXNG",
+            search=MagicMock(
+                return_value=_response(
+                    [
+                        _result(
+                            "NVIDIA AI GPU market update",
+                            None,
+                            snippet="NVIDIA AI GPU demand remains a key stock-market topic.",
+                            source="example.com",
+                        )
+                    ]
+                )
+            ),
+        )
+        service._providers = [provider]
+
+        resp = service.search_stock_news("NVDA", "NVIDIA", max_results=3)
+
+        self.assertEqual([item.title for item in resp.results], ["NVIDIA AI GPU market update"])
+        self.assertIsNone(resp.results[0].published_date)
+        self.assertTrue(resp.success)
+
+    def test_stale_publish_date_results_are_latest_news_fallback(self) -> None:
+        """If no recent items exist, keep latest provider results instead of silent no-news."""
+        stale = (datetime.now().date() - timedelta(days=90)).isoformat()
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="SearXNG",
+            search=MagicMock(
+                return_value=_response(
+                    [
+                        _result(
+                            "NVIDIA older market update",
+                            stale,
+                            snippet="NVIDIA stock coverage is older but still a real provider result.",
+                        )
+                    ]
+                )
+            ),
+        )
+        service._providers = [provider]
+
+        resp = service.search_stock_news("NVDA", "NVIDIA", max_results=3)
+
+        self.assertEqual([item.title for item in resp.results], ["NVIDIA older market update"])
+        self.assertEqual(resp.results[0].published_date, stale)
+        self.assertTrue(resp.success)
+
+    def test_comprehensive_intel_latest_news_uses_query_variants(self) -> None:
+        """Report pipeline intel search should persist latest_news from the robust variant path."""
+        fresh = datetime.now().date().isoformat()
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(
+                side_effect=[
+                    _response([]),
+                    _response([
+                        _result(
+                            "Apple earnings lift AAPL stock",
+                            fresh,
+                            snippet="Apple earnings and services revenue supported shares.",
+                        )
+                    ]),
+                ]
+            ),
+        )
+        service._providers = [provider]
+
+        with patch("src.search_service.time.sleep"):
+            intel = service.search_comprehensive_intel("AAPL", "Apple", max_searches=1)
+
+        self.assertIn("latest_news", intel)
+        self.assertEqual(
+            [item.title for item in intel["latest_news"].results],
+            ["Apple earnings lift AAPL stock"],
+        )
+        queries = [call.args[0] for call in provider.search.call_args_list]
+        self.assertEqual(queries[:2], ["AAPL Apple stock news", "Apple earnings stock news"])
+
 
 if __name__ == "__main__":
     unittest.main()

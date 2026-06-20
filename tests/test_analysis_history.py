@@ -35,6 +35,7 @@ except ModuleNotFoundError:
 from src.config import Config
 from src.storage import DatabaseManager, AnalysisHistory, BacktestResult
 from src.analyzer import AnalysisResult
+from src.search_service import SearchResponse, SearchResult
 from src.services.history_service import HistoryService
 import src.auth as auth
 
@@ -587,6 +588,55 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["meta"]["current_price"], 300.0)
         self.assertIsNone(payload["meta"]["change_pct"])
+
+    @patch("src.auth.is_auth_enabled", return_value=False)
+    def test_history_news_api_returns_persisted_news_items(self, mock_auth) -> None:
+        """GET /api/v1/history/{id}/news should expose persisted related-info items."""
+        if TestClient is None or create_app is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        query_id = "query_news_api_001"
+        record_id = self._save_history(query_id)
+        response = SearchResponse(
+            query="2330 台積電 新聞",
+            results=[
+                SearchResult(
+                    title="台積電法說會最新重點",
+                    snippet="AI 需求與先進製程仍是市場關注焦點。",
+                    url="https://news.example.com/tsmc",
+                    source="example.com",
+                    published_date="2026-06-19",
+                )
+            ],
+            provider="SearXNG",
+            success=True,
+        )
+
+        saved = self.db.save_news_intel(
+            code="2330",
+            name="台積電",
+            dimension="latest_news",
+            query=response.query,
+            response=response,
+            query_context={
+                "query_id": query_id,
+                "query_source": "phase15_6b_test",
+            },
+        )
+        self.assertEqual(saved, 1)
+
+        static_dir = Path(self._temp_dir.name) / "empty-static"
+        static_dir.mkdir(exist_ok=True)
+        client = TestClient(create_app(static_dir=static_dir))
+
+        api_response = client.get(f"/api/v1/history/{record_id}/news?limit=8")
+
+        self.assertEqual(api_response.status_code, 200)
+        payload = api_response.json()
+        self.assertEqual(payload["total"], 1)
+        self.assertEqual(payload["items"][0]["title"], "台積電法說會最新重點")
+        self.assertEqual(payload["items"][0]["snippet"], "AI 需求與先進製程仍是市場關注焦點。")
+        self.assertEqual(payload["items"][0]["url"], "https://news.example.com/tsmc")
 
     def test_history_detail_accepts_dict_raw_result(self) -> None:
         """_record_to_detail_dict should handle dict raw_result without json.loads errors."""

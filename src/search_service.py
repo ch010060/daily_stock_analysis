@@ -2201,6 +2201,14 @@ class SearchService:
         "cninfo", "sse.com", "szse.cn", "hkexnews", "sec.gov", "nasdaq.com",
         "nyse.com", "上交所", "深交所", "港交所", "證券交易所",
     )
+    _TW_NEWS_ENGLISH_ALIASES_BY_CODE = {
+        "2330": ["TSMC Taiwan Semiconductor"],
+        "2454": ["MediaTek"],
+    }
+    _US_NEWS_TOPIC_VARIANTS_BY_CODE = {
+        "AAPL": ["Apple iPhone services market news"],
+        "NVDA": ["NVIDIA earnings AI GPU stock news", "Nvidia latest market news"],
+    }
 
     def __init__(
         self,
@@ -2546,6 +2554,57 @@ class SearchService:
         """Apply light overfetch before time filtering to avoid sparse outputs."""
         target = max(1, int(max_results))
         return max(target, min(target * cls.NEWS_OVERSAMPLE_FACTOR, cls.NEWS_OVERSAMPLE_MAX))
+
+    @staticmethod
+    def _is_tw_stock_code(stock_code: str) -> bool:
+        """Return True for common Taiwan listed stock codes."""
+        code = (stock_code or "").strip()
+        return code.isdigit() and len(code) == 4
+
+    @classmethod
+    def _news_query_variants(
+        cls,
+        stock_code: str,
+        stock_name: str,
+        *,
+        focus_keywords: Optional[List[str]] = None,
+        prefer_chinese: bool = False,
+    ) -> List[str]:
+        """Build ordered related-info/news queries for one stock."""
+        code = (stock_code or "").strip()
+        name = (stock_name or "").strip()
+
+        if focus_keywords:
+            focused = " ".join(item.strip() for item in focus_keywords if item and item.strip())
+            return [focused] if focused else []
+
+        variants: List[str] = []
+
+        if cls._is_tw_stock_code(code):
+            cls._append_unique(variants, f"{code} {name} 新聞")
+            cls._append_unique(variants, f"{name} 最新消息")
+            cls._append_unique(variants, f"{name} 財報 法說 產業")
+            for alias in cls._TW_NEWS_ENGLISH_ALIASES_BY_CODE.get(code, []):
+                cls._append_unique(variants, f"{alias} news")
+            return variants
+
+        upper_code = code.upper()
+        if cls._US_STOCK_RE.match(upper_code):
+            cls._append_unique(variants, f"{upper_code} {name} stock news")
+            cls._append_unique(variants, f"{name} earnings stock news")
+            for variant in cls._US_NEWS_TOPIC_VARIANTS_BY_CODE.get(upper_code, []):
+                cls._append_unique(variants, variant)
+            cls._append_unique(variants, f"{name} latest market news")
+            return variants
+
+        is_foreign = cls._is_foreign_stock(code)
+        if prefer_chinese:
+            cls._append_unique(variants, f"{name} {code} 股票 最新訊息")
+        elif is_foreign:
+            cls._append_unique(variants, f"{name} {code} stock latest news")
+        else:
+            cls._append_unique(variants, f"{name} {code} 股票 最新訊息")
+        return variants
 
     @staticmethod
     def _append_unique(values: List[str], value: Optional[str]) -> None:
@@ -3203,6 +3262,15 @@ class SearchService:
             search_time=response.search_time,
         )
 
+    def _latest_news_fallback_response(
+        self,
+        response: SearchResponse,
+        *,
+        max_results: int,
+    ) -> SearchResponse:
+        """Keep provider latest items as a last-resort fallback after recent filtering is exhausted."""
+        return self._normalize_and_limit_response(response, max_results=max_results)
+
     def search_stock_news(
         self,
         stock_code: str,
@@ -3232,28 +3300,23 @@ class SearchService:
             focus_keywords=focus_keywords,
         )
 
-        # 構建搜尋查詢（最佳化搜尋效果）
-        is_foreign = self._is_foreign_stock(stock_code)
-        if focus_keywords:
-            # 如果提供了關鍵詞，直接使用關鍵詞作為查詢
-            query = " ".join(focus_keywords)
-        elif prefer_chinese:
-            query = f"{stock_name} {stock_code} 股票 最新訊息"
-        elif is_foreign:
-            # 港股/美股使用英文搜尋關鍵詞
-            query = f"{stock_name} {stock_code} stock latest news"
-        else:
-            # 預設主查詢：股票名稱 + 核心關鍵詞
-            query = f"{stock_name} {stock_code} 股票 最新訊息"
+        query_variants = self._news_query_variants(
+            stock_code,
+            stock_name,
+            focus_keywords=focus_keywords,
+            prefer_chinese=prefer_chinese,
+        )
+        query = query_variants[0] if query_variants else f"{stock_name} {stock_code} 股票 最新訊息"
+        candidate_queries = query_variants or [query]
 
         logger.info(
             (
-                "搜尋股票新聞: %s(%s), query='%s', 時間範圍: 近%s天 "
+                "搜尋股票新聞: %s(%s), queries=%s, 時間範圍: 近%s天 "
                 "(profile=%s, NEWS_MAX_AGE_DAYS=%s, prefer_chinese=%s), 目標條數=%s, provider請求條數=%s"
             ),
             stock_name,
             stock_code,
-            query,
+            query_variants,
             search_days,
             self.news_strategy_profile,
             self.news_max_age_days,
@@ -3264,7 +3327,7 @@ class SearchService:
 
         cache_key = self._cache_key(
             (
-                f"{query}|target={stock_code}:{stock_name}|"
+                f"{' || '.join(query_variants)}|target={stock_code}:{stock_name}|"
                 f"news_pref={'zh' if prefer_chinese else 'default'}"
             ),
             max_results,
@@ -3286,119 +3349,194 @@ class SearchService:
                 return cached
 
         try:
-            # 依次嘗試各個搜尋引擎（若過濾後為空，繼續嘗試下一引擎）
+            # 依次嘗試 query variants 和搜尋引擎；若過濾後為空，繼續耗盡後續查詢/引擎。
             had_provider_success = False
             best_ranked_response: Optional[SearchResponse] = None
             best_ranked_stats: Optional[Dict[str, int]] = None
-            for provider in self._providers:
-                if not provider.is_available:
-                    continue
+            best_latest_fallback_response: Optional[SearchResponse] = None
+            best_latest_fallback_stats: Optional[Dict[str, int]] = None
+            last_error_message: Optional[str] = None
 
-                search_kwargs: Dict[str, Any] = {}
-                if isinstance(provider, TavilySearchProvider):
-                    search_kwargs["topic"] = "news"
-                elif isinstance(provider, BraveSearchProvider):
-                    search_kwargs.update(
-                        self._brave_search_locale(
-                            stock_code,
+            for query_index, candidate_query in enumerate(candidate_queries, 1):
+                for provider in self._providers:
+                    if not provider.is_available:
+                        continue
+
+                    search_kwargs: Dict[str, Any] = {}
+                    if isinstance(provider, TavilySearchProvider):
+                        search_kwargs["topic"] = "news"
+                    elif isinstance(provider, BraveSearchProvider):
+                        search_kwargs.update(
+                            self._brave_search_locale(
+                                stock_code,
+                                prefer_chinese=prefer_chinese,
+                            )
+                        )
+
+                    try:
+                        response = provider.search(
+                            candidate_query,
+                            max_results=provider_max_results,
+                            days=search_days,
+                            **search_kwargs,
+                        )
+                    except Exception as exc:  # pragma: no cover - defensive provider boundary
+                        last_error_message = str(exc)
+                        logger.warning(
+                            "%s query[%s/%s] 搜尋異常: %s，繼續嘗試下一路徑",
+                            provider.name,
+                            query_index,
+                            len(candidate_queries),
+                            exc,
+                        )
+                        continue
+
+                    filtered_response = self._filter_news_response(
+                        response,
+                        search_days=search_days,
+                        max_results=provider_max_results,
+                        log_scope=f"{stock_code}:{provider.name}:stock_news:q{query_index}",
+                    )
+                    had_provider_success = had_provider_success or bool(response.success)
+
+                    if filtered_response.success and filtered_response.results:
+                        language_response, _preferred_count = self._prioritize_news_language(
+                            filtered_response,
                             prefer_chinese=prefer_chinese,
                         )
-                    )
-
-                response = provider.search(query, provider_max_results, days=search_days, **search_kwargs)
-                filtered_response = self._filter_news_response(
-                    response,
-                    search_days=search_days,
-                    max_results=provider_max_results,
-                    log_scope=f"{stock_code}:{provider.name}:stock_news",
-                )
-                had_provider_success = had_provider_success or bool(response.success)
-
-                if filtered_response.success and filtered_response.results:
-                    language_response, _preferred_count = self._prioritize_news_language(
-                        filtered_response,
-                        prefer_chinese=prefer_chinese,
-                    )
-                    ranked_response = self._rank_news_response(
-                        language_response,
-                        stock_code=stock_code,
-                        stock_name=stock_name,
-                        prefer_chinese=prefer_chinese,
-                        max_results=provider_max_results,
-                        log_scope=f"{stock_code}:{provider.name}:stock_news",
-                    )
-                    limited_response = self._limit_search_response(
-                        ranked_response,
-                        max_results=max_results,
-                    )
-                    stats = self._news_relevance_stats(
-                        limited_response,
-                        prefer_chinese=prefer_chinese,
-                    )
-                    if self._is_better_ranked_news_response(
-                        limited_response,
-                        candidate_stats=stats,
-                        best_response=best_ranked_response,
-                        best_stats=best_ranked_stats,
-                        prefer_chinese=prefer_chinese,
-                    ):
-                        best_ranked_response = limited_response
-                        best_ranked_stats = stats
-
-                    if stats["direct_count"] > 0 and (
-                        not prefer_chinese or stats["preferred_direct_count"] > 0
-                    ):
-                        logger.info(
-                            "%s 搜尋成功，識別到 %s 條直接個股新聞，優先返回",
-                            provider.name,
-                            stats["direct_count"],
+                        ranked_response = self._rank_news_response(
+                            language_response,
+                            stock_code=stock_code,
+                            stock_name=stock_name,
+                            prefer_chinese=prefer_chinese,
+                            max_results=provider_max_results,
+                            log_scope=f"{stock_code}:{provider.name}:stock_news:q{query_index}",
                         )
-                        self._put_cache(cache_key, limited_response)
-                        return limited_response
-
-                    if prefer_chinese and stats["direct_count"] > 0:
-                        logger.info(
-                            "%s 搜尋成功，識別到 %s 條直接個股新聞但缺少中文直接命中，繼續嘗試下一引擎",
-                            provider.name,
-                            stats["direct_count"],
+                        limited_response = self._limit_search_response(
+                            ranked_response,
+                            max_results=max_results,
                         )
-                        continue
-
-                    if prefer_chinese and stats["preferred_count"] >= max_results:
-                        logger.info(
-                            "%s 搜尋成功，中文結果已滿足目標條數但缺少直接個股命中，繼續嘗試下一引擎",
-                            provider.name,
+                        stats = self._news_relevance_stats(
+                            limited_response,
+                            prefer_chinese=prefer_chinese,
                         )
-                        continue
+                        if self._is_better_ranked_news_response(
+                            limited_response,
+                            candidate_stats=stats,
+                            best_response=best_ranked_response,
+                            best_stats=best_ranked_stats,
+                            prefer_chinese=prefer_chinese,
+                        ):
+                            best_ranked_response = limited_response
+                            best_ranked_stats = stats
 
-                    if prefer_chinese and stats["preferred_count"] > 0:
-                        logger.info(
-                            "%s 搜尋成功，識別到 %s/%s 條中文新聞但缺少直接個股命中，繼續嘗試下一引擎",
-                            provider.name,
-                            stats["preferred_count"],
-                            len(limited_response.results),
-                        )
+                        if stats["direct_count"] > 0 and (
+                            not prefer_chinese or stats["preferred_direct_count"] > 0
+                        ):
+                            logger.info(
+                                "%s query[%s/%s] 搜尋成功，識別到 %s 條直接個股新聞，優先返回",
+                                provider.name,
+                                query_index,
+                                len(candidate_queries),
+                                stats["direct_count"],
+                            )
+                            self._put_cache(cache_key, limited_response)
+                            return limited_response
+
+                        if prefer_chinese and stats["direct_count"] > 0:
+                            logger.info(
+                                "%s query[%s/%s] 搜尋成功，識別到 %s 條直接個股新聞但缺少中文直接命中，繼續嘗試下一路徑",
+                                provider.name,
+                                query_index,
+                                len(candidate_queries),
+                                stats["direct_count"],
+                            )
+                            continue
+
+                        if prefer_chinese and stats["preferred_count"] >= max_results:
+                            logger.info(
+                                "%s query[%s/%s] 搜尋成功，中文結果已滿足目標條數但缺少直接個股命中，繼續嘗試下一路徑",
+                                provider.name,
+                                query_index,
+                                len(candidate_queries),
+                            )
+                            continue
+
+                        if prefer_chinese and stats["preferred_count"] > 0:
+                            logger.info(
+                                "%s query[%s/%s] 搜尋成功，識別到 %s/%s 條中文新聞但缺少直接個股命中，繼續嘗試下一路徑",
+                                provider.name,
+                                query_index,
+                                len(candidate_queries),
+                                stats["preferred_count"],
+                                len(limited_response.results),
+                            )
+                        else:
+                            logger.info(
+                                "%s query[%s/%s] 搜尋成功但未識別直接個股新聞，繼續嘗試下一路徑",
+                                provider.name,
+                                query_index,
+                                len(candidate_queries),
+                            )
                     else:
-                        logger.info(
-                            "%s 搜尋成功但未識別直接個股新聞，繼續嘗試下一引擎",
-                            provider.name,
-                        )
-                else:
-                    if response.success and not filtered_response.results:
-                        logger.info(
-                            "%s 搜尋成功但過濾後無有效新聞，繼續嘗試下一引擎",
-                            provider.name,
-                        )
-                    else:
-                        logger.warning(
-                            "%s 搜尋失敗: %s，嘗試下一個引擎",
-                            provider.name,
-                            response.error_message,
-                        )
-
+                        if response.success and response.results:
+                            unknown_response = self._latest_news_fallback_response(
+                                response,
+                                max_results=provider_max_results,
+                            )
+                            if unknown_response.results:
+                                ranked_unknown = self._rank_news_response(
+                                    unknown_response,
+                                    stock_code=stock_code,
+                                    stock_name=stock_name,
+                                    prefer_chinese=prefer_chinese,
+                                    max_results=provider_max_results,
+                                    log_scope=f"{stock_code}:{provider.name}:stock_news:q{query_index}:latest_fallback",
+                                )
+                                limited_unknown = self._limit_search_response(
+                                    ranked_unknown,
+                                    max_results=max_results,
+                                )
+                                unknown_stats = self._news_relevance_stats(
+                                    limited_unknown,
+                                    prefer_chinese=prefer_chinese,
+                                )
+                                if self._is_better_ranked_news_response(
+                                    limited_unknown,
+                                    candidate_stats=unknown_stats,
+                                    best_response=best_latest_fallback_response,
+                                    best_stats=best_latest_fallback_stats,
+                                    prefer_chinese=prefer_chinese,
+                                ):
+                                    best_latest_fallback_response = limited_unknown
+                                    best_latest_fallback_stats = unknown_stats
+                        if response.success and not filtered_response.results:
+                            logger.info(
+                                "%s query[%s/%s] 搜尋成功但過濾後無有效新聞，繼續嘗試下一路徑",
+                                provider.name,
+                                query_index,
+                                len(candidate_queries),
+                            )
+                        else:
+                            last_error_message = response.error_message
+                            logger.warning(
+                                "%s query[%s/%s] 搜尋失敗: %s，嘗試下一路徑",
+                                provider.name,
+                                query_index,
+                                len(candidate_queries),
+                                response.error_message,
+                            )
             if best_ranked_response is not None:
                 self._put_cache(cache_key, best_ranked_response)
                 return best_ranked_response
+
+            if best_latest_fallback_response is not None and best_latest_fallback_response.results:
+                logger.info(
+                    "所有嚴格日期新聞路徑皆未返回結果，使用 provider 最新可用新聞作為最後 fallback: %s 條",
+                    len(best_latest_fallback_response.results),
+                )
+                self._put_cache(cache_key, best_latest_fallback_response)
+                return best_latest_fallback_response
 
             if had_provider_success:
                 return SearchResponse(
@@ -3408,14 +3546,14 @@ class SearchService:
                     success=True,
                     error_message=None,
                 )
-            
+
             # 所有引擎都失敗
             return SearchResponse(
                 query=query,
                 results=[],
                 provider="None",
                 success=False,
-                error_message="所有搜尋引擎都不可用或搜尋失敗"
+                error_message=last_error_message or "所有搜尋引擎都不可用或搜尋失敗"
             )
         finally:
             if cache_owner and cache_event is not None:
@@ -3623,8 +3761,29 @@ class SearchService:
         
         # 輪流使用不同的搜尋引擎
         provider_index = 0
+
+        if search_count < max_searches:
+            latest_response = self.search_stock_news(
+                stock_code,
+                stock_name,
+                max_results=target_per_dimension,
+            )
+            results["latest_news"] = latest_response
+            search_count += 1
+            if latest_response.success:
+                logger.info(
+                    "[情報搜尋] 最新訊息: 原始=%s條",
+                    len(latest_response.results),
+                )
+            else:
+                logger.warning(
+                    "[情報搜尋] 最新訊息: 搜尋失敗 - %s",
+                    latest_response.error_message,
+                )
         
         for dim in search_dimensions:
+            if dim['name'] == 'latest_news':
+                continue
             if search_count >= max_searches:
                 break
             
