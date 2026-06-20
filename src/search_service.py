@@ -39,6 +39,7 @@ from src.config import (
     normalize_news_strategy_profile,
     resolve_news_window_days,
 )
+from src.services.run_diagnostics import sanitize_diagnostic_text
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +165,7 @@ class SearchResponse:
     success: bool = True
     error_message: Optional[str] = None
     search_time: float = 0.0  # 搜尋耗時（秒）
+    diagnostics: Optional[Dict[str, Any]] = None
     
     def to_context(self, max_results: int = 5) -> str:
         """將搜尋結果轉換為可用於 AI 分析的上下文"""
@@ -2607,6 +2609,102 @@ class SearchService:
         return variants
 
     @staticmethod
+    def _sanitize_news_search_text(value: Any, *, max_length: int = 160) -> str:
+        sanitized = sanitize_diagnostic_text(value, max_length=max_length) or ""
+        return sanitized.strip()
+
+    @classmethod
+    def _sanitize_news_search_list(
+        cls,
+        values: List[Any],
+        *,
+        max_items: int = 12,
+        max_length: int = 160,
+    ) -> List[str]:
+        cleaned: List[str] = []
+        for value in values[:max_items]:
+            text = cls._sanitize_news_search_text(value, max_length=max_length)
+            if text and text not in cleaned:
+                cleaned.append(text)
+        return cleaned
+
+    @staticmethod
+    def _append_unique_diagnostic_value(values: List[str], value: Optional[str]) -> None:
+        cleaned = (value or "").strip()
+        if cleaned and cleaned not in values:
+            values.append(cleaned)
+
+    @classmethod
+    def _classify_search_error(cls, error: Any) -> str:
+        if isinstance(error, TimeoutError):
+            return "timeout"
+        text = str(error or "").lower()
+        if "timeout" in text or "timed out" in text or "超時" in text:
+            return "timeout"
+        return "provider_error"
+
+    @classmethod
+    def _build_news_search_diagnostics(
+        cls,
+        *,
+        query_variants: List[str],
+        providers_attempted: List[str],
+        attempt_count: int,
+        result_count: int,
+        fallback_used: bool,
+        final_status: str,
+        error_types: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "enabled": True,
+            "providers_attempted": cls._sanitize_news_search_list(
+                providers_attempted,
+                max_items=8,
+                max_length=80,
+            ),
+            "query_variants": cls._sanitize_news_search_list(
+                query_variants,
+                max_items=12,
+                max_length=180,
+            ),
+            "attempt_count": max(0, int(attempt_count or 0)),
+            "result_count": max(0, int(result_count or 0)),
+            "fallback_used": bool(fallback_used),
+            "final_status": cls._sanitize_news_search_text(final_status, max_length=40) or "unknown",
+        }
+        cleaned_error_types = cls._sanitize_news_search_list(
+            error_types or [],
+            max_items=6,
+            max_length=40,
+        )
+        if cleaned_error_types:
+            payload["error_types"] = cleaned_error_types
+        return {"news_search": payload}
+
+    @classmethod
+    def _attach_news_search_diagnostics(
+        cls,
+        response: SearchResponse,
+        *,
+        query_variants: List[str],
+        providers_attempted: List[str],
+        attempt_count: int,
+        fallback_used: bool,
+        final_status: str,
+        error_types: Optional[List[str]] = None,
+    ) -> SearchResponse:
+        response.diagnostics = cls._build_news_search_diagnostics(
+            query_variants=query_variants,
+            providers_attempted=providers_attempted,
+            attempt_count=attempt_count,
+            result_count=len(response.results or []),
+            fallback_used=fallback_used,
+            final_status=final_status,
+            error_types=error_types,
+        )
+        return response
+
+    @staticmethod
     def _append_unique(values: List[str], value: Optional[str]) -> None:
         cleaned = (value or "").strip()
         if cleaned and cleaned not in values:
@@ -2935,6 +3033,7 @@ class SearchService:
             success=response.success,
             error_message=response.error_message,
             search_time=response.search_time,
+            diagnostics=response.diagnostics,
         )
 
     @classmethod
@@ -3200,6 +3299,7 @@ class SearchService:
             success=response.success,
             error_message=response.error_message,
             search_time=response.search_time,
+            diagnostics=response.diagnostics,
         )
 
     def _normalize_and_limit_response(
@@ -3237,6 +3337,7 @@ class SearchService:
             success=response.success,
             error_message=response.error_message,
             search_time=response.search_time,
+            diagnostics=response.diagnostics,
         )
 
     @staticmethod
@@ -3260,6 +3361,7 @@ class SearchService:
             success=response.success,
             error_message=response.error_message,
             search_time=response.search_time,
+            diagnostics=response.diagnostics,
         )
 
     def _latest_news_fallback_response(
@@ -3358,6 +3460,10 @@ class SearchService:
             best_latest_fallback_response: Optional[SearchResponse] = None
             best_latest_fallback_stats: Optional[Dict[str, int]] = None
             last_error_message: Optional[str] = None
+            providers_attempted: List[str] = []
+            error_types: List[str] = []
+            attempt_count = 0
+            fallback_used = False
 
             for query_index, candidate_query in enumerate(candidate_queries, 1):
                 for provider in self._providers:
@@ -3376,6 +3482,13 @@ class SearchService:
                             )
                         )
 
+                    provider_name = self._sanitize_news_search_text(
+                        getattr(provider, "name", provider.__class__.__name__),
+                        max_length=80,
+                    ) or "unknown"
+                    self._append_unique_diagnostic_value(providers_attempted, provider_name)
+                    attempt_count += 1
+
                     try:
                         response = provider.search(
                             candidate_query,
@@ -3384,13 +3497,16 @@ class SearchService:
                             **search_kwargs,
                         )
                     except Exception as exc:  # pragma: no cover - defensive provider boundary
-                        last_error_message = str(exc)
+                        error_type = self._classify_search_error(exc)
+                        self._append_unique_diagnostic_value(error_types, error_type)
+                        last_error_message = sanitize_diagnostic_text(exc) or type(exc).__name__
+                        fallback_used = True
                         logger.warning(
                             "%s query[%s/%s] 搜尋異常: %s，繼續嘗試下一路徑",
-                            provider.name,
+                            provider_name,
                             query_index,
                             len(candidate_queries),
-                            exc,
+                            last_error_message,
                         )
                         continue
 
@@ -3438,18 +3554,29 @@ class SearchService:
                         ):
                             logger.info(
                                 "%s query[%s/%s] 搜尋成功，識別到 %s 條直接個股新聞，優先返回",
-                                provider.name,
+                                provider_name,
                                 query_index,
                                 len(candidate_queries),
                                 stats["direct_count"],
                             )
-                            self._put_cache(cache_key, limited_response)
-                            return limited_response
+                            final_response = self._attach_news_search_diagnostics(
+                                limited_response,
+                                query_variants=query_variants,
+                                providers_attempted=providers_attempted,
+                                attempt_count=attempt_count,
+                                fallback_used=fallback_used,
+                                final_status="available",
+                                error_types=error_types,
+                            )
+                            self._put_cache(cache_key, final_response)
+                            return final_response
+
+                        fallback_used = True
 
                         if prefer_chinese and stats["direct_count"] > 0:
                             logger.info(
                                 "%s query[%s/%s] 搜尋成功，識別到 %s 條直接個股新聞但缺少中文直接命中，繼續嘗試下一路徑",
-                                provider.name,
+                                provider_name,
                                 query_index,
                                 len(candidate_queries),
                                 stats["direct_count"],
@@ -3459,7 +3586,7 @@ class SearchService:
                         if prefer_chinese and stats["preferred_count"] >= max_results:
                             logger.info(
                                 "%s query[%s/%s] 搜尋成功，中文結果已滿足目標條數但缺少直接個股命中，繼續嘗試下一路徑",
-                                provider.name,
+                                provider_name,
                                 query_index,
                                 len(candidate_queries),
                             )
@@ -3468,7 +3595,7 @@ class SearchService:
                         if prefer_chinese and stats["preferred_count"] > 0:
                             logger.info(
                                 "%s query[%s/%s] 搜尋成功，識別到 %s/%s 條中文新聞但缺少直接個股命中，繼續嘗試下一路徑",
-                                provider.name,
+                                provider_name,
                                 query_index,
                                 len(candidate_queries),
                                 stats["preferred_count"],
@@ -3477,12 +3604,13 @@ class SearchService:
                         else:
                             logger.info(
                                 "%s query[%s/%s] 搜尋成功但未識別直接個股新聞，繼續嘗試下一路徑",
-                                provider.name,
+                                provider_name,
                                 query_index,
                                 len(candidate_queries),
                             )
                     else:
                         if response.success and response.results:
+                            fallback_used = True
                             unknown_response = self._latest_news_fallback_response(
                                 response,
                                 max_results=provider_max_results,
@@ -3514,49 +3642,89 @@ class SearchService:
                                     best_latest_fallback_response = limited_unknown
                                     best_latest_fallback_stats = unknown_stats
                         if response.success and not filtered_response.results:
+                            fallback_used = True
                             logger.info(
                                 "%s query[%s/%s] 搜尋成功但過濾後無有效新聞，繼續嘗試下一路徑",
-                                provider.name,
+                                provider_name,
                                 query_index,
                                 len(candidate_queries),
                             )
                         else:
-                            last_error_message = response.error_message
+                            error_type = self._classify_search_error(response.error_message)
+                            self._append_unique_diagnostic_value(error_types, error_type)
+                            last_error_message = sanitize_diagnostic_text(response.error_message) or "搜尋失敗"
+                            fallback_used = True
                             logger.warning(
                                 "%s query[%s/%s] 搜尋失敗: %s，嘗試下一路徑",
-                                provider.name,
+                                provider_name,
                                 query_index,
                                 len(candidate_queries),
-                                response.error_message,
+                                last_error_message,
                             )
             if best_ranked_response is not None:
-                self._put_cache(cache_key, best_ranked_response)
-                return best_ranked_response
+                final_response = self._attach_news_search_diagnostics(
+                    best_ranked_response,
+                    query_variants=query_variants,
+                    providers_attempted=providers_attempted,
+                    attempt_count=attempt_count,
+                    fallback_used=fallback_used,
+                    final_status="available",
+                    error_types=error_types,
+                )
+                self._put_cache(cache_key, final_response)
+                return final_response
 
             if best_latest_fallback_response is not None and best_latest_fallback_response.results:
                 logger.info(
                     "所有嚴格日期新聞路徑皆未返回結果，使用 provider 最新可用新聞作為最後 fallback: %s 條",
                     len(best_latest_fallback_response.results),
                 )
-                self._put_cache(cache_key, best_latest_fallback_response)
-                return best_latest_fallback_response
+                final_response = self._attach_news_search_diagnostics(
+                    best_latest_fallback_response,
+                    query_variants=query_variants,
+                    providers_attempted=providers_attempted,
+                    attempt_count=attempt_count,
+                    fallback_used=True,
+                    final_status="available",
+                    error_types=error_types,
+                )
+                self._put_cache(cache_key, final_response)
+                return final_response
 
             if had_provider_success:
-                return SearchResponse(
+                response = SearchResponse(
                     query=query,
                     results=[],
                     provider="Filtered",
                     success=True,
                     error_message=None,
                 )
+                return self._attach_news_search_diagnostics(
+                    response,
+                    query_variants=query_variants,
+                    providers_attempted=providers_attempted,
+                    attempt_count=attempt_count,
+                    fallback_used=fallback_used,
+                    final_status="empty",
+                    error_types=error_types,
+                )
 
             # 所有引擎都失敗
-            return SearchResponse(
+            response = SearchResponse(
                 query=query,
                 results=[],
                 provider="None",
                 success=False,
                 error_message=last_error_message or "所有搜尋引擎都不可用或搜尋失敗"
+            )
+            return self._attach_news_search_diagnostics(
+                response,
+                query_variants=query_variants,
+                providers_attempted=providers_attempted,
+                attempt_count=attempt_count,
+                fallback_used=fallback_used,
+                final_status="failed",
+                error_types=error_types,
             )
         finally:
             if cache_owner and cache_event is not None:

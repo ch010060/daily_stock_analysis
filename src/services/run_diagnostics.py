@@ -513,6 +513,55 @@ def _component(
     )
 
 
+def _sanitize_string_list(
+    values: Any,
+    *,
+    max_items: int = 12,
+    max_length: int = 160,
+) -> List[str]:
+    cleaned: List[str] = []
+    for value in _as_list(values)[:max_items]:
+        text = sanitize_diagnostic_text(value, max_length=max_length)
+        if text and text not in cleaned:
+            cleaned.append(text)
+    return cleaned
+
+
+def _sanitize_news_search_details(context_snapshot: Dict[str, Any]) -> Dict[str, Any]:
+    raw = _as_dict(context_snapshot.get("news_search"))
+    if not raw:
+        diagnostics = _as_dict(context_snapshot.get("diagnostics"))
+        raw = _as_dict(diagnostics.get("news_search"))
+    if not raw:
+        return {}
+
+    details: Dict[str, Any] = {
+        "enabled": bool(raw.get("enabled")),
+        "providers_attempted": _sanitize_string_list(
+            raw.get("providers_attempted"),
+            max_items=8,
+            max_length=80,
+        ),
+        "query_variants": _sanitize_string_list(
+            raw.get("query_variants"),
+            max_items=12,
+            max_length=180,
+        ),
+        "fallback_used": bool(raw.get("fallback_used")),
+    }
+    for key in ("attempt_count", "result_count"):
+        value = raw.get(key)
+        if isinstance(value, int):
+            details[key] = max(0, value)
+    final_status = sanitize_diagnostic_text(raw.get("final_status"), max_length=40)
+    if final_status:
+        details["final_status"] = final_status
+    error_types = _sanitize_string_list(raw.get("error_types"), max_items=6, max_length=40)
+    if error_types:
+        details["error_types"] = error_types
+    return {key: value for key, value in details.items() if value not in (None, [], {})}
+
+
 def _provider_component(
     *,
     key: str,
@@ -580,6 +629,24 @@ def _provider_component(
 
 def _news_component(context_snapshot: Dict[str, Any], raw_result: Dict[str, Any]) -> RunDiagnosticComponent:
     label = "新聞搜尋"
+    search_details = _sanitize_news_search_details(context_snapshot)
+    if search_details:
+        result_count = search_details.get("result_count")
+        final_status = str(search_details.get("final_status") or "unknown")
+        if final_status == "available" and isinstance(result_count, int) and result_count > 0:
+            return _component(
+                "news",
+                label,
+                "ok",
+                f"新聞搜尋取得 {result_count} 筆結果",
+                search_details,
+            )
+        if final_status in {"failed", "provider_error", "timeout"}:
+            return _component("news", label, "failed", "新聞搜尋失敗", search_details)
+        if final_status == "empty" or result_count == 0:
+            return _component("news", label, "degraded", "新聞搜尋無結果", search_details)
+        return _component("news", label, "unknown", "新聞搜尋狀態未完整記錄", search_details)
+
     has_retrieval_news = "news_retrieval_content" in context_snapshot
     has_snapshot_news = has_retrieval_news or "news_content" in context_snapshot
     news_result_count = context_snapshot.get("news_result_count")
@@ -837,6 +904,30 @@ def format_copyable_diagnostics(summary: Dict[str, Any]) -> str:
         message = sanitize_diagnostic_text(component.get("message"), max_length=160) or "unknown"
         return f"{key}: {component.get('status', 'unknown')} - {message}"
 
+    def _news_search_lines() -> List[str]:
+        news_component = _as_dict(components.get("news"))
+        details = _as_dict(news_component.get("details"))
+        if not details.get("final_status") and "attempt_count" not in details:
+            return []
+        providers = ",".join(
+            _sanitize_string_list(details.get("providers_attempted"), max_items=8, max_length=80)
+        )
+        queries = _sanitize_string_list(details.get("query_variants"), max_items=12, max_length=180)
+        status = sanitize_diagnostic_text(details.get("final_status"), max_length=40) or "unknown"
+        attempts = details.get("attempt_count", "unknown")
+        results = details.get("result_count", "unknown")
+        fallback_used = "true" if details.get("fallback_used") else "false"
+        lines = [
+            (
+                "news_search: "
+                f"status={status}; providers={providers or 'unknown'}; "
+                f"attempts={attempts}; results={results}; fallback_used={fallback_used}"
+            )
+        ]
+        if queries:
+            lines.append(f"news_queries: {' | '.join(queries)}")
+        return lines
+
     lines = [
         f"trace_id: {summary.get('trace_id') or 'unknown'}",
         f"query_id: {summary.get('query_id') or 'unknown'}",
@@ -851,4 +942,7 @@ def format_copyable_diagnostics(summary: Dict[str, Any]) -> str:
         _component_line("history"),
         f"reason: {sanitize_diagnostic_text(summary.get('reason'), max_length=160) or 'unknown'}",
     ]
+    news_line_index = 8
+    for offset, line in enumerate(_news_search_lines()):
+        lines.insert(news_line_index + offset, line)
     return "\n".join(lines)

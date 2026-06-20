@@ -154,6 +154,74 @@ const getOrderedComponents = (
   return [...ordered, ...remaining];
 };
 
+const asRecord = (value: unknown): Record<string, unknown> => (
+  value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+);
+
+const asStringList = (value: unknown): string[] => (
+  Array.isArray(value)
+    ? value
+      .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      .map((item) => item.trim())
+    : []
+);
+
+const asDisplayValue = (value: unknown): string | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim();
+  }
+  return null;
+};
+
+const renderNewsSearchDiagnostics = (component: RunDiagnosticComponent): React.ReactNode => {
+  if (component.key !== 'news') {
+    return null;
+  }
+
+  const details = asRecord(component.details);
+  const providers = asStringList(details.providersAttempted ?? details.providers_attempted);
+  const queryVariants = asStringList(details.queryVariants ?? details.query_variants);
+  const attemptCount = asDisplayValue(details.attemptCount ?? details.attempt_count);
+  const resultCount = asDisplayValue(details.resultCount ?? details.result_count);
+  const finalStatus = asDisplayValue(details.finalStatus ?? details.final_status);
+  const rawFallbackUsed = details.fallbackUsed ?? details.fallback_used;
+  const fallbackUsed = typeof rawFallbackUsed === 'boolean'
+    ? (rawFallbackUsed ? '是' : '否')
+    : null;
+
+  if (!providers.length && !attemptCount && !resultCount && !finalStatus && !fallbackUsed) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 rounded-md border border-border/70 bg-base/40 p-2.5 text-xs text-secondary-text">
+      <p className="font-medium text-foreground">新聞搜尋診斷</p>
+      <div className="mt-2 grid gap-1.5">
+        {finalStatus ? <p>狀態：{finalStatus}</p> : null}
+        {providers.length ? <p>嘗試來源：{providers.join(', ')}</p> : null}
+        {attemptCount ? <p>查詢次數：{attemptCount}</p> : null}
+        {resultCount ? <p>結果數：{resultCount}</p> : null}
+        {fallbackUsed ? <p>使用備援：{fallbackUsed}</p> : null}
+      </div>
+      {queryVariants.length ? (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-muted-text">查詢變體</summary>
+          <ul className="mt-1 space-y-1">
+            {queryVariants.map((query) => (
+              <li key={query} className="break-words">
+                {query}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  );
+};
+
 /**
  * Collapsed report diagnostics for self-hosted troubleshooting.
  */
@@ -375,12 +443,13 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
                         <p className="text-sm font-medium text-foreground">
                           {component.label}
                         </p>
-                        <p className="mt-1 text-xs leading-5 text-secondary-text">
-                          {component.message}
-                        </p>
-                      </div>
-                      <Badge variant={componentStyle.variant} className="shrink-0 gap-1.5 shadow-none">
-                        <StatusDot tone={componentStyle.tone} className="h-1.5 w-1.5" />
+                      <p className="mt-1 text-xs leading-5 text-secondary-text">
+                        {component.message}
+                      </p>
+                      {renderNewsSearchDiagnostics(component)}
+                    </div>
+                    <Badge variant={componentStyle.variant} className="shrink-0 gap-1.5 shadow-none">
+                      <StatusDot tone={componentStyle.tone} className="h-1.5 w-1.5" />
                         {componentLabel}
                       </Badge>
                     </div>
