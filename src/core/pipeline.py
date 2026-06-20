@@ -474,6 +474,7 @@ class StockAnalysisPipeline:
             # Step 4: 多維度情報搜尋（最新訊息+風險排查+業績預期）
             news_context = None
             news_result_count: Optional[int] = None
+            news_search_diagnostics: Optional[Dict[str, Any]] = None
             self._emit_progress(46, f"{stock_name}：正在檢索新聞與輿情", stage="optional_context", stage_label="正在整理新聞與延伸資料")
             if self.search_service is not None and self.search_service.is_available:
                 logger.info(f"{stock_name}({code}) 開始多維度情報搜尋...")
@@ -508,6 +509,13 @@ class StockAnalysisPipeline:
                     total_results = sum(
                         len(r.results) for r in intel_results.values() if r.success
                     )
+                    latest_news_response = intel_results.get("latest_news")
+                    if latest_news_response is not None:
+                        response_diagnostics = getattr(latest_news_response, "diagnostics", None)
+                        if isinstance(response_diagnostics, dict):
+                            search_diagnostics = response_diagnostics.get("news_search")
+                            if isinstance(search_diagnostics, dict):
+                                news_search_diagnostics = search_diagnostics
                     news_result_count = total_results
                     logger.info(f"{stock_name}({code}) 情報搜尋完成: 共 {total_results} 條結果")
                     logger.debug(f"{stock_name}({code}) 情報搜尋結果:\n{news_context}")
@@ -686,6 +694,7 @@ class StockAnalysisPipeline:
                         enhanced_context=enhanced_context,
                         news_content=news_context,
                         news_result_count=news_result_count,
+                        news_search_diagnostics=news_search_diagnostics,
                         realtime_quote=realtime_quote,
                         chip_data=chip_data,
                         analysis_context_pack_overview=analysis_context_pack_overview,
@@ -1182,6 +1191,7 @@ class StockAnalysisPipeline:
                     result.fundamental_context = fundamental_context
 
             resolved_stock_name = result.name if result and result.name else stock_name
+            news_search_diagnostics: Optional[Dict[str, Any]] = None
 
             # 儲存新聞情報到資料庫（Agent 工具結果僅用於 LLM 上下文，未持久化，Fixes #396）
             # 使用 search_stock_news（與 Agent 工具呼叫邏輯一致），僅 1 次 API 呼叫，無額外延遲
@@ -1192,6 +1202,11 @@ class StockAnalysisPipeline:
                         stock_name=resolved_stock_name,
                         max_results=5
                     )
+                    response_diagnostics = getattr(news_response, "diagnostics", None)
+                    if isinstance(response_diagnostics, dict):
+                        search_diagnostics = response_diagnostics.get("news_search")
+                        if isinstance(search_diagnostics, dict):
+                            news_search_diagnostics = search_diagnostics
                     if news_response.success and news_response.results:
                         query_context = self._build_query_context(query_id=query_id)
                         self.db.save_news_intel(
@@ -1219,6 +1234,7 @@ class StockAnalysisPipeline:
                         chip_data=chip_data,
                         analysis_context_pack_overview=analysis_context_pack_overview,
                         market_phase_summary=market_phase_summary,
+                        news_search_diagnostics=news_search_diagnostics,
                     )
                     result.diagnostic_context_snapshot = agent_context_snapshot
                     agent_context_snapshot["stock_name"] = resolved_stock_name
@@ -1883,6 +1899,7 @@ class StockAnalysisPipeline:
         realtime_quote: Any,
         chip_data: Optional[ChipDistribution],
         news_result_count: Optional[int] = None,
+        news_search_diagnostics: Optional[Dict[str, Any]] = None,
         analysis_context_pack_overview: Optional[Dict[str, Any]] = None,
         market_phase_summary: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
@@ -1899,6 +1916,8 @@ class StockAnalysisPipeline:
             snapshot["news_retrieval_content"] = news_content
         if news_result_count is not None:
             snapshot["news_result_count"] = news_result_count
+        if isinstance(news_search_diagnostics, dict):
+            snapshot["news_search"] = news_search_diagnostics
         if analysis_context_pack_overview is not None:
             snapshot["analysis_context_pack_overview"] = analysis_context_pack_overview
         if market_phase_summary is not None:

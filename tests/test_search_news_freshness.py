@@ -46,6 +46,16 @@ def _response(results) -> SearchResponse:
     )
 
 
+def _news_search_diagnostics(response: SearchResponse) -> dict:
+    diagnostics = getattr(response, "diagnostics", None)
+    if not isinstance(diagnostics, dict):
+        return {}
+    news_search = diagnostics.get("news_search")
+    if not isinstance(news_search, dict):
+        return {}
+    return news_search
+
+
 class SearchNewsFreshnessTestCase(unittest.TestCase):
     """Tests for strategy window and strict published_date filtering."""
 
@@ -1322,6 +1332,225 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         queries = [call.args[0] for call in provider.search.call_args_list]
         self.assertEqual(queries[:2], ["AAPL Apple stock news", "Apple earnings stock news"])
+
+    def test_search_diagnostics_include_tw_query_variants(self) -> None:
+        """News diagnostics should expose sanitized TW query variants."""
+        fresh = datetime.now().date().isoformat()
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(return_value=_response([_result("台積電新聞", fresh)])),
+        )
+        service._providers = [provider]
+
+        response = service.search_stock_news("2330", "台積電")
+
+        diagnostics = _news_search_diagnostics(response)
+        self.assertEqual(
+            diagnostics["query_variants"][:3],
+            ["2330 台積電 新聞", "台積電 最新消息", "台積電 財報 法說 產業"],
+        )
+        self.assertIn("TSMC Taiwan Semiconductor news", diagnostics["query_variants"])
+        self.assertEqual(diagnostics["providers_attempted"], ["MockProvider"])
+        self.assertEqual(diagnostics["attempt_count"], 1)
+        self.assertEqual(diagnostics["result_count"], 1)
+        self.assertEqual(diagnostics["final_status"], "available")
+
+    def test_search_diagnostics_include_us_query_variants(self) -> None:
+        """News diagnostics should expose sanitized US query variants."""
+        fresh = datetime.now().date().isoformat()
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(return_value=_response([_result("AAPL Apple earnings stock news", fresh)])),
+        )
+        service._providers = [provider]
+
+        response = service.search_stock_news("AAPL", "Apple")
+
+        diagnostics = _news_search_diagnostics(response)
+        self.assertEqual(
+            diagnostics["query_variants"][:3],
+            [
+                "AAPL Apple stock news",
+                "Apple earnings stock news",
+                "Apple iPhone services market news",
+            ],
+        )
+        self.assertEqual(diagnostics["providers_attempted"], ["MockProvider"])
+        self.assertEqual(diagnostics["attempt_count"], 1)
+        self.assertEqual(diagnostics["result_count"], 1)
+        self.assertEqual(diagnostics["final_status"], "available")
+
+    def test_search_diagnostics_records_empty_first_query_continuation(self) -> None:
+        """Diagnostics should prove an empty first query did not stop the search."""
+        fresh = datetime.now().date().isoformat()
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(
+                side_effect=[
+                    _response([]),
+                    _response([_result("台積電最新消息", fresh)]),
+                ]
+            ),
+        )
+        service._providers = [provider]
+
+        response = service.search_stock_news("2330", "台積電")
+
+        diagnostics = _news_search_diagnostics(response)
+        self.assertEqual(provider.search.call_count, 2)
+        self.assertEqual(diagnostics["attempt_count"], 2)
+        self.assertEqual(diagnostics["result_count"], 1)
+        self.assertIs(diagnostics["fallback_used"], True)
+        self.assertEqual(diagnostics["final_status"], "available")
+
+    def test_search_diagnostics_records_provider_error_fallback(self) -> None:
+        """Diagnostics should mark fallback when a provider error is bypassed."""
+        fresh = datetime.now().date().isoformat()
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        failing_provider = SimpleNamespace(
+            is_available=True,
+            name="PrimaryProvider",
+            search=MagicMock(
+                return_value=SearchResponse(
+                    query="AAPL Apple stock news",
+                    results=[],
+                    provider="PrimaryProvider",
+                    success=False,
+                    error_message="provider failed",
+                )
+            ),
+        )
+        fallback_provider = SimpleNamespace(
+            is_available=True,
+            name="FallbackProvider",
+            search=MagicMock(return_value=_response([_result("AAPL Apple market news", fresh)])),
+        )
+        service._providers = [failing_provider, fallback_provider]
+
+        response = service.search_stock_news("AAPL", "Apple")
+
+        diagnostics = _news_search_diagnostics(response)
+        self.assertEqual(diagnostics["providers_attempted"], ["PrimaryProvider", "FallbackProvider"])
+        self.assertEqual(diagnostics["attempt_count"], 2)
+        self.assertIs(diagnostics["fallback_used"], True)
+        self.assertEqual(diagnostics["final_status"], "available")
+        self.assertEqual(diagnostics["result_count"], 1)
+        self.assertIn("provider_error", diagnostics["error_types"])
+
+    def test_search_diagnostics_records_provider_timeout_fallback(self) -> None:
+        """Diagnostics should record timeout fallback without exposing error text."""
+        fresh = datetime.now().date().isoformat()
+        sensitive_marker = "phase15-sensitive-marker"
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        timeout_provider = SimpleNamespace(
+            is_available=True,
+            name="TimeoutProvider",
+            search=MagicMock(side_effect=TimeoutError(f"timeout while using {sensitive_marker}")),
+        )
+        fallback_provider = SimpleNamespace(
+            is_available=True,
+            name="FallbackProvider",
+            search=MagicMock(return_value=_response([_result("AAPL Apple market news", fresh)])),
+        )
+        service._providers = [timeout_provider, fallback_provider]
+
+        response = service.search_stock_news("AAPL", "Apple")
+
+        diagnostics = _news_search_diagnostics(response)
+        serialized = str(diagnostics)
+        self.assertEqual(diagnostics["attempt_count"], 2)
+        self.assertIs(diagnostics["fallback_used"], True)
+        self.assertEqual(diagnostics["final_status"], "available")
+        self.assertIn("timeout", diagnostics["error_types"])
+        self.assertNotIn(sensitive_marker, serialized)
+
+    def test_search_diagnostics_prevents_fake_news_items(self) -> None:
+        """Diagnostics must not fabricate item titles or URLs when providers fail."""
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(
+                return_value=SearchResponse(
+                    query="2330 台積電 新聞",
+                    results=[],
+                    provider="MockProvider",
+                    success=False,
+                    error_message="failed",
+                )
+            ),
+        )
+        service._providers = [provider]
+
+        response = service.search_stock_news("2330", "台積電")
+
+        diagnostics = _news_search_diagnostics(response)
+        self.assertEqual(response.results, [])
+        self.assertEqual(diagnostics["result_count"], 0)
+        self.assertNotIn("items", diagnostics)
+        self.assertNotIn("titles", diagnostics)
+        self.assertNotIn("urls", diagnostics)
+
+    def test_search_diagnostics_are_sanitized(self) -> None:
+        """Diagnostics must omit credential-like provider error details."""
+        credential_text = "phase15-sensitive-marker"
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(
+                return_value=SearchResponse(
+                    query="AAPL Apple stock news",
+                    results=[],
+                    provider="MockProvider",
+                    success=False,
+                    error_message=credential_text,
+                )
+            ),
+        )
+        service._providers = [provider]
+
+        response = service.search_stock_news("AAPL", "Apple")
+
+        diagnostics = _news_search_diagnostics(response)
+        serialized = str(diagnostics)
+        self.assertGreaterEqual(diagnostics["attempt_count"], 1)
+        self.assertNotIn(credential_text, serialized)
+        self.assertNotIn("raw_payload", diagnostics)
 
 
 if __name__ == "__main__":

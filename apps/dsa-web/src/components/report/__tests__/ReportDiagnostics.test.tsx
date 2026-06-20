@@ -41,6 +41,31 @@ const diagnosticSummary: RunDiagnosticSummary = {
   },
 };
 
+const newsSearchDiagnosticSummary: RunDiagnosticSummary = {
+  ...diagnosticSummary,
+  copyText:
+    'trace_id: trace-1234567890abcdef\n' +
+    'news_search: status=available; providers=SearXNG,Tavily; attempts=3; results=4; fallback_used=true\n' +
+    'news_queries: 2330 台積電 新聞 | 台積電 最新消息',
+  components: {
+    ...diagnosticSummary.components,
+    news: {
+      key: 'news',
+      label: '新聞搜尋',
+      status: 'ok',
+      message: '新聞搜尋取得 4 筆結果',
+      details: {
+        providersAttempted: ['SearXNG', 'Tavily'],
+        queryVariants: ['2330 台積電 新聞', '台積電 最新消息'],
+        attemptCount: 3,
+        resultCount: 4,
+        fallbackUsed: true,
+        finalStatus: 'available',
+      },
+    },
+  },
+};
+
 describe('ReportDiagnostics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -85,6 +110,33 @@ describe('ReportDiagnostics', () => {
     expect(historyApi.getDiagnostics).not.toHaveBeenCalled();
     expect(screen.getByText('執行狀態')).toBeInTheDocument();
     expect(screen.getByText('部分降級')).toBeInTheDocument();
+  });
+
+  it('displays and copies sanitized news search diagnostics', async () => {
+    render(<ReportDiagnostics summary={newsSearchDiagnosticSummary} />);
+
+    fireEvent.click(screen.getByText('執行狀態'));
+
+    expect(screen.getByText('新聞搜尋診斷')).toBeInTheDocument();
+    expect(screen.getByText('嘗試來源：SearXNG, Tavily')).toBeInTheDocument();
+    expect(screen.getByText('查詢次數：3')).toBeInTheDocument();
+    expect(screen.getByText('結果數：4')).toBeInTheDocument();
+    expect(screen.getByText('使用備援：是')).toBeInTheDocument();
+    expect(screen.getByText('狀態：available')).toBeInTheDocument();
+    expect(screen.getByText('2330 台積電 新聞')).toBeInTheDocument();
+    expect(screen.queryByText(/phase15-test-token/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '複製排障資訊' }));
+
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        newsSearchDiagnosticSummary.copyText,
+      );
+    });
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalledWith(
+      expect.stringContaining('phase15-test-token'),
+    );
+    expect(historyApi.getDiagnostics).not.toHaveBeenCalled();
   });
 
   it('refetches diagnostics after StrictMode cleans up the first effect run', async () => {

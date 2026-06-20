@@ -211,6 +211,54 @@ class RunDiagnosticsP2TestCase(unittest.TestCase):
         self.assertEqual(summary["components"]["news"]["status"], "degraded")
         self.assertEqual(summary["components"]["news"]["details"]["record_count"], 0)
 
+    def test_report_diagnostics_include_search_attempt_metadata(self) -> None:
+        diagnostics = _diagnostic_snapshot()
+        secret_query = "Authorization: Bearer " + "phase15-test-token"
+
+        summary = build_run_diagnostic_summary(
+            context_snapshot={
+                "diagnostics": diagnostics,
+                "news_content": "新聞摘要",
+                "news_search": {
+                    "enabled": True,
+                    "providers_attempted": ["SearXNG", "Tavily"],
+                    "query_variants": [
+                        "2330 台積電 新聞",
+                        "台積電 最新消息",
+                        secret_query,
+                    ],
+                    "attempt_count": 3,
+                    "result_count": 4,
+                    "fallback_used": True,
+                    "final_status": "available",
+                    "raw_payload": {"title": "must not leak"},
+                },
+            },
+            raw_result={
+                "success": True,
+                "model_used": "deepseek-chat",
+                "analysis_summary": "測試摘要",
+            },
+            report_saved=True,
+        )
+
+        news_details = summary["components"]["news"]["details"]
+        copy_text = summary["copy_text"]
+        self.assertEqual(news_details["providers_attempted"], ["SearXNG", "Tavily"])
+        self.assertEqual(news_details["attempt_count"], 3)
+        self.assertEqual(news_details["result_count"], 4)
+        self.assertIs(news_details["fallback_used"], True)
+        self.assertEqual(news_details["final_status"], "available")
+        self.assertNotIn("raw_payload", news_details)
+        self.assertIn("news_search: status=available", copy_text)
+        self.assertIn("providers=SearXNG,Tavily", copy_text)
+        self.assertIn("attempts=3", copy_text)
+        self.assertIn("results=4", copy_text)
+        self.assertIn("fallback_used=true", copy_text)
+        self.assertIn("2330 台積電 新聞", copy_text)
+        self.assertNotIn("phase15-test-token", str(news_details))
+        self.assertNotIn("phase15-test-token", copy_text)
+
     def test_summary_classifies_provider_fallback_as_degraded_and_copy_text_is_sanitized(self) -> None:
         summary = build_run_diagnostic_summary(
             context_snapshot={
