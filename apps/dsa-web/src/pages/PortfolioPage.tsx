@@ -61,6 +61,7 @@ const FALLBACK_BROKERS: PortfolioImportBrokerItem[] = [
 
 type AccountOption = 'all' | number;
 type EventType = 'trade' | 'cash' | 'corporate';
+type AccountMarket = PortfolioAccountItem['market'];
 
 type FlatPosition = PortfolioPositionItem & {
   accountId: number;
@@ -84,6 +85,12 @@ type FxRefreshContext = {
 
 type PortfolioAlertVariant = 'info' | 'success' | 'warning' | 'danger';
 type ManualEntryCurrency = 'TWD' | 'USD';
+type AccountEditForm = {
+  name: string;
+  broker: string;
+  market: AccountMarket;
+  baseCurrency: string;
+};
 
 const PORTFOLIO_INPUT_CLASS =
   'input-surface input-focus-glow h-11 w-full rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60';
@@ -91,6 +98,9 @@ const PORTFOLIO_SELECT_CLASS = `${PORTFOLIO_INPUT_CLASS} appearance-none pr-10`;
 const PORTFOLIO_FILE_PICKER_CLASS =
   'input-surface input-focus-glow flex h-11 w-full cursor-pointer items-center justify-center rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60';
 const MANUAL_ENTRY_CURRENCY_OPTIONS: ManualEntryCurrency[] = ['TWD', 'USD'];
+const ACCOUNT_MARKET_OPTIONS: AccountMarket[] = ['tw', 'us', 'cn', 'hk'];
+const ACCOUNT_ARCHIVE_CONFIRMATION = '封存後，此帳戶將不再出現在預設帳戶清單中，但歷史交易與持股資料會保留。';
+const EVENT_DELETE_RECOMPUTE_WARNING = '刪除後將重新計算持股、成本與現金摘要。此操作無法復原。';
 
 function getTodayIso(): string {
   return toDateInputValue(new Date());
@@ -154,6 +164,15 @@ function formatCorporateActionLabel(value: PortfolioCorporateActionType): string
 
 function getManualEntryCurrency(baseCurrency?: string | null): ManualEntryCurrency {
   return baseCurrency?.toUpperCase() === 'USD' ? 'USD' : 'TWD';
+}
+
+function buildAccountEditForm(account: PortfolioAccountItem): AccountEditForm {
+  return {
+    name: account.name,
+    broker: account.broker || '',
+    market: account.market,
+    baseCurrency: account.baseCurrency || 'TWD',
+  };
 }
 
 function formatBrokerLabel(value: string, displayName?: string): string {
@@ -243,13 +262,25 @@ const PortfolioPage: React.FC = () => {
   const [accounts, setAccounts] = useState<PortfolioAccountItem[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<AccountOption>('all');
   const [showCreateAccount, setShowCreateAccount] = useState(false);
+  const [showEditAccount, setShowEditAccount] = useState(false);
   const [accountCreating, setAccountCreating] = useState(false);
+  const [accountSaving, setAccountSaving] = useState(false);
+  const [accountArchiveLoading, setAccountArchiveLoading] = useState(false);
+  const [accountArchiveTarget, setAccountArchiveTarget] = useState<PortfolioAccountItem | null>(null);
   const [accountCreateError, setAccountCreateError] = useState<string | null>(null);
   const [accountCreateSuccess, setAccountCreateSuccess] = useState<string | null>(null);
+  const [accountActionError, setAccountActionError] = useState<string | null>(null);
+  const [accountActionSuccess, setAccountActionSuccess] = useState<string | null>(null);
   const [accountForm, setAccountForm] = useState({
     name: '',
     broker: 'Demo',
     market: 'tw' as 'tw' | 'us',
+    baseCurrency: 'TWD',
+  });
+  const [accountEditForm, setAccountEditForm] = useState<AccountEditForm>({
+    name: '',
+    broker: '',
+    market: 'tw',
     baseCurrency: 'TWD',
   });
   const [costMethod, setCostMethod] = useState<PortfolioCostMethod>('fifo');
@@ -261,6 +292,7 @@ const PortfolioPage: React.FC = () => {
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [riskWarning, setRiskWarning] = useState<string | null>(null);
   const [writeWarning, setWriteWarning] = useState<string | null>(null);
+  const [writeSuccess, setWriteSuccess] = useState<string | null>(null);
 
   const [brokers, setBrokers] = useState<PortfolioImportBrokerItem[]>([]);
   const [selectedBroker, setSelectedBroker] = useState('');
@@ -517,6 +549,12 @@ const PortfolioPage: React.FC = () => {
     }
   }, [writeBlocked]);
 
+  useEffect(() => {
+    setShowEditAccount(false);
+    setAccountActionError(null);
+    setAccountArchiveTarget(null);
+  }, [selectedAccount]);
+
   const positionRows: FlatPosition[] = useMemo(() => {
     if (!snapshot) return [];
     const rows: FlatPosition[] = [];
@@ -575,6 +613,7 @@ const PortfolioPage: React.FC = () => {
     }
     try {
       setWriteWarning(null);
+      setWriteSuccess(null);
       await portfolioApi.createTrade({
         accountId: writableAccountId,
         symbol: tradeForm.symbol,
@@ -603,6 +642,7 @@ const PortfolioPage: React.FC = () => {
     }
     try {
       setWriteWarning(null);
+      setWriteSuccess(null);
       await portfolioApi.createCashLedger({
         accountId: writableAccountId,
         eventDate: cashForm.eventDate,
@@ -626,6 +666,7 @@ const PortfolioPage: React.FC = () => {
     }
     try {
       setWriteWarning(null);
+      setWriteSuccess(null);
       await portfolioApi.createCorporateAction({
         accountId: writableAccountId,
         symbol: corpForm.symbol,
@@ -665,6 +706,7 @@ const PortfolioPage: React.FC = () => {
     }
     try {
       setWriteWarning(null);
+      setWriteSuccess(null);
       setCsvCommitting(true);
       const committed = await portfolioApi.commitCsvImport(writableAccountId, selectedBroker, csvFile, csvDryRun);
       setCsvCommitResult(committed);
@@ -678,11 +720,81 @@ const PortfolioPage: React.FC = () => {
     }
   };
 
+  const openEditAccountForm = () => {
+    if (!writableAccount) return;
+    setAccountEditForm(buildAccountEditForm(writableAccount));
+    setShowEditAccount(true);
+    setAccountActionError(null);
+    setAccountActionSuccess(null);
+  };
+
+  const handleUpdateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!writableAccount) return;
+
+    const name = accountEditForm.name.trim();
+    if (!name) {
+      setAccountActionError('帳戶名稱不能為空。');
+      setAccountActionSuccess(null);
+      return;
+    }
+
+    try {
+      setAccountSaving(true);
+      setAccountActionError(null);
+      setAccountActionSuccess(null);
+      await portfolioApi.updateAccount(writableAccount.id, {
+        name,
+        broker: accountEditForm.broker.trim() || undefined,
+        market: accountEditForm.market,
+        baseCurrency: accountEditForm.baseCurrency.trim().toUpperCase() || writableAccount.baseCurrency,
+      });
+      await loadAccounts();
+      setShowEditAccount(false);
+      setAccountActionSuccess('帳戶已更新。');
+    } catch (err) {
+      const parsed = getParsedApiError(err);
+      setAccountActionError(parsed.message || '更新帳戶失敗，請稍後重試。');
+      setAccountActionSuccess(null);
+    } finally {
+      setAccountSaving(false);
+    }
+  };
+
+  const openArchiveAccountDialog = () => {
+    if (!writableAccount) return;
+    setAccountArchiveTarget(writableAccount);
+    setAccountActionError(null);
+    setAccountActionSuccess(null);
+  };
+
+  const handleConfirmArchiveAccount = async () => {
+    if (!accountArchiveTarget || accountArchiveLoading) return;
+    try {
+      setAccountArchiveLoading(true);
+      setAccountActionError(null);
+      setAccountActionSuccess(null);
+      await portfolioApi.archiveAccount(accountArchiveTarget.id);
+      setAccountArchiveTarget(null);
+      setShowEditAccount(false);
+      await loadAccounts();
+      setAccountActionSuccess('帳戶已封存。');
+    } catch (err) {
+      const parsed = getParsedApiError(err);
+      setAccountActionError(parsed.message || '封存帳戶失敗，請稍後重試。');
+      setAccountActionSuccess(null);
+    } finally {
+      setAccountArchiveLoading(false);
+    }
+  };
+
   const openDeleteDialog = (item: PendingDelete) => {
     if (!writableAccountId) {
       setWriteWarning('請先在右上角選擇具體帳戶，再進行刪除修正。');
       return;
     }
+    setWriteWarning(null);
+    setWriteSuccess(null);
     setPendingDelete(item);
   };
 
@@ -698,6 +810,7 @@ const PortfolioPage: React.FC = () => {
     try {
       setDeleteLoading(true);
       setWriteWarning(null);
+      setWriteSuccess(null);
       if (pendingDelete.eventType === 'trade') {
         await portfolioApi.deleteTrade(pendingDelete.id);
       } else if (pendingDelete.eventType === 'cash') {
@@ -710,6 +823,7 @@ const PortfolioPage: React.FC = () => {
         setEventPage(nextPage);
       }
       await refreshPortfolioData(nextPage);
+      setWriteSuccess('紀錄已刪除，持股與現金摘要已重新計算。');
     } catch (err) {
       setError(getParsedApiError(err));
     } finally {
@@ -917,6 +1031,35 @@ const PortfolioPage: React.FC = () => {
                 </button>
               </div>
             </div>
+            <div className="mt-3 flex flex-col gap-2 border-t border-white/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-xs text-secondary">
+                {writableAccount ? (
+                  <span>
+                    目前帳戶：{writableAccount.name} ・ {writableAccount.market.toUpperCase()} ・ {writableAccount.baseCurrency}
+                  </span>
+                ) : (
+                  <span>選擇單一帳戶後可編輯帳戶資料或封存不再使用的帳戶。</span>
+                )}
+              </div>
+              {writableAccount ? (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary text-xs px-3 py-2"
+                    onClick={openEditAccountForm}
+                  >
+                    編輯帳戶
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary text-xs px-3 py-2 text-danger"
+                    onClick={openArchiveAccountDialog}
+                  >
+                    封存帳戶
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         ) : (
           <InlineAlert
@@ -940,6 +1083,27 @@ const PortfolioPage: React.FC = () => {
           variant="warning"
           title="操作提示"
           message={writeWarning}
+        />
+      ) : null}
+      {writeSuccess ? (
+        <InlineAlert
+          variant="success"
+          title="操作完成"
+          message={writeSuccess}
+        />
+      ) : null}
+      {accountActionError ? (
+        <InlineAlert
+          variant="danger"
+          title="帳戶操作失敗"
+          message={accountActionError}
+        />
+      ) : null}
+      {accountActionSuccess ? (
+        <InlineAlert
+          variant="success"
+          title="帳戶操作完成"
+          message={accountActionSuccess}
         />
       ) : null}
 
@@ -1008,6 +1172,71 @@ const PortfolioPage: React.FC = () => {
             </select>
             <button type="submit" className="btn-secondary text-sm" disabled={accountCreating}>
               {accountCreating ? '建立中...' : '建立帳戶'}
+            </button>
+          </form>
+        </Card>
+      ) : null}
+
+      {showEditAccount && writableAccount ? (
+        <Card padding="md">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-foreground">編輯帳戶</h2>
+            <button
+              type="button"
+              className="btn-secondary text-xs px-3 py-1"
+              onClick={() => {
+                setShowEditAccount(false);
+                setAccountActionError(null);
+              }}
+            >
+              取消編輯
+            </button>
+          </div>
+          <form className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2" onSubmit={handleUpdateAccount}>
+            <label className="block text-xs text-secondary md:col-span-2">
+              帳戶名稱
+              <input
+                aria-label="帳戶名稱"
+                className={`${PORTFOLIO_INPUT_CLASS} mt-1`}
+                value={accountEditForm.name}
+                onChange={(e) => setAccountEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                required
+              />
+            </label>
+            <label className="block text-xs text-secondary">
+              券商
+              <input
+                aria-label="券商"
+                className={`${PORTFOLIO_INPUT_CLASS} mt-1`}
+                value={accountEditForm.broker}
+                onChange={(e) => setAccountEditForm((prev) => ({ ...prev, broker: e.target.value }))}
+              />
+            </label>
+            <label className="block text-xs text-secondary">
+              基準幣
+              <input
+                aria-label="基準幣"
+                className={`${PORTFOLIO_INPUT_CLASS} mt-1`}
+                value={accountEditForm.baseCurrency}
+                onChange={(e) => setAccountEditForm((prev) => ({ ...prev, baseCurrency: e.target.value.toUpperCase() }))}
+                required
+              />
+            </label>
+            <label className="block text-xs text-secondary">
+              市場
+              <select
+                aria-label="市場"
+                className={`${PORTFOLIO_SELECT_CLASS} mt-1`}
+                value={accountEditForm.market}
+                onChange={(e) => setAccountEditForm((prev) => ({ ...prev, market: e.target.value as AccountMarket }))}
+              >
+                {ACCOUNT_MARKET_OPTIONS.map((market) => (
+                  <option key={market} value={market}>{market.toUpperCase()}</option>
+                ))}
+              </select>
+            </label>
+            <button type="submit" className="btn-secondary text-sm self-end" disabled={accountSaving}>
+              {accountSaving ? '儲存中...' : '儲存帳戶'}
             </button>
           </form>
         </Card>
@@ -1475,10 +1704,10 @@ const PortfolioPage: React.FC = () => {
                       onClick={() => openDeleteDialog({
                         eventType: 'trade',
                         id: item.id,
-                        message: `確認刪除 ${item.tradeDate} 的${formatSideLabel(item.side)}流水 ${item.symbol}（數量 ${item.quantity}，價格 ${item.price}）嗎？`,
+                        message: EVENT_DELETE_RECOMPUTE_WARNING,
                       })}
                     >
-                      刪除
+                      刪除交易紀錄
                     </button>
                   ) : null}
                 </div>
@@ -1495,10 +1724,10 @@ const PortfolioPage: React.FC = () => {
                       onClick={() => openDeleteDialog({
                         eventType: 'cash',
                         id: item.id,
-                        message: `確認刪除 ${item.eventDate} 的資金流水（${formatCashDirectionLabel(item.direction)} ${item.amount} ${item.currency}）嗎？`,
+                        message: EVENT_DELETE_RECOMPUTE_WARNING,
                       })}
                     >
-                      刪除
+                      刪除現金紀錄
                     </button>
                   ) : null}
                 </div>
@@ -1515,10 +1744,10 @@ const PortfolioPage: React.FC = () => {
                       onClick={() => openDeleteDialog({
                         eventType: 'corporate',
                         id: item.id,
-                        message: `確認刪除 ${item.effectiveDate} 的公司行為 ${formatCorporateActionLabel(item.actionType)}（${item.symbol}）嗎？`,
+                        message: EVENT_DELETE_RECOMPUTE_WARNING,
                       })}
                     >
-                      刪除
+                      刪除公司行為紀錄
                     </button>
                   ) : null}
                 </div>
@@ -1551,8 +1780,22 @@ const PortfolioPage: React.FC = () => {
         </Card>
       </section>
       <ConfirmDialog
+        isOpen={Boolean(accountArchiveTarget)}
+        title="封存帳戶"
+        message={ACCOUNT_ARCHIVE_CONFIRMATION}
+        confirmText={accountArchiveLoading ? '封存中...' : '確認封存'}
+        cancelText="取消"
+        isDanger
+        onConfirm={() => void handleConfirmArchiveAccount()}
+        onCancel={() => {
+          if (!accountArchiveLoading) {
+            setAccountArchiveTarget(null);
+          }
+        }}
+      />
+      <ConfirmDialog
         isOpen={Boolean(pendingDelete)}
-        title="刪除錯誤流水"
+        title="刪除這筆紀錄？"
         message={pendingDelete?.message || '確認刪除這條流水嗎？'}
         confirmText={deleteLoading ? '刪除中...' : '確認刪除'}
         cancelText="取消"

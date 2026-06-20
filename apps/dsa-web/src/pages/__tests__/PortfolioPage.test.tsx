@@ -22,6 +22,8 @@ const {
   parseCsvImport,
   commitCsvImport,
   createAccount,
+  updateAccount,
+  archiveAccount,
 } = vi.hoisted(() => ({
   getAccounts: vi.fn(),
   getSnapshot: vi.fn(),
@@ -40,6 +42,8 @@ const {
   parseCsvImport: vi.fn(),
   commitCsvImport: vi.fn(),
   createAccount: vi.fn(),
+  updateAccount: vi.fn(),
+  archiveAccount: vi.fn(),
 }));
 
 vi.mock('../../api/portfolio', () => ({
@@ -61,6 +65,8 @@ vi.mock('../../api/portfolio', () => ({
     parseCsvImport,
     commitCsvImport,
     createAccount,
+    updateAccount,
+    archiveAccount,
   },
 }));
 
@@ -262,6 +268,18 @@ describe('PortfolioPage FX refresh', () => {
       errors: [],
     });
     createAccount.mockResolvedValue({ id: 1 });
+    updateAccount.mockResolvedValue({
+      id: 1,
+      name: 'Main',
+      broker: 'Demo',
+      market: 'us',
+      baseCurrency: 'CNY',
+      isActive: true,
+      ownerId: null,
+      createdAt: '2026-03-19T00:00:00Z',
+      updatedAt: '2026-03-19T00:00:00Z',
+    });
+    archiveAccount.mockResolvedValue({ deleted: 1 });
   });
 
   it('renders stale FX status with a manual refresh button', async () => {
@@ -935,5 +953,196 @@ describe('PortfolioPage manual-entry currency selectors', () => {
 
     expect(screen.getByRole('button', { name: '解析檔案' })).toBeDisabled();
     expect(parseCsvImport).not.toHaveBeenCalled();
+  });
+
+  it('shows account edit and archive actions and archives with preserved-history confirmation', async () => {
+    getAccounts.mockResolvedValue(makeAccounts([{ id: 1, name: 'Main', market: 'tw', baseCurrency: 'TWD' }]));
+
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: '1' } });
+
+    expect(await screen.findByRole('button', { name: '編輯帳戶' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '封存帳戶' }));
+
+    expect(await screen.findByRole('heading', { name: '封存帳戶' })).toBeInTheDocument();
+    expect(screen.getByText('封存後，此帳戶將不再出現在預設帳戶清單中，但歷史交易與持股資料會保留。')).toBeInTheDocument();
+
+    getAccounts.mockResolvedValue({ accounts: [] });
+    fireEvent.click(screen.getByRole('button', { name: '確認封存' }));
+
+    await waitFor(() => expect(archiveAccount).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(getAccounts).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('帳戶已封存。')).toBeInTheDocument();
+  });
+
+  it('edits account metadata through the existing account update API', async () => {
+    getAccounts.mockResolvedValue(makeAccounts([{ id: 1, name: 'Main', market: 'tw', baseCurrency: 'TWD' }]));
+    updateAccount.mockResolvedValue({
+      id: 1,
+      name: 'Retirement',
+      broker: 'KGI',
+      market: 'tw',
+      baseCurrency: 'TWD',
+      isActive: true,
+      ownerId: null,
+      createdAt: '2026-03-19T00:00:00Z',
+      updatedAt: '2026-03-20T00:00:00Z',
+    });
+
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: '1' } });
+    fireEvent.click(await screen.findByRole('button', { name: '編輯帳戶' }));
+
+    fireEvent.change(screen.getByLabelText('帳戶名稱'), { target: { value: 'Retirement' } });
+    fireEvent.change(screen.getByLabelText('券商'), { target: { value: 'KGI' } });
+    fireEvent.click(screen.getByRole('button', { name: '儲存帳戶' }));
+
+    await waitFor(() => expect(updateAccount).toHaveBeenCalledWith(1, {
+      name: 'Retirement',
+      broker: 'KGI',
+      market: 'tw',
+      baseCurrency: 'TWD',
+    }));
+    expect(await screen.findByText('帳戶已更新。')).toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      label: '交易紀錄',
+      eventType: 'trade',
+      listMock: listTrades,
+      deleteMock: deleteTrade,
+      rowText: '買進 2330',
+      deleteName: '刪除交易紀錄',
+      item: {
+        id: 101,
+        accountId: 1,
+        tradeUid: null,
+        symbol: '2330',
+        market: 'tw',
+        currency: 'TWD',
+        tradeDate: '2026-03-18',
+        side: 'buy',
+        quantity: 10,
+        price: 100,
+        fee: 0,
+        tax: 0,
+        note: null,
+        createdAt: '2026-03-18T00:00:00Z',
+      },
+    },
+    {
+      label: '現金紀錄',
+      eventType: 'cash',
+      listMock: listCashLedger,
+      deleteMock: deleteCashLedger,
+      rowText: '流入 1000 TWD',
+      deleteName: '刪除現金紀錄',
+      item: {
+        id: 201,
+        accountId: 1,
+        eventDate: '2026-03-18',
+        direction: 'in',
+        amount: 1000,
+        currency: 'TWD',
+        note: null,
+        createdAt: '2026-03-18T00:00:00Z',
+      },
+    },
+    {
+      label: '公司行為紀錄',
+      eventType: 'corporate',
+      listMock: listCorporateActions,
+      deleteMock: deleteCorporateAction,
+      rowText: '現金分紅 2330',
+      deleteName: '刪除公司行為紀錄',
+      item: {
+        id: 301,
+        accountId: 1,
+        symbol: '2330',
+        market: 'tw',
+        currency: 'TWD',
+        effectiveDate: '2026-03-18',
+        actionType: 'cash_dividend',
+        cashDividendPerShare: 1,
+        splitRatio: null,
+        note: null,
+        createdAt: '2026-03-18T00:00:00Z',
+      },
+    },
+  ])('warns before deleting $label and refreshes portfolio data', async ({ eventType, listMock, deleteMock, rowText, deleteName, item }) => {
+    getAccounts.mockResolvedValue(makeAccounts([{ id: 1, name: 'Main', market: 'tw', baseCurrency: 'TWD' }]));
+    listMock.mockResolvedValue({ items: [item], total: 1, page: 1, pageSize: 20 });
+
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: '1' } });
+    fireEvent.change(screen.getByDisplayValue('交易流水'), { target: { value: eventType } });
+
+    expect(await screen.findByText((text) => text.includes(rowText))).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: deleteName }));
+
+    expect(await screen.findByText('刪除這筆紀錄？')).toBeInTheDocument();
+    expect(screen.getByText('刪除後將重新計算持股、成本與現金摘要。此操作無法復原。')).toBeInTheDocument();
+
+    const snapshotCallsBeforeDelete = getSnapshot.mock.calls.length;
+    const listCallsBeforeDelete = listMock.mock.calls.length;
+    listMock.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
+    fireEvent.click(screen.getByRole('button', { name: '確認刪除' }));
+
+    await waitFor(() => expect(deleteMock).toHaveBeenCalledWith(item.id));
+    await waitFor(() => expect(listMock.mock.calls.length).toBeGreaterThan(listCallsBeforeDelete));
+    await waitFor(() => expect(getSnapshot).toHaveBeenCalledTimes(snapshotCallsBeforeDelete + 1));
+    expect(await screen.findByText('紀錄已刪除，持股與現金摘要已重新計算。')).toBeInTheDocument();
+  });
+
+  it('shows an error when manual event delete fails', async () => {
+    getAccounts.mockResolvedValue(makeAccounts([{ id: 1, name: 'Main', market: 'tw', baseCurrency: 'TWD' }]));
+    listTrades.mockResolvedValue({
+      items: [{
+        id: 101,
+        accountId: 1,
+        tradeUid: null,
+        symbol: '2330',
+        market: 'tw',
+        currency: 'TWD',
+        tradeDate: '2026-03-18',
+        side: 'buy',
+        quantity: 10,
+        price: 100,
+        fee: 0,
+        tax: 0,
+        note: null,
+        createdAt: '2026-03-18T00:00:00Z',
+      }],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    });
+    deleteTrade.mockRejectedValueOnce(createApiError(
+      createParsedApiError({
+        category: 'http_error',
+        status: 500,
+        title: '刪除失敗',
+        message: '請稍後再試。',
+      }),
+      {},
+    ));
+
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: '1' } });
+    expect(await screen.findByText((text) => text.includes('買進 2330'))).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '刪除交易紀錄' }));
+    fireEvent.click(await screen.findByRole('button', { name: '確認刪除' }));
+
+    expect(await screen.findByText('刪除失敗')).toBeInTheDocument();
+    expect(screen.getByText('請稍後再試。')).toBeInTheDocument();
   });
 });

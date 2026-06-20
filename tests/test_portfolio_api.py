@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 # Keep this test runnable when optional LLM runtime deps are not installed.
 try:
@@ -24,7 +25,7 @@ import src.auth as auth
 from api.app import create_app
 from src.config import Config
 from src.services.portfolio_service import PortfolioBusyError
-from src.storage import DatabaseManager
+from src.storage import DatabaseManager, PortfolioCashLedger, PortfolioCorporateAction, PortfolioTrade
 
 
 def _reset_auth_globals() -> None:
@@ -508,6 +509,121 @@ class PortfolioApiTestCase(unittest.TestCase):
 
         missing_trade = self.client.delete("/api/v1/portfolio/trades/999999")
         self.assertEqual(missing_trade.status_code, 404)
+
+    def test_update_account_metadata(self) -> None:
+        create_resp = self.client.post(
+            "/api/v1/portfolio/accounts",
+            json={"name": "Old Name", "broker": "Demo", "market": "tw", "base_currency": "TWD"},
+        )
+        self.assertEqual(create_resp.status_code, 200)
+        account_id = create_resp.json()["id"]
+
+        update_resp = self.client.put(
+            f"/api/v1/portfolio/accounts/{account_id}",
+            json={
+                "name": "Updated Name",
+                "broker": "Manual",
+                "market": "us",
+                "base_currency": "USD",
+            },
+        )
+
+        self.assertEqual(update_resp.status_code, 200)
+        payload = update_resp.json()
+        self.assertEqual(payload["name"], "Updated Name")
+        self.assertEqual(payload["broker"], "Manual")
+        self.assertEqual(payload["market"], "us")
+        self.assertEqual(payload["base_currency"], "USD")
+        self.assertTrue(payload["is_active"])
+
+    def test_archive_account_hides_active_list_preserves_records_and_rejects_new_writes(self) -> None:
+        create_resp = self.client.post(
+            "/api/v1/portfolio/accounts",
+            json={"name": "Main", "broker": "Demo", "market": "tw", "base_currency": "TWD"},
+        )
+        self.assertEqual(create_resp.status_code, 200)
+        account_id = create_resp.json()["id"]
+
+        trade_resp = self.client.post(
+            "/api/v1/portfolio/trades",
+            json={
+                "account_id": account_id,
+                "symbol": "2330",
+                "trade_date": "2026-01-02",
+                "side": "buy",
+                "quantity": 10,
+                "price": 100,
+                "fee": 0,
+                "tax": 0,
+                "market": "tw",
+                "currency": "TWD",
+            },
+        )
+        cash_resp = self.client.post(
+            "/api/v1/portfolio/cash-ledger",
+            json={
+                "account_id": account_id,
+                "event_date": "2026-01-01",
+                "direction": "in",
+                "amount": 10000,
+                "currency": "TWD",
+            },
+        )
+        corp_resp = self.client.post(
+            "/api/v1/portfolio/corporate-actions",
+            json={
+                "account_id": account_id,
+                "symbol": "2330",
+                "effective_date": "2026-01-03",
+                "action_type": "cash_dividend",
+                "market": "tw",
+                "currency": "TWD",
+                "cash_dividend_per_share": 1.0,
+            },
+        )
+        self.assertEqual(trade_resp.status_code, 200)
+        self.assertEqual(cash_resp.status_code, 200)
+        self.assertEqual(corp_resp.status_code, 200)
+
+        archive_resp = self.client.delete(f"/api/v1/portfolio/accounts/{account_id}")
+        self.assertEqual(archive_resp.status_code, 200)
+        self.assertEqual(archive_resp.json()["deleted"], 1)
+
+        active_list = self.client.get("/api/v1/portfolio/accounts")
+        self.assertEqual(active_list.status_code, 200)
+        self.assertEqual(active_list.json()["accounts"], [])
+
+        inactive_list = self.client.get("/api/v1/portfolio/accounts", params={"include_inactive": "true"})
+        self.assertEqual(inactive_list.status_code, 200)
+        archived = inactive_list.json()["accounts"][0]
+        self.assertEqual(archived["id"], account_id)
+        self.assertFalse(archived["is_active"])
+
+        with self.db.get_session() as session:
+            trade_count = session.execute(
+                select(PortfolioTrade).where(PortfolioTrade.account_id == account_id)
+            ).scalars().all()
+            cash_count = session.execute(
+                select(PortfolioCashLedger).where(PortfolioCashLedger.account_id == account_id)
+            ).scalars().all()
+            corp_count = session.execute(
+                select(PortfolioCorporateAction).where(PortfolioCorporateAction.account_id == account_id)
+            ).scalars().all()
+        self.assertEqual(len(trade_count), 1)
+        self.assertEqual(len(cash_count), 1)
+        self.assertEqual(len(corp_count), 1)
+
+        write_resp = self.client.post(
+            "/api/v1/portfolio/cash-ledger",
+            json={
+                "account_id": account_id,
+                "event_date": "2026-01-04",
+                "direction": "in",
+                "amount": 1,
+                "currency": "TWD",
+            },
+        )
+        self.assertEqual(write_resp.status_code, 400)
 
     def test_create_trade_busy_returns_409(self) -> None:
         with patch(

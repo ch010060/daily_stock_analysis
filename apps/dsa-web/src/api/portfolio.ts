@@ -4,6 +4,7 @@ import type {
   PortfolioAccountItem,
   PortfolioAccountCreateRequest,
   PortfolioAccountListResponse,
+  PortfolioAccountUpdateRequest,
   PortfolioCashLedgerCreateRequest,
   PortfolioCashLedgerListResponse,
   PortfolioCorporateActionCreateRequest,
@@ -116,6 +117,23 @@ export const portfolioApi = {
       owner_id: payload.ownerId,
     });
     return toCamelCase<PortfolioAccountItem>(response.data);
+  },
+
+  async updateAccount(accountId: number, payload: PortfolioAccountUpdateRequest): Promise<PortfolioAccountItem> {
+    const response = await apiClient.put<Record<string, unknown>>(`/api/v1/portfolio/accounts/${accountId}`, {
+      name: payload.name,
+      broker: payload.broker,
+      market: payload.market,
+      base_currency: payload.baseCurrency,
+      owner_id: payload.ownerId,
+      is_active: payload.isActive,
+    });
+    return toCamelCase<PortfolioAccountItem>(response.data);
+  },
+
+  async archiveAccount(accountId: number): Promise<PortfolioDeleteResponse> {
+    const response = await apiClient.delete<Record<string, unknown>>(`/api/v1/portfolio/accounts/${accountId}`);
+    return toCamelCase<PortfolioDeleteResponse>(response.data);
   },
 
   async getSnapshot(query: SnapshotQuery = {}): Promise<PortfolioSnapshotResponse> {
