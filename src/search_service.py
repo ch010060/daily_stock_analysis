@@ -3276,7 +3276,8 @@ class SearchService:
         stock_code: str,
         stock_name: str,
         max_results: int = 5,
-        focus_keywords: Optional[List[str]] = None
+        focus_keywords: Optional[List[str]] = None,
+        tavily_news_topic_first_variant_only: bool = False,
     ) -> SearchResponse:
         """
         搜尋股票相關新聞
@@ -3286,6 +3287,7 @@ class SearchService:
             stock_name: 股票名稱
             max_results: 最大返回結果數
             focus_keywords: 重點關注的關鍵詞列表
+            tavily_news_topic_first_variant_only: 僅第一組 Tavily query 使用 news topic
             
         Returns:
             SearchResponse 物件
@@ -3364,7 +3366,8 @@ class SearchService:
 
                     search_kwargs: Dict[str, Any] = {}
                     if isinstance(provider, TavilySearchProvider):
-                        search_kwargs["topic"] = "news"
+                        if not tavily_news_topic_first_variant_only or query_index == 1:
+                            search_kwargs["topic"] = "news"
                     elif isinstance(provider, BraveSearchProvider):
                         search_kwargs.update(
                             self._brave_search_locale(
@@ -3767,6 +3770,7 @@ class SearchService:
                 stock_code,
                 stock_name,
                 max_results=target_per_dimension,
+                tavily_news_topic_first_variant_only=True,
             )
             results["latest_news"] = latest_response
             search_count += 1
