@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修復] 美股中文場景下，市場標籤與策略藍圖（`Strategy Blueprint/Strategy Framework`）已本地化為中文顯示，避免 `report_language=zh` 下混入英文策略段落與市場標籤；與 Issue #1555 的歷史/即時結果一致。
 - [修復] Docker Web 設定頁讀取配置時在活躍 `.env` 檔案缺項時回退展示啟動注入的同名環境變數，並補清 `env_file` / `--env-file`、`ENV_FILE=/app/data/runtime.env` 與單檔案 `.env` 掛載邊界文件。
 - [文件] 補充說明：LLM / LiteLLM 相容鍵的回退僅用於 Settings 介面展示與校驗上下文拼裝，不改寫、不遷移、不清理使用者現有的 provider/model/base URL 持久化配置；未發生 provider / model / base URL 語義遷移，僅保留同名啟動注入的展示級兜底。相容邊界依據 `requirements.txt`（`litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`、`openai>=1.0.0`）；官方語義來源：[LiteLLM OpenAI-compatible](https://docs.litellm.ai/docs/providers/openai_compatible)、[OpenAI Chat Completion API](https://platform.openai.com/docs/api-reference/chat/create)。回退/恢復路徑為：重啟/更新後清理同名 `env_file` / `--env-file` / `environment` 覆蓋後使用持久化儲存值，或透過桌面端匯入/匯出 `.env` 片段恢復；僅在 WebUI 未改寫同名啟動注入值時才會按該片段接管。驗證迴歸點見 `tests/test_system_config_service.py::test_get_config_uses_runtime_env_as_display_fallback`、`tests/test_system_config_service.py::test_get_config_runtime_env_fallback_does_not_persist_llm_fields_on_save`、`tests/test_system_config_service.py::test_runtime_env_fallback_does_not_override_saved_provider_and_base_url_settings`、以及 `tests/test_system_config_api.py` 的 `/api/v1/system/config` 獲取/儲存鏈路迴歸。
+- [改進] Web 個股代號相關欄位（輸入框 placeholder、表格表頭、驗證錯誤訊息、告警標的標籤）統一將「股票程式碼」「標的程式碼」用語改為「股票代號」「標的代號」，原始碼語境的「程式碼」用語保留不變。
+- [改進] Web 首頁、Settings 與 API 錯誤訊息中的「大盤覆盤」依語境拆分：首頁頂層操作與設定欄位統一改為「市場概覽」，報告/盤面回顧語境改為「盤勢回顧」；Settings `MARKET_REVIEW_REGION` 欄位標題改為「市場概覽範圍」，選項仍為台股/美股/全部市場。
+- [改進] Web 持股頁「成本口徑」「顯示口徑」與區塊標題「口徑」分別改為「成本計算方式」「顯示維度」「帳戶與計價資訊」，移除中國證券術語慣用「口徑」一詞。
+- [修復] zh_TW 本地化詞庫補上「震荡→震盪」映射，修正 LLM 自由文字敘述（如「震荡偏空」）經 Route B zh_TW 轉換後仍殘留簡體字的問題。
 <!-- 新條目格式：- [型別] 描述（型別取值：新功能/改進/修復/文件/測試/chore）-->
 <!-- 每條獨立一行追加到本段末尾，無需分類標題，合併時衝突最小 -->
 - [新功能] 新增 fixture-first TaiwanFinMindFetcher 與台股 TW 2330/2454 離線行情、基本面、籌碼和公司資料 fixtures，供 TW+US Route B MVP Phase 2.1 驗證使用。

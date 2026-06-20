@@ -402,7 +402,7 @@ const HomePage: React.FC = () => {
           setMarketReviewReport(null);
           setMarketReviewNotice({
             variant: 'danger',
-            title: '大盤覆盤已超時',
+            title: '市場概覽已超時',
             message: '任務長時間未返回最終結果，請在任務列表/歷史中檢視。',
           });
           scrollMarketReviewFeedbackIntoView();
@@ -420,7 +420,7 @@ const HomePage: React.FC = () => {
               : '進行中';
             setMarketReviewNotice({
               variant: 'warning',
-              title: '大盤覆盤進行中',
+              title: '市場概覽進行中',
               message: `任務狀態：${status.status}（${progress}）`,
             });
             return true;
@@ -434,8 +434,8 @@ const HomePage: React.FC = () => {
             setMarketReviewReport(marketReviewText ? marketReviewText.trim() : null);
             setMarketReviewNotice({
               variant: 'success',
-              title: '大盤覆盤已完成',
-              message: marketReviewText ? '大盤覆盤任務已完成，結果如下：' : '大盤覆盤任務已完成，結果已生成並按配置推送。',
+              title: '市場概覽已完成',
+              message: marketReviewText ? '市場概覽任務已完成，結果如下：' : '市場概覽任務已完成，結果已生成並按配置推送。',
             });
             setMarketReviewError(null);
             scrollMarketReviewFeedbackIntoView();
@@ -451,7 +451,7 @@ const HomePage: React.FC = () => {
                   status: 500,
                   data: {
                     error: 'market_review_failed',
-                    message: status.error || '大盤覆盤執行失敗。',
+                    message: status.error || '市場概覽執行失敗。',
                   },
                 },
               }),
@@ -465,7 +465,7 @@ const HomePage: React.FC = () => {
           setMarketReviewReport(null);
           setMarketReviewNotice({
             variant: 'danger',
-            title: '大盤覆盤狀態異常',
+            title: '市場概覽狀態異常',
             message: `收到未知任務狀態：${status.status}`,
           });
           scrollMarketReviewFeedbackIntoView();
@@ -509,7 +509,7 @@ const HomePage: React.FC = () => {
       const result = await analysisApi.triggerMarketReview({ sendNotification: notify });
       setMarketReviewNotice({
         variant: 'success',
-        title: '大盤覆盤已提交',
+        title: '市場概覽已提交',
         message: result.message,
       });
       scrollMarketReviewFeedbackIntoView();
@@ -552,7 +552,7 @@ const HomePage: React.FC = () => {
     const marketReviewItem: StockBarItem = {
       id: latestMarketReview.id,
       stockCode: 'MARKET',
-      stockName: latestMarketReview.stockName || '大盤覆盤',
+      stockName: latestMarketReview.stockName || '市場概覽',
       reportType: 'market_review',
       sentimentScore: latestMarketReview.sentimentScore,
       operationAdvice: latestMarketReview.operationAdvice,
@@ -622,7 +622,7 @@ const HomePage: React.FC = () => {
                   onSubmit={(stockCode, stockName, selectionSource) => {
                     handleSubmitAnalysis(stockCode, stockName, selectionSource);
                   }}
-                  placeholder="輸入股票程式碼或名稱，如 2330、AAPL"
+                  placeholder="輸入股票代號或名稱，如 2330、AAPL"
                   disabled={isAnalyzing}
                   className={inputError ? 'border-danger/50' : undefined}
                 />
@@ -700,7 +700,7 @@ const HomePage: React.FC = () => {
                 className="h-10 flex-1 whitespace-nowrap md:flex-none"
               >
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
-                大盤覆盤
+                市場概覽
               </Button>
               <button
                 type="button"
@@ -816,7 +816,7 @@ const HomePage: React.FC = () => {
             {marketReviewReport ? (
               <div className="mb-3 rounded-xl border border-subtle bg-surface/70 px-3 py-3 text-xs text-secondary-text shadow-sm">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="font-semibold text-foreground">大盤覆盤報告</p>
+                  <p className="font-semibold text-foreground">盤勢回顧報告</p>
                   <button
                     type="button"
                     className="home-surface-button h-7 rounded-md px-3 py-1 text-xs text-foreground"
@@ -884,7 +884,7 @@ const HomePage: React.FC = () => {
                       onClick={() => void handleTriggerMarketReview()}
                     >
                       <BarChart3 className="h-4 w-4" />
-                      重新覆盤
+                      重新回顧
                     </Button>
                   )}
                   <Button
@@ -949,7 +949,7 @@ const HomePage: React.FC = () => {
               <div className="flex h-full items-center justify-center">
                 <EmptyState
                   title="開始分析"
-                  description="輸入股票程式碼進行分析，或從左側選擇歷史報告檢視。"
+                  description="輸入股票代號進行分析，或從左側選擇歷史報告檢視。"
                   className="max-w-xl border-dashed"
                   icon={(
                     <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

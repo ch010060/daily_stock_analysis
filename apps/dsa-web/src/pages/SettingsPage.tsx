@@ -877,7 +877,7 @@ const SettingsPage: React.FC = () => {
             {activeCategory === 'base' ? (
               <SettingsSectionCard
                 title="智慧匯入"
-                description="從圖片、檔案或剪貼簿中提取股票程式碼，併合併到自選股列表。"
+                description="從圖片、檔案或剪貼簿中提取股票代號，併合併到自選股列表。"
               >
                 <IntelligentImport
                   stockListValue={

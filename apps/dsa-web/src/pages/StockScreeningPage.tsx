@@ -451,7 +451,7 @@ const StockScreeningPage: React.FC = () => {
               <thead className="bg-surface text-left text-xs text-secondary-text">
                 <tr>
                   <th className="w-14 px-4 py-3 font-semibold">#</th>
-                  <th className="px-4 py-3 font-semibold">程式碼</th>
+                  <th className="px-4 py-3 font-semibold">代號</th>
                   <th className="px-4 py-3 font-semibold">名稱</th>
                   <th className="px-4 py-3 font-semibold">行業</th>
                   <th className="px-4 py-3 font-semibold">價格</th>

@@ -184,7 +184,7 @@ describe('AlertsPage', () => {
     render(<AlertsPage />);
 
     await screen.findByText('台積電突破壓力');
-    fireEvent.change(screen.getByLabelText('標的程式碼'), { target: { value: 'aapl' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: 'aapl' } });
     fireEvent.change(screen.getByLabelText('價格閾值'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: '建立規則' }));
 
@@ -203,12 +203,12 @@ describe('AlertsPage', () => {
     render(<AlertsPage />);
 
     await screen.findByText('台積電突破壓力');
-    fireEvent.change(screen.getByLabelText('標的程式碼'), { target: { value: 'aapl' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: 'aapl' } });
     fireEvent.change(screen.getByLabelText('價格閾值'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: '建立規則' }));
 
     expect(await screen.findByText('載入失敗')).toBeInTheDocument();
-    expect(screen.getByLabelText('標的程式碼')).toHaveValue('aapl');
+    expect(screen.getByLabelText('標的代號')).toHaveValue('aapl');
     expect(screen.getByLabelText('價格閾值')).toHaveValue(200);
   });
 

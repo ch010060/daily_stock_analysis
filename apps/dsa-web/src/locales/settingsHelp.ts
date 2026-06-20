@@ -15,8 +15,8 @@ type SettingsHelpMap = Record<string, SettingsHelpContent>;
 const settingsHelpZhCN: SettingsHelpMap = {
   'settings.base.STOCK_LIST': {
     title: '自選股列表',
-    summary: '配置需要分析的股票程式碼列表，是手動分析、定時任務和通知報告的基礎輸入。',
-    usage: '多個股票程式碼使用英文逗號分隔。A 股可直接填寫 6 位程式碼，港股可使用 hk 字首，美股可填寫 ticker。',
+    summary: '配置需要分析的股票代號列表，是手動分析、定時任務和通知報告的基礎輸入。',
+    usage: '多個股票代號使用英文逗號分隔。A 股可直接填寫 6 位代號，港股可使用 hk 字首，美股可填寫 ticker。',
     valueNotes: [
       '定時模式每次觸發前會重新讀取當前儲存的 STOCK_LIST。',
       '如果命令列臨時傳入 --stocks，隻影響本次手動執行，不會鎖定後續計劃任務。',
@@ -26,7 +26,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '影響主分析任務、市場報告中的個股範圍、通知推送內容和歷史報告記錄。',
     ],
     notes: [
-      '股票程式碼之間不要使用中文逗號。',
+      '股票代號之間不要使用中文逗號。',
       '修改後儲存配置即可供後續任務讀取。',
     ],
   },
@@ -40,7 +40,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'Agent 可透過 AGENT_LITELLM_MODEL 單獨指定模型；留空時繼承主模型。',
     ],
     impact: [
-      '影響普通個股分析、大盤覆盤、報告生成，以及未單獨覆蓋模型的 Agent 呼叫。',
+      '影響普通個股分析、市場概覽、報告生成，以及未單獨覆蓋模型的 Agent 呼叫。',
     ],
     notes: [
       '無 provider 字首時，LiteLLM 可能無法判斷應該使用哪組 API Key。',
@@ -162,10 +162,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.data_source.TICKFLOW_API_KEY': {
     title: 'TickFlow API Key',
-    summary: '用於增強大盤覆盤中的指數、市場統計等資料。',
+    summary: '用於增強市場概覽中的指數、市場統計等資料。',
     usage: '在 TickFlow 獲取 API Key 後填入；未配置時系統會繼續使用其他可用資料來源和降級路徑。',
     valueNotes: ['該 Key 是可選增強項，不是執行主分析流程的必填項。'],
-    impact: ['影響大盤覆盤和市場統計增強資料的覆蓋度。'],
+    impact: ['影響市場概覽和市場統計增強資料的覆蓋度。'],
     notes: ['不要在 issue、日誌或截圖中暴露真實 Key。'],
   },
   'settings.data_source.stock_index_remote': {
@@ -373,7 +373,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'EMAIL_PASSWORD 通常是郵箱授權碼，不是網頁登入密碼。',
       '可用 STOCK_GROUP_N / EMAIL_GROUP_N 配置分組收件人。',
     ],
-    impact: ['影響郵件報告傳送、分組收件和大盤覆盤郵件送達。'],
+    impact: ['影響郵件報告傳送、分組收件和市場概覽郵件送達。'],
     notes: ['不同郵箱服務商需要先開啟 SMTP 服務。'],
   },
   'settings.notification.chat_bots': {
@@ -588,7 +588,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
     summary: '普通分析流程預設使用的執行時模型。',
     usage: '從已啟用通道的模型列表中選擇；自動模式使用第一個可用模型。',
     valueNotes: ['儲存後寫入 LITELLM_MODEL。'],
-    impact: ['影響個股分析、大盤覆盤和預設報告生成。'],
+    impact: ['影響個股分析、市場概覽和預設報告生成。'],
     notes: ['如果模型不在已啟用通道列表中，儲存時可能被清理或要求重新選擇。'],
   },
   'settings.llm_channel.agent_primary_model': {
@@ -877,11 +877,11 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.report.MERGE_EMAIL_NOTIFICATION': {
     title: '合併郵件通知',
-    summary: '將個股分析與大盤覆盤合併為一封郵件傳送。',
-    usage: '開啟後，個股分析和大盤覆盤會合併在同一封郵件中傳送。',
-    valueNotes: ['僅在同時啟用了個股分析和大盤覆盤時有效。'],
+    summary: '將個股分析與市場概覽合併為一封郵件傳送。',
+    usage: '開啟後，個股分析和市場概覽會合併在同一封郵件中傳送。',
+    valueNotes: ['僅在同時啟用了個股分析和市場概覽時有效。'],
     impact: ['影響郵件通知的封數和內容組織。'],
-    notes: ['關閉後個股分析和大盤覆盤會分別傳送郵件。'],
+    notes: ['關閉後個股分析和市場概覽會分別傳送郵件。'],
   },
   // ------------------------------------------------------------------
   // Notification routing
