@@ -356,7 +356,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
     if (targetScope === 'single_symbol') {
       const targetValidation = validateStockCode(target);
       if (!targetValidation.valid) {
-        setFormError(targetValidation.message ?? '股票程式碼格式不正確');
+        setFormError(targetValidation.message ?? '股票代號格式不正確');
         return;
       }
       resolvedTarget = targetValidation.normalized;
@@ -407,7 +407,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
     if (targetScope === 'single_symbol') {
       return (
         <Input
-          label="標的程式碼"
+          label="標的代號"
           value={target}
           onChange={(event) => setTarget(event.target.value)}
           placeholder="2330 / AAPL"

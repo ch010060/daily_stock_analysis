@@ -89,7 +89,7 @@ describe('BacktestPage', () => {
   it('renders shared surface inputs and prediction tracking outputs', async () => {
     render(<BacktestPage />);
 
-    const filterInput = await screen.findByPlaceholderText('按股票程式碼篩選（留空表示全部）');
+    const filterInput = await screen.findByPlaceholderText('按股票代號篩選（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
 
     expect(filterInput).toHaveClass('input-surface');
@@ -114,7 +114,7 @@ describe('BacktestPage', () => {
   it('filters results with stock code, window, and analysis date range when clicking Filter', async () => {
     render(<BacktestPage />);
 
-    const filterInput = await screen.findByPlaceholderText('按股票程式碼篩選（留空表示全部）');
+    const filterInput = await screen.findByPlaceholderText('按股票代號篩選（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
     const fromInput = screen.getByLabelText('分析開始日期');
     const toInput = screen.getByLabelText('分析結束日期');
@@ -145,7 +145,7 @@ describe('BacktestPage', () => {
   it('runs a backtest and refreshes results using the shared filter values', async () => {
     render(<BacktestPage />);
 
-    const filterInput = await screen.findByPlaceholderText('按股票程式碼篩選（留空表示全部）');
+    const filterInput = await screen.findByPlaceholderText('按股票代號篩選（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
 
     fireEvent.change(filterInput, { target: { value: 'tsla' } });
@@ -184,7 +184,7 @@ describe('BacktestPage', () => {
   it('switches to next-day validation with the 1D shortcut', async () => {
     render(<BacktestPage />);
 
-    await screen.findByPlaceholderText('按股票程式碼篩選（留空表示全部）');
+    await screen.findByPlaceholderText('按股票代號篩選（留空表示全部）');
     fireEvent.click(screen.getByRole('button', { name: '1 日驗證' }));
 
     await waitFor(() => {

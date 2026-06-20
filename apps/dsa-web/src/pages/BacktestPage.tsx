@@ -370,7 +370,7 @@ const BacktestPage: React.FC = () => {
               value={codeFilter}
               onChange={(e) => setCodeFilter(e.target.value.toUpperCase())}
               onKeyDown={handleKeyDown}
-              placeholder="按股票程式碼篩選（留空表示全部）"
+              placeholder="按股票代號篩選（留空表示全部）"
               disabled={isRunning}
               className={BACKTEST_INPUT_CLASS}
             />

@@ -393,7 +393,7 @@ describe('stockPoolStore', () => {
     await useStockPoolStore.getState().submitAnalysis();
 
     const state = useStockPoolStore.getState();
-    expect(state.inputError).toBe('請輸入有效的股票程式碼或股票名稱');
+    expect(state.inputError).toBe('請輸入有效的股票代號或股票名稱');
     expect(state.isAnalyzing).toBe(false);
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
   });

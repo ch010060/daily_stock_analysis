@@ -170,7 +170,7 @@ describe('HomePage', () => {
     expect(dashboard.firstElementChild?.className).toContain('min-h-0');
     expect(dashboard.querySelector('.flex-1.flex.min-h-0.overflow-hidden')).toBeTruthy();
     expect(screen.getByTestId('home-dashboard-scroll')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('輸入股票程式碼或名稱，如 2330、AAPL')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('輸入股票代號或名稱，如 2330、AAPL')).toBeInTheDocument();
     expect(await screen.findByText('趨勢維持強勢')).toBeInTheDocument();
     expect(
       screen.getByRole('button', {
@@ -222,7 +222,7 @@ describe('HomePage', () => {
 
     expect(await screen.findByText('開始分析')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '開始分析', level: 3 })).toBeInTheDocument();
-    expect(screen.getByText('輸入股票程式碼進行分析，或從左側選擇歷史報告檢視。')).toBeInTheDocument();
+    expect(screen.getByText('輸入股票代號進行分析，或從左側選擇歷史報告檢視。')).toBeInTheDocument();
     expect(screen.getByText('暫無個股記錄')).toBeInTheDocument();
   });
 
@@ -341,7 +341,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    const input = await screen.findByPlaceholderText('輸入股票程式碼或名稱，如 2330、AAPL');
+    const input = await screen.findByPlaceholderText('輸入股票代號或名稱，如 2330、AAPL');
     fireEvent.change(input, { target: { value: '600519' } });
     fireEvent.click(screen.getByRole('button', { name: '分析' }));
 
@@ -376,12 +376,12 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '大盤覆盤' }));
+    fireEvent.click(await screen.findByRole('button', { name: '市場概覽' }));
 
     await waitFor(() => {
       expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
     });
-    expect(await screen.findByText('大盤覆盤已完成')).toBeInTheDocument();
+    expect(await screen.findByText('市場概覽已完成')).toBeInTheDocument();
     expect(await screen.findByText('市場覆盤報告示例文字')).toBeInTheDocument();
     expect(analysisApi.getStatus).toHaveBeenCalledWith('task-1');
   });
@@ -425,13 +425,13 @@ describe('HomePage', () => {
     });
     dashboardScroll.scrollTop = 480;
 
-    fireEvent.click(screen.getByRole('button', { name: '大盤覆盤' }));
+    fireEvent.click(screen.getByRole('button', { name: '市場概覽' }));
 
     await waitFor(() => {
       expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
     });
     expect(dashboardScroll.scrollTop).toBe(0);
-    expect(await screen.findByText('大盤覆盤已完成')).toBeInTheDocument();
+    expect(await screen.findByText('市場概覽已完成')).toBeInTheDocument();
   });
 
   it('keeps market review results in the main dashboard scroll area', async () => {
@@ -459,7 +459,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '大盤覆盤' }));
+    fireEvent.click(await screen.findByRole('button', { name: '市場概覽' }));
 
     const dashboardScroll = screen.getByTestId('home-dashboard-scroll');
     const marketReviewReport = await screen.findByTestId('market-review-report');
@@ -699,7 +699,7 @@ describe('HomePage', () => {
     await screen.findByText('趨勢維持強勢');
 
     // Type something else in the search box
-    const input = screen.getByPlaceholderText('輸入股票程式碼或名稱，如 2330、AAPL');
+    const input = screen.getByPlaceholderText('輸入股票代號或名稱，如 2330、AAPL');
     fireEvent.change(input, { target: { value: 'AAPL' } });
 
     // Click "Reanalyze"
@@ -742,7 +742,7 @@ describe('HomePage', () => {
     fireEvent.click(await screen.findByRole('button', { name: '策略' }));
     fireEvent.click(screen.getByRole('menuitemradio', { name: /成長質量/ }));
 
-    const input = screen.getByPlaceholderText('輸入股票程式碼或名稱，如 2330、AAPL');
+    const input = screen.getByPlaceholderText('輸入股票代號或名稱，如 2330、AAPL');
     fireEvent.change(input, { target: { value: '600519' } });
     fireEvent.click(screen.getByRole('button', { name: '分析' }));
 

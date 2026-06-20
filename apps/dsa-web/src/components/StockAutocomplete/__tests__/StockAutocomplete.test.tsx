@@ -130,7 +130,7 @@ describe('StockAutocomplete', () => {
       />
     );
 
-    const input = screen.getByPlaceholderText(/輸入股票程式碼或名稱/);
+    const input = screen.getByPlaceholderText(/輸入股票代號或名稱/);
     expect(input).toBeInTheDocument();
   });
 
@@ -236,7 +236,7 @@ describe('StockAutocomplete', () => {
         />
       );
 
-      const input = screen.getByPlaceholderText(/輸入股票程式碼或名稱/);
+      const input = screen.getByPlaceholderText(/輸入股票代號或名稱/);
       expect(input).toHaveAttribute('data-autocomplete-mode', 'fallback');
     });
 
@@ -267,7 +267,7 @@ describe('StockAutocomplete', () => {
         />
       );
 
-      const input = screen.getByPlaceholderText(/輸入股票程式碼或名稱/);
+      const input = screen.getByPlaceholderText(/輸入股票代號或名稱/);
       expect(input).toHaveAttribute('data-autocomplete-mode', 'fallback');
     });
 

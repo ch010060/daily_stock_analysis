@@ -885,7 +885,7 @@ const PortfolioPage: React.FC = () => {
                 </select>
               </div>
               <div>
-                <p className="text-xs text-secondary mb-1">成本口徑</p>
+                <p className="text-xs text-secondary mb-1">成本計算方式</p>
                 <select
                   value={costMethod}
                   onChange={(e) => setCostMethod(e.target.value as PortfolioCostMethod)}
@@ -1122,7 +1122,7 @@ const PortfolioPage: React.FC = () => {
                 <thead className="text-xs text-secondary border-b border-white/10">
                   <tr>
                     <th className="text-left py-2 pr-2">帳戶</th>
-                    <th className="text-left py-2 pr-2">程式碼</th>
+                    <th className="text-left py-2 pr-2">代號</th>
                     <th className="text-right py-2 pr-2">數量</th>
                     <th className="text-right py-2 pr-2">均價</th>
                     <th className="text-right py-2 pr-2">現價</th>
@@ -1199,7 +1199,7 @@ const PortfolioPage: React.FC = () => {
             />
           )}
           <div className="mt-3 text-xs text-secondary space-y-1">
-            <div>展示口徑: {concentrationMode === 'sector' ? '行業維度' : '個股維度（降級顯示）'}</div>
+            <div>顯示維度: {concentrationMode === 'sector' ? '行業維度' : '個股維度（降級顯示）'}</div>
             <div>板塊集中度警告: {risk?.sectorConcentration?.alert ? '是' : '否'}</div>
             <div>Top1 權重: {formatPct(risk?.sectorConcentration?.topWeightPct ?? risk?.concentration?.topWeightPct)}</div>
           </div>
@@ -1232,7 +1232,7 @@ const PortfolioPage: React.FC = () => {
           </div>
         </Card>
         <Card padding="md">
-          <h3 className="text-sm font-semibold text-foreground mb-2">口徑</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-2">帳戶與計價資訊</h3>
           <div className="text-xs text-secondary space-y-1">
             <div>帳戶數: {snapshot?.accountCount ?? 0}</div>
             <div>計價幣種: {snapshot?.currency || 'TWD'}</div>
@@ -1245,7 +1245,7 @@ const PortfolioPage: React.FC = () => {
         <Card padding="md">
           <h3 className="text-sm font-semibold text-foreground mb-3">手工錄入：交易</h3>
           <form className="space-y-2" onSubmit={handleTradeSubmit}>
-            <input className={PORTFOLIO_INPUT_CLASS} placeholder="股票程式碼（例如 2330）" value={tradeForm.symbol}
+            <input className={PORTFOLIO_INPUT_CLASS} placeholder="股票代號（例如 2330）" value={tradeForm.symbol}
               onChange={(e) => setTradeForm((prev) => ({ ...prev, symbol: e.target.value }))} required />
             <div className="grid grid-cols-2 gap-2">
               <input className={PORTFOLIO_INPUT_CLASS} type="date" value={tradeForm.tradeDate}
@@ -1312,7 +1312,7 @@ const PortfolioPage: React.FC = () => {
         <Card padding="md">
           <h3 className="text-sm font-semibold text-foreground mb-3">手工錄入：公司行為</h3>
           <form className="space-y-2" onSubmit={handleCorporateSubmit}>
-            <input className={PORTFOLIO_INPUT_CLASS} placeholder="股票程式碼" value={corpForm.symbol}
+            <input className={PORTFOLIO_INPUT_CLASS} placeholder="股票代號" value={corpForm.symbol}
               onChange={(e) => setCorpForm((prev) => ({ ...prev, symbol: e.target.value }))} required />
             <div className="grid grid-cols-2 gap-2">
               <input className={PORTFOLIO_INPUT_CLASS} type="date" value={corpForm.effectiveDate}
@@ -1433,7 +1433,7 @@ const PortfolioPage: React.FC = () => {
               <input className={PORTFOLIO_INPUT_CLASS} type="date" value={eventDateTo} onChange={(e) => setEventDateTo(e.target.value)} />
             </div>
             {(eventType === 'trade' || eventType === 'corporate') ? (
-              <input className={PORTFOLIO_INPUT_CLASS} placeholder="按股票程式碼篩選" value={eventSymbol}
+              <input className={PORTFOLIO_INPUT_CLASS} placeholder="按股票代號篩選" value={eventSymbol}
                 onChange={(e) => setEventSymbol(e.target.value)} />
             ) : null}
             {eventType === 'trade' ? (

@@ -26,7 +26,7 @@ describe('AlertRuleForm', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
     fireEvent.change(screen.getByLabelText('規則名稱'), { target: { value: '台積電突破壓力' } });
-    fireEvent.change(screen.getByLabelText('標的程式碼'), { target: { value: '2330' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '2330' } });
     fireEvent.change(screen.getByLabelText('價格閾值'), { target: { value: '800' } });
     fireEvent.click(screen.getByRole('button', { name: '建立規則' }));
 
@@ -46,7 +46,7 @@ describe('AlertRuleForm', () => {
   it('submits a price_change_percent rule payload', async () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('標的程式碼'), { target: { value: 'aapl' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: 'aapl' } });
     fireEvent.change(screen.getByLabelText('規則型別'), { target: { value: 'price_change_percent' } });
     fireEvent.change(screen.getByLabelText('方向'), { target: { value: 'down' } });
     fireEvent.change(screen.getByLabelText('漲跌幅閾值（%）'), { target: { value: '3.5' } });
@@ -66,7 +66,7 @@ describe('AlertRuleForm', () => {
   it('submits a volume_spike rule payload and supports disabled creation', async () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('標的程式碼'), { target: { value: 'msft' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: 'msft' } });
     fireEvent.change(screen.getByLabelText('規則型別'), { target: { value: 'volume_spike' } });
     fireEvent.change(screen.getByLabelText('成交量放大倍數'), { target: { value: '2.5' } });
     fireEvent.click(screen.getByLabelText('建立後立即啟用'));
@@ -85,7 +85,7 @@ describe('AlertRuleForm', () => {
   it('submits technical indicator rule payloads', async () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('標的程式碼'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '600519' } });
     fireEvent.change(screen.getByLabelText('規則型別'), { target: { value: 'macd_cross' } });
     fireEvent.change(screen.getByLabelText('交叉方向'), { target: { value: 'bearish_cross' } });
     fireEvent.change(screen.getByLabelText('快線週期'), { target: { value: '6' } });
@@ -110,7 +110,7 @@ describe('AlertRuleForm', () => {
   it('rejects invalid technical indicator boundaries before submit', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('標的程式碼'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '600519' } });
     fireEvent.change(screen.getByLabelText('規則型別'), { target: { value: 'rsi_threshold' } });
     fireEvent.change(screen.getByLabelText('RSI 閾值'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: '建立規則' }));
@@ -122,7 +122,7 @@ describe('AlertRuleForm', () => {
   it('rejects indicator period combinations that exceed fetchable history', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('標的程式碼'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '600519' } });
     fireEvent.change(screen.getByLabelText('規則型別'), { target: { value: 'macd_cross' } });
     fireEvent.change(screen.getByLabelText('快線週期'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('慢線週期'), { target: { value: '250' } });
@@ -136,7 +136,7 @@ describe('AlertRuleForm', () => {
   it('rejects empty required technical indicator thresholds before submit', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('標的程式碼'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '600519' } });
     fireEvent.change(screen.getByLabelText('規則型別'), { target: { value: 'rsi_threshold' } });
     fireEvent.click(screen.getByRole('button', { name: '建立規則' }));
 
@@ -153,7 +153,7 @@ describe('AlertRuleForm', () => {
   it('rejects invalid numeric thresholds before submit', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('標的程式碼'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '600519' } });
     fireEvent.change(screen.getByLabelText('價格閾值'), { target: { value: '0' } });
     fireEvent.click(screen.getByRole('button', { name: '建立規則' }));
 
@@ -164,11 +164,11 @@ describe('AlertRuleForm', () => {
   it('rejects invalid stock code format before submit', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('標的程式碼'), { target: { value: 'aapl-2026' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: 'aapl-2026' } });
     fireEvent.change(screen.getByLabelText('價格閾值'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: '建立規則' }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent('股票程式碼格式不正確');
+    expect(screen.getByRole('alert')).toHaveTextContent('股票代號格式不正確');
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -259,12 +259,12 @@ describe('AlertRuleForm', () => {
     onSubmit.mockResolvedValueOnce(false);
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('標的程式碼'), { target: { value: 'aapl' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: 'aapl' } });
     fireEvent.change(screen.getByLabelText('價格閾值'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: '建立規則' }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
-    expect(screen.getByLabelText('標的程式碼')).toHaveValue('aapl');
+    expect(screen.getByLabelText('標的代號')).toHaveValue('aapl');
     expect(screen.getByLabelText('價格閾值')).toHaveValue(200);
   });
 });

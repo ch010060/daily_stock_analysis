@@ -582,12 +582,12 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     const skills = options?.skills;
 
     if (!stockCodeInput) {
-      set({ inputError: '請輸入股票程式碼', duplicateError: null });
+      set({ inputError: '請輸入股票代號', duplicateError: null });
       return;
     }
 
     if (selectionSource !== 'autocomplete' && isObviouslyInvalidStockQuery(stockCodeInput)) {
-      set({ inputError: '請輸入有效的股票程式碼或股票名稱', duplicateError: null });
+      set({ inputError: '請輸入有效的股票代號或股票名稱', duplicateError: null });
       return;
     }
 

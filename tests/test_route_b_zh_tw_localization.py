@@ -68,6 +68,11 @@ class TestLocalizeRouteBZhTwText(unittest.TestCase):
         self.assertIn("大盤回顧", result)
         self.assertNotIn("大盘复盘", result)
 
+    def test_choppy_term(self):
+        result = localize_route_b_zh_tw_text("震荡偏空")
+        self.assertIn("震盪", result)
+        self.assertNotIn("震荡", result)
+
     def test_buy_sell_terms(self):
         result = localize_route_b_zh_tw_text("买入 / 卖出")
         self.assertIn("買進", result)

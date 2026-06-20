@@ -32,14 +32,14 @@ export const validateStockCode = (value: string): ValidationResult => {
   const normalized = value.trim().toUpperCase();
 
   if (!normalized) {
-    return { valid: false, message: '請輸入股票程式碼', normalized };
+    return { valid: false, message: '請輸入股票代號', normalized };
   }
 
   const valid = looksLikeStockCode(normalized);
 
   return {
     valid,
-    message: valid ? undefined : '股票程式碼格式不正確',
+    message: valid ? undefined : '股票代號格式不正確',
     normalized,
   };
 };
