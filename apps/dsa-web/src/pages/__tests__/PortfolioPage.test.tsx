@@ -1126,7 +1126,8 @@ describe('PortfolioPage manual-entry currency selectors', () => {
     });
     deleteTrade.mockRejectedValueOnce(createApiError(
       createParsedApiError({
-        category: 'server_error',
+        category: 'http_error',
+        status: 500,
         title: '刪除失敗',
         message: '請稍後再試。',
       }),
