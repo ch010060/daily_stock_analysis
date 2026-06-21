@@ -1,8 +1,12 @@
 import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Check, ChevronDown, Copy } from 'lucide-react';
+import { diagnosticsApi } from '../../api/diagnostics';
 import { historyApi } from '../../api/history';
 import type {
+  NewsProviderProbeMarket,
+  NewsProviderProbeMode,
+  NewsProviderProbeResponse,
   ReportLanguage,
   RunDiagnosticComponent,
   RunDiagnosticComponentStatus,
@@ -20,6 +24,23 @@ interface ReportDiagnosticsProps {
 
 type BadgeVariant = NonNullable<React.ComponentProps<typeof Badge>['variant']>;
 type StatusTone = NonNullable<React.ComponentProps<typeof StatusDot>['tone']>;
+
+type ProbeTargetValue = `${NewsProviderProbeMarket}:${string}`;
+
+interface NewsProbeState {
+  loading: boolean;
+  result: NewsProviderProbeResponse | null;
+  error: string | null;
+}
+
+interface NewsProbeControls {
+  target: ProbeTargetValue;
+  setTarget: (value: ProbeTargetValue) => void;
+  mode: NewsProviderProbeMode;
+  setMode: (value: NewsProviderProbeMode) => void;
+  run: () => void;
+  state: NewsProbeState;
+}
 
 const COMPONENT_ORDER = [
   'realtime_quote',
@@ -120,6 +141,19 @@ const TEXT = {
   },
 } as const;
 
+const NEWS_PROBE_TARGETS: Array<{ value: ProbeTargetValue; label: string; symbol: string; market: NewsProviderProbeMarket }> = [
+  { value: 'tw:2330', label: 'TW 2330', symbol: '2330', market: 'tw' },
+  { value: 'tw:2454', label: 'TW 2454', symbol: '2454', market: 'tw' },
+  { value: 'us:AAPL', label: 'US AAPL', symbol: 'AAPL', market: 'us' },
+  { value: 'us:NVDA', label: 'US NVDA', symbol: 'NVDA', market: 'us' },
+];
+
+const NEWS_PROBE_MODES: Array<{ value: NewsProviderProbeMode; label: string }> = [
+  { value: 'runtime', label: 'Runtime' },
+  { value: 'searxng', label: 'SearXNG' },
+  { value: 'tavily', label: 'Tavily' },
+];
+
 const OVERALL_STATUS_STYLE: Record<RunDiagnosticStatus, { variant: BadgeVariant; tone: StatusTone }> = {
   normal: { variant: 'success', tone: 'success' },
   degraded: { variant: 'warning', tone: 'warning' },
@@ -176,7 +210,128 @@ const asDisplayValue = (value: unknown): string | null => {
   return null;
 };
 
-const renderNewsSearchDiagnostics = (component: RunDiagnosticComponent): React.ReactNode => {
+const sanitizeProbeDisplayText = (value: unknown, maxLength = 220): string | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  let text = String(value).replace(/\s+/g, ' ').trim();
+  if (!text) {
+    return null;
+  }
+  text = text.replace(/https?:\/\/[^\s]+?(?:token|key|secret|webhook)[^\s]*/gi, '<redacted-url>');
+  text = text.replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer <redacted>');
+  text = text.replace(
+    /\b([A-Z0-9_]*?(?:api[_-]?key|access[_-]?token|token|secret|password|passwd|cookie))\s*=\s*([^\s,&;]+)/gi,
+    '$1=<redacted>',
+  );
+  text = text.replace(
+    /\b(api[_-]?key|access[_-]?token|token|secret|password|passwd|cookie)\s*:\s*([^\s,&;]+)/gi,
+    '$1=<redacted>',
+  );
+  return text.length > maxLength ? `${text.slice(0, maxLength).trimEnd()}...` : text;
+};
+
+const sanitizeProbeDisplayList = (values: unknown[] | undefined, maxLength = 180): string[] => (
+  Array.isArray(values)
+    ? values
+      .map((value) => sanitizeProbeDisplayText(value, maxLength))
+      .filter((value): value is string => Boolean(value))
+    : []
+);
+
+const safeProbeItemUrl = (value: unknown): string | null => {
+  const text = sanitizeProbeDisplayText(value, 500);
+  if (!text || text.includes('<redacted') || !/^https?:\/\//i.test(text)) {
+    return null;
+  }
+  return text;
+};
+
+const selectedProbeTarget = (target: ProbeTargetValue) => (
+  NEWS_PROBE_TARGETS.find((item) => item.value === target) || NEWS_PROBE_TARGETS[0]
+);
+
+const renderManualProbeResult = (probeState: NewsProbeState): React.ReactNode => {
+  const result = probeState.result;
+  if (!result && !probeState.error && !probeState.loading) {
+    return null;
+  }
+
+  const providers = sanitizeProbeDisplayList(result?.providersAttempted, 80);
+  const queryVariants = sanitizeProbeDisplayList(result?.queryVariants, 180);
+  const errorMessage = sanitizeProbeDisplayText(probeState.error || result?.errorMessage, 220);
+  const items = (result?.items || [])
+    .map((item) => ({
+      title: sanitizeProbeDisplayText(item.title, 220),
+      source: sanitizeProbeDisplayText(item.source, 80),
+      url: safeProbeItemUrl(item.url),
+      publishedAt: sanitizeProbeDisplayText(item.publishedAt, 40),
+    }))
+    .filter((item) => item.title);
+
+  return (
+    <div className="mt-3 rounded-md border border-border/70 bg-surface/70 p-2.5">
+      <p className="font-medium text-foreground">手動測試結果</p>
+      {probeState.loading ? (
+        <p className="mt-2 text-secondary-text">測試中...</p>
+      ) : null}
+      {result ? (
+        <div className="mt-2 grid gap-1.5 text-secondary-text">
+          <p>模式：{sanitizeProbeDisplayText(result.providerMode, 40) || 'runtime'}</p>
+          <p>狀態：{sanitizeProbeDisplayText(result.status, 40) || 'unknown'}</p>
+          {providers.length ? <p>嘗試來源：{providers.join(', ')}</p> : null}
+          <p>查詢次數：{result.attemptCount ?? 0}</p>
+          <p>結果數：{result.resultCount ?? 0}</p>
+          <p>使用備援：{result.fallbackUsed ? '是' : '否'}</p>
+          <p>延遲：{result.latencyMs ?? 0} ms</p>
+          {errorMessage ? (
+            <p className="text-red-600">新聞來源測試失敗：{errorMessage}</p>
+          ) : null}
+        </div>
+      ) : null}
+      {items.length ? (
+        <ul className="mt-2 space-y-1.5 text-secondary-text">
+          {items.map((item, index) => (
+            <li key={`${item.title}-${index}`} className="min-w-0">
+              {item.url ? (
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="break-words font-medium text-foreground hover:text-cyan"
+                >
+                  {item.title}
+                </a>
+              ) : (
+                <span className="break-words font-medium text-foreground">{item.title}</span>
+              )}
+              <span className="mt-0.5 block text-muted-text">
+                {[item.source, item.publishedAt].filter(Boolean).join(' · ')}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {queryVariants.length ? (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-muted-text">本次查詢變體</summary>
+          <ul className="mt-1 space-y-1 text-secondary-text">
+            {queryVariants.map((query) => (
+              <li key={query} className="break-words">
+                {query}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  );
+};
+
+const renderNewsSearchDiagnostics = (
+  component: RunDiagnosticComponent,
+  probeControls: NewsProbeControls,
+): React.ReactNode => {
   if (component.key !== 'news') {
     return null;
   }
@@ -192,20 +347,18 @@ const renderNewsSearchDiagnostics = (component: RunDiagnosticComponent): React.R
     ? (rawFallbackUsed ? '是' : '否')
     : null;
 
-  if (!providers.length && !attemptCount && !resultCount && !finalStatus && !fallbackUsed) {
-    return null;
-  }
-
   return (
     <div className="mt-3 rounded-md border border-border/70 bg-base/40 p-2.5 text-xs text-secondary-text">
       <p className="font-medium text-foreground">新聞搜尋診斷</p>
-      <div className="mt-2 grid gap-1.5">
-        {finalStatus ? <p>狀態：{finalStatus}</p> : null}
-        {providers.length ? <p>嘗試來源：{providers.join(', ')}</p> : null}
-        {attemptCount ? <p>查詢次數：{attemptCount}</p> : null}
-        {resultCount ? <p>結果數：{resultCount}</p> : null}
-        {fallbackUsed ? <p>使用備援：{fallbackUsed}</p> : null}
-      </div>
+      {providers.length || attemptCount || resultCount || finalStatus || fallbackUsed ? (
+        <div className="mt-2 grid gap-1.5">
+          {finalStatus ? <p>狀態：{finalStatus}</p> : null}
+          {providers.length ? <p>嘗試來源：{providers.join(', ')}</p> : null}
+          {attemptCount ? <p>查詢次數：{attemptCount}</p> : null}
+          {resultCount ? <p>結果數：{resultCount}</p> : null}
+          {fallbackUsed ? <p>使用備援：{fallbackUsed}</p> : null}
+        </div>
+      ) : null}
       {queryVariants.length ? (
         <details className="mt-2">
           <summary className="cursor-pointer text-muted-text">查詢變體</summary>
@@ -218,6 +371,45 @@ const renderNewsSearchDiagnostics = (component: RunDiagnosticComponent): React.R
           </ul>
         </details>
       ) : null}
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <label className="sr-only" htmlFor="news-provider-probe-target">新聞來源測試標的</label>
+        <select
+          id="news-provider-probe-target"
+          aria-label="新聞來源測試標的"
+          value={probeControls.target}
+          onChange={(event) => probeControls.setTarget(event.target.value as ProbeTargetValue)}
+          className="min-h-8 rounded-md border border-border bg-surface px-2 py-1 text-xs text-foreground"
+        >
+          {NEWS_PROBE_TARGETS.map((target) => (
+            <option key={target.value} value={target.value}>
+              {target.label}
+            </option>
+          ))}
+        </select>
+        <label className="sr-only" htmlFor="news-provider-probe-mode">新聞來源測試模式</label>
+        <select
+          id="news-provider-probe-mode"
+          aria-label="新聞來源測試模式"
+          value={probeControls.mode}
+          onChange={(event) => probeControls.setMode(event.target.value as NewsProviderProbeMode)}
+          className="min-h-8 rounded-md border border-border bg-surface px-2 py-1 text-xs text-foreground"
+        >
+          {NEWS_PROBE_MODES.map((mode) => (
+            <option key={mode.value} value={mode.value}>
+              {mode.label}
+            </option>
+          ))}
+        </select>
+        <Button
+          variant="secondary"
+          size="xsm"
+          onClick={probeControls.run}
+          disabled={probeControls.state.loading}
+        >
+          測試新聞來源
+        </Button>
+      </div>
+      {renderManualProbeResult(probeControls.state)}
     </div>
   );
 };
@@ -241,6 +433,13 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
     failed: false,
   });
   const [copied, setCopied] = useState(false);
+  const [probeTarget, setProbeTarget] = useState<ProbeTargetValue>('tw:2330');
+  const [probeMode, setProbeMode] = useState<NewsProviderProbeMode>('runtime');
+  const [probeState, setProbeState] = useState<NewsProbeState>({
+    loading: false,
+    result: null,
+    error: null,
+  });
   const resetCopiedTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -361,6 +560,43 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
     }
   };
 
+  const runNewsProviderProbe = async () => {
+    const target = selectedProbeTarget(probeTarget);
+    setProbeState({
+      loading: true,
+      result: null,
+      error: null,
+    });
+    try {
+      const result = await diagnosticsApi.probeNewsProvider({
+        symbol: target.symbol,
+        market: target.market,
+        providerMode: probeMode,
+        limit: 4,
+      });
+      setProbeState({
+        loading: false,
+        result,
+        error: null,
+      });
+    } catch (err) {
+      setProbeState({
+        loading: false,
+        result: null,
+        error: sanitizeProbeDisplayText(err instanceof Error ? err.message : err, 220) || 'probe failed',
+      });
+    }
+  };
+
+  const newsProbeControls: NewsProbeControls = {
+    target: probeTarget,
+    setTarget: setProbeTarget,
+    mode: probeMode,
+    setMode: setProbeMode,
+    run: () => void runNewsProviderProbe(),
+    state: probeState,
+  };
+
   return (
     <Card variant="bordered" padding="none" className="home-panel-card text-left">
       <details data-testid="run-diagnostics" className="group">
@@ -446,7 +682,7 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
                       <p className="mt-1 text-xs leading-5 text-secondary-text">
                         {component.message}
                       </p>
-                      {renderNewsSearchDiagnostics(component)}
+                      {renderNewsSearchDiagnostics(component, newsProbeControls)}
                     </div>
                     <Badge variant={componentStyle.variant} className="shrink-0 gap-1.5 shadow-none">
                       <StatusDot tone={componentStyle.tone} className="h-1.5 w-1.5" />

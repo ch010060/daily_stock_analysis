@@ -1,9 +1,16 @@
 import { StrictMode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { diagnosticsApi } from '../../../api/diagnostics';
 import { historyApi } from '../../../api/history';
 import type { RunDiagnosticSummary } from '../../../types/analysis';
 import { ReportDiagnostics } from '../ReportDiagnostics';
+
+vi.mock('../../../api/diagnostics', () => ({
+  diagnosticsApi: {
+    probeNewsProvider: vi.fn(),
+  },
+}));
 
 vi.mock('../../../api/history', () => ({
   historyApi: {
@@ -137,6 +144,129 @@ describe('ReportDiagnostics', () => {
       expect.stringContaining('phase15-test-token'),
     );
     expect(historyApi.getDiagnostics).not.toHaveBeenCalled();
+  });
+
+  it('shows manual news provider probe controls without auto probing on render', () => {
+    render(<ReportDiagnostics summary={newsSearchDiagnosticSummary} />);
+
+    fireEvent.click(screen.getByText('執行狀態'));
+
+    expect(screen.getByRole('button', { name: '測試新聞來源' })).toBeInTheDocument();
+    expect(screen.getByLabelText('新聞來源測試標的')).toBeInTheDocument();
+    expect(screen.getByLabelText('新聞來源測試模式')).toBeInTheDocument();
+    expect(diagnosticsApi.probeNewsProvider).not.toHaveBeenCalled();
+  });
+
+  it('runs the manual news provider probe after click and displays sanitized results', async () => {
+    vi.mocked(diagnosticsApi.probeNewsProvider).mockResolvedValue({
+      symbol: '2330',
+      market: 'tw',
+      providerMode: 'runtime',
+      status: 'available',
+      providersAttempted: ['SearXNG'],
+      queryVariants: ['2330 台積電 新聞', '台積電 最新消息'],
+      attemptCount: 2,
+      resultCount: 4,
+      fallbackUsed: false,
+      latencyMs: 123,
+      items: [
+        {
+          title: '台積電 2330 法說新聞',
+          source: 'Example News',
+          url: 'https://example.com/news/1',
+          publishedAt: '2026-06-20',
+        },
+      ],
+    });
+
+    render(<ReportDiagnostics summary={newsSearchDiagnosticSummary} />);
+
+    fireEvent.click(screen.getByText('執行狀態'));
+    fireEvent.click(screen.getByRole('button', { name: '測試新聞來源' }));
+
+    await waitFor(() => {
+      expect(diagnosticsApi.probeNewsProvider).toHaveBeenCalledWith({
+        symbol: '2330',
+        market: 'tw',
+        providerMode: 'runtime',
+        limit: 4,
+      });
+    });
+    expect(await screen.findByText('手動測試結果')).toBeInTheDocument();
+    expect(screen.getByText('模式：runtime')).toBeInTheDocument();
+    expect(screen.getAllByText('狀態：available').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('嘗試來源：SearXNG')).toBeInTheDocument();
+    expect(screen.getByText('查詢次數：2')).toBeInTheDocument();
+    expect(screen.getAllByText('結果數：4').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('使用備援：否')).toBeInTheDocument();
+    expect(screen.getByText('延遲：123 ms')).toBeInTheDocument();
+    expect(screen.getByText('台積電 2330 法說新聞')).toBeInTheDocument();
+    expect(screen.getByText(/Example News/)).toBeInTheDocument();
+  });
+
+  it('shows explicit manual probe failure status', async () => {
+    vi.mocked(diagnosticsApi.probeNewsProvider).mockResolvedValue({
+      symbol: '2330',
+      market: 'tw',
+      providerMode: 'runtime',
+      status: 'failed',
+      providersAttempted: [],
+      queryVariants: [],
+      attemptCount: 0,
+      resultCount: 0,
+      fallbackUsed: false,
+      latencyMs: 50,
+      items: [],
+      errorMessage: 'provider unavailable',
+    });
+
+    render(<ReportDiagnostics summary={newsSearchDiagnosticSummary} />);
+
+    fireEvent.click(screen.getByText('執行狀態'));
+    fireEvent.click(screen.getByRole('button', { name: '測試新聞來源' }));
+
+    expect(await screen.findByText('狀態：failed')).toBeInTheDocument();
+    expect(screen.getByText('新聞來源測試失敗：provider unavailable')).toBeInTheDocument();
+  });
+
+  it('redacts secret-like values from manual probe UI output', async () => {
+    vi.mocked(diagnosticsApi.probeNewsProvider).mockResolvedValue({
+      symbol: 'AAPL',
+      market: 'us',
+      providerMode: 'tavily',
+      status: 'available',
+      providersAttempted: ['Bearer phase15-provider-secret'],
+      queryVariants: ['AAPL Apple stock news api_key=phase15-query-secret'],
+      attemptCount: 1,
+      resultCount: 1,
+      fallbackUsed: false,
+      latencyMs: 25,
+      items: [
+        {
+          title: 'token=phase15-title-secret',
+          source: 'source password=phase15-source-secret',
+          url: 'https://example.com/news?api_key=phase15-url-secret',
+        },
+      ],
+    });
+
+    render(<ReportDiagnostics summary={newsSearchDiagnosticSummary} />);
+
+    fireEvent.click(screen.getByText('執行狀態'));
+    fireEvent.change(screen.getByLabelText('新聞來源測試標的'), {
+      target: { value: 'us:AAPL' },
+    });
+    fireEvent.change(screen.getByLabelText('新聞來源測試模式'), {
+      target: { value: 'tavily' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '測試新聞來源' }));
+
+    await screen.findByText('手動測試結果');
+    expect(screen.queryByText(/phase15-provider-secret/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/phase15-query-secret/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/phase15-title-secret/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/phase15-source-secret/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/phase15-url-secret/i)).not.toBeInTheDocument();
   });
 
   it('refetches diagnostics after StrictMode cleans up the first effect run', async () => {

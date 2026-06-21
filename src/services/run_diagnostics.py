@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 import uuid
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +87,258 @@ def sanitize_diagnostic_text(value: Any, *, max_length: int = 300) -> Optional[s
     if len(text) > max_length:
         return f"{text[:max_length].rstrip()}..."
     return text
+
+
+_NEWS_PROBE_STOCK_NAMES: Dict[tuple[str, str], str] = {
+    ("tw", "2330"): "台積電",
+    ("tw", "2454"): "聯發科",
+    ("us", "AAPL"): "Apple",
+    ("us", "NVDA"): "NVIDIA",
+}
+
+_SECRET_QUERY_PARAM_RE = re.compile(
+    r"(?i)(api[_-]?key|access[_-]?token|token|secret|password|passwd|cookie|authorization|auth)"
+)
+
+
+def _sanitize_probe_list(
+    values: Any,
+    *,
+    max_items: int = 12,
+    max_length: int = 180,
+) -> List[str]:
+    if not isinstance(values, list):
+        return []
+    cleaned: List[str] = []
+    for value in values[:max_items]:
+        text = sanitize_diagnostic_text(value, max_length=max_length)
+        if text and text not in cleaned:
+            cleaned.append(text)
+    return cleaned
+
+
+def _sanitize_probe_url(value: Any) -> Optional[str]:
+    text = sanitize_diagnostic_text(value, max_length=500)
+    if not text:
+        return None
+    if text == "<redacted-url>":
+        return text
+
+    try:
+        parts = urlsplit(text)
+    except ValueError:
+        return None
+
+    if parts.scheme not in {"http", "https"} or not parts.netloc:
+        return None
+
+    hostname = parts.hostname or ""
+    netloc = hostname
+    if parts.port:
+        netloc = f"{netloc}:{parts.port}"
+
+    query_items = [
+        (key, val)
+        for key, val in parse_qsl(parts.query, keep_blank_values=True)
+        if not _SECRET_QUERY_PARAM_RE.search(key) and not _SECRET_QUERY_PARAM_RE.search(val)
+    ]
+    sanitized = urlunsplit(
+        (
+            parts.scheme,
+            netloc,
+            parts.path,
+            urlencode(query_items, doseq=True),
+            "",
+        )
+    )
+    return sanitize_diagnostic_text(sanitized, max_length=500)
+
+
+def _safe_int(value: Any, *, default: int = 0) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(0, number)
+
+
+def _news_probe_stock_name(symbol: str, market: str) -> str:
+    return _NEWS_PROBE_STOCK_NAMES.get((market, symbol), symbol)
+
+
+def _news_probe_item(result: Any, *, fallback_source: str) -> Optional[Dict[str, Any]]:
+    title = sanitize_diagnostic_text(getattr(result, "title", ""), max_length=220)
+    url = _sanitize_probe_url(getattr(result, "url", ""))
+    if not title or not url:
+        return None
+
+    source = (
+        sanitize_diagnostic_text(getattr(result, "source", ""), max_length=80)
+        or sanitize_diagnostic_text(fallback_source, max_length=80)
+        or ""
+    )
+    published_at = sanitize_diagnostic_text(getattr(result, "published_date", None), max_length=40)
+    item = {
+        "title": title,
+        "source": source,
+        "url": url,
+    }
+    if published_at:
+        item["published_at"] = published_at
+    return item
+
+
+def run_news_provider_probe(
+    *,
+    symbol: str,
+    market: str,
+    limit: int = 4,
+    search_service: Any = None,
+    provider_mode: str = "runtime",
+) -> Dict[str, Any]:
+    """Run one explicit live related-info/news provider probe.
+
+    This helper intentionally performs only ``SearchService.search_stock_news``.
+    It does not run full analysis, notifications, AlphaSift, or any LLM path.
+    """
+    normalized_market = (market or "").strip().lower()
+    normalized_symbol = (symbol or "").strip().upper()
+    normalized_provider_mode = (provider_mode or "runtime").strip().lower()
+    if normalized_provider_mode not in {"runtime", "searxng", "tavily"}:
+        normalized_provider_mode = "runtime"
+    sample_limit = min(8, max(1, _safe_int(limit, default=4)))
+    stock_name = _news_probe_stock_name(normalized_symbol, normalized_market)
+
+    started = time.perf_counter()
+    try:
+        if search_service is None:
+            from src.search_service import SearchService
+
+            search_service = SearchService()
+        response = search_service.search_stock_news(
+            normalized_symbol,
+            stock_name,
+            max_results=sample_limit,
+        )
+    except Exception as exc:  # pragma: no cover - defensive provider boundary
+        latency_ms = max(0, int((time.perf_counter() - started) * 1000))
+        return {
+            "symbol": normalized_symbol,
+            "market": normalized_market,
+            "provider_mode": normalized_provider_mode,
+            "status": "failed",
+            "providers_attempted": [],
+            "query_variants": [],
+            "attempt_count": 0,
+            "result_count": 0,
+            "fallback_used": False,
+            "latency_ms": latency_ms,
+            "items": [],
+            "error_message": sanitize_diagnostic_text(exc, max_length=240) or type(exc).__name__,
+        }
+
+    latency_ms = max(0, int((time.perf_counter() - started) * 1000))
+    response_diagnostics = getattr(response, "diagnostics", None) or {}
+    news_diagnostics = (
+        response_diagnostics.get("news_search")
+        if isinstance(response_diagnostics, dict)
+        else {}
+    )
+    if not isinstance(news_diagnostics, dict):
+        news_diagnostics = {}
+
+    providers_attempted = _sanitize_probe_list(
+        news_diagnostics.get("providers_attempted"),
+        max_items=8,
+        max_length=80,
+    )
+    if not providers_attempted:
+        provider = sanitize_diagnostic_text(getattr(response, "provider", ""), max_length=80)
+        providers_attempted = [provider] if provider else []
+
+    query_variants = _sanitize_probe_list(
+        news_diagnostics.get("query_variants"),
+        max_items=12,
+        max_length=180,
+    )
+    if not query_variants:
+        query = sanitize_diagnostic_text(getattr(response, "query", ""), max_length=180)
+        query_variants = [query] if query else []
+
+    items = [
+        item
+        for result in (getattr(response, "results", None) or [])[:sample_limit]
+        if (item := _news_probe_item(result, fallback_source=getattr(response, "provider", "")))
+    ]
+    result_count = len(items)
+    response_success = bool(getattr(response, "success", False))
+    diagnostic_status = sanitize_diagnostic_text(
+        news_diagnostics.get("final_status"),
+        max_length=40,
+    )
+    status = (
+        "available"
+        if response_success and result_count > 0
+        else "failed" if not response_success else diagnostic_status or "empty"
+    )
+
+    payload: Dict[str, Any] = {
+        "symbol": normalized_symbol,
+        "market": normalized_market,
+        "provider_mode": normalized_provider_mode,
+        "status": status,
+        "providers_attempted": providers_attempted,
+        "query_variants": query_variants,
+        "attempt_count": _safe_int(news_diagnostics.get("attempt_count"), default=1 if query_variants else 0),
+        "result_count": result_count,
+        "fallback_used": bool(news_diagnostics.get("fallback_used", False)),
+        "latency_ms": latency_ms,
+        "items": items,
+    }
+
+    if not response_success:
+        payload["error_message"] = (
+            sanitize_diagnostic_text(getattr(response, "error_message", None), max_length=240)
+            or "provider search failed"
+        )
+    return payload
+
+
+def build_news_provider_probe_search_service(provider_mode: str) -> Any:
+    """Build a one-provider search service for explicit manual probes.
+
+    This is intentionally endpoint-scoped: it does not change default provider
+    selection or background search policy. ``runtime`` mode is handled by the
+    regular ``get_search_service`` factory.
+    """
+    normalized = (provider_mode or "runtime").strip().lower()
+    if normalized not in {"searxng", "tavily"}:
+        raise ValueError("provider_mode must be searxng or tavily")
+
+    from src.config import get_config
+    from src.search_service import SearchService, SearXNGSearchProvider, TavilySearchProvider
+
+    config = get_config()
+    service = SearchService(
+        news_max_age_days=config.news_max_age_days,
+        news_strategy_profile=getattr(config, "news_strategy_profile", "short"),
+    )
+    if normalized == "searxng":
+        provider = SearXNGSearchProvider(
+            config.searxng_base_urls,
+            use_public_instances=bool(
+                config.searxng_public_instances_enabled and not config.searxng_base_urls
+            ),
+        )
+        if not provider.is_available:
+            raise ValueError("SearXNG provider is not configured")
+    else:
+        provider = TavilySearchProvider(config.tavily_api_keys)
+        if not provider.is_available:
+            raise ValueError("Tavily provider is not configured")
+
+    service._providers = [provider]
+    return service
 
 
 @dataclass
