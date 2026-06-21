@@ -2778,7 +2778,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "WEBUI_HOST": {
         "title": "Web UI Host",
-        "description": "Local-only host address for Web UI service binding. Unsafe public binds are rejected by server startup gates.",
+        "description": "Host address for Web UI service binding. Defaults to local-only; 0.0.0.0 or LAN binds require DSA_ALLOW_EXTERNAL_NETWORK=true.",
         "category": "system",
         "data_type": "string",
         "ui_control": "text",
@@ -2793,6 +2793,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "examples": [
             "WEBUI_HOST=127.0.0.1",
             "WEBUI_HOST=localhost",
+            "WEBUI_HOST=0.0.0.0",
         ],
         "docs": [
             {
@@ -2804,7 +2805,59 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
                 "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#webui-與-api-服務",
             },
         ],
-        "warning_codes": ["local_bind_required", "restart_required"],
+        "warning_codes": ["local_bind_required", "external_network_guard", "restart_required"],
+    },
+    "DSA_PUBLIC_HOST": {
+        "title": "Public/LAN Host",
+        "description": "Optional DNS/LAN host alias allowed for WebUI external-network mode. Private LAN IP origins are allowed when DSA_ALLOW_EXTERNAL_NETWORK=true.",
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {},
+        "display_order": 40,
+        "help_key": "settings.system.WEBUI_HOST",
+        "examples": [
+            "DSA_PUBLIC_HOST=192.168.1.108",
+            "DSA_PUBLIC_HOST=macmini.local",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：WebUI 與 API",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#webui-與-api-服務",
+            },
+        ],
+        "warning_codes": ["external_network_guard", "restart_required"],
+    },
+    "DSA_ALLOWED_HOSTS": {
+        "title": "Allowed LAN Hosts",
+        "description": "Optional comma-separated LAN host/IP allowlist for WebUI Host and CORS checks when DSA_ALLOW_EXTERNAL_NETWORK=true.",
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {},
+        "display_order": 41,
+        "help_key": "settings.system.WEBUI_HOST",
+        "examples": [
+            "DSA_ALLOWED_HOSTS=192.168.1.108",
+            "DSA_ALLOWED_HOSTS=192.168.1.108,macmini.local",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：WebUI 與 API",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#webui-與-api-服務",
+            },
+        ],
+        "warning_codes": ["external_network_guard", "restart_required"],
     },
     "WEBUI_PORT": {
         "title": "Web UI Port",
@@ -2818,7 +2871,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "8000",
         "options": [],
         "validation": {"min": 1, "max": 65535},
-        "display_order": 40,
+        "display_order": 42,
         "help_key": "settings.system.WEBUI_PORT",
         "examples": [
             "WEBUI_PORT=8000",

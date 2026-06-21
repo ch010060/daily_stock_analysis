@@ -243,6 +243,38 @@ export interface RunDiagnosticSummary {
   copyText: string;
 }
 
+export type NewsProviderProbeMarket = 'tw' | 'us';
+export type NewsProviderProbeMode = 'runtime' | 'searxng' | 'tavily';
+
+export interface NewsProviderProbeRequest {
+  symbol: string;
+  market: NewsProviderProbeMarket;
+  providerMode?: NewsProviderProbeMode;
+  limit?: number;
+}
+
+export interface NewsProviderProbeItem {
+  title: string;
+  source: string;
+  url: string;
+  publishedAt?: string;
+}
+
+export interface NewsProviderProbeResponse {
+  symbol: string;
+  market: NewsProviderProbeMarket;
+  providerMode: NewsProviderProbeMode;
+  status: string;
+  providersAttempted: string[];
+  queryVariants: string[];
+  attemptCount: number;
+  resultCount: number;
+  fallbackUsed: boolean;
+  latencyMs: number;
+  items: NewsProviderProbeItem[];
+  errorMessage?: string;
+}
+
 /** Sync analysis response */
 export interface AnalysisResult {
   queryId: string;

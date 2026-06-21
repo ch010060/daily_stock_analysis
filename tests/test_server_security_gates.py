@@ -26,6 +26,10 @@ class ServerSecurityGateTestCase(unittest.TestCase):
             {
                 "ENV_FILE": str(self.env_file),
                 "DATABASE_PATH": str(self.data_dir / "stock_analysis.db"),
+                "DSA_ALLOW_EXTERNAL_NETWORK": "false",
+                "DSA_PUBLIC_HOST": "",
+                "DSA_ALLOWED_HOSTS": "",
+                "WEBUI_HOST": "127.0.0.1",
             },
             clear=False,
         )
@@ -57,6 +61,30 @@ class ServerSecurityGateTestCase(unittest.TestCase):
                 with self.assertRaises(ServerSafetyError):
                     validate_local_server_host(host)
 
+    def test_external_network_enabled_allows_configured_lan_host(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "DSA_ALLOW_EXTERNAL_NETWORK": "true",
+                "DSA_PUBLIC_HOST": "192.168.1.108",
+            },
+            clear=False,
+        ):
+            self.assertEqual("192.168.1.108", validate_local_server_host("192.168.1.108"))
+            self.assertEqual("0.0.0.0", validate_local_server_host("0.0.0.0"))
+
+    def test_external_network_enabled_allows_generic_bind_all(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "DSA_ALLOW_EXTERNAL_NETWORK": "true",
+                "DSA_PUBLIC_HOST": "",
+                "DSA_ALLOWED_HOSTS": "",
+            },
+            clear=False,
+        ):
+            self.assertEqual("0.0.0.0", validate_local_server_host("0.0.0.0"))
+
     def test_wildcard_cors_is_not_constructed(self) -> None:
         origins = build_server_safe_cors_origins("*")
         self.assertNotIn("*", origins)
@@ -69,6 +97,22 @@ class ServerSecurityGateTestCase(unittest.TestCase):
         origins = build_server_safe_cors_origins("https://example.com,http://127.0.0.1:9000")
         self.assertNotIn("https://example.com", origins)
         self.assertIn("http://127.0.0.1:9000", origins)
+
+    def test_external_network_enabled_allows_configured_lan_cors_origin(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "DSA_ALLOW_EXTERNAL_NETWORK": "true",
+                "DSA_PUBLIC_HOST": "",
+                "DSA_ALLOWED_HOSTS": "",
+                "WEBUI_PORT": "8000",
+            },
+            clear=False,
+        ):
+            origins = build_server_safe_cors_origins()
+
+        self.assertIn("http://127.0.0.1:8000", origins)
+        self.assertNotIn("*", origins)
 
     def test_auth_disabled_is_rejected(self) -> None:
         self._write_env(auth_enabled=False)

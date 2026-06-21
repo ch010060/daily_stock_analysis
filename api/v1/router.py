@@ -25,6 +25,7 @@ from api.v1.endpoints import agent
 from api.v1.endpoints import usage
 from api.v1.endpoints import portfolio
 from api.v1.endpoints import health
+from api.v1.endpoints import diagnostics
 
 
 def _env_bool(name: str, *, default: bool = False) -> bool:
@@ -98,6 +99,12 @@ router.include_router(
     alerts.router,
     prefix="/alerts",
     tags=["Alerts"]
+)
+
+router.include_router(
+    diagnostics.router,
+    prefix="/diagnostics",
+    tags=["Diagnostics"]
 )
 
 if _alphasift_route_enabled():

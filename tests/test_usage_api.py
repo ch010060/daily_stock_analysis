@@ -70,13 +70,21 @@ class UsageDashboardApiTest(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.fake_db = FakeUsageDbManager()
 
+        self.auth_enabled_patch = patch.dict(
+            create_app.__globals__["add_auth_middleware"].__globals__,
+            {"is_auth_enabled": lambda: False},
+        )
+        self.auth_enabled_patch.start()
+
         app = create_app(static_dir=Path(self.temp_dir.name) / "static")
         app.dependency_overrides[get_database_manager] = lambda: self.fake_db
+        self.app = app
 
-        with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-            self.client = TestClient(app, raise_server_exceptions=True)
+        self.client = TestClient(app, raise_server_exceptions=True)
 
     def tearDown(self):
+        self.app.dependency_overrides.clear()
+        self.auth_enabled_patch.stop()
         DatabaseManager.reset_instance()
         self.temp_dir.cleanup()
 

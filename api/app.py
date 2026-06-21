@@ -22,19 +22,32 @@ import os
 import re
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime
+from ipaddress import ip_address
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 from typing import List, Optional
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
 
 LOCAL_SERVER_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+STARLETTE_TEST_HOST = "testserver"
+BIND_ALL_HOSTS = frozenset({"0.0.0.0", "::"})
+PRIVATE_NETWORK_CORS_ORIGIN_REGEX = (
+    r"^https?://("
+    r"localhost|127\.0\.0\.1|\[::1\]|"
+    r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|"
+    r"192\.168\.\d{1,3}\.\d{1,3}|"
+    r"172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|"
+    r"169\.254\.\d{1,3}\.\d{1,3}|"
+    r"[A-Za-z0-9-]+\.local"
+    r")(:\d+)?$"
+)
 DEFAULT_CORS_ORIGINS = (
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -68,12 +81,119 @@ def _normalize_bind_host(host: str | None) -> str:
     return normalized
 
 
+def _env_truthy(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _strip_host_port(value: str) -> str:
+    candidate = value.strip()
+    if not candidate:
+        return ""
+    parsed = urlparse(candidate if "://" in candidate else f"//{candidate}")
+    hostname = parsed.hostname or candidate.split(":", 1)[0]
+    return _normalize_bind_host(hostname)
+
+
+def _is_lan_access_host(host: str) -> bool:
+    if host in LOCAL_SERVER_HOSTS:
+        return True
+    try:
+        parsed = ip_address(host)
+    except ValueError:
+        # Allow mDNS LAN names such as macmini.local, but reject public DNS
+        # names and arbitrary bare Host headers by default.
+        return host.endswith(".local")
+    return parsed.is_private or parsed.is_loopback or parsed.is_link_local
+
+
+def _configured_lan_hosts() -> List[str]:
+    hosts: List[str] = []
+    sources = (
+        os.environ.get("DSA_PUBLIC_HOST", ""),
+        os.environ.get("DSA_ALLOWED_HOSTS", ""),
+        os.environ.get("WEBUI_HOST", ""),
+    )
+    for source in sources:
+        for raw in source.split(","):
+            host = _strip_host_port(raw)
+            if (
+                host
+                and host not in BIND_ALL_HOSTS
+                and _is_lan_access_host(host)
+                and host not in hosts
+            ):
+                hosts.append(host)
+    return hosts
+
+
+def _external_network_enabled() -> bool:
+    return _env_truthy("DSA_ALLOW_EXTERNAL_NETWORK", default=False)
+
+
+class SafeHostMiddleware:
+    """Reject unsafe Host headers without using wildcard TrustedHost patterns."""
+
+    def __init__(
+        self,
+        app,
+        *,
+        allowed_hosts: List[str],
+        allow_private_hosts: bool = False,
+    ) -> None:
+        self.app = app
+        self.allowed_hosts = set(allowed_hosts)
+        self.allow_private_hosts = allow_private_hosts
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] not in {"http", "websocket"}:
+            await self.app(scope, receive, send)
+            return
+
+        host_header = ""
+        for key, value in scope.get("headers") or []:
+            if key == b"host":
+                host_header = value.decode("latin-1")
+                break
+        host = _strip_host_port(host_header)
+        allowed = host in self.allowed_hosts or (
+            self.allow_private_hosts and _is_lan_access_host(host)
+        )
+        if not allowed:
+            response = PlainTextResponse("Invalid host header", status_code=400)
+            await response(scope, receive, send)
+            return
+
+        await self.app(scope, receive, send)
+
+
+def build_server_safe_allowed_hosts() -> List[str]:
+    """Build explicit TrustedHost list without wildcard hosts."""
+    hosts = ["127.0.0.1", "localhost", "::1", STARLETTE_TEST_HOST]
+    if _external_network_enabled():
+        for host in _configured_lan_hosts():
+            if host not in hosts:
+                hosts.append(host)
+    return hosts
+
+
 def validate_local_server_host(host: str | None) -> str:
-    """Return normalized host or raise when the bind host is not local-only."""
+    """Return normalized host or raise when the bind host is not allowed."""
     normalized = _normalize_bind_host(host)
+    if normalized in LOCAL_SERVER_HOSTS:
+        return normalized
+    if _external_network_enabled():
+        configured_hosts = _configured_lan_hosts()
+        if normalized in configured_hosts:
+            return normalized
+        if normalized in BIND_ALL_HOSTS:
+            return normalized
     if normalized not in LOCAL_SERVER_HOSTS:
         raise ServerSafetyError(
-            "Unsafe server bind host rejected; use 127.0.0.1, localhost, or ::1."
+            "Unsafe server bind host rejected; use 127.0.0.1, localhost, or ::1, "
+            "or set DSA_ALLOW_EXTERNAL_NETWORK=true with DSA_PUBLIC_HOST/DSA_ALLOWED_HOSTS."
         )
     return normalized
 
@@ -87,7 +207,7 @@ def _is_local_cors_origin(origin: str) -> bool:
 
 
 def build_server_safe_cors_origins(extra_origins: str | None = None) -> List[str]:
-    """Build local-only CORS origins; wildcard and non-local origins are ignored."""
+    """Build safe CORS origins; wildcard and unconfigured origins are ignored."""
     if os.environ.get("CORS_ALLOW_ALL", "").strip().lower() in {"1", "true", "yes", "on"}:
         logger.warning(
             "CORS_ALLOW_ALL is set but no longer has any effect; "
@@ -95,11 +215,40 @@ def build_server_safe_cors_origins(extra_origins: str | None = None) -> List[str
             "Remove CORS_ALLOW_ALL from your .env to silence this warning."
         )
     origins = list(DEFAULT_CORS_ORIGINS)
+    external_enabled = _external_network_enabled()
+    allowed_hosts = set(build_server_safe_allowed_hosts())
+    if external_enabled:
+        port = os.environ.get("WEBUI_PORT", "8000").strip() or "8000"
+        for host in allowed_hosts:
+            if host == STARLETTE_TEST_HOST:
+                continue
+            origin = f"http://{host}:{port}" if ":" not in host else f"http://[{host}]:{port}"
+            if origin not in origins:
+                origins.append(origin)
     for origin in (extra_origins or "").split(","):
         candidate = origin.strip()
-        if candidate and candidate not in origins and _is_local_cors_origin(candidate):
+        parsed = urlparse(candidate)
+        hostname = _normalize_bind_host(parsed.hostname)
+        is_allowed_external = (
+            external_enabled
+            and parsed.scheme in {"http", "https"}
+            and bool(parsed.netloc)
+            and hostname in allowed_hosts
+        )
+        if (
+            candidate
+            and candidate not in origins
+            and (_is_local_cors_origin(candidate) or is_allowed_external)
+        ):
             origins.append(candidate)
     return origins
+
+
+def build_server_safe_cors_origin_regex() -> str | None:
+    """Return private-network CORS regex only for explicit external-network mode."""
+    if not _external_network_enabled():
+        return None
+    return PRIVATE_NETWORK_CORS_ORIGIN_REGEX
 
 
 def validate_admin_auth_ready() -> None:
@@ -290,17 +439,26 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     # CORS 配置
     # ============================================================
     
+    allowed_hosts = build_server_safe_allowed_hosts()
     allowed_origins = build_server_safe_cors_origins(os.environ.get("CORS_ORIGINS", ""))
+    allowed_origin_regex = build_server_safe_cors_origin_regex()
+
+    add_auth_middleware(app)
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
+        allow_origin_regex=allowed_origin_regex,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    add_auth_middleware(app)
+    app.add_middleware(
+        SafeHostMiddleware,
+        allowed_hosts=allowed_hosts,
+        allow_private_hosts=_external_network_enabled(),
+    )
     
     # ============================================================
     # 註冊路由

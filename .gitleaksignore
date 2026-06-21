@@ -1,0 +1,2 @@
+# False positive: Phase 15.7B sanitization test fixture, not a real credential.
+9256bcb01d089fb62634a446785960f0ccaa1406:tests/test_search_news_freshness.py:generic-api-key:1526
