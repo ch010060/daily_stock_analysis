@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import logging
+from typing import Any, Callable
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from api.v1.schemas.diagnostics import (
     NewsProviderProbeRequest,
@@ -22,6 +23,21 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+NewsProviderProbeServiceResolver = Callable[[str], Any]
+
+
+def get_news_provider_probe_service_resolver() -> NewsProviderProbeServiceResolver:
+    """Return the service resolver used by the manual news-provider probe."""
+
+    def resolve(provider_mode: str) -> Any:
+        return (
+            get_search_service()
+            if provider_mode == "runtime"
+            else build_news_provider_probe_search_service(provider_mode)
+        )
+
+    return resolve
+
 
 @router.post(
     "/news-provider-probe",
@@ -32,14 +48,15 @@ router = APIRouter()
         "This endpoint performs only a news search provider call; it does not run full analysis or LLM."
     ),
 )
-def probe_news_provider(request: NewsProviderProbeRequest) -> NewsProviderProbeResponse:
+def probe_news_provider(
+    request: NewsProviderProbeRequest,
+    resolve_search_service: NewsProviderProbeServiceResolver = Depends(
+        get_news_provider_probe_service_resolver
+    ),
+) -> NewsProviderProbeResponse:
     provider_mode = request.provider_mode
     try:
-        service = (
-            get_search_service()
-            if provider_mode == "runtime"
-            else build_news_provider_probe_search_service(provider_mode)
-        )
+        service = resolve_search_service(provider_mode)
     except Exception as exc:
         return NewsProviderProbeResponse.model_validate({
             "symbol": request.symbol,

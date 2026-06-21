@@ -26,6 +26,10 @@ class ServerSecurityGateTestCase(unittest.TestCase):
             {
                 "ENV_FILE": str(self.env_file),
                 "DATABASE_PATH": str(self.data_dir / "stock_analysis.db"),
+                "DSA_ALLOW_EXTERNAL_NETWORK": "false",
+                "DSA_PUBLIC_HOST": "",
+                "DSA_ALLOWED_HOSTS": "",
+                "WEBUI_HOST": "127.0.0.1",
             },
             clear=False,
         )

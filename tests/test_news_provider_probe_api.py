@@ -20,6 +20,7 @@ except ModuleNotFoundError:
 
 import src.auth as auth
 from api.app import create_app
+from api.v1.endpoints.diagnostics import get_news_provider_probe_service_resolver
 from src.config import Config
 from src.search_service import SearchResponse, SearchResult
 from src.storage import DatabaseManager
@@ -73,11 +74,28 @@ class NewsProviderProbeApiTestCase(unittest.TestCase):
         self.data_dir = Path(self.temp_dir.name)
         self.env_path = self.data_dir / ".env"
         self.db_path = self.data_dir / "probe_api_test.db"
+        self._saved_env = {
+            key: os.environ.get(key)
+            for key in (
+                "ENV_FILE",
+                "DATABASE_PATH",
+                "DSA_ALLOW_EXTERNAL_NETWORK",
+                "DSA_PUBLIC_HOST",
+                "DSA_ALLOWED_HOSTS",
+                "TAVILY_API_KEYS",
+                "SEARXNG_BASE_URLS",
+                "SEARXNG_PUBLIC_INSTANCES_ENABLED",
+            )
+        }
         self.env_path.write_text(
             "\n".join(
                 [
                     "STOCK_LIST=2330,AAPL",
                     "ADMIN_AUTH_ENABLED=false",
+                    "DSA_ALLOW_EXTERNAL_NETWORK=false",
+                    "TAVILY_API_KEYS=",
+                    "SEARXNG_BASE_URLS=",
+                    "SEARXNG_PUBLIC_INSTANCES_ENABLED=false",
                     f"DATABASE_PATH={self.db_path}",
                 ]
             )
@@ -87,21 +105,41 @@ class NewsProviderProbeApiTestCase(unittest.TestCase):
 
         os.environ["ENV_FILE"] = str(self.env_path)
         os.environ["DATABASE_PATH"] = str(self.db_path)
+        os.environ["DSA_ALLOW_EXTERNAL_NETWORK"] = "false"
+        os.environ["DSA_PUBLIC_HOST"] = ""
+        os.environ["DSA_ALLOWED_HOSTS"] = ""
+        os.environ["TAVILY_API_KEYS"] = ""
+        os.environ["SEARXNG_BASE_URLS"] = ""
+        os.environ["SEARXNG_PUBLIC_INSTANCES_ENABLED"] = "false"
         Config.reset_instance()
         DatabaseManager.reset_instance()
-        app = create_app(static_dir=self.data_dir / "empty-static")
-        self.client = TestClient(app)
+        self.app = create_app(static_dir=self.data_dir / "empty-static")
+        self.client = TestClient(self.app)
 
     def tearDown(self) -> None:
+        self.app.dependency_overrides.clear()
         DatabaseManager.reset_instance()
         Config.reset_instance()
-        os.environ.pop("ENV_FILE", None)
-        os.environ.pop("DATABASE_PATH", None)
+        for key, value in self._saved_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
         self.temp_dir.cleanup()
 
-    @patch("api.v1.endpoints.diagnostics.get_search_service")
-    def test_news_provider_probe_tw_success(self, search_service_cls: MagicMock) -> None:
-        service = search_service_cls.return_value
+    def _override_probe_service(self, service_by_mode: dict[str, MagicMock]) -> list[str]:
+        calls: list[str] = []
+
+        def resolve(provider_mode: str) -> MagicMock:
+            calls.append(provider_mode)
+            return service_by_mode[provider_mode]
+
+        self.app.dependency_overrides[get_news_provider_probe_service_resolver] = lambda: resolve
+        return calls
+
+    def test_news_provider_probe_tw_success(self) -> None:
+        service = MagicMock()
+        resolver_calls = self._override_probe_service({"runtime": service})
         service.search_stock_news.return_value = _response(
             query="2330 台積電 新聞",
             provider="SearXNG",
@@ -135,11 +173,12 @@ class NewsProviderProbeApiTestCase(unittest.TestCase):
         self.assertFalse(data["fallback_used"])
         self.assertGreaterEqual(data["latency_ms"], 0)
         self.assertEqual(data["items"][0]["title"], "台積電 2330 法說新聞")
+        self.assertEqual(resolver_calls, ["runtime"])
         service.search_stock_news.assert_called_once_with("2330", "台積電", max_results=4)
 
-    @patch("api.v1.endpoints.diagnostics.get_search_service")
-    def test_news_provider_probe_us_success(self, search_service_cls: MagicMock) -> None:
-        service = search_service_cls.return_value
+    def test_news_provider_probe_us_success(self) -> None:
+        service = MagicMock()
+        resolver_calls = self._override_probe_service({"runtime": service})
         service.search_stock_news.return_value = _response(
             query="AAPL Apple stock news",
             provider="Tavily",
@@ -169,11 +208,12 @@ class NewsProviderProbeApiTestCase(unittest.TestCase):
         self.assertEqual(data["query_variants"][:2], ["AAPL Apple stock news", "Apple earnings stock news"])
         self.assertTrue(data["fallback_used"])
         self.assertEqual(data["items"][0]["source"], "Tavily")
+        self.assertEqual(resolver_calls, ["runtime"])
         service.search_stock_news.assert_called_once_with("AAPL", "Apple", max_results=4)
 
-    @patch("api.v1.endpoints.diagnostics.get_search_service")
-    def test_news_provider_probe_sanitizes_output(self, search_service_cls: MagicMock) -> None:
-        service = search_service_cls.return_value
+    def test_news_provider_probe_sanitizes_output(self) -> None:
+        service = MagicMock()
+        self._override_probe_service({"runtime": service})
         service.search_stock_news.return_value = _response(
             query="AAPL Apple stock news",
             provider="Tavily",
@@ -216,12 +256,9 @@ class NewsProviderProbeApiTestCase(unittest.TestCase):
             self.assertNotIn(leaked, payload)
         self.assertNotIn("raw_provider_payload", payload)
 
-    @patch("api.v1.endpoints.diagnostics.get_search_service")
-    def test_news_provider_probe_provider_failure_returns_structured_status(
-        self,
-        search_service_cls: MagicMock,
-    ) -> None:
-        service = search_service_cls.return_value
+    def test_news_provider_probe_provider_failure_returns_structured_status(self) -> None:
+        service = MagicMock()
+        self._override_probe_service({"runtime": service})
         service.search_stock_news.side_effect = RuntimeError("provider api_key=phase15-provider-secret failed")
 
         resp = self.client.post(
@@ -237,12 +274,9 @@ class NewsProviderProbeApiTestCase(unittest.TestCase):
         self.assertIn("error_message", data)
         self.assertNotIn("phase15-provider-secret", json.dumps(data, ensure_ascii=False))
 
-    @patch("api.v1.endpoints.diagnostics.build_news_provider_probe_search_service")
-    def test_news_provider_probe_tavily_mode_is_explicit_opt_in(
-        self,
-        build_service: MagicMock,
-    ) -> None:
-        service = build_service.return_value
+    def test_news_provider_probe_tavily_mode_is_explicit_opt_in(self) -> None:
+        service = MagicMock()
+        resolver_calls = self._override_probe_service({"tavily": service})
         service.search_stock_news.return_value = _response(
             query="AAPL Apple stock news",
             provider="Tavily",
@@ -268,4 +302,45 @@ class NewsProviderProbeApiTestCase(unittest.TestCase):
         data = resp.json()
         self.assertEqual(data["provider_mode"], "tavily")
         self.assertEqual(data["providers_attempted"], ["Tavily"])
-        build_service.assert_called_once_with("tavily")
+        self.assertEqual(resolver_calls, ["tavily"])
+
+    def test_news_provider_probe_uses_injected_service_after_no_provider_env_leak(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "DSA_ALLOW_EXTERNAL_NETWORK": "false",
+                "TAVILY_API_KEYS": "",
+                "SEARXNG_BASE_URLS": "",
+                "SEARXNG_PUBLIC_INSTANCES_ENABLED": "false",
+            },
+            clear=False,
+        ):
+            Config.reset_instance()
+            service = MagicMock()
+            resolver_calls = self._override_probe_service({"runtime": service})
+            service.search_stock_news.return_value = _response(
+                query="2330 台積電 新聞",
+                provider="SearXNG",
+                results=[_result("台積電 2330 法說新聞")],
+                diagnostics={
+                    "news_search": {
+                        "providers_attempted": ["SearXNG"],
+                        "query_variants": ["2330 台積電 新聞", "台積電 最新消息"],
+                        "attempt_count": 2,
+                        "result_count": 1,
+                        "fallback_used": False,
+                        "final_status": "available",
+                    }
+                },
+            )
+
+            resp = self.client.post(
+                "/api/v1/diagnostics/news-provider-probe",
+                json={"symbol": "2330", "market": "tw", "limit": 4},
+            )
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["status"], "available")
+        self.assertEqual(data["providers_attempted"], ["SearXNG"])
+        self.assertEqual(resolver_calls, ["runtime"])
