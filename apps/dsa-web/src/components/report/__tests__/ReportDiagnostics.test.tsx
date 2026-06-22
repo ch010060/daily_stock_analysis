@@ -76,6 +76,7 @@ const newsSearchDiagnosticSummary: RunDiagnosticSummary = {
 describe('ReportDiagnostics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: {
@@ -202,6 +203,124 @@ describe('ReportDiagnostics', () => {
     expect(screen.getByText('延遲：123 ms')).toBeInTheDocument();
     expect(screen.getByText('台積電 2330 法說新聞')).toBeInTheDocument();
     expect(screen.getByText(/Example News/)).toBeInTheDocument();
+  });
+
+  it('supports manual probe selection for fresh TW and US targets', async () => {
+    vi.mocked(diagnosticsApi.probeNewsProvider)
+      .mockResolvedValueOnce({
+        symbol: '3008',
+        market: 'tw',
+        providerMode: 'runtime',
+        status: 'available',
+        providersAttempted: ['SearXNG'],
+        queryVariants: ['3008 大立光 新聞', '大立光 最新消息'],
+        attemptCount: 2,
+        resultCount: 2,
+        fallbackUsed: false,
+        latencyMs: 111,
+        items: [
+          {
+            title: '大立光 3008 法說新聞',
+            source: 'Example TW',
+            url: 'https://example.com/tw/3008',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        symbol: 'NVDA',
+        market: 'us',
+        providerMode: 'runtime',
+        status: 'available',
+        providersAttempted: ['Tavily'],
+        queryVariants: ['NVDA NVIDIA stock news', 'NVIDIA earnings AI GPU stock news'],
+        attemptCount: 2,
+        resultCount: 3,
+        fallbackUsed: true,
+        latencyMs: 222,
+        items: [
+          {
+            title: 'NVIDIA NVDA AI GPU earnings news',
+            source: 'Example US',
+            url: 'https://example.com/us/nvda',
+          },
+        ],
+      });
+
+    render(<ReportDiagnostics summary={newsSearchDiagnosticSummary} />);
+
+    fireEvent.click(screen.getByText('執行狀態'));
+    fireEvent.change(screen.getByLabelText('新聞來源測試標的'), {
+      target: { value: 'tw:3008' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '測試新聞來源' }));
+
+    await waitFor(() => {
+      expect(diagnosticsApi.probeNewsProvider).toHaveBeenCalledWith({
+        symbol: '3008',
+        market: 'tw',
+        providerMode: 'runtime',
+        limit: 4,
+      });
+    });
+    expect(await screen.findByText('大立光 3008 法說新聞')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('新聞來源測試標的'), {
+      target: { value: 'us:NVDA' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '測試新聞來源' }));
+
+    await waitFor(() => {
+      expect(diagnosticsApi.probeNewsProvider).toHaveBeenCalledTimes(2);
+      expect(diagnosticsApi.probeNewsProvider).toHaveBeenLastCalledWith({
+        symbol: 'NVDA',
+        market: 'us',
+        providerMode: 'runtime',
+        limit: 4,
+      });
+    });
+    expect(await screen.findByText('NVIDIA NVDA AI GPU earnings news')).toBeInTheDocument();
+  });
+
+  it('keeps a completed manual probe result after diagnostics remount', async () => {
+    vi.mocked(diagnosticsApi.probeNewsProvider).mockResolvedValue({
+      symbol: '3008',
+      market: 'tw',
+      providerMode: 'runtime',
+      status: 'available',
+      providersAttempted: ['SearXNG'],
+      queryVariants: ['3008 大立光 新聞', '大立光 最新消息'],
+      attemptCount: 2,
+      resultCount: 2,
+      fallbackUsed: false,
+      latencyMs: 111,
+      items: [
+        {
+          title: '大立光 3008 法說新聞',
+          source: 'Example TW',
+          url: 'https://example.com/tw/3008',
+        },
+      ],
+    });
+
+    const firstRender = render(
+      <ReportDiagnostics recordId={61} summary={newsSearchDiagnosticSummary} />,
+    );
+
+    fireEvent.click(screen.getByText('執行狀態'));
+    fireEvent.change(screen.getByLabelText('新聞來源測試標的'), {
+      target: { value: 'tw:3008' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '測試新聞來源' }));
+
+    expect(await screen.findByText('大立光 3008 法說新聞')).toBeInTheDocument();
+    firstRender.unmount();
+
+    render(<ReportDiagnostics recordId={61} summary={newsSearchDiagnosticSummary} />);
+    fireEvent.click(screen.getByText('執行狀態'));
+
+    expect(await screen.findByText('手動測試結果')).toBeInTheDocument();
+    expect(screen.getByText('大立光 3008 法說新聞')).toBeInTheDocument();
+    expect(diagnosticsApi.probeNewsProvider).toHaveBeenCalledTimes(1);
   });
 
   it('shows explicit manual probe failure status', async () => {

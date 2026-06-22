@@ -96,14 +96,14 @@ def _validate_and_normalize_stock_code(code: str) -> str:
     if not stripped:
         raise HTTPException(
             status_code=400,
-            detail={"error": "invalid_stock_code", "message": "股票程式碼不能為空"},
+            detail={"error": "invalid_stock_code", "message": "股票代號不能為空"},
         )
     if not _STOCK_CODE_RE.match(stripped):
         raise HTTPException(
             status_code=400,
             detail={
                 "error": "invalid_stock_code",
-                "message": f"'{stripped}' 不是合法的股票程式碼格式",
+                "message": f"'{stripped}' 不是合法的股票代號格式",
             },
         )
     return normalize_stock_code(stripped)

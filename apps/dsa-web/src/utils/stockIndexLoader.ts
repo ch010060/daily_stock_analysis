@@ -18,6 +18,51 @@ export interface IndexLoadResult {
   fallback: boolean;
 }
 
+const REQUIRED_ROUTE_B_ITEMS: StockIndexItem[] = [
+  {
+    canonicalCode: '3008',
+    displayCode: '3008',
+    nameZh: '大立光',
+    pinyinFull: 'daliguang',
+    pinyinAbbr: 'dlg',
+    aliases: ['大立光精密', 'Largan', 'Largan Precision'],
+    market: 'TW',
+    assetType: 'stock',
+    active: true,
+    popularity: 96,
+  },
+  {
+    canonicalCode: 'SPX',
+    displayCode: 'SPX',
+    nameZh: '標普500指數',
+    pinyinFull: 'biaopu500zhishu',
+    pinyinAbbr: 'bp500zs',
+    aliases: ['S&P500', 'S&P 500', '^GSPC', 'SP500', '標普500', '標普500指數'],
+    market: 'US',
+    assetType: 'index',
+    active: true,
+    popularity: 99,
+  },
+  {
+    canonicalCode: 'SPY',
+    displayCode: 'SPY',
+    nameZh: 'SPDR S&P 500 ETF',
+    pinyinFull: 'spdrs&p500etf',
+    pinyinAbbr: 'spy',
+    aliases: ['SPDR S&P 500', 'SPY ETF'],
+    market: 'US',
+    assetType: 'etf',
+    active: true,
+    popularity: 97,
+  },
+];
+
+function withRequiredRouteBItems(items: StockIndexItem[]): StockIndexItem[] {
+  const seen = new Set(items.map((item) => item.canonicalCode));
+  const missing = REQUIRED_ROUTE_B_ITEMS.filter((item) => !seen.has(item.canonicalCode));
+  return missing.length ? [...items, ...missing] : items;
+}
+
 /**
  * Load stock index
  *
@@ -40,7 +85,7 @@ export async function loadStockIndex(): Promise<IndexLoadResult> {
       : data as StockIndexItem[];
 
     return {
-      data: items,
+      data: withRequiredRouteBItems(items),
       loaded: true,
       fallback: false,
     };

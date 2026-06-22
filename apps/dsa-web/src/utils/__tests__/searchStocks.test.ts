@@ -68,6 +68,66 @@ const mockIndex: StockIndexItem[] = [
     popularity: 98,
   },
   {
+    canonicalCode: "3008",
+    displayCode: "3008",
+    nameZh: "大立光",
+    pinyinFull: "daliguang",
+    pinyinAbbr: "dlg",
+    aliases: ["大立光精密", "Largan", "Largan Precision"],
+    market: "TW",
+    assetType: "stock",
+    active: true,
+    popularity: 96,
+  },
+  {
+    canonicalCode: "NVDA",
+    displayCode: "NVDA",
+    nameZh: "NVIDIA",
+    pinyinFull: "nvidia",
+    pinyinAbbr: "nvda",
+    aliases: ["NVIDIA Corporation", "Nvidia"],
+    market: "US",
+    assetType: "stock",
+    active: true,
+    popularity: 98,
+  },
+  {
+    canonicalCode: "SPX",
+    displayCode: "SPX",
+    nameZh: "標普500指數",
+    pinyinFull: "biaopu500zhishu",
+    pinyinAbbr: "bp500zs",
+    aliases: ["S&P500", "S&P 500", "^GSPC", "SP500", "標普500"],
+    market: "US",
+    assetType: "index",
+    active: true,
+    popularity: 99,
+  },
+  {
+    canonicalCode: "SPY",
+    displayCode: "SPY",
+    nameZh: "SPDR S&P 500 ETF",
+    pinyinFull: "spdrs&p500etf",
+    pinyinAbbr: "spy",
+    aliases: ["SPDR S&P 500", "SPY ETF"],
+    market: "US",
+    assetType: "etf",
+    active: true,
+    popularity: 97,
+  },
+  {
+    canonicalCode: "SYRE",
+    displayCode: "SYRE",
+    nameZh: "Spyre Therapeutics",
+    pinyinFull: "spyretherapeutics",
+    pinyinAbbr: "syre",
+    aliases: ["Spyre"],
+    market: "US",
+    assetType: "stock",
+    active: true,
+    popularity: 25,
+  },
+  {
     canonicalCode: "600000.SH",
     displayCode: "600000",
     nameZh: "浦發銀行",
@@ -196,6 +256,63 @@ describe('searchStocks', () => {
     expect(results).toHaveLength(1);
     expect(results[0].canonicalCode).toBe('AAPL.US');
     expect(results[0].market).toBe('US');
+  });
+
+  test.each(['S&P500', 'S&P 500', '^GSPC', 'SP500', '標普500'])(
+    'maps natural S&P500 query %s to SPX',
+    (query) => {
+      const results = searchStocks(query, mockIndex);
+
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].canonicalCode).toBe('SPX');
+    },
+  );
+
+  test('shows the 大立光 candidate for natural TW name input', () => {
+    const results = searchStocks('大立光', mockIndex);
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0]).toMatchObject({
+      canonicalCode: '3008',
+      market: 'TW',
+      matchField: 'name',
+      matchType: 'exact',
+    });
+  });
+
+  test('shows the NVIDIA candidate for natural US company input', () => {
+    const results = searchStocks('NVIDIA', mockIndex);
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0]).toMatchObject({
+      canonicalCode: 'NVDA',
+      market: 'US',
+      matchField: 'name',
+      matchType: 'exact',
+    });
+  });
+
+  test('prioritizes exact SPY ticker over SYRE fuzzy/name matches', () => {
+    const results = searchStocks('SPY', mockIndex);
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].canonicalCode).toBe('SPY');
+    expect(results[0].canonicalCode).not.toBe('SYRE');
+  });
+
+  test('prioritizes lowercase spy ticker over SYRE fuzzy/name matches', () => {
+    const results = searchStocks('spy', mockIndex);
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].canonicalCode).toBe('SPY');
+    expect(results[0].canonicalCode).not.toBe('SYRE');
+  });
+
+  test('does not substitute an uppercase SPY ticker query with SYRE when SPY is absent', () => {
+    const indexWithoutSpy = mockIndex.filter((item) => item.canonicalCode !== 'SPY');
+    const results = searchStocks('SPY', indexWithoutSpy);
+
+    expect(results.some((item) => item.canonicalCode === 'SYRE')).toBe(false);
   });
 
   test('supports half-width queries for full-width A-share suffix names', () => {

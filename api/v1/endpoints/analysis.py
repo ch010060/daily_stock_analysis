@@ -89,7 +89,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_SUPPORTED_FREE_TEXT_RE = re.compile(r"^[A-Za-z0-9.*\-+\u3400-\u9fff\s]+$")
+_SUPPORTED_FREE_TEXT_RE = re.compile(r"^[A-Za-z0-9.*\-+&^\u3400-\u9fff\s]+$")
+_SP500_CANONICAL_CODE = "SPX"
+_SP500_ALIASES = {
+    "S&P500",
+    "S&P 500",
+    "^GSPC",
+    "SP500",
+    "標普500",
+    "標普500指數",
+}
 
 
 def _get_task_trace_id(task: Any) -> Optional[str]:
@@ -165,14 +174,25 @@ def _invalid_analysis_input_error() -> HTTPException:
         status_code=400,
         detail={
             "error": "validation_error",
-            "message": "請輸入有效的股票程式碼或股票名稱",
+            "message": "請輸入有效的股票代號或股票名稱",
         },
     )
 
 
+def _normalize_sp500_alias(text: str) -> Optional[str]:
+    """Map user-natural S&P 500 inputs to the supported canonical index code."""
+    normalized = (text or "").strip().upper()
+    if normalized in _SP500_ALIASES:
+        return _SP500_CANONICAL_CODE
+    compact = re.sub(r"\s+", "", normalized)
+    if compact in {"S&P500", "SP500"}:
+        return _SP500_CANONICAL_CODE
+    return None
+
+
 def _is_obviously_invalid_analysis_input(text: str) -> bool:
     """Reject mixed alphanumeric noise and unsupported symbols early."""
-    if not text or is_code_like(text):
+    if not text or is_code_like(text) or _normalize_sp500_alias(text):
         return False
 
     if not _SUPPORTED_FREE_TEXT_RE.fullmatch(text):
@@ -194,6 +214,10 @@ def _resolve_and_normalize_input(raw_value: str) -> str:
     text = (raw_value or "").strip()
     if not text:
         return ""
+
+    alias_code = _normalize_sp500_alias(text)
+    if alias_code:
+        return alias_code
 
     if is_code_like(text):
         return canonical_stock_code(text)
@@ -303,7 +327,7 @@ def trigger_analysis(
             status_code=400,
             detail={
                 "error": "validation_error",
-                "message": "股票程式碼不能為空或僅包含空白字元"
+                "message": "股票代號不能為空或僅包含空白字元"
             }
         )
 
@@ -509,7 +533,7 @@ def _handle_sync_analysis(
 
 
 # ============================================================
-# POST /market-review - 觸發大盤覆盤
+# POST /market-review - 觸發市場概覽
 # ============================================================
 
 @router.post(
@@ -517,12 +541,12 @@ def _handle_sync_analysis(
     response_model=MarketReviewAccepted,
     status_code=202,
     responses={
-        202: {"description": "大盤覆盤任務已接受", "model": MarketReviewAccepted},
-        409: {"description": "大盤覆盤正在執行", "model": ErrorResponse},
+        202: {"description": "市場概覽任務已接受", "model": MarketReviewAccepted},
+        409: {"description": "市場概覽正在執行", "model": ErrorResponse},
         500: {"description": "提交失敗", "model": ErrorResponse},
     },
-    summary="觸發大盤覆盤",
-    description="提交一個後臺大盤覆盤任務，複用 CLI 的大盤覆盤鏈路並儲存報告。介面內部僅提供程序內/單機防重，如多例項（多 Worker/多容器）部署，需結合外部冪等機制避免重複觸發。",
+    summary="觸發市場概覽",
+    description="提交一個後臺市場概覽任務，複用 CLI 的盤勢回顧鏈路並儲存報告。介面內部僅提供程序內/單機防重，如多例項（多 Worker/多容器）部署，需結合外部冪等機制避免重複觸發。",
 )
 def trigger_market_review(
     request: Optional[MarketReviewRequest] = Body(None),
@@ -535,7 +559,7 @@ def trigger_market_review(
     if override_region == "":
         return MarketReviewAccepted(
             status="accepted",
-            message="今日大盤覆盤相關市場均為非交易日，已跳過大盤覆盤",
+            message="今日市場概覽相關市場均為非交易日，已跳過市場概覽",
             send_notification=request.send_notification,
             trace_id=None,
         )
@@ -546,7 +570,7 @@ def trigger_market_review(
             status_code=409,
             detail={
                 "error": "duplicate_market_review",
-                "message": "大盤覆盤正在執行中，請稍後再試",
+                "message": "市場概覽正在執行中，請稍後再試",
             },
         )
 
@@ -561,8 +585,8 @@ def trigger_market_review(
                 query_id=task_id,
             ),
             stock_code="market_review",
-            stock_name="大盤覆盤",
-            message="大盤覆盤任務已提交",
+            stock_name="市場概覽",
+            message="市場概覽任務已提交",
             task_id=task_id,
         )
     except Exception:
@@ -571,7 +595,7 @@ def trigger_market_review(
 
     return MarketReviewAccepted(
         status="accepted",
-        message="大盤覆盤任務已提交，完成後會儲存報告並按配置推送通知",
+        message="市場概覽任務已提交，完成後會儲存報告並按配置推送通知",
         send_notification=request.send_notification,
         task_id=task.task_id,
         trace_id=_get_task_trace_id(task),

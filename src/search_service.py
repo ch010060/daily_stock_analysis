@@ -2206,10 +2206,22 @@ class SearchService:
     _TW_NEWS_ENGLISH_ALIASES_BY_CODE = {
         "2330": ["TSMC Taiwan Semiconductor"],
         "2454": ["MediaTek"],
+        "2317": ["Hon Hai Foxconn"],
+        "3008": ["Largan Precision", "Largan stock"],
+    }
+    _TW_NEWS_IDENTITY_ALIASES_BY_CODE = {
+        "2330": ["台積電", "TSMC", "Taiwan Semiconductor"],
+        "2454": ["聯發科", "MediaTek"],
+        "2317": ["鴻海精密", "Hon Hai", "Foxconn"],
+        "3008": ["大立光", "大立光精密", "Largan", "Largan Precision"],
     }
     _US_NEWS_TOPIC_VARIANTS_BY_CODE = {
         "AAPL": ["Apple iPhone services market news"],
-        "NVDA": ["NVIDIA earnings AI GPU stock news", "Nvidia latest market news"],
+        "NVDA": [
+            "NVIDIA earnings AI GPU stock news",
+            "Nvidia latest market news",
+            "NVIDIA AI chip GPU data center earnings",
+        ],
     }
 
     def __init__(
@@ -2802,6 +2814,17 @@ class SearchService:
         return terms
 
     @classmethod
+    def _news_alias_identity_terms(cls, stock_code: str) -> List[str]:
+        """Return symbol-specific aliases that should count as company identity."""
+        code = (stock_code or "").strip().upper()
+        terms: List[str] = []
+        for alias in cls._TW_NEWS_IDENTITY_ALIASES_BY_CODE.get(code, []):
+            cls._append_unique(terms, alias)
+        for alias in cls._TW_NEWS_ENGLISH_ALIASES_BY_CODE.get(code, []):
+            cls._append_unique(terms, alias)
+        return terms
+
+    @classmethod
     def _contains_identity_term(cls, text: str, term: str) -> bool:
         if not text or not term:
             return False
@@ -2920,6 +2943,20 @@ class SearchService:
                 else:
                     has_unambiguous_company_signal = True
                 add_reason(f"摘要命中公司名 {term}")
+                break
+
+        for term in cls._news_alias_identity_terms(stock_code):
+            if cls._contains_identity_term(title, term):
+                score += 45
+                direct_signal += 45
+                has_unambiguous_company_signal = True
+                add_reason(f"標題命中公司別名 {term}")
+                break
+            if cls._contains_identity_term(snippet, term):
+                score += 28
+                direct_signal += 28
+                has_unambiguous_company_signal = True
+                add_reason(f"摘要命中公司別名 {term}")
                 break
 
         has_company_event = cls._contains_any_news_term(full_text, cls._COMPANY_EVENT_TERMS)

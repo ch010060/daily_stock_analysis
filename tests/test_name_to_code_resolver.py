@@ -123,6 +123,13 @@ class TestResolveNameToCode:
         assert resolve_name_to_code("貴州茅臺") == "600519"
         assert resolve_name_to_code("騰訊控股") == "00700"
 
+    def test_route_b_natural_aliases_resolve_deterministically(self):
+        assert resolve_name_to_code("大立光") == "3008"
+        assert resolve_name_to_code("大立光精密") == "3008"
+        assert resolve_name_to_code("Largan") == "3008"
+        assert resolve_name_to_code("NVIDIA") == "NVDA"
+        assert resolve_name_to_code("NVIDIA Corporation") == "NVDA"
+
     def test_returns_none_for_empty_or_invalid_input(self):
         assert resolve_name_to_code("") is None
         assert resolve_name_to_code("   ") is None

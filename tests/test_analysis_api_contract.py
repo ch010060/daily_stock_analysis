@@ -151,8 +151,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         args, kwargs = task_queue.submit_background_task.call_args
         self.assertTrue(callable(args[0]))
         self.assertEqual(kwargs["stock_code"], "market_review")
-        self.assertEqual(kwargs["stock_name"], "大盤覆盤")
-        self.assertEqual(kwargs["message"], "大盤覆盤任務已提交")
+        self.assertEqual(kwargs["stock_name"], "市場概覽")
+        self.assertEqual(kwargs["message"], "市場概覽任務已提交")
 
     def test_trigger_market_review_rejects_duplicate_submission(self) -> None:
         if trigger_market_review is None or analysis_endpoint_module is None:
@@ -236,8 +236,119 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         self.assertEqual(response.status, "accepted")
         self.assertIn("非交易日", response.message)
+        self.assertNotIn("大盤覆盤", response.message)
+        self.assertIn("市場概覽", response.message)
         acquire.assert_not_called()
         task_queue.submit_background_task.assert_not_called()
+
+    def test_trigger_analysis_maps_sp500_natural_inputs_to_spx(self) -> None:
+        if trigger_analysis is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        for raw_input in ("S&P500", "S&P 500", "^GSPC", "SP500", "標普500", "標普500指數"):
+            with self.subTest(raw_input=raw_input):
+                queue = MagicMock()
+                queue.submit_tasks_batch.return_value = ([], [])
+
+                with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue), \
+                     patch("api.v1.endpoints.analysis.resolve_name_to_code") as resolve_mock:
+                    response = trigger_analysis(
+                        request=SimpleNamespace(
+                            stock_code=raw_input,
+                            stock_codes=None,
+                            stock_name=None,
+                            original_query=raw_input,
+                            selection_source="manual",
+                            report_type="detailed",
+                            force_refresh=False,
+                            async_mode=True,
+                            notify=True,
+                            analysis_phase="auto",
+                        ),
+                        config=SimpleNamespace(),
+                    )
+
+                self.assertEqual(response.status_code, 202)
+                resolve_mock.assert_not_called()
+                queue.submit_tasks_batch.assert_called_once_with(
+                    stock_codes=["SPX"],
+                    stock_name=None,
+                    original_query=raw_input,
+                    selection_source="manual",
+                    report_type="detailed",
+                    analysis_phase="auto",
+                    force_refresh=False,
+                    notify=True,
+                )
+
+    def test_trigger_analysis_keeps_spy_as_spy_not_syre(self) -> None:
+        if trigger_analysis is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        queue = MagicMock()
+        queue.submit_tasks_batch.return_value = ([], [])
+
+        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue), \
+             patch("api.v1.endpoints.analysis.resolve_name_to_code") as resolve_mock:
+            response = trigger_analysis(
+                request=SimpleNamespace(
+                    stock_code="SPY",
+                    stock_codes=None,
+                    stock_name=None,
+                    original_query="SPY",
+                    selection_source="manual",
+                    report_type="detailed",
+                    force_refresh=False,
+                    async_mode=True,
+                    notify=True,
+                    analysis_phase="auto",
+                ),
+                config=SimpleNamespace(),
+            )
+
+        self.assertEqual(response.status_code, 202)
+        resolve_mock.assert_not_called()
+        queue.submit_tasks_batch.assert_called_once()
+        self.assertEqual(queue.submit_tasks_batch.call_args.kwargs["stock_codes"], ["SPY"])
+        self.assertNotEqual(queue.submit_tasks_batch.call_args.kwargs["stock_codes"], ["SYRE"])
+
+    def test_trigger_analysis_maps_route_b_natural_names_to_canonical_symbols(self) -> None:
+        if trigger_analysis is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        cases = (
+            ("大立光", "3008"),
+            ("NVIDIA", "NVDA"),
+        )
+        for raw_input, expected_code in cases:
+            with self.subTest(raw_input=raw_input):
+                queue = MagicMock()
+                queue.submit_tasks_batch.return_value = ([], [])
+
+                with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue), \
+                     patch("src.services.name_to_code_resolver._get_akshare_name_to_code", return_value={}):
+                    response = trigger_analysis(
+                        request=SimpleNamespace(
+                            stock_code=raw_input,
+                            stock_codes=None,
+                            stock_name=None,
+                            original_query=raw_input,
+                            selection_source="manual",
+                            report_type="detailed",
+                            force_refresh=False,
+                            async_mode=True,
+                            notify=True,
+                            analysis_phase="auto",
+                        ),
+                        config=SimpleNamespace(),
+                    )
+
+                self.assertEqual(response.status_code, 202)
+                queue.submit_tasks_batch.assert_called_once()
+                self.assertEqual(
+                    queue.submit_tasks_batch.call_args.kwargs["stock_codes"],
+                    [expected_code],
+                )
 
     def test_run_market_review_background_uses_configured_pipeline(self) -> None:
         if analysis_endpoint_module is None:
@@ -514,8 +625,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                     config=SimpleNamespace(),
                 ),
                 stock_code="market_review",
-                stock_name="大盤覆盤",
-                message="大盤覆盤任務已提交",
+                stock_name="市場概覽",
+                message="市場概覽任務已提交",
             )
 
         task_info = queue.get_task(task.task_id)
@@ -1747,7 +1858,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 400)
         self.assertEqual(
             ctx.exception.detail["message"],
-            "股票程式碼不能為空或僅包含空白字元",
+            "股票代號不能為空或僅包含空白字元",
         )
 
     def test_trigger_analysis_rejects_obviously_invalid_mixed_input_before_resolution(self) -> None:
@@ -1769,7 +1880,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 )
 
         self.assertEqual(ctx.exception.status_code, 400)
-        self.assertEqual(ctx.exception.detail["message"], "請輸入有效的股票程式碼或股票名稱")
+        self.assertEqual(ctx.exception.detail["message"], "請輸入有效的股票代號或股票名稱")
         resolve_mock.assert_not_called()
 
     def test_trigger_analysis_rejects_unresolvable_alpha_garbage(self) -> None:
@@ -1792,7 +1903,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 )
 
         self.assertEqual(ctx.exception.status_code, 400)
-        self.assertEqual(ctx.exception.detail["message"], "請輸入有效的股票程式碼或股票名稱")
+        self.assertEqual(ctx.exception.detail["message"], "請輸入有效的股票代號或股票名稱")
         queue_mock.assert_not_called()
 
     def test_trigger_analysis_accepts_us_suffix_code(self) -> None:
@@ -2464,7 +2575,7 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         queue = AnalysisTaskQueue(max_workers=1)
         queue._executor = type("ExecutorStub", (), {"submit": lambda self, *args, **kwargs: Future()})()
 
-        with self.assertRaisesRegex(ValueError, "股票程式碼不能為空或僅包含空白字元"):
+        with self.assertRaisesRegex(ValueError, "股票代號不能為空或僅包含空白字元"):
             queue.submit_task("   ", report_type="detailed")
 
         self.assertEqual(queue._tasks, {})

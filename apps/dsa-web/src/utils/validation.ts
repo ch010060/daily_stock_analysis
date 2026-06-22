@@ -4,7 +4,16 @@ interface ValidationResult {
   normalized: string;
 }
 
-const SUPPORTED_QUERY_CHARACTERS = /^[A-Z0-9.\u3400-\u9FFF\s]+$/;
+const SUPPORTED_QUERY_CHARACTERS = /^[A-Z0-9.&^\u3400-\u9FFF\s]+$/;
+const SP500_CANONICAL_CODE = 'SPX';
+const SP500_ALIASES = new Set([
+  'S&P500',
+  'S&P 500',
+  '^GSPC',
+  'SP500',
+  '標普500',
+  '標普500指數',
+]);
 
 const STOCK_CODE_PATTERNS = [
   /^\d{4}$/, // TW 4-digit code, for example 2330
@@ -17,11 +26,23 @@ const STOCK_CODE_PATTERNS = [
   /^[A-Z]{1,5}(?:\.(?:US|[A-Z]))?$/, // Common US ticker format
 ];
 
+const normalizeSp500Alias = (value: string): string | null => {
+  const normalized = value.trim().toUpperCase();
+  if (SP500_ALIASES.has(normalized)) {
+    return SP500_CANONICAL_CODE;
+  }
+  const compact = normalized.replace(/\s+/g, '');
+  return compact === 'S&P500' || compact === 'SP500' ? SP500_CANONICAL_CODE : null;
+};
+
 /**
  * Check whether the input looks like a stock code.
  */
 export const looksLikeStockCode = (value: string): boolean => {
   const normalized = value.trim().toUpperCase();
+  if (normalizeSp500Alias(normalized)) {
+    return true;
+  }
   return STOCK_CODE_PATTERNS.some((regex) => regex.test(normalized));
 };
 
@@ -33,6 +54,11 @@ export const validateStockCode = (value: string): ValidationResult => {
 
   if (!normalized) {
     return { valid: false, message: '請輸入股票代號', normalized };
+  }
+
+  const sp500Alias = normalizeSp500Alias(normalized);
+  if (sp500Alias) {
+    return { valid: true, normalized: sp500Alias };
   }
 
   const valid = looksLikeStockCode(normalized);
@@ -50,7 +76,7 @@ export const validateStockCode = (value: string): ValidationResult => {
 export const isObviouslyInvalidStockQuery = (value: string): boolean => {
   const normalized = value.trim().toUpperCase();
 
-  if (!normalized || looksLikeStockCode(normalized)) {
+  if (!normalized || looksLikeStockCode(normalized) || normalizeSp500Alias(normalized)) {
     return false;
   }
 

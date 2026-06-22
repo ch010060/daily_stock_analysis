@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { StockAutocomplete } from '../StockAutocomplete';
-import type { StockIndexItem } from '../../../types/stockIndex';
+import type { StockIndexItem, StockSuggestion } from '../../../types/stockIndex';
 
 let stockIndexHookImpl: () => {
   index: StockIndexItem[];
@@ -18,7 +18,7 @@ let stockIndexHookImpl: () => {
 let autocompleteHookImpl: () => {
   query: string;
   setQuery: ReturnType<typeof vi.fn>;
-  suggestions: typeof mockSuggestions;
+  suggestions: StockSuggestion[];
   isOpen: boolean;
   highlightedIndex: number;
   setHighlightedIndex: ReturnType<typeof vi.fn>;
@@ -57,7 +57,7 @@ const mockIndex: StockIndexItem[] = [
   },
 ];
 
-const mockSuggestions = [
+const mockSuggestions: StockSuggestion[] = [
   {
     canonicalCode: "600519.SH",
     displayCode: "600519",
@@ -69,7 +69,7 @@ const mockSuggestions = [
   },
 ];
 
-const hkSuggestion = {
+const hkSuggestion: StockSuggestion = {
   canonicalCode: "00700.HK",
   displayCode: "00700",
   nameZh: "騰訊控股",
@@ -79,7 +79,7 @@ const hkSuggestion = {
   score: 100,
 };
 
-const bseSuggestion = {
+const bseSuggestion: StockSuggestion = {
   canonicalCode: "920493.BJ",
   displayCode: "920493",
   nameZh: "示例北交所股票",
@@ -87,6 +87,16 @@ const bseSuggestion = {
   matchType: "exact" as const,
   matchField: "code" as const,
   score: 100,
+};
+
+const twSuggestion: StockSuggestion = {
+  canonicalCode: "3008",
+  displayCode: "3008",
+  nameZh: "大立光",
+  market: "TW" as const,
+  matchType: "exact" as const,
+  matchField: "name" as const,
+  score: 98,
 };
 
 describe('StockAutocomplete', () => {
@@ -459,6 +469,57 @@ describe('StockAutocomplete', () => {
 
       expect(mockOnChange).toHaveBeenCalledWith('920493');
       expect(mockOnSubmit).toHaveBeenCalledWith('920493.BJ', '示例北交所股票', 'autocomplete');
+    });
+
+    it('renders and submits the highlighted TW suggestion', async () => {
+      const requestAnimationFrameSpy = vi
+        .spyOn(window, 'requestAnimationFrame')
+        .mockImplementation((callback) => {
+          callback(0);
+          return 0;
+        });
+      const cancelAnimationFrameSpy = vi
+        .spyOn(window, 'cancelAnimationFrame')
+        .mockImplementation(() => undefined);
+      autocompleteHookImpl = () => ({
+        query: '',
+        setQuery: vi.fn(),
+        suggestions: [twSuggestion],
+        isOpen: true,
+        highlightedIndex: 0,
+        setHighlightedIndex: vi.fn(),
+        highlightPrevious: vi.fn(),
+        highlightNext: vi.fn(),
+        handleSelect: vi.fn(),
+        close: vi.fn(),
+        reset: vi.fn(),
+        isComposing: false,
+        setIsComposing: vi.fn(),
+        runtimeFallback: false,
+        error: null,
+      });
+
+      try {
+        render(
+          <StockAutocomplete
+            value="大立光"
+            onChange={mockOnChange}
+            onSubmit={mockOnSubmit}
+          />,
+        );
+
+        expect(await screen.findByText('台股')).toBeInTheDocument();
+        expect(screen.getAllByText('大立光').length).toBeGreaterThan(0);
+
+        const input = screen.getByDisplayValue('大立光');
+        fireEvent.keyDown(input, { key: 'Enter' });
+
+        expect(mockOnChange).toHaveBeenCalledWith('3008');
+        expect(mockOnSubmit).toHaveBeenCalledWith('3008', '大立光', 'autocomplete');
+      } finally {
+        requestAnimationFrameSpy.mockRestore();
+        cancelAnimationFrameSpy.mockRestore();
+      }
     });
   });
 

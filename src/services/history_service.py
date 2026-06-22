@@ -332,7 +332,12 @@ class HistoryService:
             if not record:
                 logger.warning(f"resolve_and_get_news: record not found for {record_id}")
                 return []
-            return self.get_news_intel(query_id=record.query_id, limit=limit)
+            return self.get_news_intel(
+                query_id=record.query_id,
+                limit=limit,
+                code=getattr(record, "code", None),
+                name=getattr(record, "name", None),
+            )
         except Exception as e:
             logger.error(f"resolve_and_get_news failed for {record_id}: {e}", exc_info=True)
             return []
@@ -503,19 +508,122 @@ class HistoryService:
         """
         return self.db.delete_analysis_history_records(record_ids)
 
-    def get_news_intel(self, query_id: str, limit: int = 20) -> List[Dict[str, str]]:
+    @staticmethod
+    def _news_identity_terms(code: Optional[str], name: Optional[str]) -> List[str]:
+        terms: List[str] = []
+
+        def add(term: Any) -> None:
+            text = str(term or "").strip()
+            if text and text.lower() not in {item.lower() for item in terms}:
+                terms.append(text)
+
+        normalized_code = str(code or "").strip().upper()
+        add(normalized_code)
+        add(name)
+
+        alias_map = {
+            "2317": ["鴻海", "鴻海精密", "Hon Hai", "Foxconn"],
+            "2330": ["台積電", "TSMC", "Taiwan Semiconductor"],
+            "2454": ["聯發科", "MediaTek"],
+            "3008": ["大立光", "大立光精密", "Largan", "Largan Precision"],
+            "AAPL": ["Apple"],
+            "NVDA": ["NVIDIA", "Nvidia", "NVIDIA Corporation"],
+            "SPX": ["S&P500", "S&P 500", "SP500", "標普500", "標普500指數"],
+            "SPY": ["SPDR S&P 500 ETF", "SPY"],
+        }
+        for alias in alias_map.get(normalized_code, []):
+            add(alias)
+
+        return terms
+
+    @staticmethod
+    def _news_identity_score(record: Any, terms: List[str]) -> int:
+        if not terms:
+            return 0
+
+        title = str(getattr(record, "title", "") or "")
+        snippet = str(getattr(record, "snippet", "") or "")
+        source = str(getattr(record, "source", "") or "")
+        query = str(getattr(record, "query", "") or "")
+        haystacks = (
+            (title.lower(), 100),
+            (snippet.lower(), 40),
+            (source.lower(), 20),
+            (query.lower(), 10),
+        )
+
+        score = 0
+        for term in terms:
+            normalized = term.lower()
+            if not normalized:
+                continue
+            for haystack, weight in haystacks:
+                if normalized in haystack:
+                    score += weight
+        return score
+
+    @classmethod
+    def _rank_news_records_for_subject(
+        cls,
+        records: List[Any],
+        *,
+        code: Optional[str],
+        name: Optional[str],
+    ) -> List[Any]:
+        terms = cls._news_identity_terms(code, name)
+        seen: set[str] = set()
+        unique_records: List[Tuple[int, Any]] = []
+        for index, record in enumerate(records):
+            key = str(getattr(record, "url", "") or getattr(record, "title", "") or index)
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_records.append((index, record))
+
+        def sort_key(item: Tuple[int, Any]) -> Tuple[int, int, Any, Any]:
+            index, record = item
+            score = cls._news_identity_score(record, terms)
+            published = getattr(record, "published_date", None)
+            fetched = getattr(record, "fetched_at", None)
+            recency = published or fetched
+            return (score, 1 if published is not None else 0, recency, -index)
+
+        ranked = sorted(unique_records, key=sort_key, reverse=True)
+        return [record for _, record in ranked]
+
+    def get_news_intel(
+        self,
+        query_id: str,
+        limit: int = 20,
+        code: Optional[str] = None,
+        name: Optional[str] = None,
+    ) -> List[Dict[str, str]]:
         """
         Get news intelligence associated with a specified query_id.
 
         Args:
             query_id: Unique analysis identifier
             limit: Result limit
+            code: Optional stock code for relevance ranking
+            name: Optional stock name for relevance ranking
 
         Returns:
             List of news intelligence (containing title, snippet, and url)
         """
         try:
-            records = self.db.get_news_intel_by_query_id(query_id=query_id, limit=limit)
+            fetch_limit = max(limit * 4, limit)
+            records = self.db.get_news_intel_by_query_id(query_id=query_id, limit=fetch_limit)
+
+            if code:
+                records = [
+                    *records,
+                    *self.db.get_recent_news(code=code, days=7, limit=fetch_limit),
+                ]
+                records = self._rank_news_records_for_subject(
+                    records,
+                    code=code,
+                    name=name,
+                )[:limit]
 
             if not records:
                 records = self._fallback_news_by_analysis_context(query_id=query_id, limit=limit)
