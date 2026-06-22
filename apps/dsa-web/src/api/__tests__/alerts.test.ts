@@ -30,7 +30,7 @@ describe('alertsApi', () => {
             id: 1,
             name: 'price rule',
             target_scope: 'single_symbol',
-            target: '600519',
+            target: '2330',
             alert_type: 'price_cross',
             parameters: { direction: 'above', price: 1800 },
             severity: 'warning',
@@ -117,7 +117,7 @@ describe('alertsApi', () => {
         id: 4,
         name: 'macd rule',
         target_scope: 'single_symbol',
-        target: '600519',
+        target: '2330',
         alert_type: 'macd_cross',
         parameters: {
           direction: 'bullish_cross',
@@ -134,7 +134,7 @@ describe('alertsApi', () => {
     await alertsApi.createRule({
       name: 'macd rule',
       targetScope: 'single_symbol',
-      target: '600519',
+      target: '2330',
       alertType: 'macd_cross',
       parameters: {
         direction: 'bullish_cross',
@@ -149,7 +149,7 @@ describe('alertsApi', () => {
     expect(post).toHaveBeenCalledWith('/api/v1/alerts/rules', {
       name: 'macd rule',
       target_scope: 'single_symbol',
-      target: '600519',
+      target: '2330',
       alert_type: 'macd_cross',
       parameters: {
         direction: 'bullish_cross',
@@ -169,7 +169,7 @@ describe('alertsApi', () => {
           id: 6,
           name: 'market status',
           target_scope: 'market',
-          target: 'cn',
+          target: 'tw',
           alert_type: 'market_light_status',
           parameters: { statuses: ['red', 'yellow'] },
           severity: 'critical',
@@ -194,7 +194,7 @@ describe('alertsApi', () => {
     const statusRule = await alertsApi.createRule({
       name: 'market status',
       targetScope: 'market',
-      target: 'cn',
+      target: 'tw',
       alertType: 'market_light_status',
       parameters: { statuses: ['red', 'yellow'] },
       severity: 'critical',
@@ -213,7 +213,7 @@ describe('alertsApi', () => {
     expect(post).toHaveBeenNthCalledWith(1, '/api/v1/alerts/rules', {
       name: 'market status',
       target_scope: 'market',
-      target: 'cn',
+      target: 'tw',
       alert_type: 'market_light_status',
       parameters: { statuses: ['red', 'yellow'] },
       severity: 'critical',
@@ -262,8 +262,8 @@ describe('alertsApi', () => {
           skipped_count: 0,
           target_results: [
             {
-              target: '600519',
-              display_target: '自選股 - 600519',
+              target: '2330',
+              display_target: '自選股 - 2330',
               status: 'triggered',
               record_status: 'triggered',
               triggered: true,
@@ -298,7 +298,7 @@ describe('alertsApi', () => {
     expect(created.parameters.mode).toBe('breach');
     expect(dryRun.evaluatedCount).toBe(2);
     expect(dryRun.degradedCount).toBe(1);
-    expect(dryRun.targetResults?.[0].displayTarget).toBe('自選股 - 600519');
+    expect(dryRun.targetResults?.[0].displayTarget).toBe('自選股 - 2330');
   });
 
   it('deletes, toggles, tests, and lists history endpoints', async () => {

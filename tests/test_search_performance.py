@@ -9,7 +9,6 @@ Benchmarks the name-to-code resolution engine under load.
 
 import time
 import pytest
-from unittest.mock import patch
 from src.services.name_to_code_resolver import resolve_name_to_code
 
 class TestSearchPerformance:
@@ -19,8 +18,8 @@ class TestSearchPerformance:
     def test_resolve_name_to_code_fast_path_throughput(self):
         """Benchmark the common fast paths without typo/fuzzy fallbacks dominating runtime."""
         inputs = [
-            "600519", "00700", "AAPL", "TSLA",
-            "貴州茅臺", "騰訊控股", "阿里巴巴",
+            "2330", "8299", "AAPL", "META",
+            "台積電", "群聯", "Meta Platforms",
             "aaaaaaa", "1234567",
         ]
 
@@ -41,48 +40,40 @@ class TestSearchPerformance:
         assert avg_ms < 20, f"Fast-path resolution too slow: {avg_ms:.2f}ms"
 
     @pytest.mark.benchmark
-    @patch("src.services.name_to_code_resolver._get_akshare_name_to_code", return_value={})
-    def test_resolve_name_to_code_typo_fallback_budget(self, mock_akshare):
-        """Benchmark typo/fuzzy fallback separately with a smaller iteration budget."""
-        typo_inputs = [
-            "貴州茅苔",
-            "平安銀形",
+    def test_resolve_name_to_code_unsupported_name_budget(self):
+        """Unsupported names should fail fast without fuzzy auto-selection."""
+        unsupported_inputs = [
+            "未知半導體",
+            "不存在的支援標的",
         ]
 
-        for s in typo_inputs:
+        for s in unsupported_inputs:
             resolve_name_to_code(s)
 
         start_time = time.time()
         iterations = 10
         for _ in range(iterations):
-            for s in typo_inputs:
-                resolve_name_to_code(s)
+            for s in unsupported_inputs:
+                assert resolve_name_to_code(s) is None
 
         duration = time.time() - start_time
-        avg_ms = (duration / (iterations * len(typo_inputs))) * 1000
+        avg_ms = (duration / (iterations * len(unsupported_inputs))) * 1000
 
-        print(f"\nAverage typo/fallback resolution time: {avg_ms:.2f}ms")
-        assert avg_ms < 100, f"Typo fallback too slow: {avg_ms:.2f}ms"
+        print(f"\nAverage unsupported-name resolution time: {avg_ms:.2f}ms")
+        assert avg_ms < 100, f"Unsupported-name resolution too slow: {avg_ms:.2f}ms"
 
     @pytest.mark.benchmark
-    @patch("src.services.name_to_code_resolver._get_akshare_name_to_code")
-    def test_fuzzy_match_performance_large_set(self, mock_akshare):
-        """Test difflib fuzzy matching performance with a 5000+ stock set."""
-        # Simulate 5000 stocks from AkShare
-        fake_market = {f"股票_{i}": f"{i:06d}" for i in range(5000)}
-        mock_akshare.return_value = fake_market
-        
-        query = "股票_4999" # Worst case or near worst case for fuzzy matching
-        
+    def test_unsupported_name_resolution_budget(self):
+        """Unsupported names should fail fast without provider lookup."""
+        query = "未支援的標的名稱"
+
         start_time = time.time()
-        iterations = 20
+        iterations = 50
         for _ in range(iterations):
-            resolve_name_to_code(query)
-        
+            assert resolve_name_to_code(query) is None
+
         duration = time.time() - start_time
         avg_ms = (duration / iterations) * 1000
-        
-        print(f"\nFuzzy match (5000 stocks) avg time: {avg_ms:.2f}ms")
-        # Fuzzy matching 5000 strings is CPU intensive. 
-        # Aiming for < 100ms per request on a standard CI environment.
-        assert avg_ms < 200, f"Fuzzy matching too slow: {avg_ms:.2f}ms"
+
+        print(f"\nUnsupported-market name resolution avg time: {avg_ms:.2f}ms")
+        assert avg_ms < 20, f"Unsupported-market resolution too slow: {avg_ms:.2f}ms"

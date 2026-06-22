@@ -85,7 +85,7 @@ describe('AlertRuleForm', () => {
   it('submits technical indicator rule payloads', async () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '2330' } });
     fireEvent.change(screen.getByLabelText('規則型別'), { target: { value: 'macd_cross' } });
     fireEvent.change(screen.getByLabelText('交叉方向'), { target: { value: 'bearish_cross' } });
     fireEvent.change(screen.getByLabelText('快線週期'), { target: { value: '6' } });
@@ -95,7 +95,7 @@ describe('AlertRuleForm', () => {
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
-        target: '600519',
+        target: '2330',
         alertType: 'macd_cross',
         parameters: {
           direction: 'bearish_cross',
@@ -110,7 +110,7 @@ describe('AlertRuleForm', () => {
   it('rejects invalid technical indicator boundaries before submit', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '2330' } });
     fireEvent.change(screen.getByLabelText('規則型別'), { target: { value: 'rsi_threshold' } });
     fireEvent.change(screen.getByLabelText('RSI 閾值'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: '建立規則' }));
@@ -122,7 +122,7 @@ describe('AlertRuleForm', () => {
   it('rejects indicator period combinations that exceed fetchable history', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '2330' } });
     fireEvent.change(screen.getByLabelText('規則型別'), { target: { value: 'macd_cross' } });
     fireEvent.change(screen.getByLabelText('快線週期'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('慢線週期'), { target: { value: '250' } });
@@ -136,7 +136,7 @@ describe('AlertRuleForm', () => {
   it('rejects empty required technical indicator thresholds before submit', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '2330' } });
     fireEvent.change(screen.getByLabelText('規則型別'), { target: { value: 'rsi_threshold' } });
     fireEvent.click(screen.getByRole('button', { name: '建立規則' }));
 
@@ -153,7 +153,7 @@ describe('AlertRuleForm', () => {
   it('rejects invalid numeric thresholds before submit', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('標的代號'), { target: { value: '2330' } });
     fireEvent.change(screen.getByLabelText('價格閾值'), { target: { value: '0' } });
     fireEvent.click(screen.getByRole('button', { name: '建立規則' }));
 
@@ -214,13 +214,13 @@ describe('AlertRuleForm', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
     fireEvent.change(screen.getByLabelText('目標範圍'), { target: { value: 'market' } });
-    fireEvent.change(screen.getByLabelText('市場區域'), { target: { value: 'hk' } });
+    fireEvent.change(screen.getByLabelText('市場區域'), { target: { value: 'tw' } });
     fireEvent.click(screen.getByRole('button', { name: '建立規則' }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
         targetScope: 'market',
-        target: 'hk',
+        target: 'tw',
         alertType: 'market_light_status',
         parameters: { statuses: ['red', 'yellow'] },
       }));

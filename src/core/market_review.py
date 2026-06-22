@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-股票智慧分析系統 - 大盤覆盤模組（支援台股 / 美股，保留舊 CN/HK 路徑）
+股票智慧分析系統 - 大盤覆盤模組（支援台股 / 美股）
 ===================================
 
 職責：
-1. 根據 MARKET_REVIEW_REGION 配置選擇市場區域（tw / us / all；舊 cn / hk / both 路徑保留）
+1. 根據 MARKET_REVIEW_REGION 配置選擇市場區域（tw / us / all；不支援 cn / hk）
 2. 執行大盤覆盤分析並生成覆盤報告
 3. 儲存和傳送覆盤報告
 """
@@ -28,10 +28,8 @@ logger = logging.getLogger(__name__)
 MARKET_REVIEW_HISTORY_CODE = "MARKET"
 MARKET_REVIEW_REPORT_TYPE = "market_review"
 _MARKET_REVIEW_MARKETS = (
-    ('cn', 'cn_title', 'A 股'),
-    ('hk', 'hk_title', '港股'),
-    ('us', 'us_title', '美股'),
     ('tw', 'tw_title', '台股'),
+    ('us', 'us_title', '美股'),
 )
 _MARKET_REVIEW_REGION_ORDER = tuple(market for market, _, _ in _MARKET_REVIEW_MARKETS)
 _VALID_MARKET_REVIEW_REGIONS = frozenset(_MARKET_REVIEW_REGION_ORDER)
@@ -43,9 +41,9 @@ def _get_market_review_text(language: str) -> dict[str, str]:
         return {
             "root_title": "# 🎯 Market Review",
             "push_title": "🎯 Market Review",
-            "cn_title": "# A-share Market Recap",
+            "cn_title": "# TW Market Recap",
             "us_title": "# US Market Recap",
-            "hk_title": "# HK Market Recap",
+            "hk_title": "# US Market Recap",
             "tw_title": "# TW Market Recap",
             "separator": "> Next market recap follows",
         }
@@ -53,18 +51,18 @@ def _get_market_review_text(language: str) -> dict[str, str]:
         return {
             "root_title": "# 🎯 大盤回顧",
             "push_title": "🎯 大盤回顧",
-            "cn_title": "# A股大盤回顧",
+            "cn_title": "# 台股大盤回顧",
             "us_title": "# 美股大盤回顧",
-            "hk_title": "# 港股大盤回顧",
+            "hk_title": "# 美股大盤回顧",
             "tw_title": "# 台股大盤回顧",
             "separator": "> 以下為下一市場大盤回顧",
         }
     return {
         "root_title": "# 🎯 大盤回顧",
         "push_title": "🎯 大盤回顧",
-        "cn_title": "# A股大盤回顧",
+        "cn_title": "# 台股大盤回顧",
         "us_title": "# 美股大盤回顧",
-        "hk_title": "# 港股大盤回顧",
+        "hk_title": "# 美股大盤回顧",
         "tw_title": "# 台股大盤回顧",
         "separator": "> 以下為下一市場大盤回顧",
     }
@@ -77,17 +75,17 @@ def _resolve_market_review_regions(raw_region: Optional[str]) -> list[str]:
     if region == 'all':
         return ['tw', 'us']
     if region == 'both':
-        return list(_MARKET_REVIEW_REGION_ORDER)
+        return ['tw', 'us']
     if ',' in region:
         requested = {
             item.strip().lower()
             for item in region.split(',')
             if item.strip().lower() in _VALID_MARKET_REVIEW_REGIONS
         }
-        return [market for market in _MARKET_REVIEW_REGION_ORDER if market in requested] or ['tw']
+        return [market for market in _MARKET_REVIEW_REGION_ORDER if market in requested]
     if region in _VALID_MARKET_REVIEW_REGIONS:
         return [region]
-    return ['tw']
+    return []
 
 
 def _run_tw_market_review_section():
@@ -163,6 +161,12 @@ def run_market_review(
         )
     )
     run_markets = _resolve_market_review_regions(raw_region)
+    if not run_markets:
+        logger.warning(
+            "Market review: no supported TW/US region remains after parsing %r; aborting.",
+            raw_region,
+        )
+        return None
     # Under Route B enforcement, filter out CN regions via scope gate.
     if getattr(config, "route_b_enforce_market_scope", False):
         from src.core.market_review_scope_gate import (

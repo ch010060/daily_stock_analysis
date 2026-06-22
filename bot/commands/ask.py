@@ -3,10 +3,10 @@
 Ask command - analyze one or more stocks using Agent skills.
 
 Usage:
-    /ask 600519                        -> Analyze with default skill
-    /ask 600519 用纏論分析              -> Parse skill from message
-    /ask 600519 chan_theory             -> Specify skill id directly
-    /ask 600519,000858 波浪理論         -> Multi-stock comparison with skill overlay
+    /ask 2330                          -> Analyze with default skill
+    /ask 2330 用纏論分析                -> Parse skill from message
+    /ask 2330 chan_theory               -> Specify skill id directly
+    /ask 2330,2454 波浪理論             -> Multi-stock comparison with skill overlay
 """
 
 import logging
@@ -45,7 +45,7 @@ class AskCommand(BotCommand):
 
     @property
     def usage(self) -> str:
-        return "/ask <股票程式碼[,程式碼2,...]> [技能名稱]"
+        return "/ask <股票代號[,代號2,...]> [技能名稱]"
 
     def _merge_code_args(self, args: List[str]) -> tuple[str, List[str]]:
         """Merge stock code arguments separated by commas or explicit ``vs`` markers."""
@@ -53,7 +53,7 @@ class AskCommand(BotCommand):
             return "", []
 
         code_like = re.compile(
-            r"^,?(\d{6}|hk\d{5}|[A-Za-z]{1,5}(\.[A-Za-z]{1,2})?),?$",
+            r"^,?(\d{4,6}|\d{4,5}[A-Za-z]|[A-Za-z]{1,5}(\.[A-Za-z]{1,2})?),?$",
             re.IGNORECASE,
         )
         raw_codes_parts = [args[0]]
@@ -93,23 +93,22 @@ class AskCommand(BotCommand):
     def _validate_single_code(self, code: str) -> Optional[str]:
         """Validate a single stock code format."""
         normalized = code.upper()
-        is_a_stock = re.match(r"^\d{6}$", normalized)
-        is_hk_stock = re.match(r"^HK\d{5}$", normalized)
+        is_tw_stock = re.match(r"^(\d{4,6}|\d{4,5}[A-Z])$", normalized)
         is_us_stock = re.match(r"^[A-Z]{1,5}(\.[A-Z]{1,2})?$", normalized)
 
-        if not (is_a_stock or is_hk_stock or is_us_stock):
-            return f"無效的股票程式碼: {normalized}（A股6位數字 / 港股HK+5位數字 / 美股1-5個字母）"
+        if not (is_tw_stock or is_us_stock):
+            return f"無效的股票代號: {normalized}（台股代號 / 美股1-5個字母）"
         return None
 
     def validate_args(self, args: List[str]) -> Optional[str]:
         """Validate arguments."""
         if not args:
-            return "請輸入股票程式碼。用法: /ask <股票程式碼[,程式碼2,...]> [技能名稱]"
+            return "請輸入股票代號。用法: /ask <股票代號[,代號2,...]> [技能名稱]"
 
         raw_code_str, _ = self._merge_code_args(args)
         codes = self._parse_stock_codes(raw_code_str)
         if not codes:
-            return "請輸入至少一個有效的股票程式碼"
+            return "請輸入至少一個有效的股票代號"
 
         for code in codes:
             error = self._validate_single_code(code)

@@ -218,7 +218,7 @@ class TestFeishuSender(unittest.TestCase):
             "## 📊 分析結果摘要\n\n"
             "| 股票 | 訊號 |\n"
             "| --- | --- |\n"
-            "| 600519 | 強勢 |\n\n"
+            "| 2330 | 強勢 |\n\n"
             "[詳情](https://example.com/report)"
         )
 
@@ -229,7 +229,7 @@ class TestFeishuSender(unittest.TestCase):
         rendered = payload["card"]["elements"][0]["text"]["content"]
         self.assertIn("**日報**", rendered)
         self.assertIn("**📊 分析結果摘要**", rendered)
-        self.assertIn("• 股票：600519 | 訊號：強勢", rendered)
+        self.assertIn("• 股票：2330 | 訊號：強勢", rendered)
         self.assertIn("[詳情](https://example.com/report)", rendered)
         self.assertNotIn("| --- |", rendered)
 
@@ -285,7 +285,7 @@ class TestEmailSender(unittest.TestCase):
             email_sender="a@qq.com",
             email_password="p",
             email_receivers=["default@qq.com"],
-            stock_email_groups=[(["000001", "600519"], ["group1@qq.com"])],
+            stock_email_groups=[(["000001", "2330"], ["group1@qq.com"])],
         )
         sender = EmailSender(cfg)
         self.assertEqual(
@@ -313,7 +313,7 @@ class TestEmailSender(unittest.TestCase):
             email_receivers=["default@qq.com"],
             stock_email_groups=[
                 (["000001"], ["g1@qq.com"]),
-                (["600519"], ["g2@qq.com"]),
+                (["2330"], ["g2@qq.com"]),
             ],
         )
         sender = EmailSender(cfg)
@@ -1066,7 +1066,7 @@ class TestTelegramSender(unittest.TestCase):
             "## 📊 分析結果摘要\n\n"
             "| 股票 | 訊號 |\n"
             "| --- | --- |\n"
-            "| 600519 | 強勢 |\n\n"
+            "| 2330 | 強勢 |\n\n"
             "[詳情](https://example.com/report)"
         )
 

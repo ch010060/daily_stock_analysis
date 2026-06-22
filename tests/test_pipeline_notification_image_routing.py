@@ -66,7 +66,7 @@ class TestPipelineEmailGroupImageRouting(unittest.TestCase):
     def _make_results(self):
         return [
             SimpleNamespace(code="000001"),
-            SimpleNamespace(code="600519"),
+            SimpleNamespace(code="2330"),
         ]
 
     @patch("src.md2img.markdown_to_image", return_value=b"png-bytes")
@@ -127,7 +127,7 @@ class TestPipelineEmailGroupImageRouting(unittest.TestCase):
         self.assertEqual(calls[0].kwargs["notification_runs"][0]["status"], "failed")
         self.assertEqual(calls[0].kwargs["notification_runs"][0]["channel"], "email:group@example.com")
         self.assertEqual(calls[1].kwargs["query_id"], "query-default")
-        self.assertEqual(calls[1].kwargs["code"], "600519")
+        self.assertEqual(calls[1].kwargs["code"], "2330")
         self.assertEqual(calls[1].kwargs["notification_runs"][0]["status"], "success")
         self.assertEqual(calls[1].kwargs["notification_runs"][0]["channel"], "email:default")
 

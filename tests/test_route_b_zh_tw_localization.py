@@ -170,11 +170,11 @@ class TestMarketReviewTitles(unittest.TestCase):
 
     def test_zh_tw_cn_title(self):
         texts = _get_market_review_text("zh_TW")
-        self.assertEqual(texts["cn_title"], "# A股大盤回顧")
+        self.assertEqual(texts["cn_title"], "# 台股大盤回顧")
 
     def test_zh_tw_hk_title(self):
         texts = _get_market_review_text("zh_TW")
-        self.assertEqual(texts["hk_title"], "# 港股大盤回顧")
+        self.assertEqual(texts["hk_title"], "# 美股大盤回顧")
 
     def test_zh_tw_alias_resolves(self):
         texts = _get_market_review_text("zh-tw")

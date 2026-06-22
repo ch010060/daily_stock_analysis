@@ -28,7 +28,7 @@ from src.schemas.analysis_context_pack import (
 
 def _pack() -> AnalysisContextPack:
     return AnalysisContextPack(
-        subject=AnalysisSubject(code="600519", stock_name="貴州茅臺", market="cn"),
+        subject=AnalysisSubject(code="2330", stock_name="台積電", market="cn"),
         created_at=datetime(2026, 4, 10, 8, 30, tzinfo=timezone.utc),
         blocks={
             "news": AnalysisContextBlock(
@@ -244,7 +244,7 @@ def test_extract_and_sanitize_handle_json_snapshot_strings() -> None:
     overview = render_analysis_context_pack_overview(_pack(), report_language="zh")
     snapshot = json.dumps(
         {
-            "enhanced_context": {"code": "600519"},
+            "enhanced_context": {"code": "2330"},
             "analysis_context_pack_overview": overview,
             "market_phase_summary": {"phase": "intraday", "market": "cn"},
         },
@@ -255,8 +255,8 @@ def test_extract_and_sanitize_handle_json_snapshot_strings() -> None:
     sanitized = sanitize_context_snapshot_for_api(snapshot)
 
     assert extracted is not None
-    assert extracted["subject"]["code"] == "600519"
-    assert sanitized == {"enhanced_context": {"code": "600519"}}
+    assert extracted["subject"]["code"] == "2330"
+    assert sanitized == {"enhanced_context": {"code": "2330"}}
 
 
 def test_extract_reprojects_persisted_overview_to_public_schema() -> None:
@@ -265,8 +265,8 @@ def test_extract_reprojects_persisted_overview_to_public_schema() -> None:
             "pack_version": "1.0",
             "created_at": "2026-04-10T08:30:00+00:00",
             "subject": {
-                "code": "600519",
-                "stock_name": "貴州茅臺",
+                "code": "2330",
+                "stock_name": "台積電",
                 "market": "cn",
                 "api_key": "secret-key",
             },
@@ -374,7 +374,7 @@ def test_extract_accepts_legacy_overview_without_data_quality() -> None:
         {
             "analysis_context_pack_overview": {
                 "pack_version": "1.0",
-                "subject": {"code": "600519"},
+                "subject": {"code": "2330"},
                 "blocks": [
                     {
                         "key": "quote",
@@ -399,7 +399,7 @@ def test_extract_returns_none_for_malformed_persisted_overview() -> None:
     assert extract_analysis_context_pack_overview(
         {
             "analysis_context_pack_overview": {
-                "subject": {"code": "600519"},
+                "subject": {"code": "2330"},
                 "blocks": [{"key": "quote", "label": "行情", "status": "bad_status"}],
             }
         }
@@ -407,7 +407,7 @@ def test_extract_returns_none_for_malformed_persisted_overview() -> None:
     assert extract_analysis_context_pack_overview(
         {
             "analysis_context_pack_overview": {
-                "subject": {"code": "600519"},
+                "subject": {"code": "2330"},
                 "blocks": "not-a-list",
             }
         }

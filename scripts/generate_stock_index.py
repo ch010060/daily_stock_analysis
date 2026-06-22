@@ -1,245 +1,98 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Stock Index Generation Script
+"""Generate the frontend autocomplete index from the TW/US symbol universe."""
 
-Generate stock index file for frontend autocomplete functionality
-Output to apps/dsa-web/public/stocks.index.json
-
-Two-phase strategy:
-1. MVP: Use existing STOCK_NAME_MAP
-2. Future: Combine with AkShare for complete list
-
-Usage:
-    python3 scripts/generate_stock_index.py
-"""
+from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 import unicodedata
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
-# Add the project root to sys.path.
-sys.path.insert(0, str(Path(__file__).parent.parent))
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 try:
     from pypinyin import lazy_pinyin
+
     PYPINYIN_AVAILABLE = True
 except ImportError:
     PYPINYIN_AVAILABLE = False
-    print("[Warning] pypinyin not available, pinyin fields will be empty")
-    print("[Info] Install with: pip install pypinyin")
+
+from src.services.symbol_universe import (  # noqa: E402
+    DEFAULT_SYMBOL_UNIVERSE_SNAPSHOT_PATH,
+    SymbolRecord,
+    SymbolUniverseCache,
+)
 
 
 def normalize_name_for_pinyin(name: str) -> str:
-    """
-    Normalize stock name to avoid special prefixes and full-width characters polluting pinyin index
-
-    Args:
-        name: Original stock name
-
-    Returns:
-        Normalized name for pinyin generation
-    """
-    normalized = unicodedata.normalize('NFKC', name).strip()
-
-    # Strip common A-share prefixes while preserving the core name.
-    normalized = re.sub(r'^(?:\*?ST|N)+', '', normalized, flags=re.IGNORECASE)
-
-    return normalized.strip() or unicodedata.normalize('NFKC', name).strip()
+    """Normalize display name before generating pinyin fields."""
+    return unicodedata.normalize("NFKC", name).strip()
 
 
-def generate_stock_index_from_map() -> List[Dict[str, Any]]:
-    """
-    Generate index from STOCK_NAME_MAP (MVP)
-
-    Returns:
-        List of stock index
-    """
-    from src.data.stock_mapping import STOCK_NAME_MAP
-
-    index = []
-
-    for code, name in STOCK_NAME_MAP.items():
-        # Generate pinyin fields.
-        pinyin_full = None
-        pinyin_abbr = None
-        if PYPINYIN_AVAILABLE:
-            try:
-                normalized_name = normalize_name_for_pinyin(name)
-                py = lazy_pinyin(normalized_name)
-                pinyin_full = ''.join(py)
-                pinyin_abbr = ''.join([p[0] for p in py])
-            except Exception:
-                pass
-
-        # Determine market and asset type.
-        market, asset_type = determine_market_and_type(code)
-
-        # Generate short aliases.
-        aliases = generate_aliases(name)
-
-        index.append({
-            "canonicalCode": build_canonical_code(code, market),
-            "displayCode": code,
-            "nameZh": name,
-            "pinyinFull": pinyin_full,
-            "pinyinAbbr": pinyin_abbr,
-            "aliases": aliases,
-            "market": market,
-            "assetType": asset_type,
-            "active": True,
-            "popularity": 100,  # Default popularity
-        })
-
-    return index
+def _pinyin_fields(name: str) -> tuple[str | None, str | None]:
+    if not PYPINYIN_AVAILABLE:
+        return None, None
+    try:
+        py = lazy_pinyin(normalize_name_for_pinyin(name))
+    except Exception:
+        return None, None
+    return "".join(py), "".join(part[0] for part in py if part)
 
 
-def determine_market_and_type(code: str) -> tuple:
-    """
-    Determine market and asset type based on stock code
-
-    Args:
-        code: Stock code
-
-    Returns:
-        Tuple of (market, asset_type)
-    """
-    if code.isdigit():
-        if len(code) == 5:
-            # Five digits: likely HK stock or legacy B-share.
-            if code.startswith('0') or code.startswith('2'):
-                return 'HK', 'stock'
-            return 'CN', 'stock'
-        elif len(code) == 6:
-            # Six digits: A-share universe.
-            if code.startswith('6'):
-                return 'CN', 'stock'  # Shanghai
-            elif code.startswith(('0', '2', '3')):
-                return 'CN', 'stock'  # Shenzhen
-            elif code.startswith('8'):
-                return 'BSE', 'stock'  # Beijing Stock Exchange
-            return 'CN', 'stock'
-        elif len(code) == 4:
-            # Four digits: likely a US symbol or special market code.
-            return 'US', 'stock'
-
-    # 字母程式碼，美股或其他
-    return 'US', 'stock'
+def _popularity(record: SymbolRecord) -> int:
+    if record.instrument_type == "index":
+        return 99
+    if record.instrument_type in {"etf", "etn", "beneficiary_security"}:
+        return 97
+    if record.market == "TW":
+        return 95
+    return 90
 
 
-def market_to_suffix(market: str) -> str:
-    """
-    Convert market code to suffix
-
-    Args:
-        market: Market code
-
-    Returns:
-        Market suffix
-    """
-    suffix_map = {
-        'CN': 'SH',  # 簡化處理，預設上海
-        'HK': 'HK',
-        'US': 'US',
-        'INDEX': 'SH',
-        'ETF': 'SH',
-        'BSE': 'BJ',
-    }
-    return suffix_map.get(market, 'SH')
+def _frontend_asset_type(record: SymbolRecord) -> str:
+    if record.instrument_type == "index":
+        return "index"
+    if record.instrument_type in {"etf", "etn", "beneficiary_security"}:
+        return "etf"
+    return "stock"
 
 
-def build_canonical_code(code: str, market: str) -> str:
-    """
-    Generate canonical stock code based on code and market.
-
-    A-shares need to distinguish between SH/SZ/BJ, cannot rely solely on the general CN -> SH mapping.
-    """
-    if market == 'CN' and code.isdigit() and len(code) == 6:
-        # Shanghai Stock Exchange (SH)
-        # 60xxxx: Main board, 688xxx: STAR market, 900xxx: B-shares
-        if code.startswith(('6', '900')):
-            return f"{code}.SH"
-
-        # Shenzhen Stock Exchange (SZ)
-        # 00xxxx: Main board, 30xxxx: ChiNext, 20xxxx: B-shares
-        if code.startswith(('0', '2', '3')):
-            return f"{code}.SZ"
-
-        # Beijing Stock Exchange (BJ)
-        # 920xxx: New codes and migrated stock codes after April 2024
-        # 43xxxx, 83xxxx, 87xxxx, 88xxxx: Historical/Temporary codes
-        # 81xxxx, 82xxxx: Convertible bonds/Preferred stocks
-        if code.startswith(('920', '43', '83', '87', '88', '81', '82')):
-            return f"{code}.BJ"
-
-    if market == 'BSE' and code.isdigit() and len(code) == 6:
-        return f"{code}.BJ"
-
-    return f"{code}.{market_to_suffix(market)}"
-
-
-def generate_aliases(name: str) -> List[str]:
-    """
-    Generate stock aliases (abbreviations)
-
-    Args:
-        name: Full stock name
-
-    Returns:
-        List of aliases
-    """
-    aliases = []
-
-    # 常見簡稱對映
-    alias_map = {
-        '貴州茅臺': ['茅臺'],
-        '中國平安': ['平安'],
-        '平安銀行': ['平銀'],
-        '招商銀行': ['招行'],
-        '五糧液': ['五糧'],
-        '寧德時代': ['寧德'],
-        '比亞迪': ['比亞'],
-        '工商銀行': ['工行'],
-        '建設銀行': ['建行'],
-        '農業銀行': ['農行'],
-        '中國銀行': ['中行'],
-        '交通銀行': ['交行'],
-        '興業銀行': ['興業'],
-        '浦發銀行': ['浦發'],
-        '民生銀行': ['民生'],
-        '中信證券': ['中信'],
-        '東方財富': ['東財'],
-        '海康威視': ['海康'],
-        '隆基綠能': ['隆基'],
-        '中國神華': ['神華'],
-        '長江電力': ['長電'],
-        '中國石化': ['石化'],
-        '中國石油': ['石油'],
+def _index_item(record: SymbolRecord) -> dict[str, Any]:
+    pinyin_full, pinyin_abbr = _pinyin_fields(record.name)
+    return {
+        "canonicalCode": record.raw_symbol,
+        "displayCode": record.raw_symbol,
+        "nameZh": record.name,
+        "pinyinFull": pinyin_full,
+        "pinyinAbbr": pinyin_abbr,
+        "aliases": list(record.aliases or []),
+        "market": record.market,
+        "assetType": _frontend_asset_type(record),
+        "active": record.is_active,
+        "popularity": _popularity(record),
     }
 
-    if name in alias_map:
-        aliases.extend(alias_map[name])
 
-    return aliases
+def generate_stock_index_from_symbol_universe(
+    cache: SymbolUniverseCache | None = None,
+) -> list[dict[str, Any]]:
+    """Generate frontend stock index items from the local TW/US universe."""
+    symbol_cache = cache or SymbolUniverseCache.from_json_snapshot(DEFAULT_SYMBOL_UNIVERSE_SNAPSHOT_PATH)
+    items = [_index_item(record) for record in symbol_cache.records if record.market in {"TW", "US"}]
+    items.sort(key=lambda item: (item["market"], item["displayCode"]))
+    return items
 
 
-def compress_index(index: List[Dict[str, Any]]) -> List[List]:
-    """
-    Compress index to array format to reduce file size
-
-    Args:
-        index: Original index
-
-    Returns:
-        Compressed index
-    """
-    compressed = []
-    for item in index:
-        compressed.append([
+def compress_index(index: list[dict[str, Any]]) -> list[list[Any]]:
+    """Compress index to tuple format used by the web app."""
+    return [
+        [
             item["canonicalCode"],
             item["displayCode"],
             item["nameZh"],
@@ -250,90 +103,69 @@ def compress_index(index: List[Dict[str, Any]]) -> List[List]:
             item["assetType"],
             item["active"],
             item.get("popularity", 0),
-        ])
-    return compressed
+        ]
+        for item in index
+    ]
 
 
-def main():
-    """Main function"""
-    # 解析命令列引數
-    parser = argparse.ArgumentParser(
-        description='生成股票自動補全索引檔案',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-示例:
-  python3 scripts/generate_stock_index.py              # 預設：生成索引檔案
-  python3 scripts/generate_stock_index.py --test       # 測試模式：只讀取不寫入
-  python3 scripts/generate_stock_index.py --test -v    # 測試模式 + 顯示詳細資料
-        """
+def _write_compressed_json(path: Path, rows: list[list[Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fh:
+        fh.write("[\n")
+        for index, row in enumerate(rows):
+            json.dump(row, fh, ensure_ascii=False, separators=(",", ":"))
+            fh.write(",\n" if index < len(rows) - 1 else "\n")
+        fh.write("]\n")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Generate TW/US frontend stock index")
+    parser.add_argument(
+        "--snapshot",
+        type=Path,
+        default=DEFAULT_SYMBOL_UNIVERSE_SNAPSHOT_PATH,
+        help="Local symbol universe snapshot",
     )
     parser.add_argument(
-        '--test', '-t',
-        action='store_true',
-        help='測試模式：只讀取和驗證資料，不寫入檔案'
+        "--output",
+        type=Path,
+        default=PROJECT_ROOT / "apps" / "dsa-web" / "public" / "stocks.index.json",
+        help="Frontend compressed index output",
     )
     parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='詳細模式：顯示前10條資料預覽'
+        "--test",
+        "-t",
+        action="store_true",
+        help="Validate and print counts without writing",
     )
-    args = parser.parse_args()
+    parser.add_argument("--verbose", "-v", action="store_true", help="Show preview rows")
+    args = parser.parse_args(argv)
 
-    print("開始生成股票索引...")
-
-    # 生成索引（MVP：使用現有對映）
-    index = generate_stock_index_from_map()
-    print(f"共生成 {len(index)} 條索引")
-
-    # 按市場統計
-    market_stats = {}
-    for item in index:
-        market = item['market']
-        market_stats[market] = market_stats.get(market, 0) + 1
-    print(f"市場分佈：{market_stats}")
-
-    # 壓縮格式（減少檔案大小）
+    cache = SymbolUniverseCache.from_json_snapshot(args.snapshot)
+    index = generate_stock_index_from_symbol_universe(cache)
     compressed = compress_index(index)
+    market_stats: dict[str, int] = {}
+    for item in index:
+        market_stats[item["market"]] = market_stats.get(item["market"], 0) + 1
 
-    # 測試模式：不寫入檔案
+    print(f"generated {len(index)} TW/US stock-index rows from {args.snapshot}")
+    print(f"market distribution: {market_stats}")
+
+    if args.verbose:
+        for item in index[:10]:
+            print(f"  {item['displayCode']} {item['nameZh']} ({item['market']})")
+
     if args.test:
-        print("\n[測試模式] 不會寫入檔案")
-        print(f"預計檔案大小：{len(json.dumps(compressed, ensure_ascii=False, separators=(',', ':'))) / 1024:.2f} KB")
-
-        if args.verbose:
-            print("\n前10條資料預覽：")
-            for i, item in enumerate(index[:10]):
-                print(f"  {i + 1}. {item['canonicalCode']} - {item['nameZh']} ({item['market']})")
-
-        print("\n✓ 測試透過，資料格式正確")
+        print(
+            "estimated compressed size: "
+            f"{len(json.dumps(compressed, ensure_ascii=False, separators=(',', ':'))) / 1024:.2f} KB"
+        )
         return 0
 
-    # 輸出路徑
-    output_path = Path(__file__).parent.parent / "apps" / "dsa-web" / "public" / "stocks.index.json"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # 寫入檔案
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write('[\n')
-        for i, item in enumerate(compressed):
-            json.dump(item, f, ensure_ascii=False, separators=(',', ':'))
-            if i < len(compressed) - 1:
-                f.write(',\n')
-            else:
-                f.write('\n')
-        f.write(']\n')
-
-    file_size = output_path.stat().st_size
-    print(f"索引已生成：{output_path}")
-    print(f"檔案大小：{file_size / 1024:.2f} KB")
-
-    # 驗證檔案可讀
-    with open(output_path, 'r', encoding='utf-8') as f:
-        test_data = json.load(f)
-        print(f"驗證透過：{len(test_data)} 條記錄")
-
+    _write_compressed_json(args.output, compressed)
+    print(f"wrote {args.output} ({args.output.stat().st_size / 1024:.2f} KB)")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

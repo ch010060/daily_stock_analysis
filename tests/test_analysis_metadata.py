@@ -280,14 +280,14 @@ class TestSelectionSourceDocumentation:
         """Test that each selection source corresponds to use cases"""
         use_cases = {
             "manual": [
-                "User directly inputs 600519 in input box",
+                "User directly inputs 2330 in input box",
                 "User directly inputs AAPL in input box",
-                "User directly inputs 貴州茅臺 in input box",
+                "User directly inputs 台積電 in input box",
             ],
             "autocomplete": [
-                "User inputs '茅臺', selects '貴州茅臺' from dropdown",
-                "User inputs 'gzmt', selects '貴州茅臺' from dropdown",
-                "User inputs '6005', selects '600519.SH' from dropdown",
+                "User inputs '台積電', selects '台積電' from dropdown",
+                "User inputs 'gzmt', selects '台積電' from dropdown",
+                "User inputs '6005', selects '2330.TW' from dropdown",
             ],
             "import": [
                 "User batch imports stocks through Excel",

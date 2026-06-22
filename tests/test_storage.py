@@ -89,14 +89,14 @@ class TestStorage(unittest.TestCase):
         db = DatabaseManager(db_url="sqlite:///:memory:")
 
         db.save_conversation_message("feishu_u1", "user", "legacy chat")
-        db.save_conversation_message("feishu_u1:ask_600519", "user", "ask session")
+        db.save_conversation_message("feishu_u1:ask_2330", "user", "ask session")
 
         sessions = db.get_chat_sessions(
             session_prefix="feishu_u1:",
             extra_session_ids=["feishu_u1"],
         )
 
-        self.assertEqual({item["session_id"] for item in sessions}, {"feishu_u1", "feishu_u1:ask_600519"})
+        self.assertEqual({item["session_id"] for item in sessions}, {"feishu_u1", "feishu_u1:ask_2330"})
 
         DatabaseManager.reset_instance()
 
@@ -606,7 +606,7 @@ class TestStorage(unittest.TestCase):
                         }
                     ]
                 ),
-                code='600519',
+                code='2330',
                 data_source='test',
             )
             with results_lock:
@@ -625,7 +625,7 @@ class TestStorage(unittest.TestCase):
                 total = session.execute(
                     select(func.count()).select_from(StockDaily).where(
                         and_(
-                            StockDaily.code == '600519',
+                            StockDaily.code == '2330',
                             StockDaily.date == date(2026, 4, 1),
                         )
                     )

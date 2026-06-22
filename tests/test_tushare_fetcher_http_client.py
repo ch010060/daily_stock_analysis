@@ -35,14 +35,14 @@ class TestTushareHttpClient(unittest.TestCase):
                     "code": 0,
                     "data": {
                         "fields": ["ts_code", "close"],
-                        "items": [["600519.SH", 1688.0]],
+                        "items": [["2330.TW", 1688.0]],
                     },
                 }
             ),
         )
 
         with patch("data_provider.tushare_fetcher.requests.post", return_value=response) as post_mock:
-            df = client.daily(ts_code="600519.SH", start_date="20260320", end_date="20260325")
+            df = client.daily(ts_code="2330.TW", start_date="20260320", end_date="20260325")
 
         post_mock.assert_called_once_with(
             "http://api.tushare.pro",
@@ -50,7 +50,7 @@ class TestTushareHttpClient(unittest.TestCase):
                 "api_name": "daily",
                 "token": "demo-token",
                 "params": {
-                    "ts_code": "600519.SH",
+                    "ts_code": "2330.TW",
                     "start_date": "20260320",
                     "end_date": "20260325",
                 },
@@ -58,7 +58,7 @@ class TestTushareHttpClient(unittest.TestCase):
             },
             timeout=15,
         )
-        self.assertEqual(df.to_dict(orient="records"), [{"ts_code": "600519.SH", "close": 1688.0}])
+        self.assertEqual(df.to_dict(orient="records"), [{"ts_code": "2330.TW", "close": 1688.0}])
 
 
 class TestTushareFetcherInit(unittest.TestCase):

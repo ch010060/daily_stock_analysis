@@ -32,7 +32,7 @@ def analyze_stock(
     分析單隻股票
 
     Args:
-        stock_code: 股票程式碼
+        stock_code: 股票代號
         config: 配置物件（可選，預設使用單例）
         full_report: 是否生成完整報告
         notifier: 通知服務（可選）
@@ -78,7 +78,7 @@ def analyze_stocks(
     分析多隻股票
 
     Args:
-        stock_codes: 股票程式碼列表
+        stock_codes: 股票代號列表
         config: 配置物件（可選，預設使用單例）
         full_report: 是否生成完整報告
         notifier: 通知服務（可選）

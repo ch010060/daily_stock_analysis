@@ -61,7 +61,7 @@ class AnalysisService:
         執行股票分析
         
         Args:
-            stock_code: 股票程式碼
+            stock_code: 股票代號
             report_type: 報告型別 (simple/detailed)
             force_refresh: 是否強制重新整理
             query_id: 查詢 ID（可選）
@@ -70,7 +70,7 @@ class AnalysisService:
             
         Returns:
             分析結果字典，包含:
-            - stock_code: 股票程式碼
+            - stock_code: 股票代號
             - stock_name: 股票名稱
             - report: 分析報告
         """

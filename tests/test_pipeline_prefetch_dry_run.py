@@ -61,7 +61,7 @@ class TestPipelinePrefetchBehavior(unittest.TestCase):
         pipeline.db.has_today_data.side_effect = [True, False]
 
         pipeline.run(
-            stock_codes=["600519", "AAPL"],
+            stock_codes=["2330", "AAPL"],
             dry_run=True,
             send_notification=False,
         )
@@ -69,7 +69,7 @@ class TestPipelinePrefetchBehavior(unittest.TestCase):
         self.assertEqual(
             pipeline.db.has_today_data.call_args_list,
             [
-                call("600519", date(2026, 3, 27)),
+                call("2330", date(2026, 3, 27)),
                 call("AAPL", date(2026, 3, 26)),
             ],
         )
@@ -82,7 +82,7 @@ class TestPipelinePrefetchBehavior(unittest.TestCase):
         pipeline.db.has_today_data.side_effect = [True, False]
 
         pipeline.run(
-            stock_codes=["600519", "AAPL"],
+            stock_codes=["2330", "AAPL"],
             dry_run=True,
             send_notification=False,
         )

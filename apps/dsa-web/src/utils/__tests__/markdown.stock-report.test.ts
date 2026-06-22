@@ -7,7 +7,7 @@ import { markdownToPlainText } from '../markdown';
  */
 describe('markdownToPlainText - Stock Report Scenarios', () => {
   it('handles typical Chinese stock report with tables and indicators', () => {
-    const stockReport = `# 貴州茅臺 (600519) 分析報告
+    const stockReport = `# 台積電 (2330) 分析報告
 
 ## 技術分析
 
@@ -37,13 +37,13 @@ stop_loss = 1620
 target = 1750
 \`\`\`
 
-[檢視詳細資料](https://example.com/stock/600519)`;
+[檢視詳細資料](https://example.com/stock/2330)`;
 
     const result = markdownToPlainText(stockReport);
 
     // Verify key content is preserved
-    expect(result).toContain('貴州茅臺');
-    expect(result).toContain('600519');
+    expect(result).toContain('台積電');
+    expect(result).toContain('2330');
     expect(result).toContain('技術分析');
     expect(result).toContain('MACD');
     expect(result).toContain('金叉訊號');
@@ -60,7 +60,7 @@ target = 1750
   });
 
   it('handles Hong Kong stock report with English and Chinese mix', () => {
-    const hkReport = `# Tencent (00700.HK) Technical Analysis
+    const hkReport = `# Tencent (AAPL) Technical Analysis
 
 ## Key Indicators
 
@@ -81,12 +81,12 @@ MA5 > MA10 > MA20 (多頭排列)
 RSI(14) = 58.3 (中性偏強)
 \`\`\`
 
-[Click for more details](https://finance.qq.com/q/go.php/vInvestConsult/stock/00700)`;
+[Click for more details](https://finance.qq.com/q/go.php/vInvestConsult/stock/AAPL)`;
 
     const result = markdownToPlainText(hkReport);
 
     expect(result).toContain('Tencent');
-    expect(result).toContain('00700.HK');
+    expect(result).toContain('AAPL');
     expect(result).toContain('368.20');
     expect(result).toContain('Resistance 1');
     expect(result).toContain('Support 1');
@@ -142,7 +142,7 @@ const riskReward = (targetPrice - entryPrice) / (entryPrice - stopLoss);
   });
 
   it('handles market review report with multiple stocks', () => {
-    const marketReview = `# A股市場覆盤
+    const marketReview = `# 台股市場覆盤
 
 ## 指數表現
 
@@ -180,7 +180,7 @@ const riskReward = (targetPrice - entryPrice) / (entryPrice - stopLoss);
 
     const result = markdownToPlainText(marketReview);
 
-    expect(result).toContain('A股市場覆盤');
+    expect(result).toContain('台股市場覆盤');
     expect(result).toContain('上證指數');
     expect(result).toContain('3050.32');
     expect(result).toContain('人工智慧');
@@ -273,20 +273,20 @@ def moving_average_strategy(data, short=5, long=20):
   it('handles edge case: very long stock code list', () => {
     const stockList = `# 股票池列表
 
-## 滬深300成分股（部分）
+## 台股 / 美股自選股（部分）
 
-| 程式碼 | 名稱 | 現價 | 漲跌幅 |
+| 代號 | 名稱 | 現價 | 漲跌幅 |
 |------|------|------|--------|
-| 600519 | 貴州茅臺 | 1680.50 | +0.85% |
-| 000858 | 五糧液 | 125.30 | +1.20% |
-| 600036 | 招商銀行 | 32.50 | -0.25% |
-| 000001 | 平安銀行 | 11.85 | +0.42% |
-| 601318 | 中國平安 | 45.20 | +0.15% |
-| 000333 | 美的集團 | 58.80 | +1.80% |
-| 600276 | 恆瑞醫藥 | 42.50 | +2.10% |
-| 300750 | 寧德時代 | 185.30 | +3.20% |
-| 688981 | 中芯國際 | 52.80 | +4.50% |
-| 601012 | 隆基綠能 | 25.60 | -1.20% |
+| 2330 | 台積電 | 1680.50 | +0.85% |
+| 2454 | 聯發科 | 1250.30 | +1.20% |
+| 2308 | 台達電 | 620.50 | -0.25% |
+| 00981A | 主動統一台股增長 | 10.85 | +0.42% |
+| AAPL | Apple | 205.20 | +0.15% |
+| MSFT | Microsoft | 458.80 | +1.80% |
+| NVDA | NVIDIA | 142.50 | +2.10% |
+| META | Meta Platforms | 685.30 | +3.20% |
+| SPY | SPDR S&P 500 ETF | 552.80 | +0.50% |
+| QQQ | Invesco QQQ | 525.60 | -1.20% |
 
 ## 篩選條件
 
@@ -298,10 +298,10 @@ def moving_average_strategy(data, short=5, long=20):
     const result = markdownToPlainText(stockList);
 
     // Verify all stock codes are preserved
-    expect(result).toContain('600519');
-    expect(result).toContain('000858');
+    expect(result).toContain('2330');
+    expect(result).toContain('2454');
     expect(result).toContain('601012');
-    expect(result).toContain('貴州茅臺');
+    expect(result).toContain('台積電');
     expect(result).toContain('寧德時代');
     expect(result).toContain('篩選條件');
     expect(result).toContain('ROE');

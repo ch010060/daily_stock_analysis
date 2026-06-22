@@ -34,8 +34,8 @@ def _registry_with_fetch_handlers(*handlers: MagicMock) -> ToolRegistry:
 
 def _prebuilt_result(**overrides):
     payload = {
-        "code": "600519",
-        "name": "貴州茅臺",
+        "code": "2330",
+        "name": "台積電",
         "operation_advice": "持有",
         "trend_prediction": "震盪偏強",
         "sentiment_score": 72,
@@ -74,7 +74,7 @@ class TestQAPrebuiltContext(unittest.TestCase):
 
         prompt_text = "\n\n".join(m["content"] for m in captured["messages"])
         self.assertIn("[系統提供的只讀預構建分析結果]", prompt_text)
-        self.assertIn("code: 600519", prompt_text)
+        self.assertIn("code: 2330", prompt_text)
         self.assertIn("operation_advice: 持有", prompt_text)
         self.assertIn("analysis_summary: 估值偏高但趨勢仍穩。", prompt_text)
         self.assertIn("risk_warning: 注意高估值", prompt_text)
@@ -122,8 +122,8 @@ class TestQAPrebuiltContext(unittest.TestCase):
         summary = build_prebuilt_context_summary(
             {
                 "pre_built_context": {
-                    "code": "600519",
-                    "name": "貴州茅臺",
+                    "code": "2330",
+                    "name": "台積電",
                     "realtime": {
                         "price": 1880,
                         "api_key": "secret-key-value",
@@ -136,7 +136,7 @@ class TestQAPrebuiltContext(unittest.TestCase):
             }
         )
 
-        self.assertIn("code: 600519", summary)
+        self.assertIn("code: 2330", summary)
         self.assertIn("price", summary)
         self.assertIn("公開新聞摘要", summary)
         self.assertNotIn("secret-key-value", summary)
@@ -152,8 +152,8 @@ class TestQAPrebuiltContext(unittest.TestCase):
         summary = build_prebuilt_context_summary(
             {
                 "pre_built_context": {
-                    "code": "600519",
-                    "name": "貴州茅臺",
+                    "code": "2330",
+                    "name": "台積電",
                     "news_context": "長" * 5000,
                 }
             }
@@ -166,10 +166,10 @@ class TestQAPrebuiltContext(unittest.TestCase):
         executor = AgentExecutor(ToolRegistry(), MagicMock(), max_steps=1)
         msg = executor._build_user_message(
             "Analyze",
-            context={"stock_code": "600519", "report_type": "daily"},
+            context={"stock_code": "2330", "report_type": "daily"},
         )
 
-        self.assertIn("股票程式碼: 600519", msg)
+        self.assertIn("股票代號: 2330", msg)
         self.assertIn("報告型別: daily", msg)
         self.assertIn("請使用可用工具獲取缺失的資料", msg)
         self.assertNotIn("prebuilt", msg)

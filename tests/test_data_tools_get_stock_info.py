@@ -61,17 +61,17 @@ class _DummyManager:
         return self._belong_boards
 
     def get_stock_name(self, _stock_code: str):
-        return "貴州茅臺"
+        return "台積電"
 
 
 class TestGetStockInfoContract(unittest.TestCase):
     def test_get_stock_info_preserves_board_semantics(self) -> None:
         manager = _DummyManager()
         with patch("src.agent.tools.data_tools._get_fetcher_manager", return_value=manager):
-            result = _handle_get_stock_info("600519")
+            result = _handle_get_stock_info("2330")
 
-        self.assertEqual(result["name"], "貴州茅臺")
-        self.assertEqual(result["code"], "600519")
+        self.assertEqual(result["name"], "台積電")
+        self.assertEqual(result["code"], "2330")
         self.assertEqual(result["pe_ratio"], 12.3)
         self.assertEqual(result["pb_ratio"], 2.1)
 

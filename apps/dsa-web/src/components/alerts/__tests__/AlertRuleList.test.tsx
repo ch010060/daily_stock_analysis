@@ -24,7 +24,7 @@ const rules: AlertRuleItem[] = [
     id: 2,
     name: 'MACD 金叉',
     targetScope: 'single_symbol',
-    target: '300750',
+    target: '00981A',
     alertType: 'macd_cross',
     parameters: { direction: 'bullish_cross', fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 },
     severity: 'info',
@@ -38,7 +38,7 @@ const rules: AlertRuleItem[] = [
     id: 3,
     name: 'KDJ 死叉',
     targetScope: 'single_symbol',
-    target: '000001',
+    target: 'AAPL',
     alertType: 'kdj_cross',
     parameters: { direction: 'bearish_cross', period: 9, kPeriod: 3, dPeriod: 3 },
     severity: 'warning',
@@ -159,9 +159,9 @@ describe('AlertRuleList', () => {
       rules: [
         {
           id: 6,
-          name: 'A 股紅黃燈',
+          name: '台股紅黃燈',
           targetScope: 'market',
-          target: 'cn',
+          target: 'tw',
           alertType: 'market_light_status',
           parameters: { statuses: ['red', 'yellow'] },
           severity: 'critical',
@@ -184,7 +184,7 @@ describe('AlertRuleList', () => {
       ],
     });
 
-    expect(screen.getByText('A 股')).toBeInTheDocument();
+    expect(screen.getByText('台股')).toBeInTheDocument();
     expect(screen.getByText('美股')).toBeInTheDocument();
     expect(screen.getAllByText('大盤市場').length).toBeGreaterThan(0);
     expect(screen.getAllByText('大盤紅綠燈狀態').length).toBeGreaterThan(0);

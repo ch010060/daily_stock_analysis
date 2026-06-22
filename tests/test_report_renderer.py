@@ -21,8 +21,8 @@ from src.services.report_renderer import render
 
 
 def _make_result(
-    code: str = "600519",
-    name: str = "貴州茅臺",
+    code: str = "2330",
+    name: str = "台積電",
     sentiment_score: int = 72,
     operation_advice: str = "持有",
     analysis_summary: str = "穩健",
@@ -68,7 +68,7 @@ class TestReportRenderer(unittest.TestCase):
         out = render("markdown", [r], summary_only=True)
         self.assertIsNotNone(out)
         self.assertIn("決策儀表盤", out)
-        self.assertIn("貴州茅臺", out)
+        self.assertIn("台積電", out)
         self.assertIn("持有", out)
 
     def test_render_markdown_full(self) -> None:
@@ -135,7 +135,7 @@ class TestReportRenderer(unittest.TestCase):
         r = _make_result()
         out = render("wechat", [r])
         self.assertIsNotNone(out)
-        self.assertIn("貴州茅臺", out)
+        self.assertIn("台積電", out)
 
     def test_render_brief(self) -> None:
         """Brief platform renders 3-5 sentence summary."""
@@ -143,7 +143,7 @@ class TestReportRenderer(unittest.TestCase):
         out = render("brief", [r])
         self.assertIsNotNone(out)
         self.assertIn("決策簡報", out)
-        self.assertIn("貴州茅臺", out)
+        self.assertIn("台積電", out)
 
     def test_render_brief_respects_model_visibility_toggle(self) -> None:
         r = _make_result(model_used="gemini/gemini-2.5-flash")

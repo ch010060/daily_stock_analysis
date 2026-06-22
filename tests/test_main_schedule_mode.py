@@ -27,7 +27,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.env_path = Path(self.temp_dir.name) / ".env"
-        self.env_path.write_text("STOCK_LIST=600519\n", encoding="utf-8")
+        self.env_path.write_text("STOCK_LIST=2330\n", encoding="utf-8")
         self.original_cwd = os.getcwd()
         os.chdir(self.temp_dir.name)
         self.env_patch = patch.dict(os.environ, {"ENV_FILE": str(self.env_path)}, clear=False)
@@ -97,7 +97,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
         return _DummyConfig(**defaults)
 
     def test_schedule_mode_ignores_cli_stock_snapshot(self) -> None:
-        args = self._make_args(schedule=True, stocks="600519,000001")
+        args = self._make_args(schedule=True, stocks="2330,000001")
         config = self._make_config(schedule_enabled=False)
         scheduled_call = {}
 
@@ -452,7 +452,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             self.assertEqual(provider(), "18:00")
 
     def test_single_run_keeps_cli_stock_override(self) -> None:
-        args = self._make_args(stocks="600519,000001")
+        args = self._make_args(stocks="2330,000001")
         config = self._make_config(run_immediately=True)
 
         with patch("main.parse_arguments", return_value=args), \
@@ -462,7 +462,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             exit_code = main.main()
 
         self.assertEqual(exit_code, 0)
-        run_full_analysis.assert_called_once_with(config, args, ["600519", "000001"])
+        run_full_analysis.assert_called_once_with(config, args, ["2330", "000001"])
 
     def test_run_full_analysis_skips_market_review_when_shared_lock_is_held(self) -> None:
         from src.core.market_review_lock import (

@@ -77,7 +77,7 @@ class TaskService:
         提交非同步分析任務
 
         Args:
-            code: 股票程式碼
+            code: 股票代號
             report_type: 報告型別列舉
             source_message: 來源訊息（用於回覆）
             save_context_snapshot: 是否儲存上下文快照

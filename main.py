@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自選股智慧分析系統 - 主排程程式
+台股 / 美股自選股智慧分析系統 - 主排程程式
 ===================================
 
 職責：
@@ -222,7 +222,7 @@ def _reload_env_file_values_preserving_overrides() -> None:
 def parse_arguments() -> argparse.Namespace:
     """解析命令列引數"""
     parser = argparse.ArgumentParser(
-        description='A股自選股智慧分析系統',
+        description='台股 / 美股自選股智慧分析系統',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 示例:
@@ -253,7 +253,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         '--stocks',
         type=str,
-        help='指定要分析的股票程式碼，逗號分隔（覆蓋配置檔案）'
+        help='指定要分析的股票代號，逗號分隔（覆蓋配置檔案）'
     )
 
     parser.add_argument(
@@ -366,7 +366,7 @@ def parse_arguments() -> argparse.Namespace:
         '--backtest-code',
         type=str,
         default=None,
-        help='僅回測指定股票程式碼'
+        help='僅回測指定股票代號'
     )
 
     parser.add_argument(
@@ -832,7 +832,7 @@ def main() -> int:
         return 1
 
     logger.info("=" * 60)
-    logger.info("A股自選股智慧分析系統 啟動")
+    logger.info("台股 / 美股自選股智慧分析系統 啟動")
     logger.info(f"執行時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("=" * 60)
 

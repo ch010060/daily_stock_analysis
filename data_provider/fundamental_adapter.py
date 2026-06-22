@@ -144,7 +144,7 @@ def _extract_cash_dividend_per_share(row: pd.Series) -> Optional[float]:
 def _filter_rows_by_code(df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame()
-    code_cols = [c for c in df.columns if any(k in str(c) for k in ("程式碼", "股票程式碼", "證券程式碼", "symbol", "ts_code"))]
+    code_cols = [c for c in df.columns if any(k in str(c) for k in ("代號", "程式碼", "股票程式碼", "證券程式碼", "symbol", "ts_code"))]
     if not code_cols:
         return df
 
@@ -244,7 +244,7 @@ def _extract_latest_row(df: pd.DataFrame, stock_code: str) -> Optional[pd.Series
     if df is None or df.empty:
         return None
 
-    code_cols = [c for c in df.columns if any(k in str(c) for k in ("程式碼", "股票程式碼", "證券程式碼", "ts_code", "symbol"))]
+    code_cols = [c for c in df.columns if any(k in str(c) for k in ("代號", "程式碼", "股票程式碼", "證券程式碼", "ts_code", "symbol"))]
     target = _normalize_code(stock_code)
     if code_cols:
         for col in code_cols:
@@ -493,7 +493,7 @@ class AkshareFundamentalAdapter:
             return result
 
         # Try code filter
-        code_cols = [c for c in df.columns if any(k in str(c) for k in ("程式碼", "股票程式碼", "證券程式碼"))]
+        code_cols = [c for c in df.columns if any(k in str(c) for k in ("代號", "程式碼", "股票程式碼", "證券程式碼"))]
         target = _normalize_code(stock_code)
         matched = pd.DataFrame()
         for col in code_cols:

@@ -56,9 +56,9 @@ class TestGetCapitalFlowContract(unittest.TestCase):
             "src.agent.tools.data_tools._get_fetcher_manager",
             return_value=_DummyManagerOk(),
         ):
-            result = _handle_get_capital_flow("600519")
+            result = _handle_get_capital_flow("2330")
 
-        self.assertEqual(result["stock_code"], "600519")
+        self.assertEqual(result["stock_code"], "2330")
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["main_net_inflow"], 1500000.0)
         self.assertEqual(result["inflow_5d"], 8000000.0)
@@ -88,9 +88,9 @@ class TestGetCapitalFlowContract(unittest.TestCase):
             "src.agent.tools.data_tools._get_fetcher_manager",
             return_value=_DummyManagerRaises(),
         ):
-            result = _handle_get_capital_flow("600519")
+            result = _handle_get_capital_flow("2330")
 
-        self.assertEqual(result["stock_code"], "600519")
+        self.assertEqual(result["stock_code"], "2330")
         self.assertEqual(result["status"], "error")
         self.assertIn("capital flow fetch failed", result["error"])
         self.assertIn("network timeout", result["error"])

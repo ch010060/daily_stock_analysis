@@ -2738,6 +2738,8 @@ class SearchService:
                 code_for_variants = f"HK{base.zfill(5)}"
             elif suffix in {"SH", "SZ", "SS", "BJ"} and base.isdigit() and len(base) == 6:
                 code_for_variants = base
+            elif suffix == "TW" and re.fullmatch(r"\d{4,5}[A-Z]?", base):
+                code_for_variants = base
             elif suffix == "US" and re.fullmatch(r"[A-Z]{1,5}", base):
                 code_for_variants = base
 
@@ -2900,7 +2902,7 @@ class SearchService:
                 score += 55
                 direct_signal += 55
                 has_stock_code_signal = True
-                add_reason(f"標題命中股票程式碼 {term}")
+                add_reason(f"標題命中股票代號 {term}")
                 break
         else:
             for term in cls._stock_code_identity_terms(stock_code):
@@ -2908,7 +2910,7 @@ class SearchService:
                     score += 34
                     direct_signal += 34
                     has_stock_code_signal = True
-                    add_reason(f"摘要命中股票程式碼 {term}")
+                    add_reason(f"摘要命中股票代號 {term}")
                     break
             else:
                 for term in cls._stock_code_identity_terms(stock_code):
@@ -2916,7 +2918,7 @@ class SearchService:
                         score += 18
                         direct_signal += 18
                         has_stock_code_signal = True
-                        add_reason(f"連結命中股票程式碼 {term}")
+                        add_reason(f"連結命中股票代號 {term}")
                         break
 
         for term in cls._company_identity_terms(stock_name):
@@ -2994,7 +2996,7 @@ class SearchService:
                 score += 6
                 add_reason("僅命中行業或板塊背景")
             else:
-                add_reason("未命中股票程式碼或公司全稱，降級為背景新聞")
+                add_reason("未命中股票代號或公司全稱，降級為背景新聞")
 
         score = max(0, min(100, score))
         return SearchResult(

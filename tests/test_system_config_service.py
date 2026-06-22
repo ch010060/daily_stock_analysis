@@ -27,7 +27,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.env_path.write_text(
             "\n".join(
                 [
-                    "STOCK_LIST=600519,000001",
+                    "STOCK_LIST=2330,000001",
                     "GEMINI_API_KEY=secret-key-value",
                     "SCHEDULE_TIME=18:00",
                     "LOG_LEVEL=INFO",
@@ -69,7 +69,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
     def test_get_config_masks_alphasift_install_spec(self) -> None:
         self._rewrite_env(
-            "STOCK_LIST=600519,000001",
+            "STOCK_LIST=2330,000001",
             "ALPHASIFT_INSTALL_SPEC=git+https://user:token@example.com/internal/alphasift.git",
         )
 
@@ -88,7 +88,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.assertFalse(items["REPORT_SHOW_LLM_MODEL"]["raw_value_exists"])
 
         self._rewrite_env(
-            "STOCK_LIST=600519,000001",
+            "STOCK_LIST=2330,000001",
             "GEMINI_API_KEY=secret-key-value",
             "SCHEDULE_TIME=18:00",
             "LOG_LEVEL=INFO",
@@ -103,7 +103,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
     def test_get_config_preserves_explicit_empty_switch_value(self) -> None:
         self._rewrite_env(
-            "STOCK_LIST=600519,000001",
+            "STOCK_LIST=2330,000001",
             "GEMINI_API_KEY=secret-key-value",
             "SCHEDULE_TIME=18:00",
             "LOG_LEVEL=INFO",
@@ -118,7 +118,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
     def test_get_config_preserves_explicit_empty_report_show_llm_model_value(self) -> None:
         self._rewrite_env(
-            "STOCK_LIST=600519,000001",
+            "STOCK_LIST=2330,000001",
             "GEMINI_API_KEY=secret-key-value",
             "SCHEDULE_TIME=18:00",
             "LOG_LEVEL=INFO",
@@ -133,7 +133,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
     def test_get_config_with_schema_hides_unregistered_env_keys(self) -> None:
         self._rewrite_env(
-            "STOCK_LIST=600519,000001",
+            "STOCK_LIST=2330,000001",
             "DATABASE_PATH=./custom/stock_analysis.db",
             "SQLITE_WAL_ENABLED=true",
             "USE_PROXY=true",
@@ -155,7 +155,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
     def test_get_config_with_schema_keeps_declared_llm_channel_support_keys(self) -> None:
         self._rewrite_env(
-            "STOCK_LIST=600519,000001",
+            "STOCK_LIST=2330,000001",
             "LLM_CHANNELS=deepseek,my_proxy",
             "LLM_DEEPSEEK_PROTOCOL=deepseek",
             "LLM_DEEPSEEK_BASE_URL=https://api.deepseek.com",
@@ -182,7 +182,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
     def test_get_config_without_schema_keeps_unregistered_env_keys(self) -> None:
         self._rewrite_env(
-            "STOCK_LIST=600519,000001",
+            "STOCK_LIST=2330,000001",
             "DATABASE_PATH=./custom/stock_analysis.db",
             "SQLITE_WAL_ENABLED=true",
         )
@@ -210,7 +210,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self._rewrite_env(
             "LITELLM_MODEL=gemini/gemini-3-flash-preview",
             "GEMINI_API_KEY=secret-key-value",
-            "STOCK_LIST=600519",
+            "STOCK_LIST=2330",
         )
 
         with patch.dict(os.environ, {}, clear=True):
@@ -227,7 +227,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
     def test_get_setup_status_accepts_anspire_one_key_llm(self) -> None:
         self._rewrite_env(
             "ANSPIRE_API_KEYS=sk-anspire-test-value",
-            "STOCK_LIST=600519",
+            "STOCK_LIST=2330",
         )
 
         with patch.dict(os.environ, {}, clear=True):
@@ -244,7 +244,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             "LLM_ANSPIRE_ENABLED=",
             "ANSPIRE_LLM_ENABLED=false",
             "ANSPIRE_API_KEYS=sk-anspire-test-value",
-            "STOCK_LIST=600519",
+            "STOCK_LIST=2330",
         )
 
         with patch.dict(os.environ, {}, clear=True):
@@ -260,7 +260,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             "LLM_CHANNELS=anspire",
             "LLM_ANSPIRE_ENABLED=false",
             "ANSPIRE_API_KEYS=sk-anspire-test-value",
-            "STOCK_LIST=600519",
+            "STOCK_LIST=2330",
         )
 
         with patch.dict(os.environ, {}, clear=True):
@@ -274,7 +274,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
     def test_get_setup_status_accepts_direct_env_primary_without_provider_key(self) -> None:
         self._rewrite_env(
             "LITELLM_MODEL=minimax/MiniMax-M1",
-            "STOCK_LIST=600519",
+            "STOCK_LIST=2330",
         )
 
         with patch.dict(os.environ, {}, clear=True):
@@ -289,7 +289,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         base_lines = [
             "LITELLM_MODEL=gemini/gemini-3-flash-preview",
             "GEMINI_API_KEY=secret-key-value",
-            "STOCK_LIST=600519",
+            "STOCK_LIST=2330",
         ]
 
         self._rewrite_env(*base_lines, "PUSHOVER_USER_KEY=user-key")
@@ -354,7 +354,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             {
                 "LITELLM_MODEL": "gemini/gemini-3-flash-preview",
                 "GEMINI_API_KEY": "runtime-secret",
-                "STOCK_LIST": "600519",
+                "STOCK_LIST": "2330",
             },
             clear=True,
         ), patch("src.services.system_config_service.Config.reset_instance") as mock_reset, \
@@ -371,7 +371,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self._rewrite_env(
             "LITELLM_MODEL=gemini/gemini-3-flash-preview",
             "GEMINI_API_KEY=secret-key-value",
-            "STOCK_LIST=600519",
+            "STOCK_LIST=2330",
             f"DATABASE_PATH={db_path}",
         )
 
@@ -384,7 +384,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
     def test_export_desktop_env_returns_raw_text(self) -> None:
         self.env_path.write_text(
-            "# Desktop config\nSTOCK_LIST=600519,000001\n\nGEMINI_API_KEY=secret-key-value\n",
+            "# Desktop config\nSTOCK_LIST=2330,000001\n\nGEMINI_API_KEY=secret-key-value\n",
             encoding="utf-8",
         )
 
@@ -392,13 +392,13 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
         self.assertEqual(
             payload["content"],
-            "# Desktop config\nSTOCK_LIST=600519,000001\n\nGEMINI_API_KEY=secret-key-value\n",
+            "# Desktop config\nSTOCK_LIST=2330,000001\n\nGEMINI_API_KEY=secret-key-value\n",
         )
         self.assertEqual(payload["config_version"], self.manager.get_config_version())
 
     def test_export_desktop_env_preserves_hidden_web_settings_keys(self) -> None:
         self.env_path.write_text(
-            "STOCK_LIST=600519\nDATABASE_PATH=./custom/stock_analysis.db\nUSE_PROXY=true\n",
+            "STOCK_LIST=2330\nDATABASE_PATH=./custom/stock_analysis.db\nUSE_PROXY=true\n",
             encoding="utf-8",
         )
 
@@ -493,7 +493,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             config_version=old_version,
             items=[
                 {"key": "GEMINI_API_KEY", "value": "******"},
-                {"key": "STOCK_LIST", "value": "600519,300750"},
+                {"key": "STOCK_LIST", "value": "2330,300750"},
             ],
             mask_token="******",
             reload_now=False,
@@ -505,12 +505,12 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.assertIn("STOCK_LIST", response["updated_keys"])
 
         current_map = self.manager.read_config_map()
-        self.assertEqual(current_map["STOCK_LIST"], "600519,300750")
+        self.assertEqual(current_map["STOCK_LIST"], "2330,300750")
         self.assertEqual(current_map["GEMINI_API_KEY"], "secret-key-value")
 
     def test_update_alphasift_enable_does_not_rewrite_llm_fields(self) -> None:
         self._rewrite_env(
-            "STOCK_LIST=600519,000001",
+            "STOCK_LIST=2330,000001",
             "LITELLM_MODEL=openai/gpt-4o-mini",
             "AGENT_LITELLM_MODEL=openai/gpt-4o",
             "OPENAI_BASE_URL=https://api.openai.com/v1",
@@ -990,7 +990,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             "key": "AGENT_EVENT_ALERT_RULES_JSON",
             "value": (
                 "[\n"
-                '  {"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800}\n'
+                '  {"stock_code":"2330","alert_type":"price_cross","direction":"above","price":1800}\n'
                 "]"
             ),
         }])
@@ -1005,7 +1005,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
                 "key": "AGENT_EVENT_ALERT_RULES_JSON",
                 "value": (
                     "[\n"
-                    '  {"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800}\n'
+                    '  {"stock_code":"2330","alert_type":"price_cross","direction":"above","price":1800}\n'
                     "]"
                 ),
             }],
@@ -1016,7 +1016,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         current_map = self.manager.read_config_map()
         self.assertEqual(
             current_map["AGENT_EVENT_ALERT_RULES_JSON"],
-            '[{"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800}]',
+            '[{"stock_code":"2330","alert_type":"price_cross","direction":"above","price":1800}]',
         )
 
     def test_validate_accepts_legacy_agent_orchestrator_mode_alias(self) -> None:
@@ -1684,7 +1684,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
     def test_update_runtime_model_cleanup_does_not_rewrite_temperature(self) -> None:
         self._rewrite_env(
-            "STOCK_LIST=600519,000001",
+            "STOCK_LIST=2330,000001",
             "LLM_CHANNELS=deepseek",
             "LLM_DEEPSEEK_PROTOCOL=deepseek",
             "LLM_DEEPSEEK_BASE_URL=https://api.deepseek.com",
@@ -2256,7 +2256,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
     def test_validate_reports_invalid_event_rule_semantics(self) -> None:
         validation = self.service.validate(items=[{
             "key": "AGENT_EVENT_ALERT_RULES_JSON",
-            "value": '[{"stock_code":"600519","alert_type":"price_cross","status":"bad","direction":"above","price":1800}]',
+            "value": '[{"stock_code":"2330","alert_type":"price_cross","status":"bad","direction":"above","price":1800}]',
         }])
 
         self.assertFalse(validation["valid"])
@@ -2277,7 +2277,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
     def test_validate_rejects_unsupported_event_rule_type(self) -> None:
         validation = self.service.validate(items=[{
             "key": "AGENT_EVENT_ALERT_RULES_JSON",
-            "value": '[{"stock_code":"600519","alert_type":"sentiment_shift"}]',
+            "value": '[{"stock_code":"2330","alert_type":"sentiment_shift"}]',
         }])
 
         self.assertFalse(validation["valid"])
@@ -2290,7 +2290,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
     ) -> None:
         response = self.service.update(
             config_version=self.manager.get_config_version(),
-            items=[{"key": "STOCK_LIST", "value": "600519"}],
+            items=[{"key": "STOCK_LIST", "value": "2330"}],
             reload_now=True,
         )
 
@@ -2298,7 +2298,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         mock_reload_runtime_singletons.assert_called_once()
 
     def test_update_with_reload_applies_updated_env_file_when_process_env_is_stale(self) -> None:
-        os.environ["STOCK_LIST"] = "600519,000001"
+        os.environ["STOCK_LIST"] = "2330,000001"
 
         response = self.service.update(
             config_version=self.manager.get_config_version(),
@@ -2313,7 +2313,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         with self.assertRaises(ConfigConflictError):
             self.service.update(
                 config_version="stale-version",
-                items=[{"key": "STOCK_LIST", "value": "600519"}],
+                items=[{"key": "STOCK_LIST", "value": "2330"}],
                 reload_now=False,
             )
 
@@ -2430,7 +2430,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
     def test_update_warns_when_runtime_model_references_are_cleared(self) -> None:
         self._rewrite_env(
-            "STOCK_LIST=600519,000001",
+            "STOCK_LIST=2330,000001",
             "LLM_CHANNELS=deepseek",
             "LLM_DEEPSEEK_PROTOCOL=deepseek",
             "LLM_DEEPSEEK_BASE_URL=https://api.deepseek.com",
@@ -2465,7 +2465,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
     def test_import_desktop_env_restores_runtime_models_after_cleanup(self) -> None:
         self._rewrite_env(
-            "STOCK_LIST=600519,000001",
+            "STOCK_LIST=2330,000001",
             "LLM_CHANNELS=deepseek",
             "LLM_DEEPSEEK_PROTOCOL=deepseek",
             "LLM_DEEPSEEK_BASE_URL=https://api.deepseek.com",

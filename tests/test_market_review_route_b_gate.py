@@ -148,7 +148,7 @@ class TestRunMarketReviewRouteBGating(unittest.TestCase):
             result = run_market_review(notifier, send_notification=False)
 
         self.assertIsNotNone(result)
-        for cn_marker in ("A股", "上證", "深證", "創業板", "滬深"):
+        for cn_marker in ("台股", "上證", "深證", "創業板", "滬深"):
             self.assertNotIn(cn_marker, result,
                 f"Result must not contain CN marker {cn_marker!r} when CN is filtered")
 
@@ -182,40 +182,28 @@ class TestRunMarketReviewRouteBGating(unittest.TestCase):
         notifier.send.assert_not_called()
 
     # ------------------------------------------------------------------
-    # Case 4: Route B off → legacy CN behavior preserved
+    # Case 4: Route B off still keeps active market review TW/US-only
     # ------------------------------------------------------------------
 
-    def test_route_b_off_cn_runs_normally(self):
-        """When Route B enforcement is off, CN review proceeds normally."""
+    def test_route_b_off_cn_returns_none(self):
+        """CN review is no longer an active market even when Route B enforcement is off."""
         config = _legacy_config(market_review_region="cn")
         notifier = _make_notifier()
 
-        cn_analyzer = MagicMock()
-        cn_analyzer.run_daily_review_with_snapshot.return_value = SimpleNamespace(
-            report="CN body",
-            market_light_snapshot={"region": "cn", "trade_date": "2026-06-15", "score": 60},
-        )
-
         with patch.object(market_review_module, "get_config", return_value=config), \
-             patch.object(market_review_module, "_persist_market_review_history"), \
-             patch.object(market_review_module, "MarketAnalyzer",
-                          return_value=cn_analyzer) as analyzer_cls:
+             patch.object(market_review_module, "_persist_market_review_history") as persist, \
+             patch.object(market_review_module, "MarketAnalyzer") as analyzer_cls:
             result = run_market_review(notifier, send_notification=False)
 
-        self.assertIsNotNone(result, "Legacy CN review must proceed when Route B is off")
-        self.assertEqual(result, "CN body")
-        analyzer_cls.assert_called_once()
-        self.assertEqual(analyzer_cls.call_args.kwargs.get("region"), "cn")
+        self.assertIsNone(result, "CN review must not run in active TW/US-only scope")
+        analyzer_cls.assert_not_called()
+        persist.assert_not_called()
 
-    def test_route_b_off_us_cn_regions_both_run(self):
-        """When Route B is off, both US and CN regions run without filtering."""
+    def test_route_b_off_us_cn_regions_runs_us_only(self):
+        """When Route B is off, CN is still dropped and US remains runnable."""
         config = _legacy_config(market_review_regions=["cn", "us"])
         notifier = _make_notifier()
 
-        cn_analyzer = MagicMock()
-        cn_analyzer.run_daily_review_with_snapshot.return_value = SimpleNamespace(
-            report="CN body", market_light_snapshot={"region": "cn"},
-        )
         us_analyzer = MagicMock()
         us_analyzer.run_daily_review_with_snapshot.return_value = SimpleNamespace(
             report="US body", market_light_snapshot={"region": "us"},
@@ -224,12 +212,13 @@ class TestRunMarketReviewRouteBGating(unittest.TestCase):
         with patch.object(market_review_module, "get_config", return_value=config), \
              patch.object(market_review_module, "_persist_market_review_history"), \
              patch.object(market_review_module, "MarketAnalyzer",
-                          side_effect=[cn_analyzer, us_analyzer]):
+                          return_value=us_analyzer) as analyzer_cls:
             result = run_market_review(notifier, send_notification=False)
 
         self.assertIsNotNone(result)
-        self.assertIn("CN body", result)
         self.assertIn("US body", result)
+        analyzer_cls.assert_called_once()
+        self.assertEqual(analyzer_cls.call_args.kwargs.get("region"), "us")
 
     # ------------------------------------------------------------------
     # Case 5: Route B on, TW,US — no CN involved

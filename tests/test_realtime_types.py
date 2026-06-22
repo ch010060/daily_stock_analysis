@@ -10,11 +10,11 @@ from data_provider.realtime_types import CircuitBreaker, RealtimeSource, Unified
 
 class UnifiedRealtimeQuoteMetadataTestCase(unittest.TestCase):
     def test_metadata_defaults_are_filtered_from_to_dict(self):
-        quote = UnifiedRealtimeQuote(code="600519", source=RealtimeSource.AKSHARE_EM)
+        quote = UnifiedRealtimeQuote(code="2330", source=RealtimeSource.AKSHARE_EM)
 
         data = quote.to_dict()
 
-        self.assertEqual(data["code"], "600519")
+        self.assertEqual(data["code"], "2330")
         self.assertEqual(data["source"], "akshare_em")
         self.assertNotIn("fetched_at", data)
         self.assertNotIn("provider_timestamp", data)
@@ -24,7 +24,7 @@ class UnifiedRealtimeQuoteMetadataTestCase(unittest.TestCase):
 
     def test_metadata_is_included_when_present(self):
         quote = UnifiedRealtimeQuote(
-            code="600519",
+            code="2330",
             source=RealtimeSource.TENCENT,
             price=1688.0,
             fetched_at="2026-05-31T10:00:05+00:00",

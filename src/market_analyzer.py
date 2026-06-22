@@ -127,13 +127,13 @@ class MarketAnalyzer:
         Args:
             search_service: 搜尋服務例項
             analyzer: AI分析器例項（用於呼叫LLM）
-            region: 市場區域 cn=A股 us=美股
+            region: 市場區域 tw=台股 us=美股
         """
         self.config = get_config()
         self.search_service = search_service
         self.analyzer = analyzer
         self.data_manager = DataFetcherManager()
-        _supported = ("cn", "us", "hk", "tw")
+        _supported = ("us", "tw")
         if region not in _supported:
             raise ValueError(
                 f"MarketAnalyzer: unsupported region {region!r}. Accepted: {_supported}"
@@ -1140,8 +1140,7 @@ Output the report content directly, no extra commentary.
         template_language = self._get_template_review_language()
         mood_code = self.profile.mood_index_code
         # 根據 mood_index_code 查詢對應指數
-        # cn: mood_code="000001"，idx.code 可能為 "sh000001"（以 mood_code 結尾）
-        # us: mood_code="SPX"，idx.code 直接為 "SPX"
+        # tw: mood_code="TAIEX"; us: mood_code="SPX".
         mood_index = next(
             (
                 idx
@@ -1193,7 +1192,7 @@ Output the report content directly, no extra commentary.
 - **Leaders**: {top_text or "N/A"}
 - **Laggards**: {bottom_text or "N/A"}
 """
-            market_names = {"us": "US Market Recap", "hk": "HK Market Recap"}
+            market_names = {"us": "US Market Recap", "tw": "Taiwan Market Recap"}
             market_name = market_names.get(self.region, "A-share Market Recap")
             report = f"""## {overview.date} {market_name}
 
@@ -1214,7 +1213,7 @@ Market conditions can change quickly. The data above is for reference only and d
 """
             return report
 
-        market_labels = {"cn": "A股", "us": "美股", "hk": "港股"}
+        market_labels = {"tw": "台股", "us": "美股"}
         market_label = market_labels.get(self.region, "A股")
         dashboard_block = self._build_stats_block(overview)
         indices_block = self._build_indices_block(overview)

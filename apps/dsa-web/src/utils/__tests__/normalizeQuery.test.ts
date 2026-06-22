@@ -20,18 +20,18 @@ import { describe, expect, test } from 'vitest';
 describe('normalizeQuery', () => {
   describe('normalizeQuery - Query normalization', () => {
     test('removes leading and trailing spaces', () => {
-      expect(normalizeQuery('  600519  ')).toBe('600519');
-      expect(normalizeQuery('  茅臺  ')).toBe('茅臺');
+      expect(normalizeQuery('  2330  ')).toBe('2330');
+      expect(normalizeQuery('  台積電  ')).toBe('台積電');
     });
 
     test('converts to lowercase', () => {
       expect(normalizeQuery('AAPL')).toBe('aapl');
-      expect(normalizeQuery('GZMT')).toBe('gzmt');
+      expect(normalizeQuery('PHISON')).toBe('phison');
     });
 
     test('removes internal extra spaces', () => {
-      expect(normalizeQuery('600 519')).toBe('600519');
-      expect(normalizeQuery('gui  zhou  mao  tai')).toBe('guizhoumaotai');
+      expect(normalizeQuery('00981 A')).toBe('00981a');
+      expect(normalizeQuery('Meta  Platforms')).toBe('metaplatforms');
     });
 
     test('combines space and case operations', () => {
@@ -39,8 +39,8 @@ describe('normalizeQuery', () => {
     });
 
     test('normalizes full-width latin characters to ASCII', () => {
-      expect(normalizeQuery('萬科Ａ')).toBe('萬科a');
-      expect(normalizeQuery('wkＡ')).toBe('wka');
+      expect(normalizeQuery('台積電Ａ')).toBe('台積電a');
+      expect(normalizeQuery('tsmcＡ')).toBe('tsmca');
     });
 
     test('handles empty strings', () => {
@@ -49,14 +49,14 @@ describe('normalizeQuery', () => {
     });
 
     test('preserves special characters', () => {
-      expect(normalizeQuery('600519.SH')).toBe('600519.sh');
-      expect(normalizeQuery('00700.HK')).toBe('00700.hk');
+      expect(normalizeQuery('2330.TW')).toBe('2330.tw');
+      expect(normalizeQuery('AAPL.US')).toBe('aapl.us');
     });
   });
 
   describe('isChineseChar - Chinese character detection', () => {
     test('identifies Chinese characters', () => {
-      expect(isChineseChar('茅')).toBe(true);
+      expect(isChineseChar('積')).toBe(true);
       expect(isChineseChar('臺')).toBe(true);
       expect(isChineseChar('股')).toBe(true);
     });
@@ -80,23 +80,23 @@ describe('normalizeQuery', () => {
 
   describe('containsChinese - Contains Chinese detection', () => {
     test('pure Chinese strings', () => {
-      expect(containsChinese('貴州茅臺')).toBe(true);
-      expect(containsChinese('騰訊')).toBe(true);
+      expect(containsChinese('台積電')).toBe(true);
+      expect(containsChinese('群聯')).toBe(true);
     });
 
     test('mixed Chinese-English strings', () => {
-      expect(containsChinese('600519貴州茅臺')).toBe(true);
+      expect(containsChinese('2330台積電')).toBe(true);
       expect(containsChinese('AAPL蘋果')).toBe(true);
     });
 
     test('pure English strings', () => {
       expect(containsChinese('AAPL')).toBe(false);
-      expect(containsChinese('guizhoumaotai')).toBe(false);
+      expect(containsChinese('metaplatforms')).toBe(false);
     });
 
     test('pure numeric strings', () => {
-      expect(containsChinese('600519')).toBe(false);
-      expect(containsChinese('00700')).toBe(false);
+      expect(containsChinese('2330')).toBe(false);
+      expect(containsChinese('AAPL')).toBe(false);
     });
 
     test('empty strings', () => {
@@ -105,13 +105,9 @@ describe('normalizeQuery', () => {
   });
 
   describe('extractMarketSuffix - Extract market suffix', () => {
-    test('extracts A-share market suffix', () => {
-      expect(extractMarketSuffix('600519.SH')).toBe('SH');
-      expect(extractMarketSuffix('000001.SZ')).toBe('SZ');
-    });
-
-    test('extracts HK stock market suffix', () => {
-      expect(extractMarketSuffix('00700.HK')).toBe('HK');
+    test('extracts TW market suffix', () => {
+      expect(extractMarketSuffix('2330.TW')).toBe('TW');
+      expect(extractMarketSuffix('00981A.TW')).toBe('TW');
     });
 
     test('extracts US stock market suffix', () => {
@@ -119,24 +115,20 @@ describe('normalizeQuery', () => {
     });
 
     test('returns null for no market suffix', () => {
-      expect(extractMarketSuffix('600519')).toBeNull();
+      expect(extractMarketSuffix('2330')).toBeNull();
       expect(extractMarketSuffix('AAPL')).toBeNull();
       expect(extractMarketSuffix('')).toBeNull();
     });
 
     test('handles multiple dots', () => {
-      expect(extractMarketSuffix('600519.SH.TEST')).toBe('TEST');
+      expect(extractMarketSuffix('2330.TW.TEST')).toBe('TEST');
     });
   });
 
   describe('removeMarketSuffix - Remove market suffix', () => {
-    test('removes A-share market suffix', () => {
-      expect(removeMarketSuffix('600519.SH')).toBe('600519');
-      expect(removeMarketSuffix('000001.SZ')).toBe('000001');
-    });
-
-    test('removes HK stock market suffix', () => {
-      expect(removeMarketSuffix('00700.HK')).toBe('00700');
+    test('removes TW market suffix', () => {
+      expect(removeMarketSuffix('2330.TW')).toBe('2330');
+      expect(removeMarketSuffix('00981A.TW')).toBe('00981A');
     });
 
     test('removes US stock market suffix', () => {
@@ -144,7 +136,7 @@ describe('normalizeQuery', () => {
     });
 
     test('keeps unchanged without market suffix', () => {
-      expect(removeMarketSuffix('600519')).toBe('600519');
+      expect(removeMarketSuffix('2330')).toBe('2330');
       expect(removeMarketSuffix('AAPL')).toBe('AAPL');
     });
 
@@ -156,21 +148,21 @@ describe('normalizeQuery', () => {
   describe('normalizeStockCode - Stock code normalization', () => {
     test('converts to uppercase', () => {
       expect(normalizeStockCode('aapl')).toBe('AAPL');
-      expect(normalizeStockCode('gzmt')).toBe('GZMT');
+      expect(normalizeStockCode('phison')).toBe('PHISON');
     });
 
     test('removes spaces', () => {
-      expect(normalizeStockCode('600 519')).toBe('600519');
+      expect(normalizeStockCode('00981 A')).toBe('00981A');
       expect(normalizeStockCode('AAPL US')).toBe('AAPLUS');
     });
 
     test('preserves market suffix', () => {
-      expect(normalizeStockCode('600519.SH')).toBe('600519.SH');
+      expect(normalizeStockCode('2330.TW')).toBe('2330.TW');
       expect(normalizeStockCode('AAPL.US')).toBe('AAPL.US');
     });
 
     test('removes leading and trailing spaces', () => {
-      expect(normalizeStockCode('  600519.SH  ')).toBe('600519.SH');
+      expect(normalizeStockCode('  2330.TW  ')).toBe('2330.TW');
     });
 
     test('combines operations', () => {
@@ -179,16 +171,17 @@ describe('normalizeQuery', () => {
   });
 
   describe('isStockCodeLike - Check if looks like stock code', () => {
-    test('identifies A-share codes', () => {
-      expect(isStockCodeLike('600519')).toBe(true);
-      expect(isStockCodeLike('000001')).toBe(true);
-      expect(isStockCodeLike('300001')).toBe(true);
+    test('identifies TW numeric and ETF codes', () => {
+      expect(isStockCodeLike('2330')).toBe(true);
+      expect(isStockCodeLike('006208')).toBe(true);
+      expect(isStockCodeLike('00981A')).toBe(true);
     });
 
     test('identifies codes with market suffix', () => {
-      expect(isStockCodeLike('600519.SH')).toBe(true);
-      expect(isStockCodeLike('00700.HK')).toBe(true);
-      // US stock codes without numbers return false for isStockCodeLike
+      expect(isStockCodeLike('2330.TW')).toBe(true);
+      // US stock codes without numbers return false for isStockCodeLike.
+      // Full symbol validation is handled by the local TW/US candidate search.
+      expect(isStockCodeLike('AAPL')).toBe(false);
       expect(isStockCodeLike('AAPL.US')).toBe(false);
     });
 
@@ -202,13 +195,13 @@ describe('normalizeQuery', () => {
     });
 
     test('rejects Chinese names', () => {
-      expect(isStockCodeLike('貴州茅臺')).toBe(false);
-      expect(isStockCodeLike('騰訊')).toBe(false);
+      expect(isStockCodeLike('台積電')).toBe(false);
+      expect(isStockCodeLike('群聯')).toBe(false);
     });
 
     test('rejects pinyin', () => {
-      expect(isStockCodeLike('gzmt')).toBe(false);
-      expect(isStockCodeLike('maotai')).toBe(false);
+      expect(isStockCodeLike('phison')).toBe(false);
+      expect(isStockCodeLike('largan')).toBe(false);
     });
 
     test('identifies pure numbers', () => {
@@ -222,23 +215,23 @@ describe('normalizeQuery', () => {
 
   describe('isStockNameLike - Check if looks like stock name', () => {
     test('identifies Chinese names', () => {
-      expect(isStockNameLike('貴州茅臺')).toBe(true);
-      expect(isStockNameLike('騰訊控股')).toBe(true);
-      expect(isStockNameLike('平安銀行')).toBe(true);
+      expect(isStockNameLike('台積電')).toBe(true);
+      expect(isStockNameLike('群聯')).toBe(true);
+      expect(isStockNameLike('國泰金')).toBe(true);
     });
 
     test('rejects English codes', () => {
       expect(isStockNameLike('AAPL')).toBe(false);
-      expect(isStockNameLike('600519')).toBe(false);
+      expect(isStockNameLike('2330')).toBe(false);
     });
 
     test('rejects pinyin', () => {
-      expect(isStockNameLike('guizhoumaotai')).toBe(false);
-      expect(isStockNameLike('tengxun')).toBe(false);
+      expect(isStockNameLike('phison')).toBe(false);
+      expect(isStockNameLike('largan')).toBe(false);
     });
 
     test('identifies mixed Chinese-English', () => {
-      expect(isStockNameLike('貴州茅臺600519')).toBe(true);
+      expect(isStockNameLike('台積電2330')).toBe(true);
       expect(isStockNameLike('AAPL蘋果')).toBe(true);
     });
 
@@ -249,30 +242,30 @@ describe('normalizeQuery', () => {
 
   describe('isPinyinLike - Check if looks like pinyin', () => {
     test('identifies pure pinyin', () => {
-      expect(isPinyinLike('guizhoumaotai')).toBe(true);
-      expect(isPinyinLike('tengxunkonggu')).toBe(true);
-      expect(isPinyinLike('pinganyinxing')).toBe(true);
+      expect(isPinyinLike('phison')).toBe(true);
+      expect(isPinyinLike('larganprecision')).toBe(true);
+      expect(isPinyinLike('metaplatforms')).toBe(true);
     });
 
     test('identifies pinyin abbreviations', () => {
-      expect(isPinyinLike('gzmt')).toBe(true);
-      expect(isPinyinLike('txkg')).toBe(true);
-      expect(isPinyinLike('payh')).toBe(true);
+      expect(isPinyinLike('tsmc')).toBe(true);
+      expect(isPinyinLike('umc')).toBe(true);
+      expect(isPinyinLike('nvda')).toBe(true);
     });
 
     test('identifies uppercase pinyin', () => {
-      expect(isPinyinLike('GZMT')).toBe(true);
-      expect(isPinyinLike('MAOTAI')).toBe(true);
+      expect(isPinyinLike('PHISON')).toBe(true);
+      expect(isPinyinLike('LARGAN')).toBe(true);
     });
 
     test('rejects numbers', () => {
       expect(isPinyinLike('guizhou123')).toBe(false);
-      expect(isPinyinLike('600519')).toBe(false);
+      expect(isPinyinLike('2330')).toBe(false);
     });
 
     test('rejects Chinese characters', () => {
-      expect(isPinyinLike('茅臺maotai')).toBe(false);
-      expect(isPinyinLike('貴州')).toBe(false);
+      expect(isPinyinLike('台積電tsmc')).toBe(false);
+      expect(isPinyinLike('群聯')).toBe(false);
     });
 
     test('handles empty strings', () => {
@@ -280,8 +273,8 @@ describe('normalizeQuery', () => {
     });
 
     test('rejects special characters', () => {
-      expect(isPinyinLike('maotai-sh')).toBe(false);
-      expect(isPinyinLike('ping.an')).toBe(false);
+      expect(isPinyinLike('phison-tw')).toBe(false);
+      expect(isPinyinLike('meta.platforms')).toBe(false);
     });
   });
 

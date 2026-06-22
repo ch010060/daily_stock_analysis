@@ -201,14 +201,14 @@ class TestAnspireSearchProvider(unittest.TestCase):
                 "msg": "success",
                 "results": [
                     {
-                        "title": "貴州茅臺今日股價上漲",
-                        "url": "https://finance.sina.com.cn/stock/600519",
-                        "content": "貴州茅臺 (600519) 今日收盤股價上漲 2.5%，成交量放大...",
+                        "title": "台積電今日股價上漲",
+                        "url": "https://finance.sina.com.cn/stock/2330",
+                        "content": "台積電 (2330) 今日收盤股價上漲 2.5%，成交量放大...",
                     },
                     {
                         "title": "白酒板塊持續走強",
                         "url": "https://www.10jqka.com.cn/baijiu",
-                        "content": "白酒板塊今日表現強勢，貴州茅臺、五糧液等個股漲幅居前...",
+                        "content": "白酒板塊今日表現強勢，台積電、五糧液等個股漲幅居前...",
                     }
                 ]
             }
@@ -216,13 +216,13 @@ class TestAnspireSearchProvider(unittest.TestCase):
         
         mock_requests.get = MagicMock(return_value=fake_response)
         
-        response = self.provider.search("貴州茅臺 股票新聞", max_results=5, days=7)
+        response = self.provider.search("台積電 股票新聞", max_results=5, days=7)
         
         # 驗證結果
         self.assertTrue(response.success)
         self.assertEqual(response.provider, "Anspire")
         self.assertEqual(len(response.results), 2)
-        self.assertEqual(response.results[0].title, "貴州茅臺今日股價上漲")
+        self.assertEqual(response.results[0].title, "台積電今日股價上漲")
         # 假設 source 是從 url 提取的域名
         self.assertEqual(response.results[0].source, "finance.sina.com.cn")
         
@@ -486,7 +486,7 @@ class TestAnspireIntegration(unittest.TestCase):
             self.skipTest("Anspire Provider 未初始化")
         
         # 測試 A 股搜尋
-        response = service.search_stock_news("600519", "貴州茅臺", max_results=3)
+        response = service.search_stock_news("2330", "台積電", max_results=3)
         
         print(f"\n=== Anspire 真實 API 測試結果 ===")
         print(f"搜尋狀態：{'成功' if response.success else '失敗'}")
@@ -587,10 +587,10 @@ def run_manual_test():
     
     # 執行測試搜尋
     print("\n" + "=" * 60)
-    print("執行測試搜尋：貴州茅臺 (600519)")
+    print("執行測試搜尋：台積電 (2330)")
     print("=" * 60)
     
-    response = service.search_stock_news("600519", "貴州茅臺", max_results=3)
+    response = service.search_stock_news("2330", "台積電", max_results=3)
     
     print(f"\n搜尋結果:")
     print(f"  狀態：{'✅ 成功' if response.success else '❌ 失敗'}")

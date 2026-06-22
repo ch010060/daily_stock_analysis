@@ -332,10 +332,9 @@ class PortfolioServiceTestCase(unittest.TestCase):
         self.assertAlmostEqual(fifo_acc["positions"][0]["quantity"], 50.0, places=6)
         self.assertAlmostEqual(avg_acc["positions"][0]["quantity"], 50.0, places=6)
 
-    def test_snapshot_position_price_metadata_uses_backend_values_for_cn_hk_us(self) -> None:
+    def test_snapshot_position_price_metadata_uses_backend_values_for_tw_us(self) -> None:
         for market, currency, symbol, close, expected_symbol in [
-            ("cn", "CNY", "600519", 12.5, "600519"),
-            ("hk", "HKD", "hk700", 420.0, "HK00700"),
+            ("tw", "TWD", "2330", 12.5, "2330"),
             ("us", "USD", "aapl", 210.0, "AAPL"),
         ]:
             with self.subTest(market=market):

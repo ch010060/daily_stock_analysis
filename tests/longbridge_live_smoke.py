@@ -203,7 +203,7 @@ def main():
         "stock",
         nargs="?",
         default="AAPL",
-        help="Stock code (e.g. AAPL, 00700, HK00700)",
+        help="Stock code (e.g. AAPL, AAPL, AAPL)",
     )
     parser.add_argument(
         "--lb-app-key",

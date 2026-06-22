@@ -130,7 +130,7 @@ class TestFinnhubFetcherRealtimeQuote(unittest.TestCase):
         self.assertAlmostEqual(quote.change_pct, 1.35)
 
     def test_realtime_quote_non_us_stock(self):
-        quote = self.fetcher.get_realtime_quote('600519')
+        quote = self.fetcher.get_realtime_quote('2330')
         self.assertIsNone(quote)
 
     @patch('data_provider.finnhub_fetcher.requests.get')
@@ -164,7 +164,7 @@ class TestFinnhubFetcherStockName(unittest.TestCase):
         self.assertIsNone(name)
 
     def test_get_stock_name_non_us(self):
-        name = self.fetcher.get_stock_name('600519')
+        name = self.fetcher.get_stock_name('2330')
         self.assertIsNone(name)
 
 

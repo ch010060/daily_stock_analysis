@@ -83,7 +83,7 @@ def test_extract_market_phase_summary_re_sanitizes_persisted_snapshot() -> None:
     snapshot = json.dumps(
         {
             MARKET_PHASE_SUMMARY_KEY: summary,
-            "enhanced_context": {"code": "600519"},
+            "enhanced_context": {"code": "2330"},
         },
         ensure_ascii=False,
     )
@@ -103,7 +103,7 @@ def test_extract_market_phase_summary_re_sanitizes_persisted_snapshot() -> None:
 
 def test_extract_market_phase_summary_returns_none_for_missing_or_malformed_snapshot() -> None:
     assert extract_market_phase_summary(None) is None
-    assert extract_market_phase_summary({"enhanced_context": {"code": "600519"}}) is None
+    assert extract_market_phase_summary({"enhanced_context": {"code": "2330"}}) is None
     assert extract_market_phase_summary({MARKET_PHASE_SUMMARY_KEY: "not-a-dict"}) is None
     assert extract_market_phase_summary(
         {MARKET_PHASE_SUMMARY_KEY: {**_phase_context(), "phase": "bad_phase"}}

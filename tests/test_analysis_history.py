@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自選股智慧分析系統 - 分析歷史儲存單元測試
+台股自選股智慧分析系統 - 分析歷史儲存單元測試
 ===================================
 
 職責：
@@ -45,8 +45,8 @@ def _analysis_context_pack_overview() -> dict:
         "pack_version": "1.0",
         "created_at": "2026-04-10T08:30:00+00:00",
         "subject": {
-            "code": "600519",
-            "stock_name": "貴州茅臺",
+            "code": "2330",
+            "stock_name": "台積電",
             "market": "cn",
         },
         "blocks": [
@@ -130,8 +130,8 @@ class AnalysisHistoryTestCase(unittest.TestCase):
     def _build_result(self) -> AnalysisResult:
         """構造分析結果"""
         return AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=78,
             trend_prediction="看多",
             operation_advice="持有",
@@ -170,7 +170,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
                 }
             }
         }
-        context_snapshot = {"enhanced_context": {"code": "600519"}}
+        context_snapshot = {"enhanced_context": {"code": "2330"}}
 
         saved = self.db.save_analysis_history(
             result=result,
@@ -183,7 +183,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
 
         self.assertEqual(saved, 1)
 
-        history = self.db.get_analysis_history(code="600519", days=7, limit=10)
+        history = self.db.get_analysis_history(code="2330", days=7, limit=10)
         self.assertEqual(len(history), 1)
 
         with self.db.get_session() as session:
@@ -248,11 +248,11 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             report_type="simple",
             news_content="新聞摘要",
             context_snapshot={
-                "enhanced_context": {"code": "600519"},
+                "enhanced_context": {"code": "2330"},
                 "diagnostics": {
                     "trace_id": "trace-1",
                     "query_id": "query_diag_patch",
-                    "stock_code": "600519",
+                    "stock_code": "2330",
                     "notification_runs": [],
                 },
             },
@@ -262,7 +262,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
 
         updated = self.db.update_analysis_history_diagnostics(
             query_id="query_diag_patch",
-            code="600519",
+            code="2330",
             notification_runs=[
                 {
                     "channel": "report",
@@ -280,7 +280,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             if row is None:
                 self.fail("未找到儲存的歷史記錄")
             snapshot = json.loads(row.context_snapshot or "{}")
-            self.assertEqual(snapshot["enhanced_context"]["code"], "600519")
+            self.assertEqual(snapshot["enhanced_context"]["code"], "2330")
             notification_run = snapshot["diagnostics"]["notification_runs"][-1]
             self.assertEqual(notification_run["status"], "success")
             self.assertEqual(notification_run["trace_id"], "trace-1")
@@ -337,11 +337,11 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(saved, 1)
 
         service = HistoryService(self.db)
-        payload = service.get_history_list(stock_code="600519.SH", page=1, limit=5)
+        payload = service.get_history_list(stock_code="2330.TW", page=1, limit=5)
 
         self.assertEqual(payload["total"], 1)
         item = payload["items"][0]
-        self.assertEqual(item["stock_code"], "600519")
+        self.assertEqual(item["stock_code"], "2330")
         self.assertEqual(item["trend_prediction"], "看多")
         self.assertEqual(item["analysis_summary"], "基本面穩健，短期震盪")
         self.assertEqual(item["operation_advice"], "持有")
@@ -352,13 +352,13 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(item["turnover_rate"], 11.46)
 
     def test_history_list_matches_equivalent_suffixed_stock_codes(self) -> None:
-        """Same-stock history should include rows saved with supported suffixed codes."""
+        """Same-stock history should include rows saved with supported TW/US suffixes."""
 
         def save_record(code: str, query_id: str) -> None:
             result = self._build_result()
             result.code = code
-            if "HK" in code:
-                result.name = "騰訊控股"
+            if "AAPL" in code:
+                result.name = "Apple"
             saved = self.db.save_analysis_history(
                 result=result,
                 query_id=query_id,
@@ -369,49 +369,48 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             )
             self.assertEqual(saved, 1)
 
-        save_record("600519.SH", "query_cn_suffix")
-        save_record("600519", "query_cn_plain")
-        save_record("00700.HK", "query_hk_suffix")
-        save_record("HK00700", "query_hk_prefix")
+        save_record("2330.TW", "query_tw_suffix")
+        save_record("2330", "query_tw_plain")
+        save_record("AAPL.US", "query_us_suffix")
+        save_record("AAPL", "query_us_plain")
 
         service = HistoryService(self.db)
 
-        cn_from_suffix = service.get_history_list(stock_code="600519.SH", page=1, limit=10)
-        self.assertEqual(cn_from_suffix["total"], 2)
+        tw_from_suffix = service.get_history_list(stock_code="2330.TW", page=1, limit=10)
+        self.assertEqual(tw_from_suffix["total"], 2)
         self.assertEqual(
-            {item["stock_code"] for item in cn_from_suffix["items"]},
-            {"600519.SH", "600519"},
+            {item["stock_code"] for item in tw_from_suffix["items"]},
+            {"2330.TW", "2330"},
         )
 
-        cn_from_plain = service.get_history_list(stock_code="600519", page=1, limit=10)
-        self.assertEqual(cn_from_plain["total"], 2)
+        tw_from_plain = service.get_history_list(stock_code="2330", page=1, limit=10)
+        self.assertEqual(tw_from_plain["total"], 2)
         self.assertEqual(
-            {item["stock_code"] for item in cn_from_plain["items"]},
-            {"600519.SH", "600519"},
+            {item["stock_code"] for item in tw_from_plain["items"]},
+            {"2330.TW", "2330"},
         )
 
-        hk_from_suffix = service.get_history_list(stock_code="00700.HK", page=1, limit=10)
-        self.assertEqual(hk_from_suffix["total"], 2)
+        us_from_suffix = service.get_history_list(stock_code="AAPL.US", page=1, limit=10)
+        self.assertEqual(us_from_suffix["total"], 2)
         self.assertEqual(
-            {item["stock_code"] for item in hk_from_suffix["items"]},
-            {"00700.HK", "HK00700"},
+            {item["stock_code"] for item in us_from_suffix["items"]},
+            {"AAPL.US", "AAPL"},
         )
 
-        hk_from_prefix = service.get_history_list(stock_code="HK00700", page=1, limit=10)
-        self.assertEqual(hk_from_prefix["total"], 2)
+        us_from_plain = service.get_history_list(stock_code="AAPL", page=1, limit=10)
+        self.assertEqual(us_from_plain["total"], 2)
         self.assertEqual(
-            {item["stock_code"] for item in hk_from_prefix["items"]},
-            {"00700.HK", "HK00700"},
+            {item["stock_code"] for item in us_from_plain["items"]},
+            {"AAPL.US", "AAPL"},
         )
 
-    def test_history_list_matches_unpadded_hk_suffix_variants(self) -> None:
-        """HK short suffix forms (e.g. 1810.HK) should match 5-digit canonical suffix/prefix forms."""
+    def test_history_list_matches_tw_etf_letter_suffix_variants(self) -> None:
+        """TW ETF letter-suffix forms should match their canonical .TW variants."""
 
         def save_record(code: str, query_id: str) -> None:
             result = self._build_result()
             result.code = code
-            if "HK" in code:
-                result.name = "騰訊控股"
+            result.name = "主動統一台股增長"
             saved = self.db.save_analysis_history(
                 result=result,
                 query_id=query_id,
@@ -422,28 +421,27 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             )
             self.assertEqual(saved, 1)
 
-        save_record("1810.HK", "query_hk_unpadded")
-        save_record("01810.HK", "query_hk_padded")
-        save_record("HK01810", "query_hk_prefix")
+        save_record("00981A", "query_tw_letter")
+        save_record("00981A.TW", "query_tw_letter_suffix")
 
         service = HistoryService(self.db)
 
-        hk_from_suffix = service.get_history_list(stock_code="01810.HK", page=1, limit=10)
-        self.assertEqual(hk_from_suffix["total"], 3)
+        tw_from_suffix = service.get_history_list(stock_code="00981A.TW", page=1, limit=10)
+        self.assertEqual(tw_from_suffix["total"], 2)
         self.assertEqual(
-            {item["stock_code"] for item in hk_from_suffix["items"]},
-            {"1810.HK", "01810.HK", "HK01810"},
+            {item["stock_code"] for item in tw_from_suffix["items"]},
+            {"00981A", "00981A.TW"},
         )
 
-        hk_from_prefix = service.get_history_list(stock_code="HK01810", page=1, limit=10)
-        self.assertEqual(hk_from_prefix["total"], 3)
+        tw_from_plain = service.get_history_list(stock_code="00981A", page=1, limit=10)
+        self.assertEqual(tw_from_plain["total"], 2)
         self.assertEqual(
-            {item["stock_code"] for item in hk_from_prefix["items"]},
-            {"1810.HK", "01810.HK", "HK01810"},
+            {item["stock_code"] for item in tw_from_plain["items"]},
+            {"00981A", "00981A.TW"},
         )
 
-    def test_history_list_matches_sh_and_ss_suffixed_variants(self) -> None:
-        """SH suffix and legacy `.SS` variants should be treated as the same A-share stock."""
+    def test_history_list_matches_tw_suffixed_variants(self) -> None:
+        """TW suffix and bare variants should be treated as the same TW stock."""
 
         def save_record(code: str, query_id: str) -> None:
             result = self._build_result()
@@ -458,23 +456,18 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             )
             self.assertEqual(saved, 1)
 
-        save_record("600519.SH", "query_cn_sh")
-        save_record("600519.SS", "query_cn_ss")
-        save_record("600519", "query_cn_plain")
+        save_record("2330.TW", "query_tw_suffix")
+        save_record("2330", "query_tw_plain")
 
         service = HistoryService(self.db)
-        expected = {"600519.SH", "600519.SS", "600519"}
+        expected = {"2330.TW", "2330"}
 
-        from_sh = service.get_history_list(stock_code="600519.SH", page=1, limit=10)
-        self.assertEqual(from_sh["total"], 3)
-        self.assertEqual({item["stock_code"] for item in from_sh["items"]}, expected)
+        from_suffix = service.get_history_list(stock_code="2330.TW", page=1, limit=10)
+        self.assertEqual(from_suffix["total"], 2)
+        self.assertEqual({item["stock_code"] for item in from_suffix["items"]}, expected)
 
-        from_ss = service.get_history_list(stock_code="600519.SS", page=1, limit=10)
-        self.assertEqual(from_ss["total"], 3)
-        self.assertEqual({item["stock_code"] for item in from_ss["items"]}, expected)
-
-        from_plain = service.get_history_list(stock_code="600519", page=1, limit=10)
-        self.assertEqual(from_plain["total"], 3)
+        from_plain = service.get_history_list(stock_code="2330", page=1, limit=10)
+        self.assertEqual(from_plain["total"], 2)
         self.assertEqual({item["stock_code"] for item in from_plain["items"]}, expected)
 
     def test_history_detail_preserves_zero_change_pct(self) -> None:
@@ -864,7 +857,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
 
         self.db.save_fundamental_snapshot(
             query_id=query_id,
-            code="600519",
+            code="2330",
             payload={
                 "belong_boards": [{"name": "白酒", "type": "行業"}],
                 "boards": {
@@ -919,7 +912,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         }
         saved_snapshot = self.db.save_fundamental_snapshot(
             query_id=query_id,
-            code="600519",
+            code="2330",
             payload=fallback_fundamental,
         )
         self.assertEqual(saved_snapshot, 1)
@@ -1052,7 +1045,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             report_type="simple",
             news_content="新聞摘要",
             context_snapshot={
-                "enhanced_context": {"code": "600519"},
+                "enhanced_context": {"code": "2330"},
                 "analysis_context_pack_overview": overview,
                 "market_phase_summary": {
                     **phase_summary,
@@ -1103,7 +1096,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             report_type="simple",
             news_content="新聞摘要",
             context_snapshot={
-                "enhanced_context": {"code": "600519"},
+                "enhanced_context": {"code": "2330"},
                 "analysis_context_pack_overview": _analysis_context_pack_overview(),
             },
             save_snapshot=False,
@@ -1215,8 +1208,8 @@ class AnalysisHistoryTestCase(unittest.TestCase):
 
     def test_history_markdown_collapses_unavailable_chip_structure(self) -> None:
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -1395,7 +1388,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         with self.db.session_scope() as session:
             session.add(BacktestResult(
                 analysis_history_id=record_id,
-                code="600519",
+                code="2330",
                 analysis_date=None,
                 eval_window_days=10,
                 engine_version="v1",
@@ -1459,7 +1452,7 @@ class HistoryItemSchemaNegativeSentimentTest(unittest.TestCase):
         if self.HistoryItem is None:
             self.skipTest("fastapi / pydantic not installed in this test environment")
 
-        item = self.HistoryItem(query_id="q1", stock_code="600519", sentiment_score=-22)
+        item = self.HistoryItem(query_id="q1", stock_code="2330", sentiment_score=-22)
         self.assertEqual(item.sentiment_score, -22)
 
     def test_out_of_range_high_sentiment_score_does_not_raise(self) -> None:
@@ -1467,7 +1460,7 @@ class HistoryItemSchemaNegativeSentimentTest(unittest.TestCase):
         if self.HistoryItem is None:
             self.skipTest("fastapi / pydantic not installed in this test environment")
 
-        item = self.HistoryItem(query_id="q2", stock_code="600519", sentiment_score=150)
+        item = self.HistoryItem(query_id="q2", stock_code="2330", sentiment_score=150)
         self.assertEqual(item.sentiment_score, 150)
 
     def test_none_sentiment_score_is_allowed(self) -> None:
@@ -1475,7 +1468,7 @@ class HistoryItemSchemaNegativeSentimentTest(unittest.TestCase):
         if self.HistoryItem is None:
             self.skipTest("fastapi / pydantic not installed in this test environment")
 
-        item = self.HistoryItem(query_id="q3", stock_code="600519", sentiment_score=None)
+        item = self.HistoryItem(query_id="q3", stock_code="2330", sentiment_score=None)
         self.assertIsNone(item.sentiment_score)
 
     def test_report_summary_negative_sentiment_score_does_not_raise(self) -> None:

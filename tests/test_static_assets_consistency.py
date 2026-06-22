@@ -265,19 +265,19 @@ def test_frontend_index_responses_are_not_cacheable(tmp_path: Path) -> None:
         assert response.headers["expires"] == "0"
 
 
-def _write_stock_index(path: Path, name: str = "平安銀行", size: int = 1) -> None:
+def _write_stock_index(path: Path, name: str = "聯電", size: int = 1) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(
             [
                 [
-                    f"{index:06d}.SZ",
-                    f"{index:06d}",
+                    f"{2303 + index}.TW",
+                    f"{2303 + index}",
                     name,
-                    "pinganyinhang",
-                    "payh",
+                    "liandian",
+                    "ld",
                     [],
-                    "CN",
+                    "TW",
                     "stock",
                     True,
                     100,

@@ -77,8 +77,8 @@ def _build_analysis_context_pack_summary(
     fundamental_context=None,
 ) -> str:
     artifacts = PipelineAnalysisArtifacts(
-        code="600519",
-        stock_name="貴州茅臺",
+        code="2330",
+        stock_name="台積電",
         market="cn",
         phase=None,
         base_context={
@@ -110,7 +110,7 @@ def _build_analysis_context_pack_summary(
 
 
 SAMPLE_DASHBOARD = {
-    "stock_name": "貴州茅臺",
+    "stock_name": "台積電",
     "sentiment_score": 75,
     "trend_prediction": "看多",
     "operation_advice": "持有",
@@ -118,7 +118,7 @@ SAMPLE_DASHBOARD = {
     "confidence_level": "中",
     "dashboard": {
         "core_conclusion": {
-            "one_sentence": "茅臺近期震盪走強",
+            "one_sentence": "台積電近期震盪走強",
             "signal_type": "🟡持有觀望",
         },
     },
@@ -174,8 +174,8 @@ class TestAgentExecutor(unittest.TestCase):
                             "當前問題",
                             "session-1",
                             context={
-                                "stock_code": "600519",
-                                "stock_name": "貴州茅臺",
+                                "stock_code": "2330",
+                                "stock_name": "台積電",
                                 "previous_price": 1800,
                             },
                         )
@@ -206,7 +206,7 @@ class TestAgentExecutor(unittest.TestCase):
             default_skill_policy="",
             max_steps=2,
         )
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze 2330")
 
         self.assertTrue(result.success)
         prompt = adapter.call_with_tools.call_args.args[0][0]["content"]
@@ -233,7 +233,7 @@ class TestAgentExecutor(unittest.TestCase):
             use_legacy_default_prompt=True,
             max_steps=2,
         )
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze 2330")
 
         self.assertTrue(result.success)
         prompt = adapter.call_with_tools.call_args.args[0][0]["content"]
@@ -256,7 +256,7 @@ class TestAgentExecutor(unittest.TestCase):
         )
 
         executor = AgentExecutor(registry, adapter, max_steps=5)
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze 2330")
 
         self.assertTrue(result.success)
         self.assertIsNotNone(result.dashboard)
@@ -289,7 +289,7 @@ class TestAgentExecutor(unittest.TestCase):
         adapter.call_with_tools.side_effect = [step1_response, step2_response]
 
         executor = AgentExecutor(registry, adapter, max_steps=5)
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze 2330")
 
         self.assertTrue(result.success)
         self.assertEqual(result.total_steps, 2)
@@ -464,7 +464,7 @@ class TestAgentExecutor(unittest.TestCase):
         adapter.call_with_tools.side_effect = [step1, step2]
 
         executor = AgentExecutor(registry, adapter, max_steps=5)
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze 2330")
 
         self.assertTrue(result.success)
         self.assertEqual(len(result.tool_calls_log), 2)
@@ -649,7 +649,7 @@ class TestAgentExecutor(unittest.TestCase):
         adapter.call_with_tools.side_effect = [step1, step2, step3]
 
         executor = AgentExecutor(registry, adapter, max_steps=5)
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze 2330")
 
         self.assertTrue(result.success)
         self.assertEqual(result.model, "gemini/gemini-2.0-flash, openai/gpt-4o-mini")
@@ -667,7 +667,7 @@ class TestAgentExecutor(unittest.TestCase):
         )
 
         executor = AgentExecutor(registry, adapter, max_steps=2)
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze 2330")
 
         self.assertFalse(result.success)
         self.assertEqual(result.model, "")
@@ -685,7 +685,7 @@ class TestAgentExecutor(unittest.TestCase):
         )
 
         executor = AgentExecutor(registry, adapter, max_steps=2)
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze 2330")
 
         self.assertFalse(result.success)
         self.assertEqual(result.content, "")
@@ -714,7 +714,7 @@ class TestAgentExecutor(unittest.TestCase):
         adapter.call_with_tools.side_effect = _slow_llm
 
         executor = AgentExecutor(registry, adapter, max_steps=2, timeout_seconds=0.01)
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze 2330")
 
         self.assertFalse(result.success)
         self.assertIn("timed out", (result.error or "").lower())
@@ -843,7 +843,7 @@ class TestAgentExecutor(unittest.TestCase):
 
         executor = AgentExecutor(registry, adapter, max_steps=2, timeout_seconds=1.0)
         with patch("src.agent.runner.time.time", return_value=1000.0):
-            result = executor.run("Analyze 600519")
+            result = executor.run("Analyze 2330")
 
         self.assertTrue(result.success)
         self.assertIsNotNone(captured.get("timeout"))
@@ -964,16 +964,16 @@ class TestBuildUserMessage(unittest.TestCase):
         )
 
     def test_basic_message(self):
-        msg = self.executor._build_user_message("Analyze 600519")
-        self.assertIn("Analyze 600519", msg)
+        msg = self.executor._build_user_message("Analyze 2330")
+        self.assertIn("Analyze 2330", msg)
         self.assertIn("決策儀表盤", msg)
 
     def test_message_with_context(self):
         msg = self.executor._build_user_message(
             "Analyze",
-            context={"stock_code": "600519", "report_type": "daily"},
+            context={"stock_code": "2330", "report_type": "daily"},
         )
-        self.assertIn("股票程式碼: 600519", msg)
+        self.assertIn("股票代號: 2330", msg)
         self.assertIn("報告型別: daily", msg)
 
     def test_message_renders_readable_market_phase_context_without_raw_keys(self):
@@ -987,7 +987,7 @@ class TestBuildUserMessage(unittest.TestCase):
         msg = self.executor._build_user_message(
             "Analyze",
             context={
-                "stock_code": "600519",
+                "stock_code": "2330",
                 "report_language": "zh",
                 "market_phase_context": {
                     "phase": "intraday",
@@ -1000,7 +1000,7 @@ class TestBuildUserMessage(unittest.TestCase):
                 "realtime_quote": {"price": 1880.0},
             },
         )
-        self.assertIn("股票程式碼: 600519", msg)
+        self.assertIn("股票代號: 2330", msg)
         self.assertIn("市場階段上下文", msg)
         self.assertIn("分析上下文包摘要", msg)
         self.assertIn("資料限制", msg)

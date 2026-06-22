@@ -54,7 +54,7 @@ class TestTaskService(unittest.TestCase):
         with patch.dict("sys.modules", {"main": fake_main}), patch(
             "src.config.get_config", return_value=SimpleNamespace()
         ):
-            result = service._run_analysis(code="600519", task_id="task-1")
+            result = service._run_analysis(code="2330", task_id="task-1")
 
         self.assertFalse(result["success"])
         self.assertEqual(result["error"], "JSON 解析失敗")

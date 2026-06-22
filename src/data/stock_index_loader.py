@@ -20,6 +20,7 @@ _STOCK_INDEX_FILENAME = "stocks.index.json"
 _STOCK_INDEX_CACHE: Dict[str, str] | None = None
 _REMOTE_INDEX_VALIDITY_CACHE: tuple[Path, float, int, bool] | None = None
 _STOCK_INDEX_CACHE_LOCK = RLock()
+_SUPPORTED_STOCK_INDEX_MARKETS = {"TW", "US"}
 
 
 def get_stock_index_candidate_paths() -> tuple[Path, ...]:
@@ -49,25 +50,15 @@ def _build_lookup_keys(canonical_code: str, display_code: str) -> Iterable[str]:
     _add_lookup_key(keys, canonical_code)
     _add_lookup_key(keys, display_code)
 
-    canonical_upper = str(canonical_code or "").strip().upper()
-    display_upper = str(display_code or "").strip().upper()
-
-    if "." in canonical_upper:
-        base, suffix = canonical_upper.rsplit(".", 1)
-        if suffix in {"SH", "SZ", "SS", "BJ"} and base.isdigit():
+    for candidate in (
+        str(canonical_code or "").strip().upper(),
+        str(display_code or "").strip().upper(),
+    ):
+        if "." not in candidate:
+            continue
+        base, suffix = candidate.rsplit(".", 1)
+        if suffix in _SUPPORTED_STOCK_INDEX_MARKETS and base:
             _add_lookup_key(keys, base)
-        elif suffix == "HK" and base.isdigit() and 1 <= len(base) <= 5:
-            digits = base.zfill(5)
-            _add_lookup_key(keys, digits)
-            _add_lookup_key(keys, f"HK{digits}")
-
-    for candidate in (canonical_upper, display_upper):
-        if candidate.startswith("HK"):
-            digits = candidate[2:]
-            if digits.isdigit() and 1 <= len(digits) <= 5:
-                digits = digits.zfill(5)
-                _add_lookup_key(keys, digits)
-                _add_lookup_key(keys, f"HK{digits}")
 
     return keys
 
@@ -90,6 +81,9 @@ def _build_stock_name_map(raw_items: list) -> Dict[str, str]:
             continue
 
         canonical_code, display_code, name_zh = item[0], item[1], item[2]
+        market = str(item[6] if len(item) > 6 else "").strip().upper()
+        if market not in _SUPPORTED_STOCK_INDEX_MARKETS:
+            continue
         if not is_meaningful_stock_name(name_zh, str(display_code or canonical_code or "")):
             continue
 
@@ -113,7 +107,7 @@ def _get_stock_index_signature(index_path: Path) -> tuple[float, int] | None:
     try:
         stat_result = index_path.stat()
     except OSError as exc:
-        logger.debug("[股票名称] 读取股票索引元数据失败 %s: %s", index_path, exc)
+        logger.debug("[股票名稱] 讀取股票索引中繼資料失敗 %s: %s", index_path, exc)
         return None
     if not index_path.is_file():
         return None
@@ -199,13 +193,13 @@ def get_stock_name_index_map() -> Dict[str, str]:
                 else:
                     _STOCK_INDEX_CACHE = _load_stock_index_file(index_path)
                 logger.debug(
-                    "[股票名称] 已加载前端股票索引映射: %s (%d 条)",
+                    "[股票名稱] 已載入前端股票索引映射: %s (%d 筆)",
                     index_path,
                     len(_STOCK_INDEX_CACHE),
                 )
                 return _STOCK_INDEX_CACHE
             except (OSError, TypeError, ValueError) as exc:
-                logger.debug("[股票名称] 读取股票索引失败 %s: %s", index_path, exc)
+                logger.debug("[股票名稱] 讀取股票索引失敗 %s: %s", index_path, exc)
 
         _STOCK_INDEX_CACHE = {}
         return _STOCK_INDEX_CACHE

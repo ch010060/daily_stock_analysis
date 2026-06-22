@@ -71,8 +71,8 @@ describe('useTaskStream', () => {
         data: JSON.stringify({
           task_id: 'task-1',
           trace_id: 'trace-task-1',
-          stock_code: '600519',
-          stock_name: '貴州茅臺',
+          stock_code: '2330',
+          stock_name: '台積電',
           status: 'processing',
           progress: 72,
           message: 'LLM 正在生成分析結果',
@@ -87,8 +87,8 @@ describe('useTaskStream', () => {
     expect(onTaskProgress).toHaveBeenCalledWith({
       taskId: 'task-1',
       traceId: 'trace-task-1',
-      stockCode: '600519',
-      stockName: '貴州茅臺',
+      stockCode: '2330',
+      stockName: '台積電',
       status: 'processing',
       progress: 72,
       message: 'LLM 正在生成分析結果',

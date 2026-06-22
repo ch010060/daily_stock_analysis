@@ -4,25 +4,21 @@
 Name-to-Code Resolution Engine
 ===================================
 
-Resolve stock name to code: local mapping + pinyin + AkShare fallback + fuzzy matching.
+Resolve stock name to code: Route B TW/US universe + local mapping.
 """
 
 from __future__ import annotations
 
 import difflib
 import logging
-import time
+import re
 from typing import Dict, Optional, Set, Tuple
 
 from src.data.stock_mapping import STOCK_NAME_MAP
-from src.services.stock_code_utils import is_code_like, normalize_code
+from src.services.symbol_universe import get_default_symbol_resolver
+from src.services.stock_code_utils import normalize_code
 
 logger = logging.getLogger(__name__)
-
-# AkShare result cache: (timestamp, name_to_code_dict)
-_akshare_cache: Optional[tuple[float, Dict[str, str]]] = None
-_AKSHARE_CACHE_TTL = 1800  # 30 MIN
-
 
 def _contains_cjk(text: str) -> bool:
     """Return True when text contains CJK characters."""
@@ -30,13 +26,25 @@ def _contains_cjk(text: str) -> bool:
 
 
 def _is_code_like(s: str) -> bool:
-    """Backward-compatible wrapper of shared code-like check."""
-    return is_code_like(s)
+    """Return True only for Route B TW/US code-like inputs."""
+    return _normalize_code(s) is not None
 
 
 def _normalize_code(raw: str) -> Optional[str]:
-    """Backward-compatible wrapper of shared code normalization."""
-    return normalize_code(raw)
+    """Normalize only Route B TW/US codes for name resolution."""
+    text = (raw or "").strip().upper()
+    if not text:
+        return None
+    if text.startswith("TW:"):
+        base = text[3:]
+        return base if re.fullmatch(r"\d{4}", base) else None
+    if text.endswith(".TW"):
+        base = text[:-3]
+        return base if re.fullmatch(r"\d{4}", base) else None
+    if re.fullmatch(r"\d{4}", text):
+        return text
+    normalized = normalize_code(raw)
+    return normalized if _is_supported_route_b_code(normalized) else None
 
 
 def _build_reverse_map_no_duplicates(
@@ -104,38 +112,15 @@ def _resolve_local_alias(name: str) -> Optional[str]:
     return _LOCAL_ALIAS_MAP.get(raw) or _LOCAL_ALIAS_MAP.get(raw.upper())
 
 
-def _get_akshare_name_to_code() -> Optional[Dict[str, str]]:
-    """Fetch A-share name->code from AkShare, with cache."""
-    global _akshare_cache
-    now = time.time()
-    if _akshare_cache is not None and (now - _akshare_cache[0]) < _AKSHARE_CACHE_TTL:
-        return _akshare_cache[1]
-    try:
-        import akshare as ak
-
-        df = ak.stock_info_a_code_name()
-        if df is None or df.empty:
-            return None
-        code_to_name = {}
-        for _, row in df.iterrows():
-            code = row.get("code")
-            name = row.get("name")
-            if code is None or name is None:
-                continue
-            code_str = str(code).strip()
-            # Strip .SH/.SZ suffix
-            if "." in code_str:
-                base, suffix = code_str.rsplit(".", 1)
-                if suffix.upper() in ("SH", "SZ", "SS") and base.isdigit():
-                    code_str = base
-            code_to_name[code_str] = str(name).strip()
-        result = _build_reverse_map_no_duplicates(code_to_name)
-        _akshare_cache = (now, result)
-        logger.info(f"[NameResolver] AkShare cache loaded: {len(result)} name->code mappings")
-        return result
-    except Exception as e:
-        logger.warning(f"[NameResolver] AkShare fallback failed: {e}")
-        return None
+def _is_supported_route_b_code(normalized_code: str | None) -> bool:
+    """Return True for TW/US code shapes accepted by Route B name resolution."""
+    if not normalized_code:
+        return False
+    if re.fullmatch(r"\d{4}", normalized_code):
+        return True
+    if re.fullmatch(r"[A-Z]{1,5}(?:\.[A-Z])?", normalized_code):
+        return True
+    return False
 
 
 def _is_single_char_typo(input_name: str, candidate_name: str) -> bool:
@@ -156,12 +141,11 @@ def resolve_name_to_code(name: str) -> Optional[str]:
     Resolve stock name to code.
 
     Strategy (in order):
-    1. If input looks like a code (5-6 digits or 1-5 letters), return it normalized.
-    2. Local STOCK_NAME_MAP reverse (exclude ambiguous names).
-    3. Pinyin match against local names.
-    4. AkShare online fallback (A-shares).
-    5. Fuzzy match (difflib).
-    6. Return None.
+    1. Route B TW/US symbol universe.
+    2. If input looks like a supported TW/US code, return it normalized.
+    3. Local STOCK_NAME_MAP reverse (exclude ambiguous names).
+    4. Pinyin match against local names.
+    5. Return None.
 
     Args:
         name: Stock name or code string.
@@ -175,9 +159,14 @@ def resolve_name_to_code(name: str) -> Optional[str]:
     if not s:
         return None
 
+    route_b_result = get_default_symbol_resolver().resolve(s, limit=5)
+    if route_b_result.status == "resolved" and route_b_result.selected is not None:
+        return route_b_result.selected.raw_symbol
+
     # 1. Input looks like code
     if _is_code_like(s):
-        return _normalize_code(s)
+        normalized_code = _normalize_code(s)
+        return normalized_code if _is_supported_route_b_code(normalized_code) else None
 
     alias_code = _resolve_local_alias(s)
     if alias_code:
@@ -205,39 +194,25 @@ def resolve_name_to_code(name: str) -> Optional[str]:
     except Exception as e:
         logger.debug(f"[NameResolver] Pinyin match failed: {e}")
 
-    # Skip AkShare/fuzzy fallback for non-CJK free text such as random Latin noise.
-    # These paths are expensive and only meaningfully help Chinese stock names.
     if not _contains_cjk(s):
-        logger.debug(f"[NameResolver] Skip CJK-only fallbacks for non-CJK input: {s}")
         return None
 
-    # 4. AkShare fallback
-    akshare_map = _get_akshare_name_to_code()
-    if akshare_map and s in akshare_map:
-        logger.debug(f"[NameResolver] 命中 AkShare 對映: {s} -> {akshare_map[s]}")
-        return akshare_map[s]
-
-    # 5. Fuzzy match (local + akshare, local takes precedence)
-    all_name_to_code = dict(local_reverse)
-    if akshare_map:
-        all_name_to_code.update(akshare_map)
-    # Skip fuzzy matching for very short inputs (<=2 chars) to avoid false positives,
-    # e.g. '中國' matching arbitrary company names in a pool of 5000+ stocks.
-    # Use a higher cutoff (0.8) to reduce mis-hits on longer inputs as well.
+    # 4. Fuzzy match against local TW/US names only. Route B symbol resolution
+    # intentionally does not use external non-TW/US market-name fallback.
     if len(s) > 2:
-        names = list(all_name_to_code.keys())
+        names = list(local_reverse.keys())
         matches = difflib.get_close_matches(s, names, n=1, cutoff=0.8)
         if matches:
             logger.debug(f"[NameResolver] 命中模糊匹配: input={s}, matched={matches[0]}")
-            return all_name_to_code[matches[0]]
+            return local_reverse[matches[0]]
 
         # Conservative fallback for one-character typo in medium/long names.
         # This keeps the strict default threshold while fixing obvious misspellings
-        # such as "貴州茅苔" -> "貴州茅臺".
+        # within supported TW/US names only.
         typo_matches = difflib.get_close_matches(s, names, n=1, cutoff=0.7)
         if typo_matches and _is_single_char_typo(s, typo_matches[0]):
             logger.debug(f"[NameResolver] 命中單字誤寫兜底: input={s}, matched={typo_matches[0]}")
-            return all_name_to_code[typo_matches[0]]
+            return local_reverse[typo_matches[0]]
 
     logger.debug(f"[NameResolver] 解析失敗: {s}")
     return None

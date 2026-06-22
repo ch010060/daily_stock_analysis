@@ -23,7 +23,7 @@ from src.utils.sanitize import redact_sensitive_mapping
 
 
 def _subject() -> AnalysisSubject:
-    return AnalysisSubject(code="600519", stock_name="貴州茅臺", market="cn")
+    return AnalysisSubject(code="2330", stock_name="台積電", market="cn")
 
 
 def test_pack_defaults_and_json_serialization_are_stable() -> None:
@@ -37,8 +37,8 @@ def test_pack_defaults_and_json_serialization_are_stable() -> None:
 
     assert dumped["pack_version"] == PACK_VERSION
     assert dumped["subject"] == {
-        "code": "600519",
-        "stock_name": "貴州茅臺",
+        "code": "2330",
+        "stock_name": "台積電",
         "market": "cn",
     }
     assert dumped["blocks"] == {}

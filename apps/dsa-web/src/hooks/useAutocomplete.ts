@@ -93,7 +93,7 @@ export function useAutocomplete(
     }
 
     try {
-      const results = searchStocks(q, index, { limit });
+      const results = searchStocks(q, index, { limit, marketScope: 'route_b' });
       setSuggestions(results);
       setIsOpen(results.length > 0);
       setHighlightedIndex(-1);

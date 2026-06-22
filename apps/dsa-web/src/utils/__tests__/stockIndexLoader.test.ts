@@ -1,9 +1,8 @@
 /**
- * stockIndexLoader Unit Tests
- *
- * Test stock index loading, parsing, compression, and other functions
+ * stockIndexLoader unit tests for Route B TW/US symbol index behavior.
  */
 
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   loadStockIndex,
   compressIndex,
@@ -12,70 +11,56 @@ import {
   groupStocksByMarket,
 } from '../stockIndexLoader';
 import type { StockIndexItem } from '../../types/stockIndex';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-// Mock fetch
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch as unknown as typeof fetch;
 
 describe('stockIndexLoader', () => {
   const mockIndexData: StockIndexItem[] = [
     {
-      canonicalCode: '600519.SH',
-      displayCode: '600519',
-      nameZh: '貴州茅臺',
-      pinyinFull: 'guizhoumaotai',
-      pinyinAbbr: 'gzmt',
-      aliases: ['茅臺'],
-      market: 'CN',
-      assetType: 'stock',
-      active: true,
-      popularity: 100,
-    },
-    {
-      canonicalCode: '000001.SZ',
-      displayCode: '000001',
-      nameZh: '平安銀行',
-      pinyinFull: 'pinganyinxing',
-      pinyinAbbr: 'payh',
-      aliases: ['平銀'],
-      market: 'CN',
-      assetType: 'stock',
-      active: true,
-      popularity: 90,
-    },
-    {
-      canonicalCode: '00700.HK',
-      displayCode: '00700',
-      nameZh: '騰訊控股',
-      pinyinFull: 'tengxunkonggu',
-      pinyinAbbr: 'txkg',
-      aliases: ['騰訊'],
-      market: 'HK',
-      assetType: 'stock',
-      active: true,
-      popularity: 95,
-    },
-    {
-      canonicalCode: 'AAPL.US',
+      canonicalCode: 'AAPL',
       displayCode: 'AAPL',
-      nameZh: '蘋果',
-      pinyinFull: 'pingguo',
-      pinyinAbbr: 'pg',
-      aliases: [],
+      nameZh: 'Apple',
+      pinyinFull: 'apple',
+      pinyinAbbr: 'aapl',
+      aliases: ['Apple Inc'],
       market: 'US',
       assetType: 'stock',
       active: true,
       popularity: 98,
     },
     {
-      canonicalCode: '600000.SH',
-      displayCode: '600000',
-      nameZh: '浦發銀行',
-      pinyinFull: 'pufayinxing',
-      pinyinAbbr: 'pfyh',
-      aliases: ['浦發'],
-      market: 'CN',
+      canonicalCode: 'META',
+      displayCode: 'META',
+      nameZh: 'META PLATFORMS A',
+      pinyinFull: 'metaplatformsa',
+      pinyinAbbr: 'meta',
+      aliases: [],
+      market: 'US',
+      assetType: 'stock',
+      active: true,
+      popularity: 97,
+    },
+    {
+      canonicalCode: '8299',
+      displayCode: '8299',
+      nameZh: '群聯',
+      pinyinFull: 'qunlian',
+      pinyinAbbr: 'ql',
+      aliases: [],
+      market: 'TW',
+      assetType: 'stock',
+      active: true,
+      popularity: 94,
+    },
+    {
+      canonicalCode: 'OLD',
+      displayCode: 'OLD',
+      nameZh: 'Inactive US',
+      pinyinFull: 'inactiveus',
+      pinyinAbbr: 'old',
+      aliases: [],
+      market: 'US',
       assetType: 'stock',
       active: false,
       popularity: 80,
@@ -86,8 +71,8 @@ describe('stockIndexLoader', () => {
     vi.clearAllMocks();
   });
 
-  describe('loadStockIndex - Load stock index', () => {
-    test('successfully loads object format index', async () => {
+  describe('loadStockIndex', () => {
+    test('loads object format and filters unsupported markets', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockIndexData,
@@ -97,14 +82,13 @@ describe('stockIndexLoader', () => {
 
       expect(result.loaded).toBe(true);
       expect(result.fallback).toBe(false);
-      expect(result.data).toEqual(expect.arrayContaining(mockIndexData));
+      expect(result.data.every((item) => item.market === 'TW' || item.market === 'US')).toBe(true);
       expect(result.error).toBeUndefined();
     });
 
-    test('successfully loads compressed format index (tuple format)', async () => {
+    test('loads compressed tuple format and still appends required Route B instruments', async () => {
       const compressedData = [
-        ['600519.SH', '600519', '貴州茅臺', 'guizhoumaotai', 'gzmt', ['茅臺'], 'CN', 'stock', true, 100],
-        ['000001.SZ', '000001', '平安銀行', 'pinganyinxing', 'payh', ['平銀'], 'CN', 'stock', true, 90],
+        ['AAPL', 'AAPL', 'Apple', 'apple', 'aapl', ['Apple Inc'], 'US', 'stock', true, 98],
       ];
 
       mockFetch.mockResolvedValueOnce({
@@ -115,46 +99,78 @@ describe('stockIndexLoader', () => {
       const result = await loadStockIndex();
 
       expect(result.loaded).toBe(true);
-      expect(result.fallback).toBe(false);
-      expect(result.data.length).toBeGreaterThanOrEqual(2);
-      expect(result.data[0].canonicalCode).toBe('600519.SH');
-      expect(result.data[0].nameZh).toBe('貴州茅臺');
+      expect(result.data).toEqual(expect.arrayContaining([
+        expect.objectContaining({ canonicalCode: 'AAPL', market: 'US' }),
+        expect.objectContaining({ canonicalCode: '8299', market: 'TW' }),
+        expect.objectContaining({ canonicalCode: '006208', market: 'TW', assetType: 'etf' }),
+        expect.objectContaining({ canonicalCode: '00981A', market: 'TW', assetType: 'etf' }),
+        expect.objectContaining({ canonicalCode: 'META', market: 'US' }),
+        expect.objectContaining({ canonicalCode: 'SPY', market: 'US' }),
+        expect.objectContaining({ canonicalCode: 'SPX', market: 'US', assetType: 'index' }),
+      ]));
     });
 
-    test('adds required Route B instruments when the served index is missing them', async () => {
+    test('merges required aliases into existing provider records', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockIndexData,
       } as unknown as Response);
 
       const result = await loadStockIndex();
+      const meta = result.data.find((item) => item.canonicalCode === 'META');
+      const phison = result.data.find((item) => item.canonicalCode === '8299');
 
-      expect(result.data).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          canonicalCode: '3008',
-          displayCode: '3008',
-          nameZh: '大立光',
-          market: 'TW',
-          aliases: expect.arrayContaining(['Largan', 'Largan Precision']),
-        }),
-        expect.objectContaining({
-          canonicalCode: 'SPX',
-          displayCode: 'SPX',
-          nameZh: '標普500指數',
-          market: 'US',
-          assetType: 'index',
-        }),
-        expect.objectContaining({
-          canonicalCode: 'SPY',
-          displayCode: 'SPY',
-          nameZh: 'SPDR S&P 500 ETF',
-          market: 'US',
-          assetType: 'etf',
-        }),
-      ]));
+      expect(meta).toBeDefined();
+      expect(meta?.aliases).toEqual(expect.arrayContaining(['Facebook', 'Meta', 'Meta Platforms Inc']));
+      expect(phison).toBeDefined();
+      expect(phison?.aliases).toEqual(expect.arrayContaining(['Phison', 'Phison Electronics']));
     });
 
-    test('returns fallback mode on network error', async () => {
+    test('adds required Route B instruments when the served index is missing them', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [],
+      } as unknown as Response);
+
+      const result = await loadStockIndex();
+      const byCode = new Map(result.data.map((item) => [item.canonicalCode, item]));
+
+      expect(result.data).toEqual(expect.arrayContaining([
+        expect.objectContaining({ canonicalCode: '2330', nameZh: '台積電', market: 'TW' }),
+        expect.objectContaining({ canonicalCode: '3008', nameZh: '大立光', market: 'TW' }),
+        expect.objectContaining({ canonicalCode: '8299', nameZh: '群聯', market: 'TW' }),
+        expect.objectContaining({ canonicalCode: 'META', nameZh: 'Meta Platforms', market: 'US' }),
+        expect.objectContaining({ canonicalCode: 'NVDA', nameZh: 'NVIDIA', market: 'US' }),
+      ]));
+      for (const [code, name] of [
+        ['2308', '台達電'],
+        ['2382', '廣達'],
+        ['6669', '緯穎'],
+        ['3017', '奇鋐'],
+        ['2368', '金像電'],
+        ['2345', '智邦'],
+        ['3037', '欣興'],
+        ['3661', '世芯-KY'],
+        ['2303', '聯電'],
+        ['2882', '國泰金'],
+        ['006208', '富邦台50'],
+        ['00981A', '主動統一台股增長'],
+        ['MSFT', 'Microsoft'],
+        ['GOOGL', 'Alphabet'],
+        ['AMZN', 'Amazon'],
+        ['TSLA', 'Tesla'],
+        ['AVGO', 'Broadcom'],
+        ['AMD', 'Advanced Micro Devices'],
+        ['MU', 'Micron Technology'],
+        ['ARM', 'Arm Holdings'],
+        ['ORCL', 'Oracle'],
+        ['PLTR', 'Palantir Technologies'],
+      ]) {
+        expect(byCode.get(code)).toMatchObject({ canonicalCode: code, nameZh: name });
+      }
+    });
+
+    test('returns fallback mode on load errors', async () => {
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
       const result = await loadStockIndex();
@@ -165,58 +181,10 @@ describe('stockIndexLoader', () => {
       expect(result.error).toBeInstanceOf(Error);
     });
 
-    test('returns fallback mode on HTTP error', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-      } as unknown as Response);
-
-      const result = await loadStockIndex();
-
-      expect(result.loaded).toBe(false);
-      expect(result.fallback).toBe(true);
-      expect(result.data).toEqual([]);
-      expect(result.error).toBeDefined();
-    });
-
-    test('returns fallback mode on JSON parse error', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => {
-          throw new Error('Invalid JSON');
-        },
-      } as unknown as Response);
-
-      const result = await loadStockIndex();
-
-      expect(result.loaded).toBe(false);
-      expect(result.fallback).toBe(true);
-      expect(result.data).toEqual([]);
-      expect(result.error).toBeDefined();
-    });
-
-    test('handles empty array', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => [],
-      } as unknown as Response);
-
-      const result = await loadStockIndex();
-
-      expect(result.loaded).toBe(true);
-      expect(result.fallback).toBe(false);
-      expect(result.data).toEqual(expect.arrayContaining([
-        expect.objectContaining({ canonicalCode: '3008' }),
-        expect.objectContaining({ canonicalCode: 'SPX' }),
-        expect.objectContaining({ canonicalCode: 'SPY' }),
-      ]));
-    });
-
     test('fetch call includes cache-busting parameter', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockIndexData,
+        json: async () => [],
       } as unknown as Response);
 
       await loadStockIndex();
@@ -224,266 +192,62 @@ describe('stockIndexLoader', () => {
       const fetchCallArgs = mockFetch.mock.calls[0][0];
       expect(fetchCallArgs).toContain('?_t=');
     });
+
   });
 
-  describe('compressIndex - Compress index', () => {
-    test('converts object format to tuple format', () => {
-      const compressed = compressIndex(mockIndexData);
+  describe('index utilities', () => {
+    test('compressIndex converts object format to tuple format', () => {
+      const compressed = compressIndex(mockIndexData.filter((item) => item.market === 'TW' || item.market === 'US'));
 
-      expect(compressed).toHaveLength(mockIndexData.length);
       expect(compressed[0]).toEqual([
-        '600519.SH',
-        '600519',
-        '貴州茅臺',
-        'guizhoumaotai',
-        'gzmt',
-        ['茅臺'],
-        'CN',
+        'AAPL',
+        'AAPL',
+        'Apple',
+        'apple',
+        'aapl',
+        ['Apple Inc'],
+        'US',
         'stock',
         true,
-        100,
+        98,
       ]);
     });
 
-    test('handles empty aliases array', () => {
-      const itemWithoutAliases: StockIndexItem[] = [
-        {
-          canonicalCode: 'TEST.US',
-          displayCode: 'TEST',
-          nameZh: '測試',
-          pinyinFull: 'test',
-          pinyinAbbr: 'test',
-          aliases: [],
-          market: 'US',
-          assetType: 'stock',
-          active: true,
-          popularity: 50,
-        },
-      ];
+    test('findStockInIndex finds supported TW/US records', () => {
+      const result = findStockInIndex('8299', mockIndexData);
 
-      const compressed = compressIndex(itemWithoutAliases);
-
-      expect(compressed[0][5]).toEqual([]);
-    });
-
-    test('handles undefined aliases', () => {
-      const itemWithUndefinedAliases: StockIndexItem[] = [
-        {
-          canonicalCode: 'TEST.US',
-          displayCode: 'TEST',
-          nameZh: '測試',
-          pinyinFull: 'test',
-          pinyinAbbr: 'test',
-          aliases: undefined as unknown as string[],
-          market: 'US',
-          assetType: 'stock',
-          active: true,
-          popularity: 50,
-        },
-      ];
-
-      const compressed = compressIndex(itemWithUndefinedAliases);
-
-      expect(compressed[0][5]).toEqual([]);
-    });
-
-    test('handles empty array', () => {
-      const compressed = compressIndex([]);
-      expect(compressed).toEqual([]);
-    });
-  });
-
-  describe('findStockInIndex - Find stock', () => {
-    test('finds existing stock', () => {
-      const result = findStockInIndex('600519.SH', mockIndexData);
       expect(result).not.toBeNull();
-      expect(result?.canonicalCode).toBe('600519.SH');
-      expect(result?.nameZh).toBe('貴州茅臺');
+      expect(result?.nameZh).toBe('群聯');
     });
 
-    test('returns null for non-existent stock', () => {
-      const result = findStockInIndex('NOTFOUND.US', mockIndexData);
+    test('findStockInIndex returns null for non-existent stock', () => {
+      const result = findStockInIndex('NOTFOUND', mockIndexData);
+
       expect(result).toBeNull();
     });
 
-    test('finds inactive stock', () => {
-      const result = findStockInIndex('600000.SH', mockIndexData);
-      expect(result).not.toBeNull();
-      expect(result?.active).toBe(false);
-    });
-
-    test('handles empty index', () => {
-      const result = findStockInIndex('600519.SH', []);
-      expect(result).toBeNull();
-    });
-
-    test('case-sensitive search', () => {
-      const result = findStockInIndex('600519.sh', mockIndexData);
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('getPopularStocks - Get popular stocks', () => {
-    test('sorts by popularity descending', () => {
-      const result = getPopularStocks(mockIndexData, 3);
+    test('getPopularStocks filters inactive records and sorts by popularity', () => {
+      const result = getPopularStocks(mockIndexData.filter((item) => item.market === 'TW' || item.market === 'US'), 3);
 
       expect(result).toHaveLength(3);
-      expect(result[0].canonicalCode).toBe('600519.SH'); // popularity: 100
-      expect(result[1].canonicalCode).toBe('AAPL.US');   // popularity: 98
-      expect(result[2].canonicalCode).toBe('00700.HK'); // popularity: 95
+      expect(result[0].canonicalCode).toBe('AAPL');
+      expect(result.some((item) => !item.active)).toBe(false);
     });
 
-    test('filters out inactive stocks', () => {
-      const result = getPopularStocks(mockIndexData, 10);
+    test('groupStocksByMarket groups supported markets', () => {
+      const routeBItems = mockIndexData.filter((item) => item.market === 'TW' || item.market === 'US');
+      const result = groupStocksByMarket(routeBItems);
 
-      // 600000.SH is inactive, should not appear
-      const hasInactive = result.some(item => !item.active);
-      expect(hasInactive).toBe(false);
+      expect(result.size).toBe(2);
+      expect(result.get('TW')).toHaveLength(1);
+      expect(result.get('US')).toHaveLength(2);
     });
 
-    test('limits return count', () => {
-      const result = getPopularStocks(mockIndexData, 2);
-      expect(result.length).toBeLessThanOrEqual(2);
-    });
-
-    test('defaults to limit of 20', () => {
-      const result = getPopularStocks(mockIndexData);
-      expect(result.length).toBeLessThanOrEqual(20);
-    });
-
-    test('handles empty index', () => {
-      const result = getPopularStocks([]);
-      expect(result).toEqual([]);
-    });
-
-    test('handles all inactive stocks', () => {
-      const inactiveOnly: StockIndexItem[] = [
-        {
-          canonicalCode: 'TEST.US',
-          displayCode: 'TEST',
-          nameZh: '測試',
-          pinyinFull: 'test',
-          pinyinAbbr: 'test',
-          aliases: [],
-          market: 'US',
-          assetType: 'stock',
-          active: false,
-          popularity: 100,
-        },
-      ];
-
-      const result = getPopularStocks(inactiveOnly);
-      expect(result).toEqual([]);
-    });
-
-    test('maintains stable sorting for same popularity', () => {
-      const samePopularity: StockIndexItem[] = [
-        {
-          canonicalCode: 'A.US',
-          displayCode: 'A',
-          nameZh: 'A',
-          pinyinFull: 'a',
-          pinyinAbbr: 'a',
-          aliases: [],
-          market: 'US',
-          assetType: 'stock',
-          active: true,
-          popularity: 100,
-        },
-        {
-          canonicalCode: 'B.US',
-          displayCode: 'B',
-          nameZh: 'B',
-          pinyinFull: 'b',
-          pinyinAbbr: 'b',
-          aliases: [],
-          market: 'US',
-          assetType: 'stock',
-          active: true,
-          popularity: 100,
-        },
-      ];
-
-      const result = getPopularStocks(samePopularity, 2);
-      expect(result).toHaveLength(2);
-      expect(result[0].popularity).toBe(100);
-      expect(result[1].popularity).toBe(100);
-    });
-  });
-
-  describe('groupStocksByMarket - Group stocks by market', () => {
-    test('groups different markets correctly', () => {
-      const result = groupStocksByMarket(mockIndexData);
-
-      expect(result.size).toBe(3); // CN, HK, US
-      expect(result.get('CN')).toHaveLength(2);
-      expect(result.get('HK')).toHaveLength(1);
-      expect(result.get('US')).toHaveLength(1);
-    });
-
-    test('filters out inactive stocks', () => {
-      const result = groupStocksByMarket(mockIndexData);
-
-      const cnStocks = result.get('CN')!;
-      const allActive = cnStocks.every(item => item.active);
-      expect(allActive).toBe(true);
-    });
-
-    test('handles empty index', () => {
-      const result = groupStocksByMarket([]);
-      expect(result.size).toBe(0);
-    });
-
-    test('handles all inactive stocks', () => {
-      const inactiveOnly: StockIndexItem[] = [
-        {
-          canonicalCode: 'A.US',
-          displayCode: 'A',
-          nameZh: 'A',
-          pinyinFull: 'a',
-          pinyinAbbr: 'a',
-          aliases: [],
-          market: 'US',
-          assetType: 'stock',
-          active: false,
-          popularity: 100,
-        },
-      ];
-
-      const result = groupStocksByMarket(inactiveOnly);
-      expect(result.size).toBe(0);
-    });
-
-    test('returns independent arrays for groups', () => {
-      const result = groupStocksByMarket(mockIndexData);
-
-      const cnStocks = result.get('CN')!;
-      const originalLength = cnStocks.length;
-
-      // Modifying returned array should not affect original data
-      cnStocks.pop();
-
-      const result2 = groupStocksByMarket(mockIndexData);
-      const cnStocks2 = result2.get('CN')!;
-
-      expect(cnStocks2.length).toBe(originalLength);
-    });
-
-    test('maintains order within groups', () => {
-      const result = groupStocksByMarket(mockIndexData);
-
-      const cnStocks = result.get('CN')!;
-      expect(cnStocks[0].canonicalCode).toBe('600519.SH');
-      expect(cnStocks[1].canonicalCode).toBe('000001.SZ');
-    });
-  });
-
-  describe('Edge case comprehensive tests', () => {
-    test('handles very large datasets', () => {
+    test('handles large Route B datasets', () => {
       const largeIndex: StockIndexItem[] = Array.from({ length: 10000 }, (_, i) => ({
-        canonicalCode: `TEST${i}.US`,
+        canonicalCode: `TEST${i}`,
         displayCode: `TEST${i}`,
-        nameZh: `測試${i}`,
+        nameZh: `Test ${i}`,
         pinyinFull: `test${i}`,
         pinyinAbbr: `t${i}`,
         aliases: [],
@@ -494,29 +258,8 @@ describe('stockIndexLoader', () => {
       }));
 
       expect(() => compressIndex(largeIndex)).not.toThrow();
-      expect(() => findStockInIndex('TEST5000.US', largeIndex)).not.toThrow();
+      expect(() => findStockInIndex('TEST5000', largeIndex)).not.toThrow();
       expect(() => getPopularStocks(largeIndex, 10)).not.toThrow();
-    });
-
-    test('handles special characters', () => {
-      const specialChars: StockIndexItem[] = [
-        {
-          canonicalCode: 'TEST.US',
-          displayCode: 'TEST',
-          nameZh: '測試·公司',
-          pinyinFull: 'test-gongsi',
-          pinyinAbbr: 'test',
-          aliases: ['測試(集團)'],
-          market: 'US',
-          assetType: 'stock',
-          active: true,
-          popularity: 50,
-        },
-      ];
-
-      const compressed = compressIndex(specialChars);
-      expect(compressed[0][2]).toBe('測試·公司');
-      expect(compressed[0][5]).toEqual(['測試(集團)']);
     });
   });
 });

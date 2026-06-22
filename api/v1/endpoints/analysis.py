@@ -12,7 +12,7 @@
 
 特性：
 - 非同步任務佇列：分析任務非同步執行，不阻塞請求
-- 防重複提交：相同股票程式碼正在分析時返回 409
+- 防重複提交：相同股票代號正在分析時返回 409
 - SSE 實時推送：任務狀態變化實時通知前端
 """
 
@@ -131,7 +131,7 @@ def _compute_market_review_override_region(config: Config) -> Optional[str]:
             open_markets,
         )
     except Exception as exc:
-        logger.warning("大盤覆盤交易日過濾失敗，按配置繼續執行: %s", exc)
+        logger.warning("市場概覽交易日過濾失敗，按配置繼續執行: %s", exc)
         return None
 
 
@@ -163,7 +163,7 @@ def _run_market_review_background(
             review_kwargs["query_id"] = query_id
         report = run_market_review(**review_kwargs)
         if not report:
-            raise RuntimeError("大盤覆盤未返回可持久化報告")
+            raise RuntimeError("市場概覽未返回可持久化報告")
         return {"result": report}
     finally:
         _release_market_review_lock(lock_token)
@@ -250,7 +250,7 @@ def _resolve_and_normalize_input(raw_value: str) -> str:
         500: {"description": "分析失敗", "model": ErrorResponse},
     },
     summary="觸發股票分析",
-    description="啟動 AI 智慧分析任務，支援同步和非同步模式。非同步模式下相同股票程式碼不允許重複提交。"
+    description="啟動 AI 智慧分析任務，支援同步和非同步模式。非同步模式下相同股票代號不允許重複提交。"
 )
 def trigger_analysis(
         request: AnalyzeRequest,
@@ -303,7 +303,7 @@ def trigger_analysis(
     for code in resolved:
         if not code:
             continue
-        # Use normalize_stock_code to ensure '600519' and '600519.SH' are merged
+        # Use normalize_stock_code to ensure '2330' and '2330.TW' are merged
         norm = normalize_stock_code(code)
         if norm not in seen:
             seen.add(norm)
@@ -1126,7 +1126,7 @@ def _build_analysis_report(
     Args:
         report_data: 原始報告資料
         query_id: 查詢 ID
-        stock_code: 股票程式碼
+        stock_code: 股票代號
         stock_name: 股票名稱
         context_snapshot: 上下文快照（可選）
         fallback_fundamental_payload: 基本面快照 payload（可選）

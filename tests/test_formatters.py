@@ -315,12 +315,12 @@ class TestNotificationMarkdownFormatters(unittest.TestCase):
         return text.split("```markdown\n", 1)[1].split("\n```", 1)[0]
 
     def test_markdown_tables_to_key_value_rows(self):
-        text = "| 股票 | 評級 |\n| --- | --- |\n| 600519 | 買進 |\n| AAPL | 觀望 |"
+        text = "| 股票 | 評級 |\n| --- | --- |\n| 2330 | 買進 |\n| AAPL | 觀望 |"
 
         result = markdown_tables_to_key_value_rows(text)
 
         self.assertNotIn("| --- |", result)
-        self.assertIn("• 600519：買進", result)
+        self.assertIn("• 2330：買進", result)
         self.assertIn("• AAPL：觀望", result)
 
     def test_markdown_tables_to_key_value_rows_compacts_report_metric_tables(self):
@@ -351,7 +351,7 @@ class TestNotificationMarkdownFormatters(unittest.TestCase):
             "```\n\n"
             "| 股票 | 評級 |\n"
             "| --- | --- |\n"
-            "| 600519 | 買進 |"
+            "| 2330 | 買進 |"
         )
 
         result = markdown_tables_to_key_value_rows(text)
@@ -359,26 +359,26 @@ class TestNotificationMarkdownFormatters(unittest.TestCase):
         fenced = self._first_fenced_code_body(result)
         self.assertIn("| --- |", fenced)
         self.assertIn("| 示例 | 不應轉換 |", fenced)
-        self.assertIn("• 600519：買進", result)
+        self.assertIn("• 2330：買進", result)
         self.assertNotIn("@@DSA_FENCED_CODE_BLOCK_", result)
 
     def test_feishu_formatter_keeps_legacy_structure_and_converts_table(self):
-        text = "# 日報\n\n> 風險提示\n\n| 股票 | 訊號 |\n| --- | --- |\n| 600519 | 強勢 |\n\n- 關注量能"
+        text = "# 日報\n\n> 風險提示\n\n| 股票 | 訊號 |\n| --- | --- |\n| 2330 | 強勢 |\n\n- 關注量能"
 
         result = format_feishu_markdown(text)
 
         self.assertIn("**日報**", result)
         self.assertIn("💬 風險提示", result)
-        self.assertIn("• 股票：600519 | 訊號：強勢", result)
+        self.assertIn("• 股票：2330 | 訊號：強勢", result)
         self.assertIn("• 關注量能", result)
 
     def test_telegram_formatter_uses_supported_markdown(self):
-        text = "## 日報\n\n| 股票 | 訊號 |\n| --- | --- |\n| 600519 | 強勢 |\n\n[詳情](https://example.com/report)"
+        text = "## 日報\n\n| 股票 | 訊號 |\n| --- | --- |\n| 2330 | 強勢 |\n\n[詳情](https://example.com/report)"
 
         result = format_telegram_markdown(text)
 
         self.assertIn("*日報*", result)
-        self.assertIn("- 600519：強勢", result)
+        self.assertIn("- 2330：強勢", result)
         self.assertIn("[詳情](https://example.com/report)", result)
 
     def test_telegram_formatter_escapes_non_link_metacharacters(self):
@@ -386,32 +386,32 @@ class TestNotificationMarkdownFormatters(unittest.TestCase):
             "## [P4] 日報\n\n"
             "| 股票 | 訊號 |\n"
             "| --- | --- |\n"
-            "| 600519 | [P4] 強勢 (觀察) |\n\n"
+            "| 2330 | [P4] 強勢 (觀察) |\n\n"
             "詳見 [詳情](https://example.com/report)"
         )
 
         result = format_telegram_markdown(text)
 
         self.assertIn("*\\[P4\\] 日報*", result)
-        self.assertIn("- 600519：\\[P4\\] 強勢 \\(觀察\\)", result)
+        self.assertIn("- 2330：\\[P4\\] 強勢 \\(觀察\\)", result)
         self.assertIn("[詳情](https://example.com/report)", result)
 
     def test_slack_formatter_uses_mrkdwn_links_and_tables(self):
-        text = "## 日報\n\n| 股票 | 訊號 |\n| --- | --- |\n| 600519 | 強勢 |\n\n[詳情](https://example.com/report)"
+        text = "## 日報\n\n| 股票 | 訊號 |\n| --- | --- |\n| 2330 | 強勢 |\n\n[詳情](https://example.com/report)"
 
         result = format_slack_mrkdwn(text)
 
         self.assertIn("*日報*", result)
-        self.assertIn("• 600519：強勢", result)
+        self.assertIn("• 2330：強勢", result)
         self.assertIn("<https://example.com/report|詳情>", result)
 
     def test_wechat_formatter_keeps_markdown_but_converts_tables(self):
-        text = "## 日報\n\n| 股票 | 訊號 |\n| --- | --- |\n| 600519 | 強勢 |"
+        text = "## 日報\n\n| 股票 | 訊號 |\n| --- | --- |\n| 2330 | 強勢 |"
 
         result = format_wechat_markdown(text)
 
         self.assertIn("## 日報", result)
-        self.assertIn("• 600519：強勢", result)
+        self.assertIn("• 2330：強勢", result)
         self.assertNotIn("| --- |", result)
 
     def test_platform_formatters_do_not_rewrite_fenced_code_blocks(self):
@@ -426,7 +426,7 @@ class TestNotificationMarkdownFormatters(unittest.TestCase):
             "```\n\n"
             "| 股票 | 訊號 |\n"
             "| --- | --- |\n"
-            "| 600519 | 強勢 |"
+            "| 2330 | 強勢 |"
         )
 
         for formatter in (
@@ -441,5 +441,5 @@ class TestNotificationMarkdownFormatters(unittest.TestCase):
                 self.assertIn("| 示例 | 不應轉換 |", fenced)
                 self.assertIn("# not heading", fenced)
                 self.assertIn("[詳情](https://example.com/raw)", fenced)
-                self.assertIn("600519：強勢", result)
+                self.assertIn("2330：強勢", result)
                 self.assertNotIn("@@DSA_FENCED_CODE_BLOCK_", result)

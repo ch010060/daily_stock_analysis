@@ -287,8 +287,8 @@ def extract_symbol_from_ts_code(ts_code: str, market: str) -> Optional[str]:
     """
     从 ts_code 提取 displayCode
 
-    - A股：000001.SZ → 000001
-    - 港股：00700.HK → 00700
+    - 台股：000001.SZ → 000001
+    - 美股：AAPL → AAPL
     - 美股：AAPL → AAPL
 
     Args:
@@ -306,7 +306,7 @@ def extract_symbol_from_ts_code(ts_code: str, market: str) -> Optional[str]:
         return ts_code
 
     if '.' in ts_code:
-        # A股和港股：去除后缀
+        # 台股和美股：去除后缀
         return ts_code.split('.')[0]
 
     return ts_code
@@ -316,7 +316,7 @@ def get_stock_name(row: Dict[str, str], market: str) -> Optional[str]:
     """
     获取股票名称
 
-    - A股/港股：使用 name 字段
+    - 台股/美股：使用 name 字段
     - 美股：使用 enname 字段（英文名称）
 
     Args:
@@ -331,7 +331,7 @@ def get_stock_name(row: Dict[str, str], market: str) -> Optional[str]:
         name = row.get('enname', '').strip()
         return name if name else None
     else:
-        # A股和港股使用中文名称
+        # 台股和美股使用中文名称
         name = row.get('name', '').strip()
         name = normalize_stock_name_for_index(name, market)
         return name if name else None
@@ -421,7 +421,7 @@ def determine_market(ts_code: str) -> str:
         if ts_code.isalpha():
             return 'US'
 
-    # 默认为 A股
+    # 默认为 台股
     return 'CN'
 
 
@@ -438,9 +438,9 @@ def generate_aliases(name: str, market: str) -> List[str]:
     """
     aliases = []
 
-    # A股常见别名
+    # 台股常见别名
     cn_alias_map = {
-        '贵州茅台': ['茅台'],
+        '台積電': ['台積電'],
         '中国平安': ['平安'],
         '平安银行': ['平银'],
         '招商银行': ['招行'],
@@ -465,7 +465,7 @@ def generate_aliases(name: str, market: str) -> List[str]:
         '中国石油': ['石油'],
     }
 
-    # 港股常见别名
+    # 美股常见别名
     hk_alias_map = {
         '腾讯控股': ['腾讯', 'Tencent'],
         '阿里巴巴-SW': ['阿里', '阿里巴巴', 'Alibaba'],

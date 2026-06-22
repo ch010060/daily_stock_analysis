@@ -3,10 +3,10 @@
 
 All tests are offline and mock-only. Verifies:
 - Route B default market review is enabled with regions TW,US.
-- CN/A-share market review is blocked under Route B enforce mode.
+- CN/HK market review is blocked under Route B enforce mode.
 - TW market review is explicitly deferred (not yet implemented), not CN fallback.
 - US market review is accepted when supported.
-- "A股 大盤 覆盤" search query is not generated for non-CN regions.
+- "台股 大盤 覆盤" search query is not generated for non-CN regions.
 - CN index providers are not called.
 - If all regions are rejected/deferred, the review is skipped (not fallen back to CN).
 """
@@ -25,7 +25,7 @@ from src.core.market_review_scope_gate import (
     get_effective_regions_for_route_b,
     parse_market_review_regions_env,
 )
-from src.core.market_profile import CN_PROFILE, US_PROFILE, HK_PROFILE, get_profile
+from src.core.market_profile import US_PROFILE, get_profile
 
 
 def _config(markets=None, enforce=True, market_review_enabled=True):
@@ -149,10 +149,10 @@ class TestFilterRegionsForRouteB(unittest.TestCase):
         self.assertEqual(skipped_cn, [])
         self.assertEqual(deferred_tw, [])
 
-    def test_hk_region_runs(self):
+    def test_hk_region_blocked(self):
         run, skipped_cn, deferred_tw = filter_regions_for_route_b(["hk"])
-        self.assertIn("hk", run)
-        self.assertEqual(skipped_cn, [])
+        self.assertEqual(run, [])
+        self.assertIn("hk", skipped_cn)
         self.assertEqual(deferred_tw, [])
 
 
@@ -230,20 +230,19 @@ class TestMarketReviewDefaultUnderRouteB(unittest.TestCase):
 
 
 class TestNoAShareSearchQuery(unittest.TestCase):
-    """CN profile uses 'A股 大盤 覆盤' query that must not appear in TW/US profiles."""
+    """CN/HK profiles are not active; TW/US profiles avoid A-share queries."""
 
-    def test_cn_profile_has_a_share_query(self):
-        """Confirm the CN profile contains the forbidden query."""
-        self.assertTrue(any("A股" in q for q in CN_PROFILE.news_queries))
+    def test_cn_profile_key_is_rejected(self):
+        with self.assertRaises(ValueError):
+            get_profile("cn")
 
     def test_us_profile_no_a_share_query(self):
         for q in US_PROFILE.news_queries:
-            self.assertNotIn("A股", q, f"US profile must not contain 'A股' in query: {q!r}")
+            self.assertNotIn("台股", q, f"US profile must not contain '台股' in query: {q!r}")
 
-    def test_hk_profile_no_a_share_market_query(self):
-        """HK profile should not use the A-share 大盤覆盤 query."""
-        for q in HK_PROFILE.news_queries:
-            self.assertNotIn("A股 大盤 覆盤", q, f"HK query should not be A-share: {q!r}")
+    def test_hk_profile_key_is_rejected(self):
+        with self.assertRaises(ValueError):
+            get_profile("hk")
 
     def test_us_profile_region_no_cn_context(self):
         self.assertEqual(US_PROFILE.region, "us")
@@ -258,16 +257,17 @@ class TestNoAShareSearchQuery(unittest.TestCase):
             self.assertNotEqual(profile.region, "cn",
                 f"Route B region {region!r} must not resolve to CN profile")
             for q in profile.news_queries:
-                self.assertNotIn("A股 大盤 覆盤", q,
+                self.assertNotIn("台股 大盤 覆盤", q,
                     f"Route B region {region!r} must not generate A-share query: {q!r}")
 
 
 class TestNoCNIndexProviders(unittest.TestCase):
     """Under Route B enforce mode, CN index/sector providers must not be called."""
 
-    def test_cn_profile_mood_index_is_shanghai(self):
-        """Confirm CN profile uses Shanghai index (000001) — must not be called in Route B."""
-        self.assertEqual(CN_PROFILE.mood_index_code, "000001")
+    def test_cn_profile_key_is_not_available(self):
+        """CN must be rejected before any index provider can be selected."""
+        with self.assertRaises(ValueError):
+            get_profile("cn")
 
     def test_us_profile_mood_index_is_not_cn(self):
         self.assertNotEqual(US_PROFILE.mood_index_code, "000001")

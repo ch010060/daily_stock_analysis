@@ -17,7 +17,7 @@ _orig_data_provider = sys.modules.get("data_provider")
 if _orig_data_provider_base is None:
     base_mod = types.ModuleType("data_provider.base")
     base_mod.canonical_stock_code = lambda x: (x or "").strip().upper()
-    base_mod.normalize_stock_code = lambda x: (x or "").strip().upper().removesuffix(".SH").removesuffix(".SZ")
+    base_mod.normalize_stock_code = lambda x: (x or "").strip().upper().removesuffix(".TW").removesuffix(".US")
     sys.modules["data_provider.base"] = base_mod
 
 if _orig_data_provider is None:
@@ -69,7 +69,7 @@ class TaskQueueConfigSyncTestCase(unittest.TestCase):
 
     def test_sync_max_workers_deferred_when_busy(self) -> None:
         queue = AnalysisTaskQueue(max_workers=3)
-        queue._analyzing_stocks["600519"] = "task1"
+        queue._analyzing_stocks["2330"] = "task1"
 
         result = queue.sync_max_workers(1)
         self.assertEqual(result, "deferred_busy")
@@ -97,11 +97,11 @@ class TaskQueueConfigSyncTestCase(unittest.TestCase):
         self.assertEqual(queue.max_workers, 2)
 
     def test_dedupe_stock_code_key_normalizes_market_suffix(self) -> None:
-        self.assertEqual(_dedupe_stock_code_key(" 600519.sh "), "600519")
+        self.assertEqual(_dedupe_stock_code_key(" 2330.TW "), "2330")
 
     def test_get_task_queue_defers_sync_when_busy(self) -> None:
         queue = AnalysisTaskQueue(max_workers=3)
-        queue._analyzing_stocks["600519"] = "task1"
+        queue._analyzing_stocks["2330"] = "task1"
 
         with patch("src.config.get_config", return_value=SimpleNamespace(max_workers=1)):
             synced = get_task_queue()

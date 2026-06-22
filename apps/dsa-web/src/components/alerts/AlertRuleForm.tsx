@@ -77,8 +77,7 @@ const STOP_LOSS_MODE_OPTIONS = [
 ];
 
 const MARKET_REGION_OPTIONS = [
-  { value: 'cn', label: 'A 股（cn）' },
-  { value: 'hk', label: '港股（hk）' },
+  { value: 'tw', label: '台股（tw）' },
   { value: 'us', label: '美股（us）' },
 ];
 
@@ -113,7 +112,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
   const [targetScope, setTargetScope] = useState<AlertTargetScope>('single_symbol');
   const [target, setTarget] = useState('');
   const [portfolioTarget, setPortfolioTarget] = useState('all');
-  const [marketRegion, setMarketRegion] = useState<MarketRegion>('cn');
+  const [marketRegion, setMarketRegion] = useState<MarketRegion>('tw');
   const [accounts, setAccounts] = useState<PortfolioAccountItem[]>([]);
   const [accountsError, setAccountsError] = useState<string | null>(null);
   const [alertType, setAlertType] = useState<AlertType>('price_cross');
@@ -345,7 +344,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
     setTargetScope(nextScope);
     setAlertType(nextType);
     setPortfolioTarget('all');
-    setMarketRegion('cn');
+    setMarketRegion('tw');
     resetParameters(nextType);
     setFormError(null);
   };
@@ -385,7 +384,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
     setName('');
     setTarget('');
     setPortfolioTarget('all');
-    setMarketRegion('cn');
+    setMarketRegion('tw');
     setPrice('');
     setChangePct('');
     setMultiplier('');

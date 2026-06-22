@@ -102,7 +102,7 @@ vi.mock('../../components/settings', () => ({
   AuthSettingsCard: () => <div>認證與登入保護</div>,
   ChangePasswordCard: () => <div>修改密碼</div>,
   IntelligentImport: ({ onMerged }: { onMerged: (value: string) => void }) => (
-    <button type="button" onClick={() => onMerged('SZ000001,SZ000002')}>
+    <button type="button" onClick={() => onMerged('00981A,AAPL')}>
       merge stock list
     </button>
   ),
@@ -300,7 +300,7 @@ function buildSystemConfigState(overrides: ConfigOverride = {}) {
       base: [
         {
           key: 'STOCK_LIST',
-          value: 'SH600000',
+          value: '2330',
           rawValueExists: true,
           isMasked: false,
           schema: {
@@ -417,7 +417,7 @@ describe('SettingsPage', () => {
     });
     load.mockResolvedValue(true);
     exportEnv.mockResolvedValue({
-      content: 'STOCK_LIST=600519\n',
+      content: 'STOCK_LIST=2330\n',
       configVersion: 'v1',
       updatedAt: '2026-03-21T00:00:00Z',
     });
@@ -1373,7 +1373,7 @@ describe('SettingsPage', () => {
 
     fireEvent.change(input as HTMLInputElement, {
       target: {
-        files: [new File(['STOCK_LIST=300750\n'], 'desktop-backup.env', { type: 'text/plain' })],
+        files: [new File(['STOCK_LIST=00981A\n'], 'desktop-backup.env', { type: 'text/plain' })],
       },
     });
 
@@ -1395,7 +1395,7 @@ describe('SettingsPage', () => {
 
     fireEvent.change(input as HTMLInputElement, {
       target: {
-        files: [new File(['STOCK_LIST=300750\n'], 'desktop-backup.env', { type: 'text/plain' })],
+        files: [new File(['STOCK_LIST=00981A\n'], 'desktop-backup.env', { type: 'text/plain' })],
       },
     });
 

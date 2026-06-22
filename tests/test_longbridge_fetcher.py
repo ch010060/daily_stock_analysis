@@ -5,7 +5,7 @@ Unit tests for LongbridgeFetcher integration.
 Real API / credentials: use ``tests/longbridge_live_smoke.py`` (not this file).
 
 Verifies:
-1. Symbol conversion logic (AAPL -> AAPL.US, HK00700 -> 0700.HK)
+1. Symbol conversion logic (AAPL -> AAPL.US)
 2. get_realtime_quote builds correct UnifiedRealtimeQuote with computed fields
 3. _supplement_from_longbridge merges missing fields into yfinance quote
 4. Graceful degradation when credentials are missing
@@ -29,7 +29,6 @@ from data_provider.longbridge_fetcher import (
     LongbridgeFetcher,
     _to_longbridge_symbol,
     _is_us_code,
-    _is_hk_code,
 )
 from data_provider.realtime_types import UnifiedRealtimeQuote, RealtimeSource
 
@@ -46,29 +45,14 @@ class TestSymbolConversion(unittest.TestCase):
     def test_us_stock_already_suffixed(self):
         self.assertEqual(_to_longbridge_symbol("AAPL.US"), "AAPL.US")
 
-    def test_hk_stock_with_prefix(self):
-        self.assertEqual(_to_longbridge_symbol("HK00700"), "0700.HK")
-        self.assertEqual(_to_longbridge_symbol("HK09988"), "9988.HK")
-        self.assertEqual(_to_longbridge_symbol("HK01810"), "1810.HK")
-
-    def test_hk_stock_pure_digits(self):
-        self.assertEqual(_to_longbridge_symbol("00700"), "0700.HK")
-        self.assertEqual(_to_longbridge_symbol("09988"), "9988.HK")
-
-    def test_hk_stock_already_suffixed(self):
-        self.assertEqual(_to_longbridge_symbol("0700.HK"), "0700.HK")
-
-    def test_a_share_returns_none(self):
-        self.assertIsNone(_to_longbridge_symbol("600519"))
-        self.assertIsNone(_to_longbridge_symbol("000001"))
+    def test_tw_symbols_return_none(self):
+        self.assertIsNone(_to_longbridge_symbol("2330"))
+        self.assertIsNone(_to_longbridge_symbol("00981A"))
 
     def test_code_detection(self):
         self.assertTrue(_is_us_code("AAPL"))
         self.assertTrue(_is_us_code("TSLA"))
-        self.assertFalse(_is_us_code("600519"))
-        self.assertTrue(_is_hk_code("HK00700"))
-        self.assertTrue(_is_hk_code("00700"))
-        self.assertFalse(_is_hk_code("AAPL"))
+        self.assertFalse(_is_us_code("2330"))
 
 
 class TestLongbridgeFetcherNoCredentials(unittest.TestCase):
@@ -602,20 +586,6 @@ class TestLongbridgeFetcherMocked(unittest.TestCase):
             fetcher._fetch_raw_data("AAPL", "2026-05-01", "2026-05-08")
 
         ctx.history_candlesticks_by_date.assert_not_called()
-
-    def test_hk_stock_symbol(self):
-        """HK stock should use .HK suffix."""
-        fetcher, ctx = self._make_fetcher_with_mock_ctx()
-        ctx.quote.return_value = [self._make_mock_quote()]
-        ctx.static_info.return_value = [self._make_mock_static(name_cn="騰訊控股")]
-        ctx.history_candlesticks_by_offset.return_value = []
-
-        quote = fetcher.get_realtime_quote("HK00700")
-
-        self.assertIsNotNone(quote)
-        self.assertEqual(quote.code, "HK00700")
-        ctx.quote.assert_called_with(["0700.HK"])
-
 
 class TestSupplementFromLongbridge(unittest.TestCase):
     """Test the _supplement_from_longbridge method in DataFetcherManager."""

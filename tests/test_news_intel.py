@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自選股智慧分析系統 - 新聞情報儲存單元測試
+台股自選股智慧分析系統 - 新聞情報儲存單元測試
 ===================================
 
 職責：
@@ -46,7 +46,7 @@ class NewsIntelStorageTestCase(unittest.TestCase):
     def _build_response(self, results) -> SearchResponse:
         """構造 SearchResponse 快捷函式"""
         return SearchResponse(
-            query="貴州茅臺 最新訊息",
+            query="台積電 最新訊息",
             results=results,
             provider="Bocha",
             success=True,
@@ -55,7 +55,7 @@ class NewsIntelStorageTestCase(unittest.TestCase):
     def test_save_news_intel_with_url_dedup(self) -> None:
         """相同 URL 去重，僅保留一條記錄"""
         result = SearchResult(
-            title="茅臺釋出新產品",
+            title="台積電釋出新產品",
             snippet="公司釋出新品...",
             url="https://news.example.com/a",
             source="example.com",
@@ -71,20 +71,20 @@ class NewsIntelStorageTestCase(unittest.TestCase):
             "requester_user_name": "測試使用者",
             "requester_chat_id": "c_456",
             "requester_message_id": "m_789",
-            "requester_query": "/analyze 600519",
+            "requester_query": "/analyze 2330",
         }
 
         saved_first = self.db.save_news_intel(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             dimension="latest_news",
             query=response.query,
             response=response,
             query_context=query_context
         )
         saved_second = self.db.save_news_intel(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             dimension="latest_news",
             query=response.query,
             response=response,
@@ -106,7 +106,7 @@ class NewsIntelStorageTestCase(unittest.TestCase):
     def test_save_news_intel_without_url_fallback_key(self) -> None:
         """無 URL 時使用兜底鍵去重"""
         result = SearchResult(
-            title="茅臺業績預告",
+            title="台積電業績預告",
             snippet="業績大幅增長...",
             url="",
             source="example.com",
@@ -115,15 +115,15 @@ class NewsIntelStorageTestCase(unittest.TestCase):
         response = self._build_response([result])
 
         saved_first = self.db.save_news_intel(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             dimension="earnings",
             query=response.query,
             response=response
         )
         saved_second = self.db.save_news_intel(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             dimension="earnings",
             query=response.query,
             response=response
@@ -142,7 +142,7 @@ class NewsIntelStorageTestCase(unittest.TestCase):
         """可按時間範圍查詢最新新聞"""
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         result = SearchResult(
-            title="茅台股價震盪",
+            title="台積電股價震盪",
             snippet="盤中波動較大...",
             url="https://news.example.com/b",
             source="example.com",
@@ -151,20 +151,20 @@ class NewsIntelStorageTestCase(unittest.TestCase):
         response = self._build_response([result])
 
         self.db.save_news_intel(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             dimension="market_analysis",
             query=response.query,
             response=response
         )
 
-        recent_news = self.db.get_recent_news(code="600519", days=7, limit=10)
+        recent_news = self.db.get_recent_news(code="2330", days=7, limit=10)
         self.assertEqual(len(recent_news), 1)
-        self.assertEqual(recent_news[0].title, "茅台股價震盪")
+        self.assertEqual(recent_news[0].title, "台積電股價震盪")
 
     def test_save_news_intel_retries_on_sqlite_locked_execute(self) -> None:
         result = SearchResult(
-            title="茅臺鎖競爭重試",
+            title="台積電鎖競爭重試",
             snippet="模擬 SQLite locked...",
             url="https://news.example.com/retry",
             source="example.com",
@@ -184,8 +184,8 @@ class NewsIntelStorageTestCase(unittest.TestCase):
             with patch.object(first_session, "execute", side_effect=stmt_exc):
                 with patch("src.storage.time.sleep") as mock_sleep:
                     saved = self.db.save_news_intel(
-                        code="600519",
-                        name="貴州茅臺",
+                        code="2330",
+                        name="台積電",
                         dimension="latest_news",
                         query=response.query,
                         response=response,

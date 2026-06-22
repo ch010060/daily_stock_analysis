@@ -16,8 +16,8 @@ const overview: AnalysisContextPackOverview = {
   packVersion: '1.0',
   createdAt: '2026-04-10T08:30:00+00:00',
   subject: {
-    code: '600519',
-    stockName: '貴州茅臺',
+    code: '2330',
+    stockName: '台積電',
     market: 'cn',
   },
   blocks: [
@@ -224,8 +224,8 @@ describe('ReportSummary analysis context placement', () => {
       meta: {
         id: 1,
         queryId: 'q1',
-        stockCode: '600519',
-        stockName: '貴州茅臺',
+        stockCode: '2330',
+        stockName: '台積電',
         reportType: 'detailed',
         reportLanguage: 'zh',
         createdAt: '2026-04-10T12:00:00',
@@ -260,8 +260,8 @@ describe('ReportSummary analysis context placement', () => {
     };
     const result: AnalysisResult = {
       queryId: 'q1',
-      stockCode: '600519',
-      stockName: '貴州茅臺',
+      stockCode: '2330',
+      stockName: '台積電',
       report,
       diagnosticSummary: {
         status: 'normal',

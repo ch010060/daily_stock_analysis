@@ -105,11 +105,11 @@ def test_main_default_flow_keeps_original_filename():
 
     assert exit_code == 0
     fetch_a.assert_called_once_with(api)
-    save_to_csv.assert_any_call(a_df, "stock_list_a.csv", "A股")
+    save_to_csv.assert_any_call(a_df, "stock_list_a.csv", "台股")
     fetch_hk.assert_called_once_with(api)
     fetch_us.assert_called_once_with(api)
     fix_a_stock_names.assert_not_called()
-    generate_doc.assert_called_once_with(a_df, hk_df, us_df, a_filename="stock_list_a.csv", a_title="A股列表")
+    generate_doc.assert_called_once_with(a_df, hk_df, us_df, a_filename="stock_list_a.csv", a_title="台股列表")
     assert random_sleep.call_count == 2
 
 
@@ -139,7 +139,7 @@ def test_main_a_rk_flow_overwrites_a_filename_and_rt_k():
         call for call in save_to_csv.call_args_list if call.args[1] == "stock_list_a.csv"
     )
     pd.testing.assert_frame_equal(fixed_save_call.args[0], fixed_df)
-    assert fixed_save_call.args[2] == "A股"
+    assert fixed_save_call.args[2] == "台股"
     fetch_hk.assert_called_once_with(api)
     fetch_us.assert_called_once_with(api)
     generate_doc.assert_called_once_with(
@@ -147,6 +147,6 @@ def test_main_a_rk_flow_overwrites_a_filename_and_rt_k():
         hk_df,
         us_df,
         a_filename="stock_list_a.csv",
-        a_title="A股列表（修正後）",
+        a_title="台股列表（修正後）",
     )
     assert random_sleep.call_count == 2

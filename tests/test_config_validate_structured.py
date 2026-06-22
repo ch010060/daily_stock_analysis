@@ -25,7 +25,7 @@ def _make_config(**kwargs) -> Config:
     only have to specify the fields that matter for their scenario.
     """
     defaults = dict(
-        stock_list=["600519"],
+        stock_list=["2330"],
         tushare_token=None,
         # Populate llm_model_list as the three-tier signal
         llm_model_list=[{"model_name": "gemini/gemini-2.0-flash", "litellm_params": {"model": "gemini/gemini-2.0-flash", "api_key": "sk-test"}}],
@@ -124,14 +124,14 @@ class TestValidateStructuredStockList:
         assert "2330,2454,AAPL,NVDA" in stock_errors[0].message
 
     def test_configured_stock_list_no_stock_error(self):
-        cfg = _make_config(stock_list=["600519", "000001"])
+        cfg = _make_config(stock_list=["2330", "000001"])
         issues = cfg.validate_structured()
         assert not any(i.field == "STOCK_LIST" for i in issues if i.severity == "error")
 
     def test_stock_email_groups_outside_stock_list_is_warning(self):
         cfg = _make_config(
-            stock_list=["600519"],
-            stock_email_groups=[(["600519", "000001"], ["group@example.com"])],
+            stock_list=["2330"],
+            stock_email_groups=[(["2330", "000001"], ["group@example.com"])],
         )
         issues = cfg.validate_structured()
         warning = next(i for i in issues if i.field == "STOCK_GROUP_N")
@@ -142,32 +142,27 @@ class TestValidateStructuredStockList:
 
     def test_stock_email_groups_subset_of_stock_list_has_no_warning(self):
         cfg = _make_config(
-            stock_list=["600519", "000001"],
-            stock_email_groups=[(["600519"], ["group@example.com"])],
+            stock_list=["2330", "000001"],
+            stock_email_groups=[(["2330"], ["group@example.com"])],
         )
         issues = cfg.validate_structured()
         assert not any(i.field == "STOCK_GROUP_N" for i in issues)
 
     def test_stock_email_groups_canonical_normalization_no_false_warning(self):
-        """Equivalent stock code formats (SH600519 vs 600519, 1810.HK vs HK01810)
-        should not trigger a subset warning after canonical normalization."""
+        """Equivalent TW/US code formats should not trigger a subset warning."""
         cfg = _make_config(
-            stock_list=["600519", "HK00700"],
+            stock_list=["2330", "AAPL"],
             stock_email_groups=[
-                (["SH600519", "1810.HK"], ["group@example.com"]),
+                (["2330.TW", "AAPL.US"], ["group@example.com"]),
             ],
         )
         issues = cfg.validate_structured()
         group_warnings = [i for i in issues if i.field == "STOCK_GROUP_N"]
-        # SH600519 normalizes to 600519 (present in stock_list)
-        # 1810.HK normalizes to HK01810 (NOT present — HK00700 ≠ HK01810)
-        assert len(group_warnings) == 1
-        assert "HK01810" in group_warnings[0].message
-        assert "600519" not in group_warnings[0].message
+        assert group_warnings == []
 
     def test_stock_email_groups_warning_normalizes_and_deduplicates_codes(self):
         cfg = _make_config(
-            stock_list=["600519"],
+            stock_list=["2330"],
             stock_email_groups=[
                 (["  aapl ", "AAPL", "aapl", " "], ["group@example.com"]),
             ],

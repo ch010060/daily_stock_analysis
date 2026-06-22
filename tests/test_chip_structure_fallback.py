@@ -86,7 +86,7 @@ class TestBuildChipStructureFromData(unittest.TestCase):
 
     def test_from_chip_distribution(self) -> None:
         chip = ChipDistribution(
-            code="600519",
+            code="2330",
             profit_ratio=0.567,
             avg_cost=1850.5,
             concentration_90=0.12,
@@ -113,7 +113,7 @@ class TestBuildChipStructureFromData(unittest.TestCase):
         self.assertEqual(out["concentration"], "15.00%")
 
     def test_avg_cost_zero_shows_na(self) -> None:
-        chip = ChipDistribution(code="600519", profit_ratio=0.5, avg_cost=0.0, concentration_90=0.1)
+        chip = ChipDistribution(code="2330", profit_ratio=0.5, avg_cost=0.0, concentration_90=0.1)
         out = _build_chip_structure_from_data(chip)
         self.assertEqual(out["avg_cost"], "N/A")
 
@@ -128,8 +128,8 @@ class TestFillChipStructureIfNeeded(unittest.TestCase):
 
     def _make_result(self, dashboard: dict = None) -> AnalysisResult:
         return AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -140,7 +140,7 @@ class TestFillChipStructureIfNeeded(unittest.TestCase):
 
     def _make_chip(self) -> ChipDistribution:
         return ChipDistribution(
-            code="600519",
+            code="2330",
             profit_ratio=0.67,
             avg_cost=1850.0,
             concentration_90=0.11,
@@ -292,7 +292,7 @@ class TestFillChipStructureIfNeeded(unittest.TestCase):
         result = self._make_result(
             dashboard={"data_perspective": {"chip_structure": {"profit_ratio": 0, "avg_cost": 0, "concentration": 0}}}
         )
-        empty_chip = ChipDistribution(code="600519")
+        empty_chip = ChipDistribution(code="2330")
 
         normalize_chip_structure_availability(result, empty_chip)
 
@@ -305,7 +305,7 @@ class TestFillChipStructureIfNeeded(unittest.TestCase):
             dashboard={"data_perspective": {"chip_structure": {"profit_ratio": 0, "avg_cost": 0, "concentration": 0}}}
         )
         zero_concentration_chip = ChipDistribution(
-            code="600519",
+            code="2330",
             profit_ratio=0.52,
             avg_cost=1850.0,
             concentration_90=0.0,

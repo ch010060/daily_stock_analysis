@@ -26,8 +26,8 @@ class TestCheckContentIntegrity(unittest.TestCase):
     def test_pass_when_all_required_present(self) -> None:
         """Integrity passes when all mandatory fields are present."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -46,8 +46,8 @@ class TestCheckContentIntegrity(unittest.TestCase):
     def test_fail_when_analysis_summary_empty(self) -> None:
         """Integrity fails when analysis_summary is empty."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -66,8 +66,8 @@ class TestCheckContentIntegrity(unittest.TestCase):
     def test_fail_when_one_sentence_missing(self) -> None:
         """Integrity fails when core_conclusion.one_sentence is missing."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -86,8 +86,8 @@ class TestCheckContentIntegrity(unittest.TestCase):
     def test_fail_when_one_sentence_blank(self) -> None:
         """Integrity fails when one_sentence is blank whitespace."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -106,8 +106,8 @@ class TestCheckContentIntegrity(unittest.TestCase):
     def test_fail_when_stop_loss_missing_for_buy(self) -> None:
         """Integrity fails when stop_loss missing and decision_type is buy."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="買進",
@@ -126,8 +126,8 @@ class TestCheckContentIntegrity(unittest.TestCase):
     def test_pass_when_stop_loss_missing_for_sell(self) -> None:
         """Integrity passes when stop_loss missing and decision_type is sell."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看空",
             sentiment_score=35,
             operation_advice="賣出",
@@ -146,8 +146,8 @@ class TestCheckContentIntegrity(unittest.TestCase):
     def test_fail_when_risk_alerts_missing(self) -> None:
         """Integrity fails when intelligence.risk_alerts field is missing."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -166,8 +166,8 @@ class TestCheckContentIntegrity(unittest.TestCase):
     def test_phase_decision_missing_only_when_required(self) -> None:
         """Phase decision fields are required only for phase-aware analysis."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -193,8 +193,8 @@ class TestCheckContentIntegrity(unittest.TestCase):
     def test_fail_when_risk_alerts_is_none(self) -> None:
         """Integrity fails when risk_alerts is None."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -213,8 +213,8 @@ class TestCheckContentIntegrity(unittest.TestCase):
     def test_fail_when_risk_alerts_is_invalid_type(self) -> None:
         """Integrity fails when risk_alerts is not list."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -233,8 +233,8 @@ class TestCheckContentIntegrity(unittest.TestCase):
     def test_fail_when_stop_loss_is_blank(self) -> None:
         """Integrity fails when stop_loss is blank whitespace."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="買進",
@@ -257,8 +257,8 @@ class TestApplyPlaceholderFill(unittest.TestCase):
     def test_fills_missing_analysis_summary(self) -> None:
         """Placeholder fills analysis_summary when missing."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -272,7 +272,7 @@ class TestApplyPlaceholderFill(unittest.TestCase):
     def test_fills_missing_analysis_summary_in_english(self) -> None:
         """English report should use English placeholder text for missing analysis_summary."""
         result = AnalysisResult(
-            code="600519",
+            code="2330",
             name="MacaoTech",
             report_language="en",
             trend_prediction="Bullish",
@@ -288,8 +288,8 @@ class TestApplyPlaceholderFill(unittest.TestCase):
     def test_fills_missing_stop_loss(self) -> None:
         """Placeholder fills stop_loss when missing."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="買進",
@@ -306,8 +306,8 @@ class TestApplyPlaceholderFill(unittest.TestCase):
     def test_fills_risk_alerts_empty_list(self) -> None:
         """Placeholder fills risk_alerts with empty list when missing."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -321,8 +321,8 @@ class TestApplyPlaceholderFill(unittest.TestCase):
     def test_fills_risk_alerts_when_none(self) -> None:
         """Placeholder fills risk_alerts when value is None."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -337,8 +337,8 @@ class TestApplyPlaceholderFill(unittest.TestCase):
     def test_fills_risk_alerts_when_invalid_type(self) -> None:
         """Placeholder fills risk_alerts when value is non-list."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -352,8 +352,8 @@ class TestApplyPlaceholderFill(unittest.TestCase):
     def test_fills_risk_alerts_when_risk_warning_is_list(self) -> None:
         """Placeholder handles list risk_warning and flattens valid text values."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -368,8 +368,8 @@ class TestApplyPlaceholderFill(unittest.TestCase):
     def test_fills_risk_alerts_when_risk_warning_is_dict(self) -> None:
         """Placeholder serializes dict risk_warning into a string risk alert."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -387,8 +387,8 @@ class TestApplyPlaceholderFill(unittest.TestCase):
     def test_fills_stop_loss_when_blank(self) -> None:
         """Placeholder fills stop_loss when blank whitespace."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="買進",
@@ -405,8 +405,8 @@ class TestApplyPlaceholderFill(unittest.TestCase):
     def test_fills_stop_loss_when_invalid_type(self) -> None:
         """Placeholder fills stop_loss when value is invalid type."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="買進",
@@ -423,8 +423,8 @@ class TestApplyPlaceholderFill(unittest.TestCase):
     def test_fills_none_dashboard_blocks_from_existing_context(self) -> None:
         """Placeholder fill handles null dashboard blocks and reuses existing result text."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="買進",
@@ -454,8 +454,8 @@ class TestApplyPlaceholderFill(unittest.TestCase):
     def test_phase_decision_placeholder_fill_satisfies_integrity_contract(self) -> None:
         """Phase placeholders close the retry-exhausted integrity contract without fake conditions."""
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             trend_prediction="震盪",
             sentiment_score=50,
             operation_advice="持有",

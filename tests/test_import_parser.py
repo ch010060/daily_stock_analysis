@@ -28,43 +28,43 @@ from src.services.import_parser import (
 
 class TestParseImportFromBytesCsv:
     def test_parses_csv_with_header(self):
-        data = "code,name\n600519,貴州茅臺\n00700,騰訊控股".encode("utf-8")
+        data = "code,name\n2330,台積電\nAAPL,騰訊控股".encode("utf-8")
         result = parse_import_from_bytes(data, "a.csv")
         assert len(result) == 2
-        assert result[0] == ("600519", "貴州茅臺", "medium")
-        assert result[1] == ("00700", "騰訊控股", "medium")
+        assert result[0] == ("2330", "台積電", "medium")
+        assert result[1] == ("AAPL", "騰訊控股", "medium")
 
     def test_parses_csv_chinese_column_names(self):
-        data = "股票程式碼,股票名稱\n600519,貴州茅臺".encode("utf-8")
+        data = "股票代號,股票名稱\n2330,台積電".encode("utf-8")
         result = parse_import_from_bytes(data, "a.csv")
-        assert result[0] == ("600519", "貴州茅臺", "medium")
+        assert result[0] == ("2330", "台積電", "medium")
 
     def test_parses_csv_no_header(self):
-        # Use 300750 instead of 00700 to avoid pandas stripping leading zeros
-        data = "600519,貴州茅臺\n300750,寧德時代".encode("utf-8")
+        # Use 300750 instead of AAPL to avoid pandas stripping leading zeros
+        data = "2330,台積電\n300750,寧德時代".encode("utf-8")
         result = parse_import_from_bytes(data, "a.csv")
         assert len(result) == 2
-        assert result[0] == ("600519", "貴州茅臺", "medium")
+        assert result[0] == ("2330", "台積電", "medium")
         assert result[1] == ("300750", "寧德時代", "medium")
 
     def test_skips_empty_rows(self):
-        data = "code,name\n600519,貴州茅臺\n\n00700,騰訊控股".encode("utf-8")
+        data = "code,name\n2330,台積電\n\nAAPL,騰訊控股".encode("utf-8")
         result = parse_import_from_bytes(data, "a.csv")
         assert len(result) == 2
 
     def test_tab_separated(self):
-        data = "code\tname\n600519\t貴州茅臺".encode("utf-8")
+        data = "code\tname\n2330\t台積電".encode("utf-8")
         result = parse_import_from_bytes(data, "paste.txt")
-        assert result[0] == ("600519", "貴州茅臺", "medium")
+        assert result[0] == ("2330", "台積電", "medium")
 
     @patch("src.services.import_parser.resolve_name_to_code")
     def test_resolves_name_when_code_empty(self, mock_resolve):
-        mock_resolve.return_value = "600519"
+        mock_resolve.return_value = "2330"
         # code column empty, name column has value
-        data = "code,name\n,貴州茅臺".encode("utf-8")
+        data = "code,name\n,台積電".encode("utf-8")
         result = parse_import_from_bytes(data, "a.csv")
-        assert result[0] == ("600519", "貴州茅臺", "medium")
-        mock_resolve.assert_called_with("貴州茅臺")
+        assert result[0] == ("2330", "台積電", "medium")
+        mock_resolve.assert_called_with("台積電")
 
     @patch("src.services.import_parser.resolve_name_to_code")
     def test_returns_none_code_when_resolution_fails(self, mock_resolve):
@@ -88,7 +88,7 @@ class TestParseImportFromBytesExcel:
         wb = Workbook()
         ws = wb.active
         ws.append(["code", "name"])
-        ws.append(["600519", "貴州茅臺"])
+        ws.append(["2330", "台積電"])
         ws.append(["300750", "寧德時代"])
         buf = io.BytesIO()
         wb.save(buf)
@@ -96,7 +96,7 @@ class TestParseImportFromBytesExcel:
         data = buf.read()
         result = parse_import_from_bytes(data, "a.xlsx")
         assert len(result) == 2
-        assert result[0] == ("600519", "貴州茅臺", "medium")
+        assert result[0] == ("2330", "台積電", "medium")
         assert result[1] == ("300750", "寧德時代", "medium")
 
     def test_parses_xlsx_without_header(self):
@@ -108,8 +108,8 @@ class TestParseImportFromBytesExcel:
         from openpyxl import Workbook
         wb = Workbook()
         ws = wb.active
-        ws.append(["600519", "貴州茅臺"])
-        ws.append(["00700", "騰訊控股"])
+        ws.append(["2330", "台積電"])
+        ws.append(["AAPL", "騰訊控股"])
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
@@ -117,8 +117,8 @@ class TestParseImportFromBytesExcel:
         result = parse_import_from_bytes(data, "noheader.xlsx")
         assert len(result) == 2, f"Expected 2 rows, got {len(result)} — first row may have been eaten as header"
         codes = [r[0] for r in result]
-        assert "600519" in codes
-        assert "00700" in codes
+        assert "2330" in codes
+        assert "AAPL" in codes
 
     def test_rejects_xls(self):
         data = b"dummy"
@@ -152,7 +152,7 @@ class TestParseImportLimits:
 
     def test_csv_parser_error_raises_helpful_message(self):
         """Malformed CSV (e.g. unclosed quote) should raise with actionable hint."""
-        data = 'code,name\n600519,"貴州茅臺'.encode("utf-8")
+        data = 'code,name\n2330,"台積電'.encode("utf-8")
         with pytest.raises(ValueError) as exc_info:
             parse_import_from_bytes(data, "a.csv")
         msg = str(exc_info.value)
@@ -161,11 +161,11 @@ class TestParseImportLimits:
 
     def test_accepts_gbk_encoded_csv(self):
         # Build CSV with Chinese in GBK encoding
-        data = ("code,name\n600519," + "貴州茅臺").encode("gbk")
+        data = ("code,name\n2330," + "台積電").encode("gbk")
         result = parse_import_from_bytes(data, "a.csv")
         assert len(result) == 1
-        assert result[0][0] == "600519"
-        assert result[0][1] == "貴州茅臺"
+        assert result[0][0] == "2330"
+        assert result[0][1] == "台積電"
 
 
 # ---------------------------------------------------------------------------
@@ -174,33 +174,33 @@ class TestParseImportLimits:
 
 class TestParseImportFromText:
     def test_parses_pasted_text(self):
-        text = "600519,貴州茅臺\n300750,寧德時代"
+        text = "2330,台積電\n300750,寧德時代"
         result = parse_import_from_text(text)
         assert len(result) == 2
-        assert result[0] == ("600519", "貴州茅臺", "medium")
+        assert result[0] == ("2330", "台積電", "medium")
 
     def test_parses_single_column_codes(self):
-        text = "00700\n600519"
+        text = "AAPL\n2330"
         result = parse_import_from_text(text)
         assert len(result) == 2
-        assert result[0] == ("00700", None, "medium")
-        assert result[1] == ("600519", None, "medium")
+        assert result[0] == ("AAPL", None, "medium")
+        assert result[1] == ("2330", None, "medium")
 
     def test_parses_single_column_with_header(self):
-        text = "code\n00700"
+        text = "code\nAAPL"
         result = parse_import_from_text(text)
         assert len(result) == 1
-        assert result[0] == ("00700", None, "medium")
+        assert result[0] == ("AAPL", None, "medium")
 
     def test_parses_space_separated_code_name_lines(self):
-        text = "600519 貴州茅臺\n00700 騰訊控股"
+        text = "2330 台積電\nAAPL 騰訊控股"
         result = parse_import_from_text(text)
         assert len(result) == 2
-        assert result[0] == ("600519", "貴州茅臺", "medium")
-        assert result[1] == ("00700", "騰訊控股", "medium")
+        assert result[0] == ("2330", "台積電", "medium")
+        assert result[1] == ("AAPL", "騰訊控股", "medium")
 
     def test_preserves_name_when_code_is_dirty(self):
-        data = "code,name\nINVALID,貴州茅臺".encode("utf-8")
+        data = "code,name\nINVALID,台積電".encode("utf-8")
         result = parse_import_from_bytes(data, "a.csv")
         assert len(result) == 1
-        assert result[0] == ("600519", "貴州茅臺", "medium")
+        assert result[0] == ("2330", "台積電", "medium")

@@ -20,7 +20,7 @@ from src.services.analysis_context_builder import (
 
 def _pack() -> AnalysisContextPack:
     return AnalysisContextPack(
-        subject=AnalysisSubject(code="600519", stock_name="貴州茅臺", market="cn"),
+        subject=AnalysisSubject(code="2330", stock_name="台積電", market="cn"),
         blocks={
             "quote": AnalysisContextBlock(
                 status=ContextFieldStatus.FALLBACK,
@@ -106,7 +106,7 @@ def _pack_with_phase(phase: str) -> AnalysisContextPack:
 
 def _core_available_pack(*, phase: str) -> AnalysisContextPack:
     return AnalysisContextPack(
-        subject=AnalysisSubject(code="600519", stock_name="貴州茅臺", market="cn"),
+        subject=AnalysisSubject(code="2330", stock_name="台積電", market="cn"),
         phase={"phase": phase, "is_partial_bar": False},
         blocks={
             "quote": AnalysisContextBlock(status=ContextFieldStatus.AVAILABLE),
@@ -134,8 +134,8 @@ def _core_available_pack(*, phase: str) -> AnalysisContextPack:
 
 def _builder_artifacts(*, fundamental_context: dict) -> PipelineAnalysisArtifacts:
     return PipelineAnalysisArtifacts(
-        code="600519",
-        stock_name="貴州茅臺",
+        code="2330",
+        stock_name="台積電",
         market="cn",
         phase=None,
         base_context={
@@ -164,8 +164,8 @@ def test_chinese_summary_renders_low_sensitivity_pack_statuses() -> None:
     section = format_analysis_context_pack_prompt_section(_pack())
 
     assert "分析上下文包摘要" in section
-    assert "600519" in section
-    assert "貴州茅臺" in section
+    assert "2330" in section
+    assert "台積電" in section
     assert "行情: fallback" in section
     assert "技術: partial" in section
     assert "警告=realtime_provider_fallback" in section
@@ -187,7 +187,7 @@ def test_english_summary_renders_readable_statuses() -> None:
     )
 
     assert "Analysis Context Pack Summary" in section
-    assert "Subject: 600519 (貴州茅臺)" in section
+    assert "Subject: 2330 (台積電)" in section
     assert "quote: fallback" in section
     assert "news: missing" in section
     assert "News result count: 3" in section

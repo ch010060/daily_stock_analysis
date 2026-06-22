@@ -70,8 +70,7 @@ const scopeLabel: Record<string, string> = {
 };
 
 const marketRegionLabel: Record<string, string> = {
-  cn: 'A 股',
-  hk: '港股',
+  tw: '台股',
   us: '美股',
 };
 

@@ -104,8 +104,8 @@ export const historyApi = {
   },
 
   /**
-   * 按股票程式碼刪除所有歷史記錄
-   * @param stockCode 股票程式碼
+   * 按股票代號刪除所有歷史記錄
+   * @param stockCode 股票代號
    */
   deleteByCode: async (stockCode: string): Promise<{ deleted: number }> => {
     const response = await apiClient.delete<Record<string, unknown>>(`/api/v1/history/by-code/${encodeURIComponent(stockCode)}`);

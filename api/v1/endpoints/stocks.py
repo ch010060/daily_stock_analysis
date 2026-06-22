@@ -5,7 +5,7 @@
 ===================================
 
 職責：
-1. POST /api/v1/stocks/extract-from-image 從圖片提取股票程式碼
+1. POST /api/v1/stocks/extract-from-image 從圖片提取股票代號
 2. POST /api/v1/stocks/parse-import 解析 CSV/Excel/剪貼簿
 3. GET /api/v1/stocks/{code}/quote 實時行情介面
 4. GET /api/v1/stocks/{code}/history 歷史行情介面
@@ -25,6 +25,9 @@ from api.v1.schemas.stocks import (
     KLineData,
     StockHistoryResponse,
     StockQuote,
+    SymbolCandidateResponse,
+    SymbolResolveResponse,
+    SymbolSearchResponse,
 )
 from api.v1.schemas.history import WatchlistRequest, WatchlistResponse
 from api.v1.schemas.common import ErrorResponse
@@ -40,6 +43,7 @@ from src.services.import_parser import (
 )
 from src.services.stock_service import StockService
 from src.services.system_config_service import SystemConfigService
+from src.services.symbol_universe import SymbolCandidate, get_default_symbol_resolver
 from data_provider.base import normalize_stock_code
 
 logger = logging.getLogger(__name__)
@@ -48,6 +52,70 @@ router = APIRouter()
 
 # 須在 /{stock_code} 路由之前定義
 ALLOWED_MIME_STR = ", ".join(ALLOWED_MIME)
+
+
+def _symbol_candidate_response(candidate: SymbolCandidate) -> SymbolCandidateResponse:
+    record = candidate.record
+    return SymbolCandidateResponse(
+        canonical_symbol=record.canonical_symbol,
+        raw_symbol=record.raw_symbol,
+        symbol=record.raw_symbol,
+        market=record.market,
+        exchange=record.exchange,
+        instrument_type=record.instrument_type,
+        name=record.name,
+        aliases=list(record.aliases or []),
+        provider_source=record.provider_source,
+        is_active=record.is_active,
+        last_updated=record.last_updated,
+        confidence=candidate.confidence,
+        match_reason=candidate.match_reason,
+    )
+
+
+def _coerce_symbol_lookup_limit(limit: int) -> int:
+    """Support direct unit-test calls where FastAPI Query default is not resolved."""
+    return limit if isinstance(limit, int) else 8
+
+
+@router.get(
+    "/search",
+    response_model=SymbolSearchResponse,
+    summary="搜尋台股 / 美股標的候選",
+    description="以 deterministic TW/US symbol universe 搜尋標的候選，不呼叫 LLM。",
+)
+def search_symbols(
+    q: str = Query(..., min_length=1, description="股票代號或股票名稱"),
+    limit: int = Query(8, ge=1, le=20, description="最大候選數"),
+) -> SymbolSearchResponse:
+    resolver = get_default_symbol_resolver()
+    candidates = resolver.search(q, limit=_coerce_symbol_lookup_limit(limit))
+    return SymbolSearchResponse(
+        query=q,
+        candidates=[_symbol_candidate_response(candidate) for candidate in candidates],
+    )
+
+
+@router.get(
+    "/resolve",
+    response_model=SymbolResolveResponse,
+    summary="解析台股 / 美股標的",
+    description="解析使用者輸入為 canonical TW/US symbol；低信心時回傳候選而非靜默替代。",
+)
+def resolve_symbol(
+    q: str = Query(..., min_length=1, description="股票代號或股票名稱"),
+    limit: int = Query(8, ge=1, le=20, description="最大候選數"),
+) -> SymbolResolveResponse:
+    result = get_default_symbol_resolver().resolve(q, limit=_coerce_symbol_lookup_limit(limit))
+    candidates = [_symbol_candidate_response(candidate) for candidate in result.candidates]
+    selected = candidates[0] if result.selected is not None and candidates else None
+    return SymbolResolveResponse(
+        query=result.query,
+        status=result.status,
+        selected=selected,
+        candidates=candidates,
+        message=result.message,
+    )
 
 
 def _read_watchlist_codes(service: SystemConfigService) -> list:
@@ -75,13 +143,10 @@ def _write_watchlist_codes(service: SystemConfigService, codes: list) -> None:
 
 # Stock code validation patterns (aligned with frontend validateStockCode)
 _STOCK_CODE_RE = re.compile(
-    r"^(?:\d{6}"                              # A-share 6-digit
-    r"|(?:SH|SZ|BJ)\d{6}"                     # exchange-prefixed A-share
-    r"|\d{6}\.(?:SH|SZ|SS|BJ)"                # exchange-suffixed A-share
-    r"|\d{1,5}\.HK"                           # HK suffix format
-    r"|HK\d{1,5}"                             # HK prefix format
-    r"|\d{5}"                                 # bare 5-digit HK code
-    r"|[A-Z]{1,5}(?:\.(?:US|[A-Z]))?"         # US ticker
+    r"^(?:TW:(?:\d{4,6}|\d{4,5}[A-Z])"        # TW canonical prefix
+    r"|(?:\d{4,6}|\d{4,5}[A-Z])(?:\.TW)?"     # TW universe code
+    r"|US:[A-Z]{1,5}(?:[.-][A-Z])?"           # US canonical prefix
+    r"|[A-Z]{1,5}(?:[.-][A-Z])?(?:\.US)?"     # US ticker
     r")$",
     re.IGNORECASE,
 )
@@ -106,26 +171,36 @@ def _validate_and_normalize_stock_code(code: str) -> str:
                 "message": f"'{stripped}' 不是合法的股票代號格式",
             },
         )
-    return normalize_stock_code(stripped)
+    normalized = normalize_stock_code(stripped)
+    resolved = get_default_symbol_resolver().resolve(normalized)
+    if resolved.status != "resolved" or resolved.selected is None:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "unsupported_stock_code",
+                "message": "找不到支援的台股 / 美股標的",
+            },
+        )
+    return resolved.selected.raw_symbol
 
 
 @router.post(
     "/extract-from-image",
     response_model=ExtractFromImageResponse,
     responses={
-        200: {"description": "提取的股票程式碼"},
+        200: {"description": "提取的股票代號"},
         400: {"description": "圖片無效", "model": ErrorResponse},
         500: {"description": "伺服器錯誤", "model": ErrorResponse},
     },
-    summary="從圖片提取股票程式碼",
-    description="上傳截圖/圖片，透過 Vision LLM 提取股票程式碼。支援 JPEG、PNG、WebP、GIF，最大 5MB。",
+    summary="從圖片提取股票代號",
+    description="上傳截圖/圖片，透過 Vision LLM 提取股票代號。支援 JPEG、PNG、WebP、GIF，最大 5MB。",
 )
 def extract_from_image(
     file: Optional[UploadFile] = File(None, description="圖片檔案（表單欄位名 file）"),
     include_raw: bool = Query(False, description="是否在結果中包含原始 LLM 響應"),
 ) -> ExtractFromImageResponse:
     """
-    從上傳的圖片中提取股票程式碼（使用 Vision LLM）。
+    從上傳的圖片中提取股票代號（使用 Vision LLM）。
 
     表單欄位請使用 file 上傳圖片。優先順序：Gemini / Anthropic / OpenAI（首個可用）。
     """
@@ -195,7 +270,7 @@ def extract_from_image(
         500: {"description": "伺服器錯誤", "model": ErrorResponse},
     },
     summary="解析 CSV/Excel/剪貼簿",
-    description="上傳 CSV/Excel 檔案或貼上文字，自動解析股票程式碼。檔案上限 2MB，文字上限 100KB。",
+    description="上傳 CSV/Excel 檔案或貼上文字，自動解析股票代號。檔案上限 2MB，文字上限 100KB。",
 )
 async def parse_import(request: Request) -> ExtractFromImageResponse:
     """
@@ -312,7 +387,7 @@ async def parse_import(request: Request) -> ExtractFromImageResponse:
         500: {"description": "伺服器錯誤", "model": ErrorResponse},
     },
     summary="獲取自選佇列",
-    description="返回當前 STOCK_LIST 配置中的所有股票程式碼。",
+    description="返回當前 STOCK_LIST 配置中的所有股票代號。",
 )
 def get_watchlist(
     service: SystemConfigService = Depends(get_system_config_service),
@@ -337,7 +412,7 @@ def get_watchlist(
         500: {"description": "伺服器錯誤", "model": ErrorResponse},
     },
     summary="加入自選佇列",
-    description="將指定股票程式碼加入 STOCK_LIST。",
+    description="將指定股票代號加入 STOCK_LIST。",
 )
 def add_to_watchlist(
     request: WatchlistRequest,
@@ -370,7 +445,7 @@ def add_to_watchlist(
         500: {"description": "伺服器錯誤", "model": ErrorResponse},
     },
     summary="從自選佇列刪除",
-    description="從 STOCK_LIST 中移除指定股票程式碼。",
+    description="從 STOCK_LIST 中移除指定股票代號。",
 )
 def remove_from_watchlist(
     request: WatchlistRequest,
@@ -413,7 +488,7 @@ def get_stock_quote(stock_code: str) -> StockQuote:
     獲取指定股票的最新行情資料
     
     Args:
-        stock_code: 股票程式碼（如 600519、00700、AAPL）
+        stock_code: 股票代號（如 2330、AAPL、AAPL）
         
     Returns:
         StockQuote: 實時行情資料
@@ -486,7 +561,7 @@ def get_stock_history(
     獲取指定股票的歷史 K 線資料
     
     Args:
-        stock_code: 股票程式碼
+        stock_code: 股票代號
         period: K 線週期 (daily/weekly/monthly)
         days: 獲取天數
         

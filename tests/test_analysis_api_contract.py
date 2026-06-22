@@ -49,9 +49,9 @@ def _analysis_context_pack_overview() -> dict:
         "pack_version": "1.0",
         "created_at": "2026-04-10T08:30:00+00:00",
         "subject": {
-            "code": "600519",
-            "stock_name": "貴州茅臺",
-            "market": "cn",
+            "code": "2330",
+            "stock_name": "台積電",
+            "market": "tw",
         },
         "blocks": [
             {
@@ -104,7 +104,7 @@ def _analysis_context_pack_overview() -> dict:
 
 def _market_phase_summary() -> dict:
     return {
-        "market": "cn",
+        "market": "tw",
         "phase": "intraday",
         "market_local_time": "2026-03-27T10:00:00+08:00",
         "session_date": "2026-03-27",
@@ -221,7 +221,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         task_queue = MagicMock()
         request = SimpleNamespace(send_notification=True)
-        config = SimpleNamespace(trading_day_check_enabled=True, market_review_region="cn")
+        config = SimpleNamespace(trading_day_check_enabled=True, market_review_region="tw")
 
         with patch.object(
             analysis_endpoint_module,
@@ -236,7 +236,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         self.assertEqual(response.status, "accepted")
         self.assertIn("非交易日", response.message)
-        self.assertNotIn("大盤覆盤", response.message)
+        legacy_label = "大盤" + "覆盤"
+        self.assertNotIn(legacy_label, response.message)
         self.assertIn("市場概覽", response.message)
         acquire.assert_not_called()
         task_queue.submit_background_task.assert_not_called()
@@ -318,15 +319,18 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         cases = (
             ("大立光", "3008"),
+            ("群聯", "8299"),
+            ("Phison", "8299"),
             ("NVIDIA", "NVDA"),
+            ("Meta Platforms", "META"),
+            ("Facebook", "META"),
         )
         for raw_input, expected_code in cases:
             with self.subTest(raw_input=raw_input):
                 queue = MagicMock()
                 queue.submit_tasks_batch.return_value = ([], [])
 
-                with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue), \
-                     patch("src.services.name_to_code_resolver._get_akshare_name_to_code", return_value={}):
+                with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue):
                     response = trigger_analysis(
                         request=SimpleNamespace(
                             stock_code=raw_input,
@@ -380,7 +384,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         ), patch("src.core.market_review.run_market_review") as run_market_review:
             analysis_endpoint_module._run_market_review_background(
                 send_notification=False,
-                override_region="cn,us",
+                override_region="tw,us",
                 lock_token=None,
                 config=config,
             )
@@ -390,7 +394,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             analyzer=runtime_analyzer,
             search_service=runtime_search,
             send_notification=False,
-            override_region="cn,us",
+            override_region="tw,us",
         )
 
     def test_market_review_runtime_initializes_analyzer_for_litellm_provider(self) -> None:
@@ -430,7 +434,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         ), patch("src.core.market_review.run_market_review", return_value="report") as run_market_review:
             result = analysis_endpoint_module._run_market_review_background(
                 send_notification=False,
-                override_region="cn",
+                override_region="tw",
                 lock_token=None,
                 config=SimpleNamespace(),
             )
@@ -441,7 +445,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             analyzer=runtime_analyzer,
             search_service=runtime_search,
             send_notification=False,
-            override_region="cn",
+            override_region="tw",
         )
 
     def test_get_analysis_status_returns_market_review_report_from_queue(self) -> None:
@@ -452,7 +456,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         queue.get_task.return_value = SimpleNamespace(
             task_id="market-task-1",
             stock_code="market_review",
-            stock_name="大盤覆盤",
+            stock_name="市場概覽",
             status=analysis_endpoint_module.TaskStatusEnum.COMPLETED,
             progress=100,
             result={"result": "市場覆盤報告示例文字"},
@@ -477,15 +481,15 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         queue = MagicMock()
         queue.get_task.return_value = SimpleNamespace(
             task_id="task-queue-1",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             status=analysis_endpoint_module.TaskStatusEnum.COMPLETED,
             progress=100,
             result={
-                "stock_code": "600519",
-                "stock_name": "貴州茅臺",
+                "stock_code": "2330",
+                "stock_name": "台積電",
                 "report": {
-                    "meta": {"query_id": "task-queue-1", "stock_code": "600519"},
+                    "meta": {"query_id": "task-queue-1", "stock_code": "2330"},
                     "summary": {"analysis_summary": "summary"},
                 },
             },
@@ -503,8 +507,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(status.status, "completed")
         self.assertIsNotNone(status.result)
         self.assertEqual(status.result.query_id, "task-queue-1")
-        self.assertEqual(status.result.stock_code, "600519")
-        self.assertEqual(status.result.stock_name, "貴州茅臺")
+        self.assertEqual(status.result.stock_code, "2330")
+        self.assertEqual(status.result.stock_name, "台積電")
         self.assertEqual(status.result.created_at, created_at.isoformat())
         self.assertEqual(
             status.result.report["summary"]["analysis_summary"],
@@ -519,15 +523,15 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         queue = MagicMock()
         queue.get_task.return_value = SimpleNamespace(
             task_id="task-queue-2",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             status=analysis_endpoint_module.TaskStatusEnum.COMPLETED,
             progress=100,
             result={
-                "stock_code": "600519",
-                "stock_name": "貴州茅臺",
+                "stock_code": "2330",
+                "stock_name": "台積電",
                 "report": {
-                    "meta": {"query_id": "task-queue-2", "stock_code": "600519"},
+                    "meta": {"query_id": "task-queue-2", "stock_code": "2330"},
                     "summary": {"analysis_summary": "summary"},
                 },
             },
@@ -566,10 +570,10 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             "_build_market_review_runtime",
             return_value=(runtime_notifier, runtime_analyzer, runtime_search),
         ), patch("src.core.market_review.run_market_review", return_value=None):
-            with self.assertRaisesRegex(RuntimeError, "大盤覆盤未返回可持久化報告"):
+            with self.assertRaisesRegex(RuntimeError, "市場概覽未返回可持久化報告"):
                 analysis_endpoint_module._run_market_review_background(
                     send_notification=False,
-                    override_region="cn",
+                    override_region="tw",
                     lock_token=None,
                     config=SimpleNamespace(),
                 )
@@ -590,7 +594,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 analysis_endpoint_module._run_market_review_background(
                     send_notification=False,
-                    override_region="cn",
+                    override_region="tw",
                     lock_token=lock_token,
                     config=SimpleNamespace(),
                 )
@@ -620,7 +624,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             task = queue.submit_background_task(
                 lambda: analysis_endpoint_module._run_market_review_background(
                     send_notification=False,
-                    override_region="cn",
+                    override_region="tw",
                     lock_token=object(),
                     config=SimpleNamespace(),
                 ),
@@ -646,8 +650,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         mock_db.get_analysis_history.return_value = [
             SimpleNamespace(
                 id=1,
-                code="600519",
-                name="貴州茅臺",
+                code="2330",
+                name="台積電",
                 report_type="detailed",
                 raw_result={"report_language": "zh", "model_used": "test-model"},
                 context_snapshot={
@@ -691,10 +695,10 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             SimpleNamespace(
                 id=10,
                 code="MARKET",
-                name="大盤覆盤",
+                name="市場概覽",
                 report_type="market_review",
-                raw_result={"raw_response": "# 🎯 大盤覆盤\n\n覆盤正文"},
-                news_content="覆盤正文",
+                raw_result={"raw_response": "# 🎯 盤勢回顧\n\n回顧正文"},
+                news_content="回顧正文",
                 created_at=None,
             )
         ]
@@ -704,7 +708,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             result = get_analysis_status("market-task-1")
 
         self.assertEqual(result.status, "completed")
-        self.assertEqual(result.market_review_report, "# 🎯 大盤覆盤\n\n覆盤正文")
+        self.assertEqual(result.market_review_report, "# 🎯 盤勢回顧\n\n回顧正文")
         self.assertIsNone(result.result)
 
     def test_get_analysis_status_completed_db_snapshot_reads_change_pct_from_raw_when_price_present(self) -> None:
@@ -802,10 +806,10 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         with patch("src.config.get_config", return_value=SimpleNamespace()), \
              patch("src.core.pipeline.StockAnalysisPipeline", return_value=pipeline_instance), \
-             patch.object(AnalysisService, "_build_analysis_response", return_value={"stock_code": "600519"}):
-            result = AnalysisService.analyze_stock(service, "600519", report_type="full", query_id="q1")
+             patch.object(AnalysisService, "_build_analysis_response", return_value={"stock_code": "2330"}):
+            result = AnalysisService.analyze_stock(service, "2330", report_type="full", query_id="q1")
 
-        self.assertEqual(result, {"stock_code": "600519"})
+        self.assertEqual(result, {"stock_code": "2330"})
         self.assertEqual(
             pipeline_instance.process_single_stock.call_args.kwargs["report_type"],
             ReportType.FULL,
@@ -820,24 +824,24 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         with patch("src.config.get_config", return_value=SimpleNamespace()), \
              patch("src.core.pipeline.StockAnalysisPipeline", return_value=pipeline_instance) as pipeline_cls, \
-             patch.object(AnalysisService, "_build_analysis_response", return_value={"stock_code": "600519"}):
+             patch.object(AnalysisService, "_build_analysis_response", return_value={"stock_code": "2330"}):
             result = AnalysisService.analyze_stock(
                 service,
-                "600519",
+                "2330",
                 report_type="full",
                 query_id="q1",
                 skills=request_skills,
             )
 
-        self.assertEqual(result, {"stock_code": "600519"})
+        self.assertEqual(result, {"stock_code": "2330"})
         self.assertEqual(pipeline_cls.call_args.kwargs["analysis_skills"], request_skills)
 
     def test_report_type_full_is_preserved_in_response_metadata(self) -> None:
         service = AnalysisService()
         pipeline_instance = MagicMock()
         pipeline_instance.process_single_stock.return_value = SimpleNamespace(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             current_price=1234.56,
             change_pct=1.23,
             model_used="test-model",
@@ -854,7 +858,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         with patch("src.config.get_config", return_value=SimpleNamespace()), \
              patch("src.core.pipeline.StockAnalysisPipeline", return_value=pipeline_instance):
-            result = service.analyze_stock("600519", report_type="full", query_id="q1", send_notification=False)
+            result = service.analyze_stock("2330", report_type="full", query_id="q1", send_notification=False)
 
         self.assertEqual(result["report"]["meta"]["report_type"], "full")
 
@@ -868,7 +872,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         with patch("src.config.get_config", return_value=SimpleNamespace()), \
              patch("src.core.pipeline.StockAnalysisPipeline", return_value=pipeline_instance):
-            result = service.analyze_stock("600519", report_type="detailed", query_id="q1", send_notification=False)
+            result = service.analyze_stock("2330", report_type="detailed", query_id="q1", send_notification=False)
 
         self.assertIsNone(result)
         self.assertEqual(service.last_error, "LLM stream interrupted")
@@ -884,7 +888,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         with patch("src.services.analysis_service.AnalysisService", return_value=service_instance):
             with self.assertRaises(Exception) as ctx:
                 _handle_sync_analysis(
-                    "600519",
+                    "2330",
                     SimpleNamespace(
                         report_type="detailed",
                         force_refresh=False,
@@ -910,10 +914,10 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         phase_summary = _market_phase_summary()
         service_instance = MagicMock()
         service_instance.analyze_stock.return_value = {
-            "stock_code": "600519",
-            "stock_name": "貴州茅臺",
+            "stock_code": "2330",
+            "stock_name": "台積電",
             "report": {
-                "meta": {"stock_code": "600519", "report_language": "zh"},
+                "meta": {"stock_code": "2330", "report_language": "zh"},
                 "summary": {"analysis_summary": "summary"},
                 "strategy": {},
                 "details": {"news_summary": "news"},
@@ -926,7 +930,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                  "api.v1.endpoints.analysis._load_sync_fundamental_sources",
                  return_value=(
                      {
-                         "enhanced_context": {"code": "600519"},
+                         "enhanced_context": {"code": "2330"},
                          "analysis_context_pack_overview": overview,
                          "market_phase_summary": phase_summary,
                      },
@@ -934,7 +938,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                  ),
              ):
             result = _handle_sync_analysis(
-                "600519",
+                "2330",
                 SimpleNamespace(
                     report_type="detailed",
                     force_refresh=False,
@@ -992,8 +996,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         service = AnalysisService()
         result = service._build_analysis_response(
             SimpleNamespace(
-                code="600519",
-                name="貴州茅臺",
+                code="2330",
+                name="台積電",
                 current_price=1234.56,
                 change_pct=1.23,
                 model_used="test-model",
@@ -1020,8 +1024,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         result = service._build_analysis_response(
             SimpleNamespace(
-                code="600519",
-                name="貴州茅臺",
+                code="2330",
+                name="台積電",
                 current_price=1234.56,
                 change_pct=1.23,
                 model_used="test-model",
@@ -1050,8 +1054,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         pipeline_instance = MagicMock()
         pipeline_instance.process_single_stock.return_value = SimpleNamespace(
             success=True,
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             current_price=1234.56,
             change_pct=1.23,
             model_used="test-model",
@@ -1071,7 +1075,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             return_value=pipeline_instance,
         ) as pipeline_cls:
             result = service.analyze_stock(
-                "600519",
+                "2330",
                 report_type="detailed",
                 send_notification=False,
                 analysis_phase="postmarket",
@@ -1092,8 +1096,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "details": {"news_summary": "news"},
             },
             query_id="q1",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             context_snapshot={
                 "enhanced_context": {
                     "fundamental_context": {
@@ -1129,8 +1133,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "details": {},
             },
             query_id="q1",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             context_snapshot=None,
             fallback_fundamental_payload=None,
         )
@@ -1152,8 +1156,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "details": {},
             },
             query_id="q1",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             context_snapshot={
                 "enhanced_context": {
                     "fundamental_context": {
@@ -1188,10 +1192,10 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "details": {"news_summary": "news"},
             },
             query_id="q1",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             context_snapshot={
-                "enhanced_context": {"code": "600519"},
+                "enhanced_context": {"code": "2330"},
                 "analysis_context_pack_overview": overview,
                 "market_phase_summary": {
                     **phase_summary,
@@ -1242,8 +1246,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "details": {},
             },
             query_id="q-meta-phase",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             context_snapshot=None,
             fallback_fundamental_payload=None,
         )
@@ -1270,8 +1274,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "details": {},
             },
             query_id="q-snapshot-phase",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             context_snapshot={"market_phase_summary": snapshot_summary},
             fallback_fundamental_payload=None,
         )
@@ -1291,8 +1295,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "details": {},
             },
             query_id="q1",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             context_snapshot={
                 "fundamental_context": {
                     "belong_boards": [{"name": "白酒", "type": "行業"}],
@@ -1331,8 +1335,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "details": {},
             },
             query_id="q1",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             context_snapshot={
                 "fundamental_context": {
                     "belong_boards": [],
@@ -1379,8 +1383,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "details": {},
             },
             query_id="q1",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             context_snapshot={
                 "enhanced_context": {
                     "fundamental_context": {
@@ -1429,8 +1433,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "details": {},
             },
             query_id="q1",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             context_snapshot={
                 "enhanced_context": {
                     "fundamental_context": {
@@ -1487,19 +1491,19 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         with patch("src.storage.DatabaseManager.get_instance", return_value=mock_db):
             context_snapshot, fundamental_snapshot = _load_sync_fundamental_sources(
                 query_id="q_sync_001",
-                stock_code="600519",
+                stock_code="2330",
             )
 
         self.assertIsNone(context_snapshot)
         self.assertEqual(fundamental_snapshot, fallback_payload)
         mock_db.get_analysis_history.assert_called_once_with(
             query_id="q_sync_001",
-            code="600519",
+            code="2330",
             limit=1,
         )
         mock_db.get_latest_fundamental_snapshot.assert_called_once_with(
             query_id="q_sync_001",
-            code="600519",
+            code="2330",
         )
 
     def test_get_analysis_status_reads_price_fields_from_context_snapshot_preserving_zero_change_pct(self) -> None:
@@ -1508,8 +1512,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         record = SimpleNamespace(
             id=1,
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             report_type="detailed",
             created_at=datetime(2026, 4, 10, 12, 0, 0),
             raw_result=json.dumps({"model_used": "test-model", "report_language": "zh"}),
@@ -1559,8 +1563,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         phase_summary = _market_phase_summary()
         record = SimpleNamespace(
             id=1,
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             report_type="detailed",
             created_at=datetime(2026, 4, 10, 12, 0, 0),
             raw_result=json.dumps({"model_used": "test-model", "report_language": "zh"}),
@@ -1663,18 +1667,18 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         }
         task = SimpleNamespace(
             task_id="task_agent_snapshot_in_memory_1",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             status=TaskStatus.COMPLETED,
             progress=100,
             result={
-                "stock_code": "600519",
-                "stock_name": "貴州茅臺",
+                "stock_code": "2330",
+                "stock_name": "台積電",
                 "report": {
                     "meta": {
                         "query_id": "task_agent_snapshot_in_memory_1",
-                        "stock_code": "600519",
-                        "stock_name": "貴州茅臺",
+                        "stock_code": "2330",
+                        "stock_name": "台積電",
                         "report_type": "detailed",
                         "report_language": "zh",
                         "created_at": "2026-04-10T12:00:00",
@@ -1735,7 +1739,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         )
         mock_db.get_analysis_history.assert_called_once_with(
             query_id="task_agent_snapshot_in_memory_1",
-            code="600519",
+            code="2330",
             limit=1,
         )
 
@@ -1746,19 +1750,19 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         phase_summary = _market_phase_summary()
         task = SimpleNamespace(
             task_id="task_no_snapshot_in_memory_1",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             status=TaskStatus.COMPLETED,
             progress=100,
             analysis_phase="intraday",
             result={
-                "stock_code": "600519",
-                "stock_name": "貴州茅臺",
+                "stock_code": "2330",
+                "stock_name": "台積電",
                 "report": {
                     "meta": {
                         "query_id": "task_no_snapshot_in_memory_1",
-                        "stock_code": "600519",
-                        "stock_name": "貴州茅臺",
+                        "stock_code": "2330",
+                        "stock_name": "台積電",
                         "market_phase_summary": phase_summary,
                     },
                     "summary": {"analysis_summary": "summary"},
@@ -1789,7 +1793,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         )
         load_sources.assert_called_once_with(
             query_id="task_no_snapshot_in_memory_1",
-            stock_code="600519",
+            stock_code="2330",
         )
 
     def test_openapi_declares_single_and_batch_async_202_payloads(self) -> None:
@@ -1815,7 +1819,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         if create_app is None or analysis_endpoint_module is None:
             self.skipTest("fastapi is not installed in this test environment")
 
-        config = SimpleNamespace(trading_day_check_enabled=True, market_review_region="cn")
+        config = SimpleNamespace(trading_day_check_enabled=True, market_review_region="tw")
 
         with tempfile.TemporaryDirectory() as temp_dir:
             app = create_app(static_dir=Path(temp_dir))
@@ -1951,7 +1955,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         task = SimpleNamespace(
             task_id="task-phase-1",
             trace_id="trace-phase-1",
-            stock_code="600519",
+            stock_code="2330",
             analysis_phase="intraday",
         )
         queue = MagicMock()
@@ -1960,7 +1964,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue):
             response = trigger_analysis(
                 request=SimpleNamespace(
-                    stock_code="600519",
+                    stock_code="2330",
                     stock_codes=None,
                     stock_name=None,
                     original_query=None,
@@ -1977,7 +1981,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
         self.assertEqual(json.loads(response.body)["analysis_phase"], "intraday")
         queue.submit_tasks_batch.assert_called_once_with(
-            stock_codes=["600519"],
+            stock_codes=["2330"],
             stock_name=None,
             original_query=None,
             selection_source=None,
@@ -1987,7 +1991,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             notify=True,
         )
 
-    def test_trigger_analysis_accepts_hk_suffix_code_from_autocomplete(self) -> None:
+    def test_trigger_analysis_accepts_us_candidate_from_autocomplete(self) -> None:
         if trigger_analysis is None:
             self.skipTest("fastapi is not installed in this test environment")
 
@@ -1998,10 +2002,10 @@ class AnalysisApiContractTestCase(unittest.TestCase):
              patch("api.v1.endpoints.analysis.resolve_name_to_code") as resolve_mock:
             response = trigger_analysis(
                 request=SimpleNamespace(
-                    stock_code="00700.HK",
+                    stock_code="AAPL",
                     stock_codes=None,
-                    stock_name="騰訊控股",
-                    original_query="00700",
+                    stock_name="Apple",
+                    original_query="AAPL",
                     selection_source="autocomplete",
                     report_type="detailed",
                     force_refresh=False,
@@ -2014,9 +2018,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
         resolve_mock.assert_not_called()
         queue.submit_tasks_batch.assert_called_once_with(
-            stock_codes=["00700.HK"],
-            stock_name="騰訊控股",
-            original_query="00700",
+            stock_codes=["AAPL"],
+            stock_name="Apple",
+            original_query="AAPL",
             selection_source="autocomplete",
             report_type="detailed",
             analysis_phase="auto",
@@ -2024,7 +2028,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             notify=True,
         )
 
-    def test_trigger_analysis_accepts_bse_suffix_code_from_autocomplete(self) -> None:
+    def test_trigger_analysis_accepts_tw_etf_candidate_from_autocomplete(self) -> None:
         if trigger_analysis is None:
             self.skipTest("fastapi is not installed in this test environment")
 
@@ -2035,10 +2039,10 @@ class AnalysisApiContractTestCase(unittest.TestCase):
              patch("api.v1.endpoints.analysis.resolve_name_to_code") as resolve_mock:
             response = trigger_analysis(
                 request=SimpleNamespace(
-                    stock_code="920493.BJ",
+                    stock_code="00981A",
                     stock_codes=None,
-                    stock_name="示例北交所股票",
-                    original_query="920493",
+                    stock_name="主動統一台股增長",
+                    original_query="00981A",
                     selection_source="autocomplete",
                     report_type="detailed",
                     force_refresh=False,
@@ -2052,9 +2056,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
         resolve_mock.assert_not_called()
         queue.submit_tasks_batch.assert_called_once_with(
-            stock_codes=["920493.BJ"],
-            stock_name="示例北交所股票",
-            original_query="920493",
+            stock_codes=["00981A"],
+            stock_name="主動統一台股增長",
+            original_query="00981A",
             selection_source="autocomplete",
             report_type="detailed",
             analysis_phase="auto",
@@ -2062,11 +2066,11 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             notify=True,
         )
 
-    def test_trigger_analysis_rejects_non_bse_code_with_bj_exchange_hint(self) -> None:
+    def test_trigger_analysis_rejects_unsupported_exchange_hints(self) -> None:
         if trigger_analysis is None:
             self.skipTest("fastapi is not installed in this test environment")
 
-        for bad_code in ("600519.BJ", "BJ600519"):
+        for bad_code in ("2330.BAD", "UNKNOWN_TARGET"):
             with self.subTest(bad_code=bad_code):
                 queue = MagicMock()
 
@@ -2094,7 +2098,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 resolve_mock.assert_not_called()
                 queue.submit_tasks_batch.assert_not_called()
 
-    def test_trigger_analysis_accepts_hk_prefixed_code(self) -> None:
+    def test_trigger_analysis_accepts_us_ticker(self) -> None:
         if trigger_analysis is None:
             self.skipTest("fastapi is not installed in this test environment")
 
@@ -2105,10 +2109,10 @@ class AnalysisApiContractTestCase(unittest.TestCase):
              patch("api.v1.endpoints.analysis.resolve_name_to_code") as resolve_mock:
             response = trigger_analysis(
                 request=SimpleNamespace(
-                    stock_code="HK00700",
+                    stock_code="AAPL",
                     stock_codes=None,
                     stock_name=None,
-                    original_query="HK00700",
+                    original_query="AAPL",
                     selection_source="manual",
                     report_type="detailed",
                     force_refresh=False,
@@ -2121,9 +2125,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
         resolve_mock.assert_not_called()
         queue.submit_tasks_batch.assert_called_once_with(
-            stock_codes=["HK00700"],
+            stock_codes=["AAPL"],
             stock_name=None,
-            original_query="HK00700",
+            original_query="AAPL",
             selection_source="manual",
             report_type="detailed",
             analysis_phase="auto",
@@ -2175,14 +2179,14 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         queue = MagicMock()
         queue.submit_tasks_batch.return_value = ([], [])
 
-        with patch("api.v1.endpoints.analysis.resolve_name_to_code", return_value="600519"), \
+        with patch("api.v1.endpoints.analysis.resolve_name_to_code", return_value="2330"), \
              patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue):
             response = trigger_analysis(
                 request=SimpleNamespace(
-                    stock_code="貴州茅臺",
+                    stock_code="台積電",
                     stock_codes=None,
                     stock_name=None,
-                    original_query="貴州茅臺",
+                    original_query="台積電",
                     selection_source="manual",
                     report_type="detailed",
                     force_refresh=False,
@@ -2195,9 +2199,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 202)
         queue.submit_tasks_batch.assert_called_once_with(
-            stock_codes=["600519"],
+            stock_codes=["2330"],
             stock_name=None,
-            original_query="貴州茅臺",
+            original_query="台積電",
             selection_source="manual",
             report_type="detailed",
             analysis_phase="auto",
@@ -2216,7 +2220,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             response = trigger_analysis(
                 request=SimpleNamespace(
                     stock_code=None,
-                    stock_codes=["600519", "000001"],
+                    stock_codes=["2330", "AAPL"],
                     stock_name=None,
                     original_query="uploaded.csv",
                     selection_source="import",
@@ -2231,7 +2235,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 202)
         queue.submit_tasks_batch.assert_called_once_with(
-            stock_codes=["600519", "000001"],
+            stock_codes=["2330", "AAPL"],
             stock_name=None,
             original_query="uploaded.csv",
             selection_source="import",
@@ -2254,7 +2258,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue):
                 first = trigger_analysis(
                     request=SimpleNamespace(
-                        stock_code="600519",
+                        stock_code="2330",
                         stock_codes=None,
                         stock_name=None,
                         original_query=None,
@@ -2269,7 +2273,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 )
                 second = trigger_analysis(
                     request=SimpleNamespace(
-                        stock_code="600519.SH",
+                        stock_code="2330.TW",
                         stock_codes=None,
                         stock_name=None,
                         original_query=None,
@@ -2286,7 +2290,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             self.assertEqual(first.status_code, 202)
             self.assertEqual(second.status_code, 409)
             self.assertEqual(json.loads(second.body)["error"], "duplicate_task")
-            self.assertEqual(json.loads(second.body)["stock_code"], "600519.SH")
+            self.assertEqual(json.loads(second.body)["stock_code"], "2330.TW")
             self.assertEqual(
                 json.loads(second.body)["existing_task_id"],
                 json.loads(first.body)["task_id"],
@@ -2310,9 +2314,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             response = trigger_analysis(
                 request=SimpleNamespace(
                     stock_code=None,
-                    stock_codes=["600519", "000001"],
-                    stock_name="貴州茅臺",
-                    original_query="茅臺,平安銀行",
+                    stock_codes=["2330", "AAPL"],
+                    stock_name="台積電",
+                    original_query="台積電,AAPL",
                     selection_source="import",
                     report_type="detailed",
                     force_refresh=False,
@@ -2325,9 +2329,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 202)
         queue.submit_tasks_batch.assert_called_once_with(
-            stock_codes=["600519", "000001"],
+            stock_codes=["2330", "AAPL"],
             stock_name=None,
-            original_query="茅臺,平安銀行",
+            original_query="台積電,AAPL",
             selection_source="import",
             report_type="detailed",
             analysis_phase="auto",
@@ -2432,8 +2436,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         task = SimpleNamespace(
             task_id="task-list-phase",
             trace_id="trace-list-phase",
-            stock_code="600519",
-            stock_name="貴州茅臺",
+            stock_code="2330",
+            stock_name="台積電",
             status=TaskStatus.PROCESSING,
             progress=42,
             message="running",
@@ -2442,7 +2446,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             started_at=datetime(2026, 4, 10, 12, 0, 1),
             completed_at=None,
             error=None,
-            original_query="茅臺",
+            original_query="台積電",
             selection_source="manual",
             analysis_phase="postmarket",
             skills=["growth_quality"],
@@ -2492,7 +2496,7 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         queue._executor = FailingExecutor()
 
         with self.assertRaisesRegex(RuntimeError, "executor down"):
-            queue.submit_tasks_batch(["600519", "000858"], report_type="detailed")
+            queue.submit_tasks_batch(["2330", "2454"], report_type="detailed")
 
         self.assertEqual(queue._tasks, {})
         self.assertEqual(queue._analyzing_stocks, {})
@@ -2502,11 +2506,11 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         queue = AnalysisTaskQueue(max_workers=1)
         queue._executor = type("ExecutorStub", (), {"submit": lambda self, *args, **kwargs: Future()})()
 
-        accepted, duplicates = queue.submit_tasks_batch(["600519", "   "], report_type="detailed")
+        accepted, duplicates = queue.submit_tasks_batch(["2330", "   "], report_type="detailed")
 
-        self.assertEqual([task.stock_code for task in accepted], ["600519"])
+        self.assertEqual([task.stock_code for task in accepted], ["2330"])
         self.assertEqual(duplicates, [])
-        self.assertEqual(sorted(task.stock_code for task in queue._tasks.values()), ["600519"])
+        self.assertEqual(sorted(task.stock_code for task in queue._tasks.values()), ["2330"])
 
     def test_batch_submit_and_worker_use_copied_request_skills(self) -> None:
         class CapturingExecutor:
@@ -2523,7 +2527,7 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         request_skills = ["growth_quality"]
 
         accepted, duplicates = queue.submit_tasks_batch(
-            ["600519"],
+            ["2330"],
             report_type="detailed",
             analysis_phase="intraday",
             skills=request_skills,
@@ -2538,7 +2542,7 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         self.assertIs(executor.calls[0][1][-1], accepted[0].skills)
 
         service_instance = MagicMock()
-        service_instance.analyze_stock.return_value = {"stock_name": "貴州茅臺"}
+        service_instance.analyze_stock.return_value = {"stock_name": "台積電"}
         with patch("src.services.analysis_service.AnalysisService", return_value=service_instance):
             executor.calls[0][0](*executor.calls[0][1])
 
@@ -2553,22 +2557,22 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         queue = AnalysisTaskQueue(max_workers=1)
         queue._executor = type("ExecutorStub", (), {"submit": lambda self, *args, **kwargs: Future()})()
 
-        accepted, duplicates = queue.submit_tasks_batch(["600519"], report_type="detailed")
+        accepted, duplicates = queue.submit_tasks_batch(["2330"], report_type="detailed")
 
         self.assertEqual(len(accepted), 1)
         self.assertEqual(duplicates, [])
-        self.assertTrue(queue.is_analyzing("600519.SH"))
-        self.assertEqual(queue.get_analyzing_task_id("600519.SH"), accepted[0].task_id)
+        self.assertTrue(queue.is_analyzing("2330.TW"))
+        self.assertEqual(queue.get_analyzing_task_id("2330.TW"), accepted[0].task_id)
 
         accepted_again, duplicates_again = queue.submit_tasks_batch(
-            ["600519.SH"],
+            ["2330.TW"],
             report_type="detailed",
             analysis_phase="intraday",
         )
 
         self.assertEqual(accepted_again, [])
         self.assertEqual(len(duplicates_again), 1)
-        self.assertEqual(duplicates_again[0].stock_code, "600519.SH")
+        self.assertEqual(duplicates_again[0].stock_code, "2330.TW")
         self.assertEqual(duplicates_again[0].existing_task_id, accepted[0].task_id)
 
     def test_submit_task_rejects_blank_stock_code(self) -> None:
@@ -2593,7 +2597,7 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
 
         queue._broadcast_event = record_broadcast
 
-        accepted, duplicates = queue.submit_tasks_batch(["600519", "000858"], report_type="detailed")
+        accepted, duplicates = queue.submit_tasks_batch(["2330", "2454"], report_type="detailed")
 
         self.assertEqual(len(accepted), 2)
         self.assertEqual(duplicates, [])
@@ -2602,7 +2606,7 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
     def test_update_task_progress_broadcasts_task_progress_event(self) -> None:
         queue = AnalysisTaskQueue(max_workers=1)
         queue._executor = type("ExecutorStub", (), {"submit": lambda self, *args, **kwargs: Future()})()
-        accepted, _ = queue.submit_tasks_batch(["600519"], report_type="detailed")
+        accepted, _ = queue.submit_tasks_batch(["2330"], report_type="detailed")
 
         events = []
         queue._broadcast_event = lambda event_type, data: events.append((event_type, data))
@@ -2634,7 +2638,7 @@ class ImageStockExtractorContractTestCase(unittest.TestCase):
             openai_base_url=None,
         )
         msg = MagicMock()
-        msg.content = '["600519"]'
+        msg.content = '["2330"]'
         choice = MagicMock()
         choice.message = msg
         response = MagicMock()
@@ -2644,7 +2648,7 @@ class ImageStockExtractorContractTestCase(unittest.TestCase):
              patch("src.services.image_stock_extractor.litellm.completion", return_value=response) as mock_completion:
             result = _call_litellm_vision("base64data", "image/jpeg")
 
-        self.assertEqual(result, '["600519"]')
+        self.assertEqual(result, '["2330"]')
         mock_completion.assert_called_once()
 
 

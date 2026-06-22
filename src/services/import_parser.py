@@ -22,7 +22,7 @@ from src.services.stock_code_utils import is_code_like, normalize_code
 logger = logging.getLogger(__name__)
 
 # Column name mappings (case-insensitive)
-_CODE_ALIASES = frozenset({"code", "股票程式碼", "程式碼", "stock_code", "symbol"})
+_CODE_ALIASES = frozenset({"code", "股票代號", "代號", "stock_code", "symbol"})
 _NAME_ALIASES = frozenset({"name", "股票名稱", "名稱", "stock_name"})
 
 MAX_FILE_BYTES = 2 * 1024 * 1024  # 2MB
@@ -47,7 +47,7 @@ def _should_use_single_column_fast_path(lines: List[str]) -> bool:
     for ln in lines:
         parts = ln.split()
         if len(parts) >= 2 and is_code_like(parts[0]):
-            # Example: "600519 貴州茅臺" / "HK00700 騰訊控股"
+            # Example: "2330 台積電" / "00981A 主動統一台股增長" / "AAPL Apple"
             # First token is code-like and tail contains non-code token(s).
             if any(not is_code_like(p) for p in parts[1:]):
                 return False
@@ -108,7 +108,7 @@ def _parse_dataframe(df: pd.DataFrame) -> List[Tuple[Optional[str], Optional[str
         if code_val:
             code = normalize_code(code_val)
             # If code_val is not a valid code, treat as name only when name_val is empty
-            # (do not overwrite valid name with dirty code_val, e.g. INVALID,貴州茅臺)
+            # (do not overwrite valid name with dirty code_val, e.g. INVALID,台積電)
             if not code and not is_code_like(code_val):
                 if name_val:
                     code = resolve_name_to_code(name_val)
@@ -189,7 +189,7 @@ def parse_import_from_bytes(data: bytes, filename: Optional[str] = None) -> List
         raise ValueError("無法識別檔案編碼，請使用 UTF-8 或 GBK")
 
     # Single-column (one value per line): bypass pandas to avoid sep=None inference issues
-    # e.g. "00700\n600519" or "code\n00700" - pandas with sep=None can produce wrong results
+    # e.g. "2330\n00981A" or "code\n2330" - pandas with sep=None can produce wrong results
     lines = [ln.strip() for ln in text.strip().splitlines() if ln.strip()]
     if _should_use_single_column_fast_path(lines):
         rows = [[ln] for ln in lines]
@@ -200,7 +200,7 @@ def parse_import_from_bytes(data: bytes, filename: Optional[str] = None) -> List
             df = df.iloc[1:].reset_index(drop=True)
         return _parse_dataframe(df)
 
-    # Try pandas for CSV-like; use dtype=str to preserve leading zeros (e.g. 00700)
+    # Try pandas for CSV-like; use dtype=str to preserve leading zeros (e.g. 006208)
     try:
         df = pd.read_csv(io.StringIO(text), sep=None, engine="python", header=None, dtype=str)
         if df is not None and not df.empty:

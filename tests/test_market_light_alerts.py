@@ -25,7 +25,7 @@ def _snapshot(
     limit_available: bool = True,
 ) -> dict:
     return {
-        "region": "cn",
+        "region": "tw",
         "trade_date": trade_date,
         "status": status,
         "score": score,
@@ -46,7 +46,7 @@ class MarketLightAlertsTestCase(unittest.TestCase):
     def _rule(self, alert_type: str, parameters: dict) -> MarketLightAlert:
         return MarketLightAlert(
             target_scope="market",
-            target="cn",
+            target="tw",
             alert_type=alert_type,
             parameters=parameters,
             metadata={"persisted_rule_id": 7, "trading_day_check_enabled": False},

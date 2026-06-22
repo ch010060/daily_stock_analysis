@@ -8,80 +8,31 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from data_provider.base import is_bse_code
 
-
-# Known exchange prefixes (case-insensitive) and the digit lengths they accept.
-# e.g. SH600519 -> 600519, HK00700 -> 00700
-_PREFIX_DIGIT_LENS: dict = {
-    "SH": (6,),
-    "SZ": (6,),
-    "SS": (6,),
-    "BJ": (6,),
-    "HK": (1, 2, 3, 4, 5),
-}
-
-_SUFFIX_DIGIT_LENS: dict = {
-    ".SH": (6,),
-    ".SZ": (6,),
-    ".SS": (6,),
-    ".BJ": (6,),
-    ".HK": (1, 2, 3, 4, 5),
-}
-
-
-def _valid_exchange_code(exchange: str, base: str, digit_lens: tuple[int, ...]) -> bool:
-    if not (base.isdigit() and len(base) in digit_lens):
-        return False
-    if exchange == "BJ":
-        return is_bse_code(base)
-    return True
-
-
-def _strip_exchange_prefix(text: str) -> Optional[str]:
-    """Strip leading exchange prefix (SH/SZ/HK etc.) and return the bare digits, or None."""
-    for prefix, digit_lens in _PREFIX_DIGIT_LENS.items():
-        if text.startswith(prefix):
-            base = text[len(prefix):]
-            if _valid_exchange_code(prefix, base, digit_lens):
-                return base.zfill(5) if prefix == "HK" else base
-    return None
-
-
-def _strip_exchange_suffix(text: str) -> Optional[str]:
-    """Strip exchange suffix (.SH/.SZ/.SS/.HK) and return normalized bare digits, or None."""
-    for suffix, digit_lens in _SUFFIX_DIGIT_LENS.items():
-        if text.endswith(suffix):
-            base = text[: -len(suffix)].strip()
-            exchange = suffix.lstrip(".")
-            if _valid_exchange_code(exchange, base, digit_lens):
-                return base.zfill(5) if suffix == ".HK" else base
-    return None
+_TW_SYMBOL_RE = re.compile(r"^(?:\d{4,6}|\d{4,5}[A-Z])$")
 
 
 def is_code_like(value: str) -> bool:
-    """Check if string looks like a stock code (digits, 1-5 letters, or prefixed code)."""
+    """Check if string looks like a supported TW/US stock code."""
     text = value.strip().upper()
     if not text:
         return False
-    # TW market codes: explicit prefix (TW:2330) or suffix (2330.TW)
     if text.startswith("TW:"):
         base = text[3:]
-        if base.isdigit() and len(base) in (4, 5, 6):
+        if _TW_SYMBOL_RE.fullmatch(base):
             return True
     if text.endswith(".TW"):
         base = text[:-3]
-        if base.isdigit() and len(base) in (4, 5, 6):
+        if _TW_SYMBOL_RE.fullmatch(base):
             return True
-    # Bare 4-digit TW codes (2330, 0050), or 5-6 digit CN/HK codes
-    if text.isdigit() and len(text) in (4, 5, 6):
+    if text.startswith("US:"):
+        return bool(re.match(r"^US:[A-Z]{1,5}(?:[.-][A-Z])?$", text))
+    if text.endswith(".US"):
+        candidate = text[:-3]
+        return bool(re.match(r"^[A-Z]{1,5}(?:[.-][A-Z])?$", candidate))
+    if _TW_SYMBOL_RE.fullmatch(text):
         return True
-    if _strip_exchange_suffix(text) is not None:
-        return True
-    if re.match(r"^[A-Z]{1,5}(?:\.(?:US|[A-Z]))?$", text):
-        return True
-    # Support exchange-prefixed codes: SH600519, SZ000001, BJ920493, HK00700
-    if _strip_exchange_prefix(text) is not None:
+    if re.match(r"^[A-Z]{1,5}(?:[.-][A-Z])?(?:\.US)?$", text):
         return True
     return False
 
@@ -89,24 +40,23 @@ def is_code_like(value: str) -> bool:
 def normalize_code(raw: str) -> Optional[str]:
     """Normalize and validate a single stock code.
 
-    Supports:
-    - Plain digit codes: 600519, 00700
-    - Suffix format: 600519.SH, 600519.SZ, 920493.BJ, 00700.HK
-    - Prefix format: SH600519, SZ000001, BJ920493, HK00700 (case-insensitive)
-    - US ticker symbols: AAPL, TSLA
+    Supports TW 4-digit codes and US tickers only.
     """
     text = raw.strip().upper()
     if not text:
         return None
-    if text.isdigit() and len(text) in (5, 6):
+    if text.startswith("TW:") and _TW_SYMBOL_RE.fullmatch(text[3:]):
+        return text[3:]
+    if text.endswith(".TW") and _TW_SYMBOL_RE.fullmatch(text[:-3]):
+        return text[:-3]
+    if text.startswith("US:"):
+        candidate = text[3:]
+        return candidate if re.match(r"^[A-Z]{1,5}(?:[.-][A-Z])?$", candidate) else None
+    if _TW_SYMBOL_RE.fullmatch(text):
         return text
-    if re.match(r"^[A-Z]{1,5}(?:\.(?:US|[A-Z]))?$", text):
+    if text.endswith(".US"):
+        candidate = text[:-3]
+        return candidate if re.match(r"^[A-Z]{1,5}(?:[.-][A-Z])?$", candidate) else None
+    if re.match(r"^[A-Z]{1,5}(?:[.-][A-Z])?$", text):
         return text
-    stripped_suffix = _strip_exchange_suffix(text)
-    if stripped_suffix is not None:
-        return stripped_suffix
-    # Support exchange-prefixed codes: SH600519 -> 600519, BJ920493 -> 920493
-    stripped = _strip_exchange_prefix(text)
-    if stripped is not None:
-        return stripped
     return None

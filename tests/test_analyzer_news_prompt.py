@@ -87,7 +87,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             default_skill_policy="",
         )
         with patch("src.agent.factory.resolve_skill_prompt_state", return_value=fake_state):
-            prompt = analyzer._get_analysis_system_prompt("zh", stock_code="600519")
+            prompt = analyzer._get_analysis_system_prompt("zh", stock_code="2330")
 
         self.assertIn("### 技能 1: 波段低吸", prompt)
         self.assertNotIn("專注於趨勢交易", prompt)
@@ -99,7 +99,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
                 default_skill_policy="",
             )
 
-        prompt = analyzer._get_analysis_system_prompt("zh", stock_code="600519")
+        prompt = analyzer._get_analysis_system_prompt("zh", stock_code="2330")
 
         self.assertIn("### 技能 1: 纏論", prompt)
         self.assertNotIn("專注於趨勢交易", prompt)
@@ -113,7 +113,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
                 use_legacy_default_prompt=True,
             )
 
-        prompt = analyzer._get_analysis_system_prompt("zh", stock_code="600519")
+        prompt = analyzer._get_analysis_system_prompt("zh", stock_code="2330")
 
         self.assertIn("專注於趨勢交易", prompt)
         self.assertIn("多頭排列必須條件", prompt)
@@ -128,7 +128,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
                     use_legacy_default_prompt=legacy,
                 )
 
-            prompt = analyzer._get_analysis_system_prompt("zh", stock_code="600519")
+            prompt = analyzer._get_analysis_system_prompt("zh", stock_code="2330")
 
             self.assertIn('"phase_decision"', prompt)
             self.assertIn('"watch_conditions"', prompt)
@@ -152,8 +152,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             analyzer = GeminiAnalyzer()
 
         context = {
-            "code": "600519",
-            "stock_name": "貴州茅臺",
+            "code": "2330",
+            "stock_name": "台積電",
             "date": "2026-03-16",
             "today": {},
             "fundamental_context": {
@@ -170,7 +170,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             news_strategy_profile="medium",  # 7 days
         )
         with patch("src.analyzer.get_config", return_value=fake_cfg):
-            prompt = analyzer._format_prompt(context, "貴州茅臺", news_context="news")
+            prompt = analyzer._format_prompt(context, "台積電", news_context="news")
 
         self.assertIn("近7日的新聞搜尋結果", prompt)
         self.assertIn("每一條都必須帶具體日期（YYYY-MM-DD）", prompt)
@@ -219,8 +219,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             analyzer = GeminiAnalyzer()
 
         context = {
-            "code": "600519",
-            "stock_name": "貴州茅臺",
+            "code": "2330",
+            "stock_name": "台積電",
             "date": "2026-03-16",
             "today": {},
             "news_window_days": 1,
@@ -230,7 +230,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             news_strategy_profile="long",  # 30 days if fallback is used
         )
         with patch("src.analyzer.get_config", return_value=fake_cfg):
-            prompt = analyzer._format_prompt(context, "貴州茅臺", news_context="news")
+            prompt = analyzer._format_prompt(context, "台積電", news_context="news")
 
         self.assertIn("近1日的新聞搜尋結果", prompt)
         self.assertIn("超出近1日視窗的新聞一律忽略", prompt)
@@ -240,8 +240,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             analyzer = GeminiAnalyzer()
 
         context = {
-            "code": "600519",
-            "stock_name": "貴州茅臺",
+            "code": "2330",
+            "stock_name": "台積電",
             "date": "2026-03-27",
             "today": {},
             "market_phase_context": {
@@ -257,7 +257,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
 
         prompt = analyzer._format_prompt(
             context,
-            "貴州茅臺",
+            "台積電",
             news_context=None,
             analysis_context_pack_summary="\n## 分析上下文包摘要\n- 資料塊狀態：行情 available\n",
         )
@@ -276,13 +276,13 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             analyzer = GeminiAnalyzer()
 
         context = {
-            "code": "600519",
-            "stock_name": "貴州茅臺",
+            "code": "2330",
+            "stock_name": "台積電",
             "date": "2026-03-27",
             "today": {},
         }
 
-        prompt = analyzer._format_prompt(context, "貴州茅臺", news_context=None)
+        prompt = analyzer._format_prompt(context, "台積電", news_context=None)
 
         self.assertNotIn("市場階段上下文", prompt)
         self.assertNotIn("分析上下文包摘要", prompt)
@@ -292,8 +292,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             analyzer = GeminiAnalyzer()
 
         context = {
-            "code": "600519",
-            "stock_name": "貴州茅臺",
+            "code": "2330",
+            "stock_name": "台積電",
             "date": "2026-03-27",
             "today": {"close": 1880.0},
             "market_phase_context": {
@@ -303,7 +303,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             },
         }
 
-        prompt = analyzer._format_prompt(context, "貴州茅臺", news_context=None)
+        prompt = analyzer._format_prompt(context, "台積電", news_context=None)
 
         self.assertIn("### 最新行情", prompt)
         self.assertIn("| 盤中估算價 | 1880.0 元 |", prompt)
@@ -316,8 +316,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
 
         for phase in ("premarket", "non_trading"):
             context = {
-                "code": "600519",
-                "stock_name": "貴州茅臺",
+                "code": "2330",
+                "stock_name": "台積電",
                 "date": "2026-03-27",
                 "today": {
                     "close": 1870.0,
@@ -332,7 +332,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
                 },
             }
 
-            prompt = analyzer._format_prompt(context, "貴州茅臺", news_context=None)
+            prompt = analyzer._format_prompt(context, "台積電", news_context=None)
 
             self.assertIn("### 上一完整交易日行情", prompt)
             self.assertIn("| 上一完整交易日收盤價 | 1870.0 元 |", prompt)
@@ -348,8 +348,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
 
         for phase in ("premarket", "non_trading"):
             context = {
-                "code": "600519",
-                "stock_name": "貴州茅臺",
+                "code": "2330",
+                "stock_name": "台積電",
                 "date": "2026-03-27",
                 "today": {
                     "close": 1882.5,
@@ -370,7 +370,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
                 },
             }
 
-            prompt = analyzer._format_prompt(context, "貴州茅臺", news_context=None)
+            prompt = analyzer._format_prompt(context, "台積電", news_context=None)
 
             self.assertIn("### 最新行情", prompt)
             self.assertIn("| 實時估算價 | 1882.5 元 |", prompt)
@@ -391,8 +391,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             analyzer = GeminiAnalyzer()
 
         context = {
-            "code": "600519",
-            "stock_name": "貴州茅臺",
+            "code": "2330",
+            "stock_name": "台積電",
             "date": "2026-03-27",
             "today": {
                 "close": 1882.5,
@@ -409,7 +409,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             },
         }
 
-        prompt = analyzer._format_prompt(context, "貴州茅臺", news_context=None)
+        prompt = analyzer._format_prompt(context, "台積電", news_context=None)
 
         self.assertIn("### 最新行情", prompt)
         self.assertIn("| 最新價 | 1882.5 元 |", prompt)
@@ -431,15 +431,15 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             None,
         ):
             context = {
-                "code": "600519",
-                "stock_name": "貴州茅臺",
+                "code": "2330",
+                "stock_name": "台積電",
                 "date": "2026-03-27",
                 "today": {"close": 1880.0},
             }
             if phase_context is not None:
                 context["market_phase_context"] = phase_context
 
-            prompt = analyzer._format_prompt(context, "貴州茅臺", news_context=None)
+            prompt = analyzer._format_prompt(context, "台積電", news_context=None)
 
             self.assertIn("### 今日行情", prompt)
             self.assertIn("| 收盤價 | 1880.0 元 |", prompt)
@@ -453,8 +453,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             )
 
         context = {
-            "code": "600519",
-            "stock_name": "貴州茅臺",
+            "code": "2330",
+            "stock_name": "台積電",
             "date": "2026-03-16",
             "today": {"close": 100, "ma5": 99, "ma10": 98, "ma20": 97},
             "trend_analysis": {
@@ -471,7 +471,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
                 "risk_factors": ["無背馳確認"],
             },
         }
-        prompt = analyzer._format_prompt(context, "貴州茅臺", news_context=None)
+        prompt = analyzer._format_prompt(context, "台積電", news_context=None)
 
         self.assertIn("當前結構是否滿足啟用技能的關鍵觸發條件", prompt)
         self.assertNotIn("是否滿足 MA5>MA10>MA20 多頭排列", prompt)
@@ -530,8 +530,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             )
 
         context = {
-            "code": "600519",
-            "stock_name": "貴州茅臺",
+            "code": "2330",
+            "stock_name": "台積電",
             "date": "2026-04-28",
             "today": {"close": 1688.0, "ma5": 1675.0, "ma10": 1660.0, "ma20": 1640.0},
             "trend_analysis": {
@@ -549,7 +549,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             },
         }
 
-        prompt = analyzer._format_prompt(context, "貴州茅臺", news_context=None)
+        prompt = analyzer._format_prompt(context, "台積電", news_context=None)
 
         self.assertIn("多頭排列 MA5>MA10>MA20", prompt)
         self.assertIn("財報披露前波動可能放大", prompt)

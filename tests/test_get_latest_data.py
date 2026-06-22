@@ -63,23 +63,23 @@ class GetLatestDataTestCase(unittest.TestCase):
         """返回正確數量的資料"""
         # 插入5天資料
         for i in range(5):
-            self._insert_stock_data("600519", days_ago=i, close=100.0 + i)
+            self._insert_stock_data("2330", days_ago=i, close=100.0 + i)
 
         # 請求2天資料
-        result = self.db.get_latest_data("600519", days=2)
+        result = self.db.get_latest_data("2330", days=2)
         self.assertEqual(len(result), 2)
 
         # 請求5天資料
-        result = self.db.get_latest_data("600519", days=5)
+        result = self.db.get_latest_data("2330", days=5)
         self.assertEqual(len(result), 5)
 
     def test_get_latest_data_ordered_by_date_desc(self) -> None:
         """驗證資料按日期降序排列"""
         # 插入3天資料
         for i in range(3):
-            self._insert_stock_data("600519", days_ago=i, close=100.0 + i)
+            self._insert_stock_data("2330", days_ago=i, close=100.0 + i)
 
-        result = self.db.get_latest_data("600519", days=3)
+        result = self.db.get_latest_data("2330", days=3)
 
         # 驗證日期降序（最新日期在前）
         self.assertEqual(len(result), 3)
@@ -87,14 +87,14 @@ class GetLatestDataTestCase(unittest.TestCase):
         self.assertGreater(result[1].date, result[2].date)
 
     def test_get_latest_data_filters_by_code(self) -> None:
-        """驗證按股票程式碼過濾"""
+        """驗證按股票代號過濾"""
         # 插入不同股票的資料
-        self._insert_stock_data("600519", days_ago=0, close=100.0)
+        self._insert_stock_data("2330", days_ago=0, close=100.0)
         self._insert_stock_data("000001", days_ago=0, close=50.0)
 
-        result = self.db.get_latest_data("600519", days=5)
+        result = self.db.get_latest_data("2330", days=5)
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].code, "600519")
+        self.assertEqual(result[0].code, "2330")
 
     def test_save_daily_data_batch_upsert_updates_existing_rows_and_keeps_insert_count(self) -> None:
         base_date = date(2026, 1, 2)
@@ -165,13 +165,13 @@ class GetLatestDataTestCase(unittest.TestCase):
             ]
         )
 
-        saved_first = self.db.save_daily_data(first_batch, "600519", data_source="batch-1")
-        saved_second = self.db.save_daily_data(second_batch, "600519", data_source="batch-2")
+        saved_first = self.db.save_daily_data(first_batch, "2330", data_source="batch-1")
+        saved_second = self.db.save_daily_data(second_batch, "2330", data_source="batch-2")
 
         self.assertEqual(saved_first, 2)
         self.assertEqual(saved_second, 1)
 
-        rows = self.db.get_latest_data("600519", days=5)
+        rows = self.db.get_latest_data("2330", days=5)
         by_date = {row.date: row for row in rows}
 
         self.assertEqual(len(by_date), 3)

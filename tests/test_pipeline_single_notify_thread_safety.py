@@ -100,7 +100,7 @@ class TestPipelineSingleNotifyThreadSafety(unittest.TestCase):
 
         threads = [
             threading.Thread(target=_worker, args=(code,), name=f"notify-{code}")
-            for code in ("000001", "600519")
+            for code in ("000001", "2330")
         ]
 
         for thread in threads:
@@ -118,8 +118,8 @@ class TestPipelineSingleNotifyThreadSafety(unittest.TestCase):
             [
                 ("generate", "000001"),
                 ("send", "000001"),
-                ("generate", "600519"),
-                ("send", "600519"),
+                ("generate", "2330"),
+                ("send", "2330"),
             ],
         )
 

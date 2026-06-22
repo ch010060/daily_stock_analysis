@@ -46,7 +46,7 @@ _OPENAI_KEY = "openai-placeholder-key"
 def _cfg(**kwargs) -> Config:
     """Minimal Config for extractor tests."""
     defaults = dict(
-        stock_list=["600519"],
+        stock_list=["2330"],
         tushare_token=None,
         llm_model_list=[],
         llm_channels=[],
@@ -157,7 +157,7 @@ class TestGetApiKeysForModel:
 class TestCallLitellmVision:
     def _good_response(self):
         msg = MagicMock()
-        msg.content = '["600519"]'
+        msg.content = '["2330"]'
         choice = MagicMock()
         choice.message = msg
         resp = MagicMock()
@@ -170,7 +170,7 @@ class TestCallLitellmVision:
              patch("src.services.image_stock_extractor.litellm.completion",
                    return_value=self._good_response()) as mock_comp:
             result = _call_litellm_vision("base64data", "image/jpeg")
-            assert result == '["600519"]'
+            assert result == '["2330"]'
             mock_comp.assert_called_once()
             kwargs = mock_comp.call_args[1]
             assert kwargs["timeout"] == VISION_API_TIMEOUT
@@ -219,13 +219,13 @@ class TestCallLitellmVision:
 
 class TestParseCodesFromText:
     def test_parses_json_array(self):
-        text = '["600519", "300750", "AAPL"]'
-        assert _parse_codes_from_text(text) == ["600519", "300750", "AAPL"]
+        text = '["2330", "300750", "AAPL"]'
+        assert _parse_codes_from_text(text) == ["2330", "300750", "AAPL"]
 
     def test_parses_fallback_from_plain_text(self):
-        text = "關注 600519、300750 和 AAPL。"
+        text = "關注 2330、300750 和 AAPL。"
         codes = _parse_codes_from_text(text)
-        assert "600519" in codes
+        assert "2330" in codes
         assert "300750" in codes
         assert "AAPL" in codes
 
@@ -244,19 +244,19 @@ class TestParseCodesFromText:
 
 class TestParseItemsFromText:
     def test_parses_new_format(self):
-        text = '[{"code":"600519","name":"貴州茅臺","confidence":"high"},{"code":"00700","name":"騰訊控股","confidence":"medium"}]'
+        text = '[{"code":"2330","name":"台積電","confidence":"high"},{"code":"AAPL","name":"騰訊控股","confidence":"medium"}]'
         items = _parse_items_from_text(text)
         assert len(items) == 2
-        assert items[0] == ("600519", "貴州茅臺", "high")
-        assert items[1] == ("00700", "騰訊控股", "medium")
+        assert items[0] == ("2330", "台積電", "high")
+        assert items[1] == ("AAPL", "騰訊控股", "medium")
 
     def test_fallback_to_legacy_format(self):
-        text = '["600519", "300750"]'
+        text = '["2330", "300750"]'
         items = _parse_items_from_text(text)
-        assert [(i[0], i[1], i[2]) for i in items] == [("600519", None, "medium"), ("300750", None, "medium")]
+        assert [(i[0], i[1], i[2]) for i in items] == [("2330", None, "medium"), ("300750", None, "medium")]
 
     def test_normalizes_invalid_confidence(self):
-        text = '[{"code":"600519","name":"茅臺","confidence":"invalid"}]'
+        text = '[{"code":"2330","name":"台積電","confidence":"invalid"}]'
         items = _parse_items_from_text(text)
         assert items[0][2] == "medium"
 
@@ -281,9 +281,9 @@ class TestParseItemsFromText:
         assert items[1] == ("512880", "證券ETF", "high")
 
     def test_uses_json_repair_when_json_invalid(self):
-        text = '[{"code":"600519","name":"貴州茅臺","confidence":"high"'
+        text = '[{"code":"2330","name":"台積電","confidence":"high"'
         items = _parse_items_from_text(text)
-        assert items == [("600519", "貴州茅臺", "high")]
+        assert items == [("2330", "台積電", "high")]
 
 
 # ---------------------------------------------------------------------------
@@ -291,7 +291,7 @@ class TestParseItemsFromText:
 # ---------------------------------------------------------------------------
 
 class TestExtractStockCodesFromImage:
-    def _good_vision_response(self, codes='["600519", "300750"]'):
+    def _good_vision_response(self, codes='["2330", "300750"]'):
         msg = MagicMock()
         msg.content = codes
         choice = MagicMock()
@@ -308,7 +308,7 @@ class TestExtractStockCodesFromImage:
                    return_value=self._good_vision_response()):
             items, raw = extract_stock_codes_from_image(jpeg, "image/jpeg")
             codes = [i[0] for i in items]
-            assert "600519" in codes
+            assert "2330" in codes
             assert "300750" in codes
             assert isinstance(raw, str)
 

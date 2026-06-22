@@ -82,7 +82,7 @@ class AugmentRealtimeMarketDateTestCase(unittest.TestCase):
         quote = SimpleNamespace(price=31.0, open_price=30.5, high=31.5, low=29.5, volume=100, amount=None, change_pct=1.0, pre_close=None)
 
         pipeline = _make_pipeline()
-        result = pipeline._augment_historical_with_realtime(df, quote, "600519")
+        result = pipeline._augment_historical_with_realtime(df, quote, "2330")
 
         self.assertEqual(len(result), 1)
         self.assertEqual(result.iloc[0]["close"], 30.0)

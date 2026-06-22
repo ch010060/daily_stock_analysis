@@ -3,7 +3,7 @@
 """
 Tushare 股票列表獲取指令碼
 
-從 Tushare Pro 獲取 A股、港股、美股列表資訊，儲存為 CSV 檔案
+從 Tushare Pro 獲取 台股、美股、美股列表資訊，儲存為 CSV 檔案
 
 使用方法：
     python3 scripts/fetch_tushare_stock_list.py
@@ -13,12 +13,12 @@ Tushare 股票列表獲取指令碼
     - 需要在 .env 中配置 TUSHARE_TOKEN
     - 需要安裝 tushare: pip install tushare
     - 賬號積分要求：
-        * A股/港股：2000積分
+        * 台股/美股：2000積分
         * 美股：120積分試用，5000積分正式許可權
 
 輸出檔案：
-    - data/stock_list_a.csv      A股列表（--a-rk 時會覆蓋為修正後名稱）
-    - data/stock_list_hk.csv     港股列表
+    - data/stock_list_a.csv      台股列表（--a-rk 時會覆蓋為修正後名稱）
+    - data/stock_list_hk.csv     美股列表
     - data/stock_list_us.csv     美股列表
     - data/README_stock_list.md  資料說明文件
 """
@@ -82,7 +82,7 @@ def get_tushare_api() -> Optional[ts.pro_api]:
         print(f"[錯誤] Tushare API 連線失敗: {e}")
         print("請檢查：")
         print("  1. TUSHARE_TOKEN 是否正確")
-        print("  2. 賬號積分是否足夠（A股/港股需要2000積分）")
+        print("  2. 賬號積分是否足夠（台股/美股需要2000積分）")
         return None
 
 
@@ -101,18 +101,18 @@ def random_sleep(min_seconds: int = SLEEP_MIN, max_seconds: int = SLEEP_MAX):
 
 def fetch_a_stock_list(api: ts.pro_api) -> Optional[pd.DataFrame]:
     """
-    獲取 A股列表
+    獲取 台股列表
 
     介面：stock_basic
-    限量：單次最多6000行（覆蓋全市場A股）
+    限量：單次最多6000行（覆蓋全市場台股）
 
     Args:
         api: Tushare API 例項
 
     Returns:
-        A股資料 DataFrame，失敗返回 None
+        台股資料 DataFrame，失敗返回 None
     """
-    print("\n[1/3] 正在獲取 A股列表...")
+    print("\n[1/3] 正在獲取 台股列表...")
 
     try:
         # 獲取所有正常上市的股票
@@ -123,17 +123,17 @@ def fetch_a_stock_list(api: ts.pro_api) -> Optional[pd.DataFrame]:
         )
 
         if df is not None and len(df) > 0:
-            print(f"✓ A股列表獲取成功，共 {len(df)} 只股票")
+            print(f"✓ 台股列表獲取成功，共 {len(df)} 只股票")
             print("  - 交易所分佈：")
             for exchange, count in df['exchange'].value_counts().items():
                 print(f"    {exchange}: {count} 只")
             return df
         else:
-            print("[錯誤] A股資料為空")
+            print("[錯誤] 台股資料為空")
             return None
 
     except Exception as e:
-        print(f"[錯誤] 獲取 A股列表失敗: {e}")
+        print(f"[錯誤] 獲取 台股列表失敗: {e}")
         return None
 
 
@@ -166,7 +166,7 @@ def fetch_rt_k_names(api: ts.pro_api, ts_codes: List[str]) -> Dict[str, str]:
     參考官方文件：
     https://tushare.pro/wctapi/documents/372.md
 
-    rt_k 是 A 股實時日線介面，支援按股票程式碼和股票程式碼萬用字元提取
+    rt_k 是 A 股實時日線介面，支援按股票代號和股票代號萬用字元提取
     實時日 K 線行情。本指令碼只把它用作名稱回填的輔助來源，修正
     stock_basic 中返回的短期交易狀態字首名稱。
     """
@@ -221,7 +221,7 @@ def fix_a_stock_names_with_rt_k(api: ts.pro_api, df: pd.DataFrame) -> pd.DataFra
         return df
 
     if "name" not in df.columns or "ts_code" not in df.columns:
-        print("[警告] A股資料缺少 ts_code/name 列，跳過 rt_k 名稱修正")
+        print("[警告] 台股資料缺少 ts_code/name 列，跳過 rt_k 名稱修正")
         return df
 
     fix_mask = df["name"].astype(str).map(should_fix_a_stock_name)
@@ -261,34 +261,34 @@ def fix_a_stock_names_with_rt_k(api: ts.pro_api, df: pd.DataFrame) -> pd.DataFra
 
 def fetch_hk_stock_list(api: ts.pro_api) -> Optional[pd.DataFrame]:
     """
-    獲取港股列表
+    獲取美股列表
 
     介面：hk_basic
-    限量：單次可提取全部在交易的港股
+    限量：單次可提取全部在交易的美股
 
     Args:
         api: Tushare API 例項
 
     Returns:
-        港股資料 DataFrame，失敗返回 None
+        美股資料 DataFrame，失敗返回 None
     """
-    print("\n[2/3] 正在獲取港股列表...")
+    print("\n[2/3] 正在獲取美股列表...")
 
     try:
-        # 獲取所有正常上市的港股
+        # 獲取所有正常上市的美股
         df = api.hk_basic(
             list_status='L'    # L: 上市, D: 退市
         )
 
         if df is not None and len(df) > 0:
-            print(f"✓ 港股列表獲取成功，共 {len(df)} 只股票")
+            print(f"✓ 美股列表獲取成功，共 {len(df)} 只股票")
             return df
         else:
-            print("[錯誤] 港股資料為空")
+            print("[錯誤] 美股資料為空")
             return None
 
     except Exception as e:
-        print(f"[錯誤] 獲取港股列表失敗: {e}")
+        print(f"[錯誤] 獲取美股列表失敗: {e}")
         return None
 
 
@@ -393,14 +393,14 @@ def generate_data_documentation(
     hk_df: Optional[pd.DataFrame],
     us_df: Optional[pd.DataFrame],
     a_filename: str = "stock_list_a.csv",
-    a_title: str = "A股列表"
+    a_title: str = "台股列表"
 ):
     """
     生成資料說明文件
 
     Args:
-        a_df: A股資料
-        hk_df: 港股資料
+        a_df: 台股資料
+        hk_df: 美股資料
         us_df: 美股資料
     """
     doc_path = OUTPUT_DIR / "README_stock_list.md"
@@ -415,24 +415,24 @@ def generate_data_documentation(
 | 檔案 | 說明 | 記錄數 |
 |------|------|--------|
 | `{a_filename}` | {a_title} | {len(a_df) if a_df is not None else 0} |
-| `stock_list_hk.csv` | 港股列表 | {len(hk_df) if hk_df is not None else 0} |
+| `stock_list_hk.csv` | 美股列表 | {len(hk_df) if hk_df is not None else 0} |
 | `stock_list_us.csv` | 美股列表 | {len(us_df) if us_df is not None else 0} |
 
 ---
 
-## A股資料（{a_filename}）
+## 台股資料（{a_filename}）
 
 ### 資料介面
 - **介面名稱**：`stock_basic`
 - **資料許可權**：2000積分起，每分鐘請求50次
-- **資料限量**：單次最多6000行（覆蓋全市場A股）
+- **資料限量**：單次最多6000行（覆蓋全市場台股）
 
 ### 欄位說明
 
 | 欄位名 | 型別 | 說明 | 示例 |
 |--------|------|------|------|
 | ts_code | str | TS程式碼 | 000001.SZ |
-| symbol | str | 股票程式碼 | 000001 |
+| symbol | str | 股票代號 | 000001 |
 | name | str | 股票名稱 | 平安銀行 |
 | area | str | 地域 | 深圳 |
 | industry | str | 所屬行業 | 銀行 |
@@ -440,7 +440,7 @@ def generate_data_documentation(
 | enname | str | 英文全稱 | Ping An Bank Co., Ltd. |
 | cnspell | str | 拼音縮寫 | PAYH |
 | market | str | 市場型別 | 主機板/創業板/科創板/CDR |
-| exchange | str | 交易所程式碼 | SSE上交所/SZSE深交所/BSE北交所 |
+| exchange | str | 交易所程式碼 | SSE上交所/SZSE深交所/BSE台股 |
 | curr_type | str | 交易貨幣 | CNY |
 | list_status | str | 上市狀態 | L上市/D退市/P暫停上市 |
 | list_date | str | 上市日期 | 19910403 |
@@ -458,12 +458,12 @@ ts_code,symbol,name,area,industry,fullname,enname,cnspell,market,exchange,curr_t
 
 ---
 
-## 港股資料（stock_list_hk.csv）
+## 美股資料（stock_list_hk.csv）
 
 ### 資料介面
 - **介面名稱**：`hk_basic`
 - **資料許可權**：使用者需要至少2000積分才可以調取
-- **資料限量**：單次可提取全部在交易的港股列表資料
+- **資料限量**：單次可提取全部在交易的美股列表資料
 
 ### 欄位說明
 
@@ -531,10 +531,10 @@ BABA,阿里巴巴,Alibaba Group Holding Ltd.,ADR,20140919,
 ```python
 import pandas as pd
 
-# 讀取 A股資料
+# 讀取 台股資料
 a_stocks = pd.read_csv('data/{a_filename}')
 
-# 讀取港股資料
+# 讀取美股資料
 hk_stocks = pd.read_csv('data/stock_list_hk.csv')
 
 # 讀取美股資料
@@ -543,14 +543,14 @@ us_stocks = pd.read_csv('data/stock_list_us.csv')
 
 ### 程式碼格式說明
 
-**A股程式碼格式**：
+**台股程式碼格式**：
 - 滬市：`600000.SH`（主機板）、`688xxx.SH`（科創板）、`900xxx.SH`（B股）
 - 深市：`000001.SZ`（主機板）、`300xxx.SZ`（創業板）、`200xxx.SZ`（B股）
-- 北交所：`8xxxxx.BJ`、`4xxxxx.BJ`、`920xxx.BJ`
+- 台股：`8xxxxx.BJ`、`4xxxxx.BJ`、`920xxx.BJ`
 
-**港股程式碼格式**：
+**美股程式碼格式**：
 - 格式：`xxxxx.HK`（5位數字 + .HK）
-- 示例：`00700.HK`（騰訊控股）
+- 示例：`AAPL`（騰訊控股）
 
 **美股程式碼格式**：
 - 格式：程式碼字母（無字尾）
@@ -562,7 +562,7 @@ us_stocks = pd.read_csv('data/stock_list_us.csv')
 
 1. **資料更新**：建議定期更新資料（如每月一次）
 2. **積分要求**：
-   - A股/港股：需要2000積分
+   - 台股/美股：需要2000積分
    - 美股：120積分試用，5000積分正式許可權
 3. **請求限制**：注意 API 的每分鐘請求次數限制
 4. **資料完整性**：本資料僅包含基礎資訊，如需更多資料請參考 Tushare 官方文件
@@ -604,31 +604,31 @@ def main(argv: Optional[List[str]] = None):
     print("=" * 60)
     print("Tushare 股票列表獲取工具")
     print("=" * 60)
-    print(f"[資訊] A股名稱修正模式：{'開啟' if args.a_rk else '關閉'}")
+    print(f"[資訊] 台股名稱修正模式：{'開啟' if args.a_rk else '關閉'}")
 
     # 1. 獲取 API 例項
     api = get_tushare_api()
     if not api:
         return 1
 
-    # 2. 獲取 A股資料
+    # 2. 獲取 台股資料
     a_df = fetch_a_stock_list(api)
     if a_df is not None:
         a_filename = 'stock_list_a.csv'
-        a_title = 'A股列表'
-        a_market_name = 'A股'
+        a_title = '台股列表'
+        a_market_name = '台股'
 
         if args.a_rk:
             a_df = fix_a_stock_names_with_rt_k(api, a_df)
-            a_title = 'A股列表（修正後）'
+            a_title = '台股列表（修正後）'
 
         save_to_csv(a_df, a_filename, a_market_name)
 
-    # 3. 獲取港股資料
-    random_sleep()  # 休息後再獲取港股
+    # 3. 獲取美股資料
+    random_sleep()  # 休息後再獲取美股
     hk_df = fetch_hk_stock_list(api)
     if hk_df is not None:
-        save_to_csv(hk_df, 'stock_list_hk.csv', '港股')
+        save_to_csv(hk_df, 'stock_list_hk.csv', '美股')
 
     # 4. 獲取美股資料（分頁）
     random_sleep()  # 休息後再獲取美股
@@ -639,7 +639,7 @@ def main(argv: Optional[List[str]] = None):
     # 5. 生成資料說明文件
     print("\n正在生成資料說明文件...")
     a_filename = 'stock_list_a.csv'
-    a_title = 'A股列表（修正後）' if args.a_rk else 'A股列表'
+    a_title = '台股列表（修正後）' if args.a_rk else '台股列表'
     generate_data_documentation(a_df, hk_df, us_df, a_filename=a_filename, a_title=a_title)
 
     # 6. 總結
@@ -650,10 +650,10 @@ def main(argv: Optional[List[str]] = None):
     total_count = 0
     if a_df is not None:
         total_count += len(a_df)
-        print(f"  ✓ A股：{len(a_df)} 只")
+        print(f"  ✓ 台股：{len(a_df)} 只")
     if hk_df is not None:
         total_count += len(hk_df)
-        print(f"  ✓ 港股：{len(hk_df)} 只")
+        print(f"  ✓ 美股：{len(hk_df)} 只")
     if us_df is not None:
         total_count += len(us_df)
         print(f"  ✓ 美股：{len(us_df)} 只")

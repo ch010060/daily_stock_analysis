@@ -24,7 +24,7 @@ def _diagnostic_snapshot() -> dict:
         "trace_id": "trace-p2",
         "task_id": "task-p2",
         "query_id": "query-p2",
-        "stock_code": "600519",
+        "stock_code": "2330",
         "trigger_source": "api",
         "provider_runs": [
             {
@@ -84,8 +84,8 @@ def _history_record(*, context_snapshot: dict | None) -> SimpleNamespace:
     return SimpleNamespace(
         id=1,
         query_id="query-p2",
-        code="600519",
-        name="貴州茅臺",
+        code="2330",
+        name="台積電",
         report_type="detailed",
         created_at=datetime(2026, 5, 24, 12, 0, 0),
         raw_result=json.dumps(
@@ -196,7 +196,7 @@ class RunDiagnosticsP2TestCase(unittest.TestCase):
         summary = build_run_diagnostic_summary(
             context_snapshot={
                 "diagnostics": diagnostics,
-                "news_content": "【貴州茅臺 情報搜尋結果】\n  未找到相關資訊",
+                "news_content": "【台積電 情報搜尋結果】\n  未找到相關資訊",
                 "news_result_count": 0,
             },
             raw_result={
@@ -418,7 +418,7 @@ class RunDiagnosticsP2TestCase(unittest.TestCase):
             raw_result={"success": True, "model_used": "deepseek-chat"},
             report_saved=True,
             query_id="legacy-query",
-            stock_code="600519",
+            stock_code="2330",
         )
 
         self.assertEqual(summary["status"], "unknown")

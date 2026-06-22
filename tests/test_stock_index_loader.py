@@ -15,13 +15,13 @@ def _write_stock_index(path: Path, name: str, size: int = 1) -> None:
         json.dumps(
             [
                 [
-                    f"{index + 1:06d}.SZ",
-                    f"{index + 1:06d}",
+                    f"{2303 + index}.TW",
+                    f"{2303 + index}",
                     name,
-                    "pinganyinhang",
-                    "payh",
+                    "liandian",
+                    "ld",
                     [],
-                    "CN",
+                    "TW",
                     "stock",
                     True,
                     100,
@@ -41,14 +41,15 @@ class TestStockIndexLoader(unittest.TestCase):
     def tearDown(self):
         stock_index_loader._clear_stock_index_cache_for_tests()
 
-    def test_get_index_stock_name_supports_display_canonical_and_hk_keys(self):
+    def test_get_index_stock_name_supports_tw_us_and_ignores_non_route_b_rows(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             index_path = Path(temp_dir) / "stocks.index.json"
             index_path.write_text(
                 json.dumps(
                     [
-                        ["000001.SZ", "000001", "平安銀行", "pinganyinhang", "payh", [], "CN", "stock", True, 100],
-                        ["00700.HK", "00700", "騰訊控股", "tengxunkonggu", "txkg", [], "HK", "stock", True, 100],
+                        ["2303.TW", "2303", "聯電", "liandian", "ld", [], "TW", "stock", True, 100],
+                        ["AAPL", "AAPL", "Apple", "apple", "aapl", [], "US", "stock", True, 100],
+                        ["ZZ:TEST", "TEST", "非支援市場測試資料", "", "", [], "ZZ", "stock", True, 100],
                         ["AAPL", "AAPL", "蘋果", "pingguo", "pg", [], "US", "stock", True, 100],
                     ],
                     ensure_ascii=False,
@@ -57,12 +58,10 @@ class TestStockIndexLoader(unittest.TestCase):
             )
 
             with patch.object(stock_index_loader, "get_stock_index_candidate_paths", return_value=(index_path,)):
-                self.assertEqual(stock_index_loader.get_index_stock_name("000001"), "平安銀行")
-                self.assertEqual(stock_index_loader.get_index_stock_name("000001.SZ"), "平安銀行")
-                self.assertEqual(stock_index_loader.get_index_stock_name("HK00700"), "騰訊控股")
-                self.assertEqual(stock_index_loader.get_index_stock_name("00700"), "騰訊控股")
-                self.assertEqual(stock_index_loader.get_index_stock_name("700.HK"), "騰訊控股")
+                self.assertEqual(stock_index_loader.get_index_stock_name("2303"), "聯電")
+                self.assertEqual(stock_index_loader.get_index_stock_name("2303.TW"), "聯電")
                 self.assertEqual(stock_index_loader.get_index_stock_name("aapl"), "蘋果")
+                self.assertIsNone(stock_index_loader.get_index_stock_name("TEST"))
 
     def test_default_candidate_paths_prefer_remote_cache(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -82,27 +81,27 @@ class TestStockIndexLoader(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             index_path = Path(temp_dir) / "stocks.index.json"
             index_path.write_text(
-                json.dumps([["000001.SZ", "000001", "平安銀行"]], ensure_ascii=False),
+                json.dumps([["2303.TW", "2303", "聯電", "", "", [], "TW"]], ensure_ascii=False),
                 encoding="utf-8",
             )
 
             with patch.object(stock_index_loader, "get_stock_index_candidate_paths", return_value=(index_path,)):
                 first = stock_index_loader.get_stock_name_index_map()
                 index_path.write_text(
-                    json.dumps([["000001.SZ", "000001", "變更後名稱"]], ensure_ascii=False),
+                    json.dumps([["2303.TW", "2303", "變更後名稱", "", "", [], "TW"]], ensure_ascii=False),
                     encoding="utf-8",
                 )
                 second = stock_index_loader.get_stock_name_index_map()
 
             self.assertIs(first, second)
-            self.assertEqual(stock_index_loader.get_index_stock_name("000001"), "平安銀行")
+            self.assertEqual(stock_index_loader.get_index_stock_name("2303"), "聯電")
 
     def test_get_index_stock_name_returns_none_when_index_missing(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             missing_path = Path(temp_dir) / "stocks.index.json"
             with patch.object(stock_index_loader, "get_stock_index_candidate_paths", return_value=(missing_path,)):
                 self.assertEqual(stock_index_loader.get_stock_name_index_map(), {})
-                self.assertIsNone(stock_index_loader.get_index_stock_name("000001"))
+                self.assertIsNone(stock_index_loader.get_index_stock_name("2303"))
 
     def test_get_stock_name_index_map_skips_invalid_utf8_and_uses_next_candidate(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -110,7 +109,7 @@ class TestStockIndexLoader(unittest.TestCase):
             valid_path = Path(temp_dir) / "stocks.index.json"
             invalid_path.write_bytes(b"\xff\xfe\xfd")
             valid_path.write_text(
-                json.dumps([["000001.SZ", "000001", "平安銀行"]], ensure_ascii=False),
+                json.dumps([["2303.TW", "2303", "聯電", "", "", [], "TW"]], ensure_ascii=False),
                 encoding="utf-8",
             )
 
@@ -119,18 +118,18 @@ class TestStockIndexLoader(unittest.TestCase):
                 "get_stock_index_candidate_paths",
                 return_value=(invalid_path, valid_path),
             ):
-                self.assertEqual(stock_index_loader.get_index_stock_name("000001"), "平安銀行")
+                self.assertEqual(stock_index_loader.get_index_stock_name("2303"), "聯電")
 
     def test_get_stock_name_index_map_skips_unexpected_json_shape_and_uses_next_candidate(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             malformed_path = Path(temp_dir) / "malformed-stocks.index.json"
             valid_path = Path(temp_dir) / "stocks.index.json"
             malformed_path.write_text(
-                json.dumps({"code": "000001", "name": "平安銀行"}, ensure_ascii=False),
+                json.dumps({"code": "2303", "name": "聯電"}, ensure_ascii=False),
                 encoding="utf-8",
             )
             valid_path.write_text(
-                json.dumps([["000001.SZ", "000001", "平安銀行"]], ensure_ascii=False),
+                json.dumps([["2303.TW", "2303", "聯電", "", "", [], "TW"]], ensure_ascii=False),
                 encoding="utf-8",
             )
 
@@ -139,7 +138,7 @@ class TestStockIndexLoader(unittest.TestCase):
                 "get_stock_index_candidate_paths",
                 return_value=(malformed_path, valid_path),
             ):
-                self.assertEqual(stock_index_loader.get_index_stock_name("000001"), "平安銀行")
+                self.assertEqual(stock_index_loader.get_index_stock_name("2303"), "聯電")
 
     def test_newer_bundled_index_wins_over_older_remote_cache(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -155,9 +154,9 @@ class TestStockIndexLoader(unittest.TestCase):
                      stock_index_loader,
                      "get_stock_index_candidate_paths",
                      return_value=(remote_cache, bundled_path),
-                 ):
+                ):
                 self.assertEqual(stock_index_loader.find_existing_stock_index_path(), bundled_path)
-                self.assertEqual(stock_index_loader.get_index_stock_name("000001"), "新內建索引")
+                self.assertEqual(stock_index_loader.get_index_stock_name("2303"), "新內建索引")
 
     def test_newer_remote_cache_wins_when_valid(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -173,9 +172,9 @@ class TestStockIndexLoader(unittest.TestCase):
                      stock_index_loader,
                      "get_stock_index_candidate_paths",
                      return_value=(remote_cache, bundled_path),
-                 ):
+                ):
                 self.assertEqual(stock_index_loader.find_existing_stock_index_path(), remote_cache)
-                self.assertEqual(stock_index_loader.get_index_stock_name("000001"), "新遠端快取")
+                self.assertEqual(stock_index_loader.get_index_stock_name("2303"), "新遠端快取")
 
     def test_invalid_remote_cache_is_skipped_even_when_newer(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -192,9 +191,9 @@ class TestStockIndexLoader(unittest.TestCase):
                      stock_index_loader,
                      "get_stock_index_candidate_paths",
                      return_value=(remote_cache, bundled_path),
-                 ):
+                ):
                 self.assertEqual(stock_index_loader.find_existing_stock_index_path(), bundled_path)
-                self.assertEqual(stock_index_loader.get_index_stock_name("000001"), "內建索引")
+                self.assertEqual(stock_index_loader.get_index_stock_name("2303"), "內建索引")
 
 
 if __name__ == "__main__":

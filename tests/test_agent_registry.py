@@ -129,18 +129,18 @@ class TestToolRegistry(unittest.TestCase):
     def test_execute_success(self):
         tool = _make_tool("exec_test")
         self.registry.register(tool)
-        result = self.registry.execute("exec_test", stock_code="600519", days=10)
-        self.assertEqual(result, {"code": "600519", "days": 10})
+        result = self.registry.execute("exec_test", stock_code="2330", days=10)
+        self.assertEqual(result, {"code": "2330", "days": 10})
 
     def test_execute_default_param(self):
         tool = _make_tool("default_test")
         self.registry.register(tool)
-        result = self.registry.execute("default_test", stock_code="600519")
+        result = self.registry.execute("default_test", stock_code="2330")
         self.assertEqual(result["days"], 30)
 
     def test_execute_not_found(self):
         with self.assertRaises(KeyError):
-            self.registry.execute("not_exist", stock_code="600519")
+            self.registry.execute("not_exist", stock_code="2330")
 
     def test_execute_handler_error(self):
         def bad_handler(**kwargs):
@@ -511,7 +511,7 @@ class TestBuiltinToolDefinitions(unittest.TestCase):
 
         with patch("src.agent.tools.backtest_tools._get_backtest_service", return_value=svc):
             skill_payload = _handle_get_skill_backtest_summary(skill_id="bull_trend")
-            stock_payload = _handle_get_stock_backtest_summary(stock_code="600519")
+            stock_payload = _handle_get_stock_backtest_summary(stock_code="2330")
 
         self.assertEqual(skill_payload, {"error": "Failed to retrieve backtest summary."})
         self.assertEqual(stock_payload, {"error": "Failed to retrieve backtest data."})

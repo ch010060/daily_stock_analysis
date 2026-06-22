@@ -49,8 +49,8 @@ def _quote(
     **overrides,
 ) -> UnifiedRealtimeQuote:
     return UnifiedRealtimeQuote(
-        code="600519",
-        name="貴州茅臺",
+        code="2330",
+        name="台積電",
         source=source,
         price=1880.0,
         change_pct=1.2,
@@ -62,13 +62,13 @@ def _quote(
 
 def _artifacts(**overrides) -> PipelineAnalysisArtifacts:
     data = {
-        "code": "600519",
-        "stock_name": "貴州茅臺",
+        "code": "2330",
+        "stock_name": "台積電",
         "market": "cn",
         "phase": {"market": "cn", "phase": "intraday"},
         "base_context": {
-            "code": "600519",
-            "stock_name": "貴州茅臺",
+            "code": "2330",
+            "stock_name": "台積電",
             "date": "2026-05-24",
             "today": {"date": "2026-05-24", "close": 1880.0},
             "yesterday": {"date": "2026-05-23", "close": 1860.0},
@@ -87,7 +87,7 @@ def _artifacts(**overrides) -> PipelineAnalysisArtifacts:
         ),
         "chip_data": _FakeChip(
             {
-                "code": "600519",
+                "code": "2330",
                 "date": "2026-05-24",
                 "source": "akshare",
                 "profit_ratio": 0.72,
@@ -237,8 +237,8 @@ def test_daily_bars_uses_base_context_and_keeps_dates_out_of_timestamp() -> None
     pack = AnalysisContextBuilder.build(
         _artifacts(
             base_context={
-                "code": "600519",
-                "stock_name": "貴州茅臺",
+                "code": "2330",
+                "stock_name": "台積電",
                 "date": "2026-05-24",
                 "data_missing": True,
                 "today": {},
@@ -459,12 +459,12 @@ def test_data_quality_scores_fixed_blocks_and_limits_auxiliary_missing() -> None
 def test_build_batch_returns_one_pack_per_artifact() -> None:
     packs = AnalysisContextBuilder.build_batch(
         [
-            _artifacts(code="600519", stock_name="貴州茅臺"),
+            _artifacts(code="2330", stock_name="台積電"),
             _artifacts(code="000001", stock_name="平安銀行"),
         ]
     )
 
-    assert [pack.subject.code for pack in packs] == ["600519", "000001"]
+    assert [pack.subject.code for pack in packs] == ["2330", "000001"]
 
 
 def test_builder_output_safe_dict_redacts_sensitive_mapping_keys() -> None:

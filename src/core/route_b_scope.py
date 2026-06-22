@@ -1,28 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Route B runtime scope gate: TW/US market enforcement.
-
-Classifies stock symbols by market, filters non-TW/US symbols under Route B
-enforce mode, and raises a descriptive error when the accepted watchlist is empty.
-Provider-name helpers allow callers to skip CN-only data providers without
-calling into them.
-"""
+"""Route B runtime scope gate: TW/US market enforcement."""
 
 import logging
 import os
-import re
 from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# Providers that exclusively serve CN/A-share markets
-_CN_PROVIDERS = frozenset({"EfinanceFetcher", "AkshareFetcher", "BaostockFetcher", "PytdxFetcher"})
-
-# Symbol classification patterns
-_US_TICKER_RE = re.compile(r"^[A-Z]{1,5}([.\-][A-Z])?$")
-_CN_6DIGIT_RE = re.compile(r"^\d{6}$")
-_TW_4DIGIT_RE = re.compile(r"^\d{4}$")
-_HK_PREFIX_RE = re.compile(r"^HK\d{4,5}$")
-_HK_SUFFIX_RE = re.compile(r"^\d{4,5}\.HK$", re.IGNORECASE)
+# Providers that are outside the active TW/US route.
+_NON_ROUTE_B_PROVIDERS = frozenset({"EfinanceFetcher", "AkshareFetcher", "BaostockFetcher", "PytdxFetcher"})
 
 
 class RouteBScopeError(ValueError):
@@ -48,35 +34,18 @@ def get_route_b_markets(config=None) -> frozenset:
 
 
 def classify_symbol(code: str) -> str:
-    """Classify a stock symbol as 'TW', 'US', 'HK', 'CN', or 'UNKNOWN'.
-
-    Detection order (first match wins):
-    - Explicit TW: prefix or .TW suffix → TW
-    - Explicit US: prefix → US
-    - HK prefix (HK01810) or .HK suffix (1810.HK) → HK
-    - Pure alphabetic 1-5 char ticker (AAPL, BRK.B) → US
-    - 6 pure digits (600519) → CN
-    - Anything else → UNKNOWN
-    """
-    upper = (code or "").strip().upper()
-    if not upper:
+    """Classify a stock symbol using the local TW/US symbol universe."""
+    text = (code or "").strip()
+    if not text:
         return "UNKNOWN"
-    if upper.startswith("TW:"):
-        return "TW"
-    if upper.endswith(".TW"):
-        return "TW"
-    if upper.startswith("US:"):
-        return "US"
-    if _HK_PREFIX_RE.fullmatch(upper):
-        return "HK"
-    if _HK_SUFFIX_RE.fullmatch(upper):
-        return "HK"
-    if _TW_4DIGIT_RE.fullmatch(upper):
-        return "TW"
-    if _US_TICKER_RE.fullmatch(upper):
-        return "US"
-    if _CN_6DIGIT_RE.fullmatch(upper):
-        return "CN"
+    try:
+        from src.services.symbol_universe import get_default_symbol_resolver
+
+        result = get_default_symbol_resolver().resolve(text)
+    except Exception:
+        return "UNKNOWN"
+    if result.status == "resolved" and result.selected is not None:
+        return result.selected.market
     return "UNKNOWN"
 
 
@@ -88,7 +57,7 @@ def filter_stocks_for_route_b(
 
     Returns:
         (accepted, rejected) where accepted contains TW/US symbols and rejected
-        contains all others (CN, HK, UNKNOWN).
+        contains all other unsupported inputs.
     """
     allowed_markets = get_route_b_markets(config)
     accepted: List[str] = []
@@ -130,6 +99,6 @@ def validate_route_b_watchlist(
     return accepted
 
 
-def is_cn_provider(provider_name: str) -> bool:
-    """Return True if the named fetcher exclusively serves CN/A-share markets."""
-    return provider_name in _CN_PROVIDERS
+def is_non_route_b_provider(provider_name: str) -> bool:
+    """Return True if the named fetcher is outside the active TW/US route."""
+    return provider_name in _NON_ROUTE_B_PROVIDERS

@@ -142,8 +142,8 @@ class SearchServiceConcurrencyTestCase(unittest.TestCase):
                 query=query,
                 results=[
                     SearchResult(
-                        title="fresh-news",
-                        snippet="snippet",
+                        title="台積電 fresh-news",
+                        snippet="台積電 相關新聞",
                         url="https://example.com/fresh-news",
                         source="example.com",
                         published_date=datetime.now().date().isoformat(),
@@ -167,7 +167,7 @@ class SearchServiceConcurrencyTestCase(unittest.TestCase):
         def worker():
             try:
                 barrier.wait(timeout=1)
-                responses.append(service.search_stock_news("600519", "貴州茅臺", max_results=3))
+                responses.append(service.search_stock_news("2330", "台積電", max_results=3))
             except Exception as exc:  # pragma: no cover - thread collection
                 errors.append(exc)
 
@@ -182,7 +182,7 @@ class SearchServiceConcurrencyTestCase(unittest.TestCase):
         self.assertEqual(len(responses), 4)
         for response in responses:
             self.assertTrue(response.success)
-            self.assertEqual([item.title for item in response.results], ["fresh-news"])
+            self.assertEqual([item.title for item in response.results], ["台積電 fresh-news"])
 
     def test_search_stock_news_rechecks_cache_after_wait_before_provider_search(self):
         service = SearchService(
@@ -191,13 +191,18 @@ class SearchServiceConcurrencyTestCase(unittest.TestCase):
             news_strategy_profile="short",
         )
         search_days = service._effective_news_window_days()
+        query_variants = service._news_query_variants(
+            "2330",
+            "台積電",
+            prefer_chinese=True,
+        )
         cache_key = service._cache_key(
-            "貴州茅臺 600519 股票 最新訊息|target=600519:貴州茅臺|news_pref=zh",
+            f"{' || '.join(query_variants)}|target=2330:台積電|news_pref=zh",
             3,
             search_days,
         )
         cached_response = SearchResponse(
-            query="貴州茅臺 600519 股票 最新訊息",
+            query=query_variants[0],
             results=[
                 SearchResult(
                     title="cached-after-wait",
@@ -224,7 +229,7 @@ class SearchServiceConcurrencyTestCase(unittest.TestCase):
             return None
 
         with patch.object(service, "_wait_for_cached", side_effect=wait_for_cached):
-            response = service.search_stock_news("600519", "貴州茅臺", max_results=3)
+            response = service.search_stock_news("2330", "台積電", max_results=3)
 
         self.assertIs(response, cached_response)
         provider.search.assert_not_called()

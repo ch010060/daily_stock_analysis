@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Market strategy blueprints for CN/HK/US daily market recap."""
+"""Market strategy blueprints for TW/US daily market recap."""
 
 from dataclasses import dataclass
 from typing import List
@@ -209,9 +209,7 @@ TW_BLUEPRINT = MarketStrategyBlueprint(
 )
 
 _BLUEPRINT_MAP = {
-    "cn": CN_BLUEPRINT,
     "us": US_BLUEPRINT,
-    "hk": HK_BLUEPRINT,
     "tw": TW_BLUEPRINT,
 }
 

@@ -2,7 +2,7 @@
 """Market review region scope gate for Route B TW/US enforcement.
 
 Resolves which market review regions are allowed to run under Route B enforce mode.
-CN/A-share regions are always blocked; US and TW are accepted when supported.
+CN/HK regions are always blocked; US and TW are accepted when supported.
 """
 
 import logging
@@ -11,18 +11,16 @@ from typing import List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 # Internal region codes that have a working market review implementation
-_IMPLEMENTED_REGIONS = frozenset({"cn", "hk", "us", "tw"})
+_IMPLEMENTED_REGIONS = frozenset({"us", "tw"})
 # Internal region codes that are recognised but not yet implemented
 _DEFERRED_REGIONS = frozenset()
 # Internal region codes that are blocked under Route B
-_CN_REGIONS = frozenset({"cn"})
+_CN_REGIONS = frozenset({"cn", "hk"})
 
 # Mapping from Route B market name (uppercase) to internal region code (lowercase)
 _MARKET_TO_REGION = {
     "US": "us",
     "TW": "tw",
-    "HK": "hk",
-    "CN": "cn",
 }
 
 # Mapping from MARKET_REVIEW_REGIONS entry (case-insensitive) to internal region
@@ -39,7 +37,7 @@ def parse_market_review_regions_env(raw: Optional[str]) -> List[str]:
 
     Accepted input formats (case-insensitive, comma-separated):
       "TW,US"  → ['tw', 'us']
-      "us,cn"  → ['us', 'cn']
+      "us,cn"  → ['us', 'cn'] (cn will be blocked by the scope gate)
       ""       → []
     Unknown tokens are logged and dropped.
     """
@@ -64,14 +62,14 @@ def parse_market_review_regions_env(raw: Optional[str]) -> List[str]:
 def get_default_route_b_regions(config=None) -> List[str]:
     """Derive candidate market review regions from ROUTE_B_MARKETS.
 
-    TW maps to internal 'tw' (deferred), US maps to internal 'us' (implemented).
+    TW maps to internal 'tw', US maps to internal 'us'.
     Returns an ordered list (US before TW by default).
     """
     from src.core.route_b_scope import get_route_b_markets
 
     allowed_markets = get_route_b_markets(config)
     # Stable order: US first, then TW
-    order = ["US", "TW", "HK", "CN"]
+    order = ["US", "TW"]
     regions: List[str] = []
     for market in order:
         if market in allowed_markets:
@@ -101,7 +99,7 @@ def filter_regions_for_route_b(
         if region in _CN_REGIONS:
             skipped_cn.append(region)
             logger.warning(
-                "[Route B] CN/A-share market review is disabled under Route B TW/US scope. "
+                "[Route B] CN/HK market review is disabled under Route B TW/US scope. "
                 "Skipping region: %r",
                 region,
             )

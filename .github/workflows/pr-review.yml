@@ -115,7 +115,7 @@ jobs:
         id: check_files
         run: |
           BASE_REF="${{ github.base_ref || 'main' }}"
-          CHANGED_FILES=$(git diff --name-only origin/$BASE_REF...HEAD -- '*.py' 2>/dev/null || echo "")
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR origin/$BASE_REF...HEAD -- '*.py' 2>/dev/null || echo "")
           REVIEWABLE_FILES=$(git diff --name-only origin/$BASE_REF...HEAD -- '*.py' '*.md' 'docs/**' 'README.md' 'AGENTS.md' 'requirements.txt' '.github/requirements-ci.txt' 'pyproject.toml' 'setup.cfg' '.github/PULL_REQUEST_TEMPLATE.md' '.github/workflows/**' '.github/scripts/**' 2>/dev/null || echo "")
 
           if [ -z "$REVIEWABLE_FILES" ]; then
@@ -165,7 +165,19 @@ jobs:
         if: steps.check_files.outputs.has_py_changes == 'true'
         run: |
           echo "## 🔎 代码质量检查" >> $GITHUB_STEP_SUMMARY
-          RESULT=$(flake8 $CHANGED_FILES --select=E9,F63,F7,F82 --format='%(path)s:%(row)d: %(code)s %(text)s' 2>/dev/null || true)
+          PY_FILES=()
+          for file in $CHANGED_FILES; do
+            if [ -f "$file" ]; then
+              PY_FILES+=("$file")
+            fi
+          done
+
+          if [ ${#PY_FILES[@]} -eq 0 ]; then
+            echo "✅ 没有需要检查的现存 Python 文件" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          RESULT=$(flake8 "${PY_FILES[@]}" --select=E9,F63,F7,F82 --format='%(path)s:%(row)d: %(code)s %(text)s' 2>/dev/null || true)
           if [ -n "$RESULT" ]; then
             echo "⚠️ 发现以下问题：" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY

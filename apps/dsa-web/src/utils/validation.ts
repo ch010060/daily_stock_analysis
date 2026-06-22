@@ -4,7 +4,7 @@ interface ValidationResult {
   normalized: string;
 }
 
-const SUPPORTED_QUERY_CHARACTERS = /^[A-Z0-9.&^\u3400-\u9FFF\s]+$/;
+const SUPPORTED_QUERY_CHARACTERS = /^[A-Z0-9.&^\-\u3400-\u9FFF\s]+$/;
 const SP500_CANONICAL_CODE = 'SPX';
 const SP500_ALIASES = new Set([
   'S&P500',
@@ -16,14 +16,8 @@ const SP500_ALIASES = new Set([
 ]);
 
 const STOCK_CODE_PATTERNS = [
-  /^\d{4}$/, // TW 4-digit code, for example 2330
-  /^\d{6}$/, // A-share 6-digit code
-  /^(SH|SZ|BJ)\d{6}$/, // A-share code with exchange prefix
-  /^\d{6}\.(SH|SZ|SS|BJ)$/, // A-share code with exchange suffix
-  /^\d{5}$/, // HK code without prefix
-  /^HK\d{1,5}$/, // HK-prefixed code, for example HK00700
-  /^\d{1,5}\.HK$/, // HK suffix format, for example 00700.HK
-  /^[A-Z]{1,5}(?:\.(?:US|[A-Z]))?$/, // Common US ticker format
+  /^(?:TW:)?(?:\d{4,6}|\d{4,5}[A-Z])(?:\.TW)?$/, // TW universe codes, for example 2330, 006208, 00981A
+  /^(?:US:)?[A-Z]{1,5}(?:[.-][A-Z])?(?:\.US)?$/, // Common US ticker format
 ];
 
 const normalizeSp500Alias = (value: string): string | null => {
@@ -47,7 +41,7 @@ export const looksLikeStockCode = (value: string): boolean => {
 };
 
 /**
- * Validate common A-share, HK, and US stock code formats.
+ * Validate supported TW/US stock code formats.
  */
 export const validateStockCode = (value: string): ValidationResult => {
   const normalized = value.trim().toUpperCase();
