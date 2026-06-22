@@ -86,6 +86,22 @@ def _build_local_name_indexes(code_to_name: Dict[str, str]) -> Tuple[Dict[str, s
 
 
 _LOCAL_REVERSE_MAP, _LOCAL_AMBIGUOUS_NAMES = _build_local_name_indexes(STOCK_NAME_MAP)
+_LOCAL_ALIAS_MAP = {
+    "大立光": "3008",
+    "大立光精密": "3008",
+    "LARGAN": "3008",
+    "LARGAN PRECISION": "3008",
+    "NVIDIA": "NVDA",
+    "NVIDIA CORPORATION": "NVDA",
+}
+
+
+def _resolve_local_alias(name: str) -> Optional[str]:
+    """Resolve curated Route B aliases without fuzzy or LLM-style guessing."""
+    raw = (name or "").strip()
+    if not raw:
+        return None
+    return _LOCAL_ALIAS_MAP.get(raw) or _LOCAL_ALIAS_MAP.get(raw.upper())
 
 
 def _get_akshare_name_to_code() -> Optional[Dict[str, str]]:
@@ -162,6 +178,10 @@ def resolve_name_to_code(name: str) -> Optional[str]:
     # 1. Input looks like code
     if _is_code_like(s):
         return _normalize_code(s)
+
+    alias_code = _resolve_local_alias(s)
+    if alias_code:
+        return alias_code
 
     # 2. Local reverse map (no duplicates)
     local_reverse = _LOCAL_REVERSE_MAP

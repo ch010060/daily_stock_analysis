@@ -27,7 +27,7 @@ const overview: AnalysisContextPackOverview = {
       status: 'available',
       source: 'mock_quote',
       warnings: [],
-      missingReasons: [],
+      missingReasons: ['realtime_quote_missing'],
     },
     {
       key: 'news',
@@ -100,12 +100,17 @@ describe('AnalysisContextSummary', () => {
     expect(screen.getByText('行情')).toBeInTheDocument();
     expect(screen.getByText('來源: mock_quote')).toBeVisible();
     expect(screen.getByText('警告:')).toBeInTheDocument();
-    expect(screen.getByText(/intraday_realtime_overlay/)).toBeInTheDocument();
+    expect(screen.queryByText(/intraday_realtime_overlay/)).not.toBeInTheDocument();
+    expect(screen.getByText(/盤中資料可能不完整/)).toBeInTheDocument();
     expect(screen.getByText('資料限制:')).toBeInTheDocument();
     expect(screen.getByText(/基本面：擷取失敗/)).toBeInTheDocument();
-    expect(screen.getByText(/news_provider_timeout/)).toBeInTheDocument();
-    expect(screen.getByText(/news_context_missing/)).toBeInTheDocument();
-    expect(screen.getByText(/fundamental_pipeline_failed/)).toBeInTheDocument();
+    expect(screen.queryByText(/news_provider_timeout/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/news_context_missing/)).not.toBeInTheDocument();
+    expect(screen.getByText(/本次分析未取得新聞資料/)).toBeInTheDocument();
+    expect(screen.queryByText(/realtime_quote_missing/)).not.toBeInTheDocument();
+    expect(screen.getByText(/本次分析未取得即時行情資料/)).toBeInTheDocument();
+    expect(screen.queryByText(/fundamental_pipeline_failed/)).not.toBeInTheDocument();
+    expect(screen.getByText(/基本面資料暫時無法取得/)).toBeInTheDocument();
     expect(screen.getAllByText('新聞結果數: 3').some((item) => item.textContent === '新聞結果數: 3')).toBe(true);
   });
 

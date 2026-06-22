@@ -1361,6 +1361,141 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         self.assertEqual(diagnostics["result_count"], 1)
         self.assertEqual(diagnostics["final_status"], "available")
 
+    def test_2317_news_query_variants_include_hon_hai_foxconn_aliases(self) -> None:
+        """2317 should search 鴻海 and known English aliases, not only broad TW market terms."""
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(return_value=_response([_result("鴻海新聞", datetime.now().date().isoformat())])),
+        )
+        service._providers = [provider]
+
+        response = service.search_stock_news("2317", "鴻海", max_results=3)
+
+        diagnostics = _news_search_diagnostics(response)
+        self.assertEqual(
+            diagnostics["query_variants"][:3],
+            ["2317 鴻海 新聞", "鴻海 最新消息", "鴻海 財報 法說 產業"],
+        )
+        self.assertIn("Hon Hai Foxconn news", diagnostics["query_variants"])
+
+    def test_2317_news_prefers_later_alias_relevant_result_over_broad_unrelated_result(self) -> None:
+        """A broad unrelated first result must not dominate when a later alias query returns 2317-relevant news."""
+        fresh = datetime.now().date().isoformat()
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(
+                side_effect=[
+                    _response([
+                        _result(
+                            "Taiwan navy market update",
+                            fresh,
+                            snippet="A broad Taiwan geopolitical headline without Hon Hai or Foxconn relevance.",
+                        )
+                    ]),
+                    _response([]),
+                    _response([]),
+                    _response([
+                        _result(
+                            "Hon Hai Foxconn AI server revenue update",
+                            fresh,
+                            snippet="Foxconn and Hon Hai revenue news for 2317 investors.",
+                            source="example.com",
+                        )
+                    ]),
+                ]
+            ),
+        )
+        service._providers = [provider]
+
+        response = service.search_stock_news("2317", "鴻海", max_results=3)
+
+        self.assertEqual(
+            [item.title for item in response.results],
+            ["Hon Hai Foxconn AI server revenue update"],
+        )
+        self.assertGreaterEqual(provider.search.call_count, 4)
+        self.assertEqual(response.results[0].relevance_category, SearchService._DIRECT_NEWS_CATEGORY)
+
+    def test_3008_news_query_variants_include_largan_aliases(self) -> None:
+        """3008 should search 大立光 and Largan aliases for related-info relevance."""
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(return_value=_response([_result("大立光新聞", datetime.now().date().isoformat())])),
+        )
+        service._providers = [provider]
+
+        response = service.search_stock_news("3008", "大立光", max_results=3)
+
+        diagnostics = _news_search_diagnostics(response)
+        self.assertEqual(
+            diagnostics["query_variants"][:3],
+            ["3008 大立光 新聞", "大立光 最新消息", "大立光 財報 法說 產業"],
+        )
+        self.assertIn("Largan Precision news", diagnostics["query_variants"])
+        self.assertIn("Largan stock news", diagnostics["query_variants"])
+
+    def test_3008_news_prefers_later_largan_relevant_result_over_broad_result(self) -> None:
+        """Broad optical-sector news should not dominate when Largan-specific news is available."""
+        fresh = datetime.now().date().isoformat()
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(
+                side_effect=[
+                    _response([
+                        _result(
+                            "Taiwan optics sector market update",
+                            fresh,
+                            snippet="A broad lens supply-chain headline without direct company identity.",
+                        )
+                    ]),
+                    _response([]),
+                    _response([]),
+                    _response([
+                        _result(
+                            "Largan Precision earnings and iPhone lens order update",
+                            fresh,
+                            snippet="Largan and 大立光 revenue news for 3008 investors.",
+                            source="example.com",
+                        )
+                    ]),
+                ]
+            ),
+        )
+        service._providers = [provider]
+
+        response = service.search_stock_news("3008", "大立光", max_results=3)
+
+        self.assertEqual(
+            [item.title for item in response.results],
+            ["Largan Precision earnings and iPhone lens order update"],
+        )
+        self.assertGreaterEqual(provider.search.call_count, 4)
+        self.assertEqual(response.results[0].relevance_category, SearchService._DIRECT_NEWS_CATEGORY)
+
     def test_search_diagnostics_include_us_query_variants(self) -> None:
         """News diagnostics should expose sanitized US query variants."""
         fresh = datetime.now().date().isoformat()
@@ -1391,6 +1526,67 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         self.assertEqual(diagnostics["attempt_count"], 1)
         self.assertEqual(diagnostics["result_count"], 1)
         self.assertEqual(diagnostics["final_status"], "available")
+
+    def test_nvda_news_query_variants_include_ai_gpu_data_center_terms(self) -> None:
+        """NVDA should search direct NVIDIA and AI/GPU/data-center earnings variants."""
+        fresh = datetime.now().date().isoformat()
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(return_value=_response([_result("NVDA NVIDIA stock news", fresh)])),
+        )
+        service._providers = [provider]
+
+        response = service.search_stock_news("NVDA", "NVIDIA")
+
+        diagnostics = _news_search_diagnostics(response)
+        self.assertEqual(
+            diagnostics["query_variants"][:3],
+            [
+                "NVDA NVIDIA stock news",
+                "NVIDIA earnings stock news",
+                "NVIDIA earnings AI GPU stock news",
+            ],
+        )
+        self.assertIn("NVIDIA AI chip GPU data center earnings", diagnostics["query_variants"])
+
+    def test_nvda_relevant_company_news_ranks_above_broad_sector_card(self) -> None:
+        """Direct NVIDIA news should rank before broad AI-sector cards."""
+        fresh = datetime.now().date().isoformat()
+        service = SearchService(
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        provider = SimpleNamespace(
+            is_available=True,
+            name="MockProvider",
+            search=MagicMock(
+                return_value=_response([
+                    _result(
+                        "AI chip sector market update",
+                        fresh,
+                        snippet="Broad GPU demand lifted semiconductor peers without a direct company update.",
+                    ),
+                    _result(
+                        "NVIDIA NVDA data center earnings update",
+                        fresh,
+                        snippet="NVIDIA AI GPU and data center revenue remain the core NVDA stock catalyst.",
+                    ),
+                ])
+            ),
+        )
+        service._providers = [provider]
+
+        response = service.search_stock_news("NVDA", "NVIDIA", max_results=2)
+
+        self.assertEqual(response.results[0].title, "NVIDIA NVDA data center earnings update")
+        self.assertEqual(response.results[0].relevance_category, SearchService._DIRECT_NEWS_CATEGORY)
 
     def test_search_diagnostics_records_empty_first_query_continuation(self) -> None:
         """Diagnostics should prove an empty first query did not stop the search."""

@@ -149,6 +149,39 @@ const TEXT = {
   },
 } as const;
 
+const REASON_LABELS: Record<ReportLanguage, Record<string, string>> = {
+  zh: {
+    news_context_missing: '本次分析未取得新聞資料',
+    news_provider_timeout: '新聞服務暫時不可用',
+    chip_distribution_missing: '此市場暫不支援籌碼資料',
+    fundamentals_not_supported: '此資料源暫不支援基本面資料',
+    fundamental_pipeline_failed: '基本面資料暫時無法取得',
+    realtime_quote_missing: '本次分析未取得即時行情資料',
+    realtime_provider_fallback: '即時行情來源已降級，但仍可繼續分析',
+    intraday_realtime_overlay: '盤中資料可能不完整，已以可用資料補足',
+  },
+  zh_TW: {
+    news_context_missing: '本次分析未取得新聞資料',
+    news_provider_timeout: '新聞服務暫時不可用',
+    chip_distribution_missing: '此市場暫不支援籌碼資料',
+    fundamentals_not_supported: '此資料源暫不支援基本面資料',
+    fundamental_pipeline_failed: '基本面資料暫時無法取得',
+    realtime_quote_missing: '本次分析未取得即時行情資料',
+    realtime_provider_fallback: '即時行情來源已降級，但仍可繼續分析',
+    intraday_realtime_overlay: '盤中資料可能不完整，已以可用資料補足',
+  },
+  en: {
+    news_context_missing: 'News data was not retrieved for this analysis',
+    news_provider_timeout: 'News service is temporarily unavailable',
+    chip_distribution_missing: 'Chip distribution data is not supported for this market',
+    fundamentals_not_supported: 'Fundamentals are not supported by this data source',
+    fundamental_pipeline_failed: 'Fundamentals are temporarily unavailable',
+    realtime_quote_missing: 'Realtime quote data was not retrieved for this analysis',
+    realtime_provider_fallback: 'Realtime quote source was degraded, but analysis can continue',
+    intraday_realtime_overlay: 'Intraday data may be incomplete and was supplemented with available data',
+  },
+};
+
 const STATUS_ORDER: AnalysisContextPackBlockStatus[] = [
   'available',
   'missing',
@@ -194,6 +227,24 @@ const formatLimitation = (
   return language === 'en' ? `${label}: ${statusLabel}` : `${label}：${statusLabel}`;
 };
 
+const formatReason = (value: string, language: ReportLanguage): string => {
+  const trimmed = (value || '').trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  const [rawKey, ...details] = trimmed.split(':');
+  const key = rawKey.trim();
+  const label = REASON_LABELS[language][key];
+  if (!label) {
+    return trimmed;
+  }
+  const suffix = details.join(':').trim();
+  return suffix ? `${label} (${suffix})` : label;
+};
+
+const formatReasons = (values: string[] | undefined, language: ReportLanguage): string[] =>
+  values?.map((item) => formatReason(item, language)).filter(Boolean) || [];
+
 export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
   overview,
   language = 'zh_TW',
@@ -222,6 +273,7 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
   const qualityStyle = qualityLevel ? QUALITY_STYLE[qualityLevel] : undefined;
   const qualityLabel = qualityLevel ? text.qualityLevel[qualityLevel] : undefined;
   const limitations = quality?.limitations?.map((item) => formatLimitation(item, reportLanguage, text)) || [];
+  const overviewWarnings = formatReasons(overview.warnings, reportLanguage);
 
   return (
     <Card variant="bordered" padding="none" className="home-panel-card">
@@ -310,16 +362,18 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
             </div>
           ) : null}
 
-          {overview.warnings?.length ? (
+          {overviewWarnings.length ? (
             <div className="mb-3 home-subpanel p-3 text-xs leading-5 text-warning">
               <span className="font-medium">{text.warnings}: </span>
-              {overview.warnings.join(', ')}
+              {overviewWarnings.join(', ')}
             </div>
           ) : null}
 
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             {overview.blocks.map((block) => {
               const style = STATUS_STYLE[block.status] || STATUS_STYLE.missing;
+              const blockWarnings = formatReasons(block.warnings, reportLanguage);
+              const missingReasons = formatReasons(block.missingReasons, reportLanguage);
               return (
                 <div key={block.key} className="home-subpanel p-3">
                   <div className="flex items-start justify-between gap-3">
@@ -337,14 +391,14 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
                     </Badge>
                   </div>
 
-                  {block.warnings?.length ? (
+                  {blockWarnings.length ? (
                     <p className="mt-2 text-xs leading-5 text-warning">
-                      {text.warnings}: {block.warnings.join(', ')}
+                      {text.warnings}: {blockWarnings.join(', ')}
                     </p>
                   ) : null}
-                  {block.missingReasons?.length ? (
+                  {missingReasons.length ? (
                     <p className="mt-2 text-xs leading-5 text-muted-text">
-                      {text.missingReasons}: {block.missingReasons.join(', ')}
+                      {text.missingReasons}: {missingReasons.join(', ')}
                     </p>
                   ) : null}
                 </div>

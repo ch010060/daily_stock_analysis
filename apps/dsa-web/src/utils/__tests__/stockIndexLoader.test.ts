@@ -97,7 +97,7 @@ describe('stockIndexLoader', () => {
 
       expect(result.loaded).toBe(true);
       expect(result.fallback).toBe(false);
-      expect(result.data).toEqual(mockIndexData);
+      expect(result.data).toEqual(expect.arrayContaining(mockIndexData));
       expect(result.error).toBeUndefined();
     });
 
@@ -116,9 +116,42 @@ describe('stockIndexLoader', () => {
 
       expect(result.loaded).toBe(true);
       expect(result.fallback).toBe(false);
-      expect(result.data).toHaveLength(2);
+      expect(result.data.length).toBeGreaterThanOrEqual(2);
       expect(result.data[0].canonicalCode).toBe('600519.SH');
       expect(result.data[0].nameZh).toBe('貴州茅臺');
+    });
+
+    test('adds required Route B instruments when the served index is missing them', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockIndexData,
+      } as unknown as Response);
+
+      const result = await loadStockIndex();
+
+      expect(result.data).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          canonicalCode: '3008',
+          displayCode: '3008',
+          nameZh: '大立光',
+          market: 'TW',
+          aliases: expect.arrayContaining(['Largan', 'Largan Precision']),
+        }),
+        expect.objectContaining({
+          canonicalCode: 'SPX',
+          displayCode: 'SPX',
+          nameZh: '標普500指數',
+          market: 'US',
+          assetType: 'index',
+        }),
+        expect.objectContaining({
+          canonicalCode: 'SPY',
+          displayCode: 'SPY',
+          nameZh: 'SPDR S&P 500 ETF',
+          market: 'US',
+          assetType: 'etf',
+        }),
+      ]));
     });
 
     test('returns fallback mode on network error', async () => {
@@ -173,7 +206,11 @@ describe('stockIndexLoader', () => {
 
       expect(result.loaded).toBe(true);
       expect(result.fallback).toBe(false);
-      expect(result.data).toEqual([]);
+      expect(result.data).toEqual(expect.arrayContaining([
+        expect.objectContaining({ canonicalCode: '3008' }),
+        expect.objectContaining({ canonicalCode: 'SPX' }),
+        expect.objectContaining({ canonicalCode: 'SPY' }),
+      ]));
     });
 
     test('fetch call includes cache-busting parameter', async () => {

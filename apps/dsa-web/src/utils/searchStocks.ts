@@ -31,12 +31,14 @@ export function searchStocks(
   index: StockIndexItem[],
   options: SearchOptions = {}
 ): StockSuggestion[] {
+  const rawQuery = query.trim();
   const normalizedQuery = normalizeQuery(query);
   if (!normalizedQuery) {
     return [];
   }
   const limit = options.limit || SEARCH_CONFIG.DEFAULT_LIMIT;
   const activeOnly = options.activeOnly !== false;
+  const strictTickerQuery = /^[A-Z]{1,5}(?:\.[A-Z]{1,3})?$/.test(rawQuery);
 
   // Filter index
   const filteredIndex = index.filter(item => {
@@ -47,7 +49,7 @@ export function searchStocks(
   // Calculate match score for each item
   const suggestions = filteredIndex.map(item => ({
     item,
-    score: calculateMatchScore(normalizedQuery, item),
+    score: calculateMatchScore(normalizedQuery, item, strictTickerQuery),
   }));
 
   // Filter out items with score of 0
@@ -84,7 +86,7 @@ export function searchStocks(
  * - 60-69: Contains match
  * - 0: No match
  */
-function calculateMatchScore(query: string, item: StockIndexItem): number {
+function calculateMatchScore(query: string, item: StockIndexItem, strictTickerQuery = false): number {
   let score = 0;
   const q = query.toLowerCase();
   const normalizedCanonicalCode = normalizeQuery(item.canonicalCode);
@@ -97,8 +99,9 @@ function calculateMatchScore(query: string, item: StockIndexItem): number {
   // 1. Exact match (96-100 points)
   if (q === normalizedCanonicalCode) return 100;
   if (q === normalizedDisplayCode) return 99;
-  if (q === normalizedName) return 98;
   if (normalizedAliases.some(a => a === q)) return 97;
+  if (strictTickerQuery) return 0;
+  if (q === normalizedName) return 98;
   if (q === normalizedPinyinAbbr) return 96;
 
   // 2. Prefix match (77-80 points)

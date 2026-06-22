@@ -316,7 +316,7 @@ export function parseApiError(error: unknown): ParsedApiError {
   if (hasStockCodeField && hasMissingParamText) {
     return createParsedApiError({
       title: '請求缺少必要引數',
-      message: '請先補充股票程式碼或必要輸入後再試。',
+      message: '請先補充股票代號或必要輸入後再試。',
       rawMessage,
       status,
       category: 'missing_params',
