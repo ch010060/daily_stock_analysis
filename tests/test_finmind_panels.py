@@ -406,14 +406,10 @@ class TestSymbolSafety(unittest.TestCase):
         dq = bundle.get("data_quality", {})
         self.assertFalse(dq.get("valid_symbol"))
 
-    def test_cn_symbol_rejected(self):
+    def test_non_tw_symbol_rejected_with_warning(self):
         b = _make_builder()
-        bundle = b.build_stock_bundle("2330", _START, _END)
+        bundle = b.build_stock_bundle("US:AAPL", _START, _END)
         self.assertFalse(bundle.get("ok"))
-
-    def test_cn_symbol_rejected_with_warning(self):
-        b = _make_builder()
-        bundle = b.build_stock_bundle("2330", _START, _END)
         warnings = bundle.get("warnings", [])
         self.assertGreater(len(warnings), 0)
 
@@ -434,7 +430,7 @@ class TestSymbolSafety(unittest.TestCase):
 
 class TestNoCNTerms(unittest.TestCase):
 
-    _CN_TERMS = ["台股", "上證", "上證", "深證", "深證", "創業板", "創業板", "科創50", "科創50"]
+    _CN_TERMS = ["上證", "上证", "深證", "深证", "創業板", "创业板", "科創50", "科创50"]
 
     def test_no_cn_terms_in_bundle(self):
         b = _make_builder()

@@ -149,21 +149,16 @@ class TestValidateStructuredStockList:
         assert not any(i.field == "STOCK_GROUP_N" for i in issues)
 
     def test_stock_email_groups_canonical_normalization_no_false_warning(self):
-        """Equivalent stock code formats (SH2330 vs 2330, 1810.HK vs HK01810)
-        should not trigger a subset warning after canonical normalization."""
+        """Equivalent TW/US code formats should not trigger a subset warning."""
         cfg = _make_config(
             stock_list=["2330", "AAPL"],
             stock_email_groups=[
-                (["SH2330", "1810.HK"], ["group@example.com"]),
+                (["2330.TW", "AAPL.US"], ["group@example.com"]),
             ],
         )
         issues = cfg.validate_structured()
         group_warnings = [i for i in issues if i.field == "STOCK_GROUP_N"]
-        # SH2330 normalizes to 2330 (present in stock_list)
-        # 1810.HK normalizes to HK01810 (NOT present — AAPL ≠ HK01810)
-        assert len(group_warnings) == 1
-        assert "HK01810" in group_warnings[0].message
-        assert "2330" not in group_warnings[0].message
+        assert group_warnings == []
 
     def test_stock_email_groups_warning_normalizes_and_deduplicates_codes(self):
         cfg = _make_config(

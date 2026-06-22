@@ -47,18 +47,18 @@ class PipelineFetchErrorTestCase(unittest.TestCase):
         pipeline.db.has_today_data.assert_called_once_with("2330", date(2026, 3, 27))
         pipeline.fetcher_manager.get_daily_data.assert_not_called()
 
-    def test_resolve_resume_target_date_normalizes_supported_a_share_formats(self):
-        with patch("src.core.pipeline.get_market_for_stock", return_value="cn") as mock_market, patch(
+    def test_resolve_resume_target_date_normalizes_supported_tw_us_formats(self):
+        with patch("src.core.pipeline.get_market_for_stock", return_value="tw") as mock_market, patch(
             "src.core.pipeline.get_effective_trading_date",
             return_value=date(2026, 3, 27),
         ) as mock_target:
-            for code in ("SH2330", "000001.SZ", "BJ920748"):
+            for code in ("2330.TW", "TW:2330", "00981A.TW"):
                 result = StockAnalysisPipeline._resolve_resume_target_date(code)
                 self.assertEqual(result, date(2026, 3, 27))
 
         self.assertEqual(
             [args.args[0] for args in mock_market.call_args_list],
-            ["2330", "000001", "920748"],
+            ["2330", "2330", "00981A"],
         )
         self.assertEqual(mock_target.call_count, 3)
 

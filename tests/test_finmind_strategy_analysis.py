@@ -374,9 +374,9 @@ class TestSafety(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertTrue(any("symbol rejected" in w for w in result["warnings"]))
 
-    def test_cn_symbol_rejected(self):
+    def test_non_tw_symbol_rejected(self):
         analyzer = _make_analyzer()
-        result = analyzer.analyze(_default_cfg(symbol="2330"))
+        result = analyzer.analyze(_default_cfg(symbol="BADTARGET"))
         self.assertFalse(result["ok"])
 
     def test_no_cn_a_share_terms(self):

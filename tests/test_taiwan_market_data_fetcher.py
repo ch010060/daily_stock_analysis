@@ -36,7 +36,7 @@ _START = "2026-06-10"
 _END = "2026-06-12"
 
 _CN_FORBIDDEN = [
-    "台股", "上証", "上證", "深証", "深證",
+        "上証", "上證", "深証", "深證",
     "創業板", "創業板", "科創50", "科創50",
     "滬深", "滬深", "baostock", "akshare", "efinance",
     "tushare", "pytdx",
@@ -430,7 +430,7 @@ class TestNoCnFallback(unittest.TestCase):
         source = inspect.getsource(mod)
         for term in [
             "akshare", "baostock", "tushare", "efinance", "pytdx",
-            "台股", "上證", "深證", "創業板", "滬深",
+            "上證", "深證", "創業板", "滬深",
         ]:
             self.assertNotIn(term, source,
                              f"Forbidden CN term {term!r} found in taiwan_market.py")

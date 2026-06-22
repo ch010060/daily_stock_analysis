@@ -3,28 +3,25 @@
 
 Covers:
 - TW_PROFILE existence and correctness
-- get_profile("tw") returns TW_PROFILE, not CN_PROFILE
+- get_profile("tw") returns TW_PROFILE
 - get_profile raises ValueError for unknown regions
 - get_market_strategy_blueprint raises ValueError for unknown regions
 - MarketAnalyzer(region="tw") accepts "tw", uses TW profile
 - MarketAnalyzer(region="tw") region methods return TW-specific values
 - TW news queries contain Taiwan terms, not A-share terms
-- Scope gate still defers TW (unchanged from Phase 7A)
-- US and CN profile/strategy behavior unchanged
+- Scope gate runs TW/US and blocks CN/HK
+- Legacy CN/HK profile/strategy keys are rejected
 """
 
 import unittest
 from unittest.mock import patch, MagicMock
 
 from src.core.market_profile import (
-    CN_PROFILE,
     US_PROFILE,
-    HK_PROFILE,
     TW_PROFILE,
     get_profile,
 )
 from src.core.market_strategy import (
-    CN_BLUEPRINT,
     US_BLUEPRINT,
     TW_BLUEPRINT,
     get_market_strategy_blueprint,
@@ -33,7 +30,7 @@ from src.core.market_review_scope_gate import filter_regions_for_route_b
 
 
 _FORBIDDEN_CN_TERMS = [
-    "台股", "上證", "上證", "深證", "深證",
+    "上證", "上证", "深證", "深证",
     "創業板", "創業板", "科創50", "科創50", "滬深", "滬深",
 ]
 
@@ -81,11 +78,6 @@ class TestTWProfile(unittest.TestCase):
             self.assertNotIn(term, TW_PROFILE.prompt_index_hint,
                              f"Forbidden CN term {term!r} in TW prompt_index_hint")
 
-    def test_tw_profile_not_equal_cn_profile(self):
-        self.assertIsNot(TW_PROFILE, CN_PROFILE)
-        self.assertNotEqual(TW_PROFILE.region, CN_PROFILE.region)
-        self.assertNotEqual(TW_PROFILE.mood_index_code, CN_PROFILE.mood_index_code)
-
 
 class TestGetProfile(unittest.TestCase):
     """get_profile() routing and ValueError guard."""
@@ -93,17 +85,16 @@ class TestGetProfile(unittest.TestCase):
     def test_get_profile_tw_returns_tw_profile(self):
         self.assertIs(get_profile("tw"), TW_PROFILE)
 
-    def test_get_profile_tw_not_cn_profile(self):
-        self.assertIsNot(get_profile("tw"), CN_PROFILE)
-
     def test_get_profile_us_returns_us_profile(self):
         self.assertIs(get_profile("us"), US_PROFILE)
 
-    def test_get_profile_cn_returns_cn_profile(self):
-        self.assertIs(get_profile("cn"), CN_PROFILE)
+    def test_get_profile_cn_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            get_profile("cn")
 
-    def test_get_profile_hk_returns_hk_profile(self):
-        self.assertIs(get_profile("hk"), HK_PROFILE)
+    def test_get_profile_hk_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            get_profile("hk")
 
     def test_get_profile_unknown_raises_value_error(self):
         with self.assertRaises(ValueError) as ctx:
@@ -116,8 +107,7 @@ class TestGetProfile(unittest.TestCase):
 
     def test_get_profile_unknown_does_not_return_cn(self):
         with self.assertRaises(ValueError):
-            result = get_profile("xx")
-            self.assertIsNot(result, CN_PROFILE)
+            get_profile("xx")
 
 
 class TestTWBlueprint(unittest.TestCase):
@@ -139,7 +129,7 @@ class TestTWBlueprint(unittest.TestCase):
 
     def test_tw_blueprint_no_cn_terms(self):
         block = TW_BLUEPRINT.to_prompt_block()
-        for term in ["台股", "上証", "深証", "創業板", "創業板"]:
+        for term in ["上証", "深証", "創業板", "创业板"]:
             self.assertNotIn(term, block, f"Forbidden term {term!r} in TW blueprint")
 
     def test_tw_blueprint_contains_tw_terms(self):
@@ -150,8 +140,9 @@ class TestTWBlueprint(unittest.TestCase):
     def test_us_blueprint_unchanged(self):
         self.assertIs(get_market_strategy_blueprint("us"), US_BLUEPRINT)
 
-    def test_cn_blueprint_unchanged(self):
-        self.assertIs(get_market_strategy_blueprint("cn"), CN_BLUEPRINT)
+    def test_legacy_cn_blueprint_is_rejected(self):
+        with self.assertRaises(ValueError):
+            get_market_strategy_blueprint("cn")
 
 
 class TestMarketAnalyzerTWRegion(unittest.TestCase):
@@ -174,10 +165,6 @@ class TestMarketAnalyzerTWRegion(unittest.TestCase):
     def test_tw_uses_tw_profile(self):
         ma = self._make_analyzer("tw")
         self.assertIs(ma.profile, TW_PROFILE)
-
-    def test_tw_not_cn_profile(self):
-        ma = self._make_analyzer("tw")
-        self.assertIsNot(ma.profile, CN_PROFILE)
 
     def test_tw_uses_tw_blueprint(self):
         ma = self._make_analyzer("tw")
@@ -234,10 +221,12 @@ class TestMarketAnalyzerTWRegion(unittest.TestCase):
         self.assertEqual(ma.region, "us")
         self.assertIs(ma.profile, US_PROFILE)
 
-    def test_cn_region_unchanged(self):
-        ma = self._make_analyzer("cn")
-        self.assertEqual(ma.region, "cn")
-        self.assertIs(ma.profile, CN_PROFILE)
+    def test_legacy_cn_region_is_rejected(self):
+        from src.market_analyzer import MarketAnalyzer
+        with patch("src.market_analyzer.get_config"), \
+             patch("src.market_analyzer.DataFetcherManager"), \
+             self.assertRaises(ValueError):
+            MarketAnalyzer(region="cn")
 
 
 class TestScopeGateStillDefersTV(unittest.TestCase):
@@ -257,6 +246,11 @@ class TestScopeGateStillDefersTV(unittest.TestCase):
         run, skipped_cn, deferred_tw = filter_regions_for_route_b(["cn"])
         self.assertIn("cn", skipped_cn)
         self.assertNotIn("cn", run)
+
+    def test_hk_blocked_in_scope_gate(self):
+        run, skipped_cn, deferred_tw = filter_regions_for_route_b(["hk"])
+        self.assertIn("hk", skipped_cn)
+        self.assertNotIn("hk", run)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@
 Offline tests for YfinanceFundamentalAdapter.
 
 The adapter is fail-open; these tests confirm the bundle shape under realistic
-mocked yfinance responses (typical AAPL / 9988.HK style payloads) and the
+mocked yfinance responses (typical AAPL style payloads) and the
 graceful degradation when yfinance is unavailable.
 """
 from __future__ import annotations
@@ -39,13 +39,9 @@ class TestYfinanceSymbolConversion(unittest.TestCase):
         self.assertEqual(_convert_to_yf_symbol("AAPL"), "AAPL")
         self.assertEqual(_convert_to_yf_symbol(" tsla "), "TSLA")
 
-    def test_hk_prefix_strip(self) -> None:
-        self.assertEqual(_convert_to_yf_symbol("HK09988"), "9988.HK")
-        self.assertEqual(_convert_to_yf_symbol("AAPL"), "0700.HK")
-
     def test_already_suffixed(self) -> None:
-        self.assertEqual(_convert_to_yf_symbol("0700.HK"), "0700.HK")
-        self.assertEqual(_convert_to_yf_symbol("2330.SS"), "2330.SS")
+        self.assertEqual(_convert_to_yf_symbol("AAPL.US"), "AAPL.US")
+        self.assertEqual(_convert_to_yf_symbol("2330.TW"), "2330.TW")
 
     def test_empty(self) -> None:
         self.assertEqual(_convert_to_yf_symbol(""), "")
@@ -167,40 +163,6 @@ class TestYfinanceFundamentalAdapter(unittest.TestCase):
         growth = bundle["growth"]
         self.assertAlmostEqual(growth["revenue_yoy"], 16.6, places=1)
         self.assertAlmostEqual(growth["net_profit_yoy"], 19.3, places=1)
-
-    def test_hk_stock_splits_financial_vs_dividend_currency(self) -> None:
-        """HK ADRs typically report financialCurrency=CNY but pay dividends in HKD."""
-        info = {
-            "financialCurrency": "CNY",
-            "currency": "HKD",
-            "currentPrice": 100.0,
-            "sector": "Technology",
-            "industry": "Internet Retail",
-            "totalRevenue": 9.5e11,
-            "operatingCashflow": 1.8e11,
-            "returnOnEquity": 0.12,
-            "revenueGrowth": 0.05,
-            "earningsGrowth": 0.08,
-            "grossMargins": 0.38,
-        }
-        dividends = pd.Series(
-            [2.0],
-            index=pd.DatetimeIndex(["2026-01-15"], tz="Asia/Hong_Kong"),
-            name="Dividends",
-        )
-        ticker = _build_mock_ticker(info, dividends=dividends)
-
-        with patch("yfinance.Ticker", return_value=ticker):
-            bundle = YfinanceFundamentalAdapter().get_fundamental_bundle("HK09988")
-
-        fr = bundle["earnings"]["financial_report"]
-        self.assertEqual(fr["currency"], "CNY", "financial report must remain in financialCurrency")
-
-        div = bundle["earnings"]["dividend"]
-        self.assertEqual(div["currency"], "HKD", "dividends must use trading currency, not financialCurrency")
-        # TTM yield computed in HKD: 2.0 / 100.0 * 100 = 2.0%; must NOT be cross-currency mix.
-        self.assertAlmostEqual(div["ttm_dividend_yield_pct"], 2.0, places=4)
-        self.assertAlmostEqual(div["ttm_cash_dividend_per_share"], 2.0, places=4)
 
     def test_ttm_yield_falls_back_to_info_when_ttm_cash_absent(self) -> None:
         """If no dividend events and no trailing rate, the only source is

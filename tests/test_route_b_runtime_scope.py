@@ -155,7 +155,7 @@ class TestValidateRouteBWatchlist(unittest.TestCase):
 
     def test_error_message_mentions_stock_list(self):
         with self.assertRaises(RouteBScopeError) as ctx:
-            validate_route_b_watchlist(["2330", "BADTARGET", "BADTARGET"], _route_b_config())
+            validate_route_b_watchlist(["BADTARGET", "UNSUPPORTED"], _route_b_config())
         self.assertIn("STOCK_LIST", str(ctx.exception))
 
 

@@ -58,7 +58,7 @@ class _ThreadUnsafeStockListFetcher:
             return pd.DataFrame(
                 [
                     {"code": "2330", "name": "台積電"},
-                    {"code": "000001", "name": "平安银行"},
+                    {"code": "AAPL", "name": "Apple"},
                 ]
             )
         finally:
@@ -79,12 +79,12 @@ class TestPrefetchStockNames(unittest.TestCase):
         manager = DataFetcherManager.__new__(DataFetcherManager)
         manager.get_stock_name = MagicMock(return_value="")
 
-        DataFetcherManager.prefetch_stock_names(manager, ["SH2330", "000001"], use_bulk=False)
+        DataFetcherManager.prefetch_stock_names(manager, ["2330.TW", "AAPL.US"], use_bulk=False)
 
         manager.get_stock_name.assert_has_calls(
             [
                 call("2330", allow_realtime=False),
-                call("000001", allow_realtime=False),
+                call("AAPL", allow_realtime=False),
             ]
         )
 
@@ -295,7 +295,7 @@ class TestPrefetchStockNames(unittest.TestCase):
         def worker():
             try:
                 barrier.wait(timeout=1)
-                result = DataFetcherManager.batch_get_stock_names(manager, ["2330", "000001"])
+                result = DataFetcherManager.batch_get_stock_names(manager, ["2330", "AAPL"])
                 results.append(result)
             except Exception as exc:  # pragma: no cover - thread collection
                 errors.append(exc)
@@ -310,10 +310,10 @@ class TestPrefetchStockNames(unittest.TestCase):
         self.assertEqual(len(results), 2)
         for result in results:
             self.assertEqual(result["2330"], "台積電")
-            self.assertEqual(result["000001"], "平安银行")
+            self.assertEqual(result["AAPL"], "Apple")
         self.assertGreaterEqual(manager._fetchers[0].call_count, 1)
         self.assertEqual(manager._stock_name_cache["2330"], "台積電")
-        self.assertEqual(manager._stock_name_cache["000001"], "平安银行")
+        self.assertEqual(manager._stock_name_cache["AAPL"], "Apple")
 
 
 if __name__ == "__main__":

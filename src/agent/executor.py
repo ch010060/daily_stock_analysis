@@ -744,7 +744,7 @@ class AgentExecutor:
             context_parts = []
             prebuilt_context_summary = build_prebuilt_context_summary(context)
             if context.get("stock_code"):
-                context_parts.append(f"股票程式碼: {context['stock_code']}")
+                context_parts.append(f"股票代號: {context['stock_code']}")
             if context.get("stock_name"):
                 context_parts.append(f"股票名稱: {context['stock_name']}")
             if prebuilt_context_summary:
@@ -923,7 +923,7 @@ class AgentExecutor:
                 context.get("report_language") or get_prebuilt_report_language(context) or "zh"
             )
             if context.get("stock_code"):
-                parts.append(f"\n股票程式碼: {context['stock_code']}")
+                parts.append(f"\n股票代號: {context['stock_code']}")
             if context.get("report_type"):
                 parts.append(f"報告型別: {context['report_type']}")
             if report_language == "en":

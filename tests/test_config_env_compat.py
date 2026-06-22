@@ -512,7 +512,7 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
         validate_structured()."""
         env = {
             "STOCK_LIST": "2330,AAPL",
-            "STOCK_GROUP_1": "SH2330,1810.HK",
+            "STOCK_GROUP_1": "2330.TW,AAPL.US",
             "EMAIL_GROUP_1": "user@example.com",
         }
 
@@ -520,7 +520,7 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
             config = Config._load_from_env()
 
         stocks, emails = config.stock_email_groups[0]
-        self.assertEqual(stocks, ["2330", "HK01810"])
+        self.assertEqual(stocks, ["2330", "AAPL"])
         self.assertEqual(emails, ["user@example.com"])
 
 

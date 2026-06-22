@@ -352,13 +352,13 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(item["turnover_rate"], 11.46)
 
     def test_history_list_matches_equivalent_suffixed_stock_codes(self) -> None:
-        """Same-stock history should include rows saved with supported suffixed codes."""
+        """Same-stock history should include rows saved with supported TW/US suffixes."""
 
         def save_record(code: str, query_id: str) -> None:
             result = self._build_result()
             result.code = code
-            if "HK" in code:
-                result.name = "騰訊控股"
+            if "AAPL" in code:
+                result.name = "Apple"
             saved = self.db.save_analysis_history(
                 result=result,
                 query_id=query_id,
@@ -369,49 +369,48 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             )
             self.assertEqual(saved, 1)
 
-        save_record("2330.TW", "query_cn_suffix")
-        save_record("2330", "query_cn_plain")
-        save_record("AAPL", "query_hk_suffix")
-        save_record("AAPL", "query_hk_prefix")
+        save_record("2330.TW", "query_tw_suffix")
+        save_record("2330", "query_tw_plain")
+        save_record("AAPL.US", "query_us_suffix")
+        save_record("AAPL", "query_us_plain")
 
         service = HistoryService(self.db)
 
-        cn_from_suffix = service.get_history_list(stock_code="2330.TW", page=1, limit=10)
-        self.assertEqual(cn_from_suffix["total"], 2)
+        tw_from_suffix = service.get_history_list(stock_code="2330.TW", page=1, limit=10)
+        self.assertEqual(tw_from_suffix["total"], 2)
         self.assertEqual(
-            {item["stock_code"] for item in cn_from_suffix["items"]},
+            {item["stock_code"] for item in tw_from_suffix["items"]},
             {"2330.TW", "2330"},
         )
 
-        cn_from_plain = service.get_history_list(stock_code="2330", page=1, limit=10)
-        self.assertEqual(cn_from_plain["total"], 2)
+        tw_from_plain = service.get_history_list(stock_code="2330", page=1, limit=10)
+        self.assertEqual(tw_from_plain["total"], 2)
         self.assertEqual(
-            {item["stock_code"] for item in cn_from_plain["items"]},
+            {item["stock_code"] for item in tw_from_plain["items"]},
             {"2330.TW", "2330"},
         )
 
-        hk_from_suffix = service.get_history_list(stock_code="AAPL", page=1, limit=10)
-        self.assertEqual(hk_from_suffix["total"], 2)
+        us_from_suffix = service.get_history_list(stock_code="AAPL.US", page=1, limit=10)
+        self.assertEqual(us_from_suffix["total"], 2)
         self.assertEqual(
-            {item["stock_code"] for item in hk_from_suffix["items"]},
-            {"AAPL", "AAPL"},
+            {item["stock_code"] for item in us_from_suffix["items"]},
+            {"AAPL.US", "AAPL"},
         )
 
-        hk_from_prefix = service.get_history_list(stock_code="AAPL", page=1, limit=10)
-        self.assertEqual(hk_from_prefix["total"], 2)
+        us_from_plain = service.get_history_list(stock_code="AAPL", page=1, limit=10)
+        self.assertEqual(us_from_plain["total"], 2)
         self.assertEqual(
-            {item["stock_code"] for item in hk_from_prefix["items"]},
-            {"AAPL", "AAPL"},
+            {item["stock_code"] for item in us_from_plain["items"]},
+            {"AAPL.US", "AAPL"},
         )
 
-    def test_history_list_matches_unpadded_hk_suffix_variants(self) -> None:
-        """HK short suffix forms (e.g. 1810.HK) should match 5-digit canonical suffix/prefix forms."""
+    def test_history_list_matches_tw_etf_letter_suffix_variants(self) -> None:
+        """TW ETF letter-suffix forms should match their canonical .TW variants."""
 
         def save_record(code: str, query_id: str) -> None:
             result = self._build_result()
             result.code = code
-            if "HK" in code:
-                result.name = "騰訊控股"
+            result.name = "主動統一台股增長"
             saved = self.db.save_analysis_history(
                 result=result,
                 query_id=query_id,
@@ -422,28 +421,27 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             )
             self.assertEqual(saved, 1)
 
-        save_record("1810.HK", "query_hk_unpadded")
-        save_record("01810.HK", "query_hk_padded")
-        save_record("HK01810", "query_hk_prefix")
+        save_record("00981A", "query_tw_letter")
+        save_record("00981A.TW", "query_tw_letter_suffix")
 
         service = HistoryService(self.db)
 
-        hk_from_suffix = service.get_history_list(stock_code="01810.HK", page=1, limit=10)
-        self.assertEqual(hk_from_suffix["total"], 3)
+        tw_from_suffix = service.get_history_list(stock_code="00981A.TW", page=1, limit=10)
+        self.assertEqual(tw_from_suffix["total"], 2)
         self.assertEqual(
-            {item["stock_code"] for item in hk_from_suffix["items"]},
-            {"1810.HK", "01810.HK", "HK01810"},
+            {item["stock_code"] for item in tw_from_suffix["items"]},
+            {"00981A", "00981A.TW"},
         )
 
-        hk_from_prefix = service.get_history_list(stock_code="HK01810", page=1, limit=10)
-        self.assertEqual(hk_from_prefix["total"], 3)
+        tw_from_plain = service.get_history_list(stock_code="00981A", page=1, limit=10)
+        self.assertEqual(tw_from_plain["total"], 2)
         self.assertEqual(
-            {item["stock_code"] for item in hk_from_prefix["items"]},
-            {"1810.HK", "01810.HK", "HK01810"},
+            {item["stock_code"] for item in tw_from_plain["items"]},
+            {"00981A", "00981A.TW"},
         )
 
-    def test_history_list_matches_sh_and_ss_suffixed_variants(self) -> None:
-        """SH suffix and legacy `.SS` variants should be treated as the same A-share stock."""
+    def test_history_list_matches_tw_suffixed_variants(self) -> None:
+        """TW suffix and bare variants should be treated as the same TW stock."""
 
         def save_record(code: str, query_id: str) -> None:
             result = self._build_result()
@@ -458,23 +456,18 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             )
             self.assertEqual(saved, 1)
 
-        save_record("2330.TW", "query_cn_sh")
-        save_record("2330.SS", "query_cn_ss")
-        save_record("2330", "query_cn_plain")
+        save_record("2330.TW", "query_tw_suffix")
+        save_record("2330", "query_tw_plain")
 
         service = HistoryService(self.db)
-        expected = {"2330.TW", "2330.SS", "2330"}
+        expected = {"2330.TW", "2330"}
 
-        from_sh = service.get_history_list(stock_code="2330.TW", page=1, limit=10)
-        self.assertEqual(from_sh["total"], 3)
-        self.assertEqual({item["stock_code"] for item in from_sh["items"]}, expected)
-
-        from_ss = service.get_history_list(stock_code="2330.SS", page=1, limit=10)
-        self.assertEqual(from_ss["total"], 3)
-        self.assertEqual({item["stock_code"] for item in from_ss["items"]}, expected)
+        from_suffix = service.get_history_list(stock_code="2330.TW", page=1, limit=10)
+        self.assertEqual(from_suffix["total"], 2)
+        self.assertEqual({item["stock_code"] for item in from_suffix["items"]}, expected)
 
         from_plain = service.get_history_list(stock_code="2330", page=1, limit=10)
-        self.assertEqual(from_plain["total"], 3)
+        self.assertEqual(from_plain["total"], 2)
         self.assertEqual({item["stock_code"] for item in from_plain["items"]}, expected)
 
     def test_history_detail_preserves_zero_change_pct(self) -> None:

@@ -109,10 +109,10 @@ class HistoryLoaderTestCase(unittest.TestCase):
             reset_frozen_target_date(token)
 
     # ------------------------------------------------------------------
-    # normalize_stock_code fallback for prefixed codes
+    # normalize_stock_code fallback for supported market suffixes
     # ------------------------------------------------------------------
     @patch("src.storage.get_db")
-    def test_uses_normalize_fallback_for_prefixed_code(self, mock_get_db):
+    def test_uses_normalize_fallback_for_tw_suffix_code(self, mock_get_db):
         from src.services.history_loader import load_history_df
 
         fake_bar = MagicMock()
@@ -121,14 +121,14 @@ class HistoryLoaderTestCase(unittest.TestCase):
         mock_db = MagicMock()
 
         def side_effect(code, start, end):
-            if code == "SH2330":
+            if code == "2330.TW":
                 return []
             return [fake_bar] * 30
 
         mock_db.get_data_range.side_effect = side_effect
         mock_get_db.return_value = mock_db
 
-        df, source = load_history_df("SH2330", days=30, target_date=date(2026, 4, 18))
+        df, source = load_history_df("2330.TW", days=30, target_date=date(2026, 4, 18))
 
         self.assertEqual(source, "db_cache")
         self.assertEqual(mock_db.get_data_range.call_count, 2)

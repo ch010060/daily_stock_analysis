@@ -158,10 +158,10 @@ class TestNormalizeTWSymbol(unittest.TestCase):
         self.assertIsNone(stock_id)
         self.assertIn("pure-alpha", err)
 
-    def test_reject_cn_6digit(self):
-        stock_id, err = normalize_tw_symbol("2330")
+    def test_reject_non_tw_unknown_alpha(self):
+        stock_id, err = normalize_tw_symbol("BADTARGET")
         self.assertIsNone(stock_id)
-        self.assertIn("CN A-share", err)
+        self.assertIsNotNone(err)
 
     def test_reject_empty(self):
         stock_id, err = normalize_tw_symbol("")
@@ -328,10 +328,10 @@ class TestTWStockAnalysisCollector(unittest.TestCase):
         self.assertIsNone(snap.stock_id)
         self.assertTrue(any("normalization" in w for w in snap.warnings))
 
-    def test_snapshot_cn_symbol_rejected(self):
+    def test_snapshot_non_tw_symbol_rejected(self):
         collector = self._make_collector()
         snap = collector.collect_stock_analysis_snapshot(
-            symbol="2330", start_date="2025-06-01", end_date="2026-06-14"
+            symbol="US:AAPL", start_date="2025-06-01", end_date="2026-06-14"
         )
         self.assertFalse(snap.ok)
         self.assertIsNone(snap.stock_id)

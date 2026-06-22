@@ -865,7 +865,7 @@ class TestAnalyzerGenerateText:
 class TestMarketAnalyzerBypassFix:
     def _make_market_analyzer_with_mock_generate_text(self, return_value="覆盤報告"):
         """Return a MarketAnalyzer whose embedded Analyzer.generate_text is mocked."""
-        from src.core.market_profile import CN_PROFILE
+        from src.core.market_profile import TW_PROFILE
         from src.core.market_strategy import get_market_strategy_blueprint
 
         with patch("src.analyzer.get_config") as mock_cfg, \
@@ -879,7 +879,7 @@ class TestMarketAnalyzerBypassFix:
             cfg.deepseek_api_keys = []
             cfg.llm_model_list = []
             cfg.openai_base_url = None
-            cfg.market_review_region = "cn"
+            cfg.market_review_region = "tw"
             cfg.market_review_color_scheme = "green_up"
             cfg.report_language = "zh"
             mock_cfg.return_value = cfg
@@ -896,9 +896,9 @@ class TestMarketAnalyzerBypassFix:
             ma = MarketAnalyzer.__new__(MarketAnalyzer)
             ma.analyzer = analyzer
             ma.config = cfg
-            ma.profile = CN_PROFILE
-            ma.strategy = get_market_strategy_blueprint("cn")
-            ma.region = "cn"
+            ma.profile = TW_PROFILE
+            ma.strategy = get_market_strategy_blueprint("tw")
+            ma.region = "tw"
             return ma
 
     def test_no_access_to_private_model_attribute(self):
@@ -960,7 +960,7 @@ class TestMarketAnalyzerBypassFix:
         assert kwargs["max_tokens"] == 8192
         assert kwargs["temperature"] == 0.7
 
-    def test_generate_template_review_uses_english_shell_for_cn_when_report_language_is_en(self):
+    def test_generate_template_review_uses_english_shell_for_tw_when_report_language_is_en(self):
         from src.market_analyzer import MarketOverview, MarketIndex
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
@@ -969,8 +969,8 @@ class TestMarketAnalyzerBypassFix:
             date="2026-03-05",
             indices=[
                 MarketIndex(
-                    code="000001",
-                    name="上證指數",
+                    code="TAIEX",
+                    name="TAIEX",
                     current=3300.0,
                     change=12.0,
                     change_pct=0.36,
@@ -987,12 +987,11 @@ class TestMarketAnalyzerBypassFix:
 
         result = ma.generate_market_review(overview, [])
 
-        assert "A-share Market Recap" in result
+        assert "Taiwan Market Recap" in result
         assert "### 1. Market Summary" in result
-        assert "### 3. Breadth & Liquidity" in result
-        assert "Turnover (CNY 100m)" in result
-        assert "### 4. Sector Highlights" in result
-        assert "### 6. Strategy Framework" in result
+        assert "Today's Taiwan market" in result
+        assert "CNY 100m" not in result
+        assert "A-share" not in result
         assert "### 一、市場總結" not in result
 
     def test_generate_template_review_keeps_chinese_shell_for_us_when_report_language_is_default(self):
@@ -1034,8 +1033,8 @@ class TestMarketAnalyzerBypassFix:
             date="2026-03-05",
             indices=[
                 MarketIndex(
-                    code="000001",
-                    name="上證指數",
+                    code="TAIEX",
+                    name="TAIEX",
                     current=3300.0,
                     change=12.0,
                     change_pct=0.36,
@@ -1048,10 +1047,10 @@ class TestMarketAnalyzerBypassFix:
             limit_up_count=88,
             limit_down_count=5,
             total_amount=14567.0,
-            top_sectors=[{"name": "AI算力", "change_pct": 3.25}],
-            bottom_sectors=[{"name": "煤炭", "change_pct": -1.12}],
+            top_sectors=[{"name": "半導體", "change_pct": 3.25}],
+            bottom_sectors=[{"name": "金融", "change_pct": -1.12}],
         )
-        review = """## 2026-03-05 A-share Market Recap
+        review = """## 2026-03-05 Taiwan Market Recap
 
 ### 1. Market Summary
 Summary text.
@@ -1065,14 +1064,14 @@ Sector text.
 
         result = ma._inject_data_into_review(review, overview)
 
-        assert "- **Market Signal**: 66/100 (constructive, risk-on)" in result
+        assert "- **Market Signal**: 51/100 (mixed, balanced)" in result
         assert "- **Breadth**: Advancers 3200 / Decliners 1800 / Flat 100;" in result
-        assert "Turnover 14567 (CNY 100m)" in result
-        assert "| Index | Last | Change % | Open | High | Low | Amplitude | Turnover (CNY 100m) |" in result
+        assert "Turnover 14567 (TWD bn)" in result
+        assert "| Index | Last | Change % | Open | High | Low | Amplitude | Turnover (TWD bn) |" in result
         assert "#### Leading Sectors" in result
-        assert "| 1 | AI算力 | +3.25% |" in result
+        assert "| 1 | 半導體 | +3.25% |" in result
         assert "#### Lagging Sectors" in result
-        assert "| 1 | 煤炭 | -1.12% |" in result
+        assert "| 1 | 金融 | -1.12% |" in result
 
     def test_inject_data_into_review_matches_reference_style_chinese_headings(self):
         from src.market_analyzer import MarketOverview, MarketIndex
@@ -1082,8 +1081,8 @@ Sector text.
             date="2026-03-05",
             indices=[
                 MarketIndex(
-                    code="000001",
-                    name="上證指數",
+                    code="TAIEX",
+                    name="加權指數",
                     current=3300.0,
                     change=12.0,
                     change_pct=0.36,
@@ -1100,10 +1099,10 @@ Sector text.
             limit_up_count=88,
             limit_down_count=5,
             total_amount=14567.0,
-            top_sectors=[{"name": "AI算力", "change_pct": 3.25}],
-            bottom_sectors=[{"name": "煤炭", "change_pct": -1.12}],
+            top_sectors=[{"name": "半導體", "change_pct": 3.25}],
+            bottom_sectors=[{"name": "金融", "change_pct": -1.12}],
         )
-        news = [{"title": "AI算力板塊走強", "snippet": "算力產業鏈延續活躍，成交額放大"}]
+        news = [{"title": "半導體族群走強", "snippet": "AI 供應鏈延續活躍，成交額放大"}]
         review = """## 2026-03-05 大盤覆盤
 
 ### 一、盤面總覽
@@ -1122,7 +1121,7 @@ Sector text.
         result = ma._inject_data_into_review(review, overview, news)
 
         assert "盤面訊號" in result
-        assert "66/100（偏暖，可進攻）" in result
+        assert "51/100（震盪，需觀察）" in result
         assert "綠燈（可進攻）" not in result
         assert "大盤紅綠燈" not in result
         assert "green（可進攻）" not in result
@@ -1130,7 +1129,7 @@ Sector text.
         signal_line = next(line for line in result.splitlines() if "**盤面訊號**" in line)
         drivers_line = next(line for line in result.splitlines() if "**訊號依據**" in line)
         assert signal_line.startswith("- ")
-        assert "66/100" in signal_line
+        assert "51/100" in signal_line
         assert "█" not in result
         assert "░" not in result
         assert "盤面溫度" not in drivers_line
@@ -1138,19 +1137,19 @@ Sector text.
         assert "盤面溫度" not in result
         assert "| 上漲/下跌/平盤 | 3200 / 1800 / 100 |" in result
         assert "| 指數 | 最新 | 漲跌幅 | 開盤 | 最高 | 最低 | 振幅 | 成交額(億) |" in result
-        assert "| 上證指數 | 3300.00 | 🟢 +0.36% | 3288.00 | 3312.00 | 3276.00 | 1.10% | 1450 |" in result
+        assert "| 加權指數 | 3300.00 | 🟢 +0.36% | 3288.00 | 3312.00 | 3276.00 | 1.10% | 145.00 |" in result
         assert "#### 領漲板塊 Top 5" in result
-        assert "| 1 | AI算力 | +3.25% |" in result
+        assert "| 1 | 半導體 | +3.25% |" in result
         assert "#### 近三日市場線索" in result
-        assert "AI算力板塊走強" in result
-        assert "算力產業鏈延續活躍" not in result
+        assert "半導體族群走強" in result
+        assert "供應鏈延續活躍" not in result
 
     def test_news_block_renders_title_source_and_link_only(self):
         from src.market_analyzer import MarketAnalyzer
 
         ma = MarketAnalyzer.__new__(MarketAnalyzer)
         ma.config = SimpleNamespace(report_language="zh")
-        ma.region = "cn"
+        ma.region = "tw"
         long_snippet = (
             "覆盤必讀 2026-05-06 覆盤的意義在於更清晰地把握市場脈搏，"
             "綜合描述 A 股三大指數今日集體反彈，成交額放大，科技成長方向領漲。"
@@ -1181,7 +1180,7 @@ Sector text.
 
         ma = MarketAnalyzer.__new__(MarketAnalyzer)
         ma.config = SimpleNamespace(report_language="zh")
-        ma.region = "cn"
+        ma.region = "tw"
 
         result = ma._build_news_block([
             {
@@ -1247,13 +1246,13 @@ Sector text.
         overview = MarketOverview(
             date="2026-03-06",
             indices=[
-                MarketIndex(code="000001", name="上證指數", current=3200, change_pct=-1.8),
-                MarketIndex(code="399001", name="深證成指", current=9800, change_pct=-2.4),
+                MarketIndex(code="TAIEX", name="加權指數", current=3200, change_pct=-4.8),
+                MarketIndex(code="TPEx", name="櫃買指數", current=250, change_pct=-4.4),
             ],
-            up_count=900,
-            down_count=4100,
-            limit_up_count=10,
-            limit_down_count=80,
+            up_count=100,
+            down_count=4900,
+            limit_up_count=0,
+            limit_down_count=100,
             total_amount=9800.0,
         )
 
@@ -1262,12 +1261,12 @@ Sector text.
         assert snapshot["status"] == "red"
         assert snapshot["label"] == "偏防守"
         assert snapshot["score"] < 40
-        assert snapshot["region"] == "cn"
+        assert snapshot["region"] == "tw"
         assert snapshot["trade_date"] == "2026-03-06"
-        assert snapshot["data_quality"] == "ok"
-        assert snapshot["dimensions"]["breadth"]["available"] is True
+        assert snapshot["data_quality"] == "partial"
+        assert snapshot["dimensions"]["breadth"]["available"] is False
         assert snapshot["dimensions"]["index"]["available"] is True
-        assert snapshot["dimensions"]["limit"]["available"] is True
+        assert snapshot["dimensions"]["limit"]["available"] is False
         assert any("虧錢效應" in reason for reason in snapshot["reasons"])
 
     def test_market_light_snapshot_uses_english_labels_and_reasons(self):
@@ -1278,13 +1277,13 @@ Sector text.
         overview = MarketOverview(
             date="2026-03-06",
             indices=[
-                MarketIndex(code="000001", name="SSE Composite", current=3200, change_pct=-1.8),
-                MarketIndex(code="399001", name="SZSE Component", current=9800, change_pct=-2.4),
+                MarketIndex(code="TAIEX", name="TAIEX", current=3200, change_pct=-4.8),
+                MarketIndex(code="TPEx", name="TPEx", current=250, change_pct=-4.4),
             ],
-            up_count=900,
-            down_count=4100,
-            limit_up_count=10,
-            limit_down_count=80,
+            up_count=100,
+            down_count=4900,
+            limit_up_count=0,
+            limit_down_count=100,
             total_amount=9800.0,
         )
 

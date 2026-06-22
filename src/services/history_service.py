@@ -12,6 +12,7 @@ Responsibilities:
 from __future__ import annotations
 import json
 import logging
+import re
 from datetime import date, datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple, TYPE_CHECKING
 
@@ -82,11 +83,7 @@ class HistoryService:
                 candidates.append(candidate)
 
         try:
-            from data_provider.base import (
-                canonical_stock_code,
-                is_bse_code,
-                normalize_stock_code,
-            )
+            from data_provider.base import canonical_stock_code, normalize_stock_code
 
             raw_canonical = canonical_stock_code(raw_code)
             normalized = canonical_stock_code(normalize_stock_code(raw_canonical))
@@ -94,40 +91,18 @@ class HistoryService:
             add(raw_code)
             return candidates
 
-        def add_hk_variants(digits: str) -> None:
-            if not digits or not digits.isdigit():
-                return
-
-            normalized_digits = digits.zfill(5)
-            add(f"HK{normalized_digits}")
-            add(f"{normalized_digits}.HK")
-
-            unpadded_digits = digits.lstrip("0")
-            if unpadded_digits:
-                add(f"{unpadded_digits}.HK")
-
         add(raw_canonical)
         add(normalized)
 
-        if normalized.startswith("HK") and normalized[2:].isdigit():
-            add_hk_variants(normalized[2:])
-        elif normalized.isdigit() and len(normalized) == 5:
-            add_hk_variants(normalized)
-        elif normalized.isdigit() and len(normalized) == 6:
-            exchange = None
-            if is_bse_code(normalized):
-                exchange = "BJ"
-            elif normalized.startswith(("5", "6", "9")):
-                exchange = "SH"
-            elif normalized.startswith(("0", "1", "2", "3")):
-                exchange = "SZ"
-
-            if exchange:
-                add(f"{normalized}.{exchange}")
-                add(f"{exchange}{normalized}")
-                if exchange == "SH":
-                    add(f"{normalized}.SS")
-                    add(f"SS{normalized}")
+        if normalized and (
+            normalized.isdigit()
+            or re.fullmatch(r"\d{4,5}[A-Z]", normalized)
+        ):
+            add(f"{normalized}.TW")
+            add(f"TW:{normalized}")
+        elif normalized and re.fullmatch(r"[A-Z]{1,5}(?:[.-][A-Z])?", normalized):
+            add(f"{normalized}.US")
+            add(f"US:{normalized}")
 
         return candidates
     

@@ -31,7 +31,7 @@ class TestFundamentalAdapter(unittest.TestCase):
     def test_extract_latest_row_returns_none_when_code_mismatch(self) -> None:
         df = pd.DataFrame(
             {
-                "股票代號": ["600000", "000001"],
+                "股票代號": ["8299", "AAPL"],
                 "值": [1, 2],
             }
         )
@@ -48,7 +48,7 @@ class TestFundamentalAdapter(unittest.TestCase):
         adapter = AkshareFundamentalAdapter()
         df = pd.DataFrame(
             {
-                "股票代號": ["600000"],
+                "股票代號": ["8299"],
                 "日期": ["2026-01-01"],
             }
         )
@@ -132,7 +132,7 @@ class TestFundamentalAdapter(unittest.TestCase):
         now = datetime.now().strftime("%Y-%m-%d")
         df = pd.DataFrame(
             {
-                "股票代號": ["000001"],
+                "股票代號": ["8299"],
                 "除息日": [now],
                 "分配方案": ["10派3元(含稅)"],
             }

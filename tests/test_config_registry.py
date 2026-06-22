@@ -644,7 +644,7 @@ class TestMarketReviewFieldsRegistered(unittest.TestCase):
 class TestStockListDefaultIsTwUsOnly(unittest.TestCase):
     """STOCK_LIST's active default/examples must stay TW/US-only (Route B scope)."""
 
-    _FORBIDDEN_CODES = ("2330", "300750", "002594", "hkAAPL")
+    _FORBIDDEN_CODES = ("600519", "300750", "002594", "HK00700")
 
     def test_default_value_excludes_cn_and_hk_codes(self):
         field = get_field_definition("STOCK_LIST")
@@ -668,7 +668,7 @@ class TestOtherActiveExamplesAreTwUsOnly(unittest.TestCase):
     """EMAIL_RECEIVERS' STOCK_GROUP_1 example and AGENT_EVENT_ALERT_RULES_JSON's
     stock_code examples must stay TW/US-only (Route B scope), same as STOCK_LIST."""
 
-    _FORBIDDEN_CODES = ("2330", "300750", "002594", "hkAAPL")
+    _FORBIDDEN_CODES = ("600519", "300750", "002594", "HK00700")
 
     def test_email_receivers_examples_exclude_cn_and_hk_codes(self):
         field = get_field_definition("EMAIL_RECEIVERS")

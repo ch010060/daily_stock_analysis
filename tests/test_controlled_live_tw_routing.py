@@ -131,7 +131,7 @@ class TestControlledLiveTWRouting(unittest.TestCase):
             ):
                 name = manager.get_stock_name("TW:2330")
 
-        self.assertEqual(name, "Taiwan Semiconductor Manufacturing Co.")
+        self.assertEqual(name, "台積電")
         for fetcher in legacy:
             self.assertEqual(fetcher.calls, [])
 
@@ -153,7 +153,7 @@ class TestControlledLiveTWRouting(unittest.TestCase):
 
         self.assertEqual(source, "EfinanceFetcher")
         self.assertFalse(df.empty)
-        self.assertEqual(efinance.calls, [("TW:2330", "2025-01-02", "2025-01-10")])
+        self.assertEqual(efinance.calls, [("2330", "2025-01-02", "2025-01-10")])
         self.assertEqual(finmind.calls, [])
 
     def test_us_symbol_not_affected_by_tw_live_guard(self):

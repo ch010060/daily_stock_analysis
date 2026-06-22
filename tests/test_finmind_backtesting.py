@@ -367,8 +367,8 @@ class TestSafetyAndCorrectness(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertTrue(any("symbol rejected" in w for w in result["warnings"]))
 
-    def test_cn_symbol_rejected(self):
-        result = _make_engine().run(_default_config(symbol="2330"))
+    def test_non_tw_symbol_rejected(self):
+        result = _make_engine().run(_default_config(symbol="BADTARGET"))
         self.assertFalse(result["ok"])
         self.assertTrue(any("symbol rejected" in w for w in result["warnings"]))
 

@@ -7,6 +7,7 @@ import os
 import sys
 import unittest
 from datetime import datetime, timedelta, timezone
+from itertools import chain, repeat
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -43,6 +44,23 @@ def _response(results) -> SearchResponse:
         results=results,
         provider="Mock",
         success=True,
+    )
+
+
+def _responses_then_empty(*responses: SearchResponse):
+    return chain(responses, repeat(_response([])))
+
+
+def _comprehensive_intel_responses(
+    latest_response: SearchResponse,
+    *dimension_responses: SearchResponse,
+    latest_variant_count: int = 4,
+):
+    latest_variant_padding = [_response([]) for _ in range(max(0, latest_variant_count - 1))]
+    return _responses_then_empty(
+        latest_response,
+        *latest_variant_padding,
+        *dimension_responses,
     )
 
 
@@ -180,8 +198,8 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
 
         resp = service.search_stock_news("2330", "台積電", max_results=3)
         self.assertEqual([r.title for r in resp.results], ["fresh"])
-        p1.search.assert_called_once()
-        p2.search.assert_called_once()
+        self.assertEqual(p1.search.call_count, 4)
+        self.assertEqual(p2.search.call_count, 4)
 
     def test_search_stock_news_tries_next_provider_when_chinese_context_is_english_only(self) -> None:
         """Chinese-preferred queries should not stop on English-only provider results."""
@@ -214,8 +232,8 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
 
         resp = service.search_stock_news("2330", "台積電", max_results=3)
         self.assertEqual([r.title for r in resp.results], ["中文資訊"])
-        p1.search.assert_called_once()
-        p2.search.assert_called_once()
+        self.assertEqual(p1.search.call_count, 4)
+        self.assertEqual(p2.search.call_count, 4)
 
     def test_search_stock_news_prioritizes_chinese_items_within_mixed_results(self) -> None:
         """Chinese items should be ordered ahead of English items in mixed batches."""
@@ -279,8 +297,8 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
 
         resp = service.search_stock_news("2330", "台積電", max_results=1)
         self.assertEqual([r.title for r in resp.results], ["中文快訊"])
-        p1.search.assert_called_once()
-        p2.search.assert_called_once()
+        self.assertEqual(p1.search.call_count, 4)
+        self.assertEqual(p2.search.call_count, 4)
 
     def test_search_stock_news_prefers_chinese_direct_hit_before_score_truncation(self) -> None:
         """Chinese direct hits should outrank higher-scored English direct hits before limiting."""
@@ -367,8 +385,8 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
 
         self.assertEqual([r.title for r in resp.results], ["白酒板塊資金回暖"])
         self.assertEqual(resp.results[0].relevance_category, "sector_related_news")
-        p1.search.assert_called_once()
-        p2.search.assert_called_once()
+        self.assertEqual(p1.search.call_count, 4)
+        self.assertEqual(p2.search.call_count, 4)
 
     def test_search_stock_news_keeps_english_provider_order_for_us_stock(self) -> None:
         """English stock searches should keep the first successful provider result."""
@@ -888,10 +906,10 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             news_max_age_days=3,
             news_strategy_profile="medium",  # min(7,3)=3
         )
-        mock_search.side_effect = [
+        mock_search.side_effect = _comprehensive_intel_responses(
             _response([_result("old", old), _result("fresh", fresh)]),
             _response([_result("analysis_unknown", None), _result("analysis_dated", analysis_text)]),
-        ]
+        )
         with patch("src.search_service.time.sleep"):
             intel = service.search_comprehensive_intel(
                 stock_code="2330",
@@ -923,11 +941,12 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             news_max_age_days=3,
             news_strategy_profile="short",
         )
-        mock_search.side_effect = [
+        mock_search.side_effect = _comprehensive_intel_responses(
             _response([_result("latest_news", fresh_text)]),
             _response([_result("market_analysis_unknown", None)]),
             _response([_result("risk_unknown", None)]),
-        ]
+            latest_variant_count=1,
+        )
 
         with patch("src.search_service.time.sleep"):
             intel = service.search_comprehensive_intel(
@@ -952,11 +971,11 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             news_max_age_days=3,
             news_strategy_profile="short",
         )
-        mock_search.side_effect = [
+        mock_search.side_effect = _comprehensive_intel_responses(
             _response([_result("latest_news", fresh_text)]),
             _response([_result("market_analysis_unknown", None)]),
             _response([_result("risk_unknown", None)]),
-        ]
+        )
 
         with patch("src.search_service.time.sleep"):
             intel = service.search_comprehensive_intel(
@@ -979,12 +998,12 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             news_max_age_days=3,
             news_strategy_profile="short",
         )
-        mock_search.side_effect = [
+        mock_search.side_effect = _comprehensive_intel_responses(
             _response([_result("latest_news", fresh_text)]),
             _response([_result("market_analysis", None)]),
             _response([_result("risk_check", fresh_text)]),
             _response([_result("announcement_item", fresh_text)]),
-        ]
+        )
 
         with patch("src.search_service.time.sleep"):
             intel = service.search_comprehensive_intel(
@@ -1009,12 +1028,12 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             news_max_age_days=3,
             news_strategy_profile="short",
         )
-        mock_search.side_effect = [
+        mock_search.side_effect = _comprehensive_intel_responses(
             _response([_result("latest_news", fresh_text)]),
             _response([_result("market_analysis", None)]),
             _response([_result("risk_check", fresh_text)]),
             _response([_result("old_announcement", old), _result("fresh_announcement", fresh_text)]),
-        ]
+        )
 
         with patch("src.search_service.time.sleep"):
             intel = service.search_comprehensive_intel(
@@ -1038,12 +1057,12 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             news_max_age_days=3,
             news_strategy_profile="short",
         )
-        mock_search.side_effect = [
+        mock_search.side_effect = _responses_then_empty(
             _response([_result("latest_news", fresh_text)]),
             _response([_result("market_analysis", None)]),
             _response([_result("risk_check", None)]),
             _response([_result("announcement_item", fresh_text)]),
-        ]
+        )
 
         with patch("src.search_service.time.sleep"):
             intel = service.search_comprehensive_intel(

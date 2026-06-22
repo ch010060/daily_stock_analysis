@@ -17,7 +17,7 @@ _orig_data_provider = sys.modules.get("data_provider")
 if _orig_data_provider_base is None:
     base_mod = types.ModuleType("data_provider.base")
     base_mod.canonical_stock_code = lambda x: (x or "").strip().upper()
-    base_mod.normalize_stock_code = lambda x: (x or "").strip().upper().removesuffix(".SH").removesuffix(".SZ")
+    base_mod.normalize_stock_code = lambda x: (x or "").strip().upper().removesuffix(".TW").removesuffix(".US")
     sys.modules["data_provider.base"] = base_mod
 
 if _orig_data_provider is None:
@@ -97,7 +97,7 @@ class TaskQueueConfigSyncTestCase(unittest.TestCase):
         self.assertEqual(queue.max_workers, 2)
 
     def test_dedupe_stock_code_key_normalizes_market_suffix(self) -> None:
-        self.assertEqual(_dedupe_stock_code_key(" 2330.sh "), "2330")
+        self.assertEqual(_dedupe_stock_code_key(" 2330.TW "), "2330")
 
     def test_get_task_queue_defers_sync_when_busy(self) -> None:
         queue = AnalysisTaskQueue(max_workers=3)

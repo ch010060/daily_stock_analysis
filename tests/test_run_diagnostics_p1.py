@@ -81,8 +81,8 @@ class _Quote:
         return True
 
 
-class _EfinanceRealtimeFetcher(BaseFetcher):
-    name = "EfinanceFetcher"
+class _YfinanceRealtimeFetcher(BaseFetcher):
+    name = "YfinanceFetcher"
     priority = 0
 
     def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
@@ -149,11 +149,11 @@ class RunDiagnosticsP1TestCase(unittest.TestCase):
         token = activate_run_diagnostic_context(
             trace_id="trace-daily",
             query_id="query-daily",
-            stock_code="2330",
+            stock_code="BADTARGET",
             trigger_source="api",
         )
         try:
-            df, source = manager.get_daily_data("2330")
+            df, source = manager.get_daily_data("BADTARGET")
             snapshot = current_diagnostic_snapshot()
         finally:
             reset_run_diagnostic_context(token)
@@ -169,7 +169,7 @@ class RunDiagnosticsP1TestCase(unittest.TestCase):
         self.assertEqual(runs[1]["record_count"], 1)
 
     def test_realtime_quote_provider_run_records_success(self) -> None:
-        manager = DataFetcherManager(fetchers=[_EfinanceRealtimeFetcher()])
+        manager = DataFetcherManager(fetchers=[_YfinanceRealtimeFetcher()])
         config = SimpleNamespace(
             enable_realtime_quote=True,
             realtime_source_priority="efinance",
@@ -177,12 +177,12 @@ class RunDiagnosticsP1TestCase(unittest.TestCase):
         token = activate_run_diagnostic_context(
             trace_id="trace-realtime",
             query_id="query-realtime",
-            stock_code="2330",
+            stock_code="AAPL",
             trigger_source="api",
         )
         try:
             with patch("src.config.get_config", return_value=config):
-                quote = manager.get_realtime_quote("2330")
+                quote = manager.get_realtime_quote("AAPL")
             snapshot = current_diagnostic_snapshot()
         finally:
             reset_run_diagnostic_context(token)
@@ -191,7 +191,7 @@ class RunDiagnosticsP1TestCase(unittest.TestCase):
         runs = snapshot["provider_runs"]
         self.assertEqual(len(runs), 1)
         self.assertEqual(runs[0]["data_type"], "realtime_quote")
-        self.assertEqual(runs[0]["provider"], "EfinanceFetcher")
+        self.assertEqual(runs[0]["provider"], "YfinanceFetcher")
         self.assertTrue(runs[0]["success"])
 
     def test_record_provider_run_sanitizes_sensitive_text(self) -> None:

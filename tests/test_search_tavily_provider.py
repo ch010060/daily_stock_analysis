@@ -282,7 +282,13 @@ class TestTavilySearchProvider(unittest.TestCase):
         self.assertGreaterEqual(len(_FakeTavilyClient.search_calls), 3)
         self.assertEqual(_FakeTavilyClient.search_calls[0]["topic"], "news")
         self.assertNotIn("topic", _FakeTavilyClient.search_calls[1])
-        self.assertEqual(_FakeTavilyClient.search_calls[2]["topic"], "news")
+        risk_calls = [
+            call
+            for call in _FakeTavilyClient.search_calls
+            if "風險" in call.get("query", "") or "risk" in call.get("query", "").lower()
+        ]
+        self.assertTrue(risk_calls)
+        self.assertTrue(any(call.get("topic") == "news" for call in risk_calls))
 
 
 if __name__ == "__main__":

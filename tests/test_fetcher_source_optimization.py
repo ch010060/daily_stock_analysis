@@ -230,33 +230,6 @@ class TestFetcherSourceOptimization(unittest.TestCase):
         yfinance.get_daily_data.assert_called_once()
         longbridge.get_daily_data.assert_not_called()
 
-    @patch("src.config.get_config")
-    def test_hk_daily_route_skips_temporarily_unavailable_longbridge(self, mock_get_config):
-        mock_get_config.return_value = SimpleNamespace(
-            longbridge_app_key="app-key",
-            longbridge_app_secret="app-secret",
-            longbridge_access_token="access-token",
-        )
-
-        longbridge = MagicMock()
-        longbridge.name = "LongbridgeFetcher"
-        longbridge.priority = 5
-        longbridge.is_available_for_request.return_value = False
-
-        akshare = MagicMock()
-        akshare.name = "AkshareFetcher"
-        akshare.priority = 1
-        akshare.get_daily_data.return_value = _make_daily_df()
-
-        manager = DataFetcherManager(fetchers=[longbridge, akshare])
-
-        df, source = manager.get_daily_data("AAPL", start_date="2026-05-01", end_date="2026-05-08")
-
-        self.assertFalse(df.empty)
-        self.assertEqual(source, "AkshareFetcher")
-        akshare.get_daily_data.assert_called_once()
-        longbridge.get_daily_data.assert_not_called()
-
 
 if __name__ == "__main__":
     unittest.main()
