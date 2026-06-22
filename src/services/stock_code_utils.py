@@ -6,6 +6,7 @@ Shared stock code utilities.
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 
 _TW_SYMBOL_RE = re.compile(r"^(?:\d{4,6}|\d{4,5}[A-Z])$")
@@ -26,6 +27,9 @@ def is_code_like(value: str) -> bool:
             return True
     if text.startswith("US:"):
         return bool(re.match(r"^US:[A-Z]{1,5}(?:[.-][A-Z])?$", text))
+    if text.endswith(".US"):
+        candidate = text[:-3]
+        return bool(re.match(r"^[A-Z]{1,5}(?:[.-][A-Z])?$", candidate))
     if _TW_SYMBOL_RE.fullmatch(text):
         return True
     if re.match(r"^[A-Z]{1,5}(?:[.-][A-Z])?(?:\.US)?$", text):

@@ -164,7 +164,7 @@ class AlertIndicatorHelperTestCase(unittest.TestCase):
         self.assertEqual(kdj.status, "triggered")
         self.assertAlmostEqual(kdj.observed_value, 4.166666666666664)
         self.assertEqual(cci.status, "triggered")
-        self.assertAlmostEqual(cci.observed_value, 100.00000000AAPL)
+        self.assertAlmostEqual(cci.observed_value, 100.00000000000001)
 
     def test_indicator_degraded_paths_cover_missing_data_and_partial_bar(self) -> None:
         missing_columns = evaluate_indicator_alert(
