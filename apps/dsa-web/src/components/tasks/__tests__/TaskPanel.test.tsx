@@ -5,8 +5,8 @@ import type { TaskInfo } from '../../../types/analysis';
 
 const baseTask: TaskInfo = {
   taskId: 'task-1',
-  stockCode: '600519',
-  stockName: '貴州茅臺',
+  stockCode: '2330',
+  stockName: '台積電',
   status: 'processing',
   progress: 40,
   message: '正在抓取最新行情',
@@ -62,7 +62,7 @@ describe('TaskPanel', () => {
     expect(screen.getByText('分析任務')).toBeInTheDocument();
     expect(screen.getByText('1 進行中')).toBeInTheDocument();
     expect(screen.getByText('1 等待中')).toBeInTheDocument();
-    expect(screen.getByText('貴州茅臺')).toBeInTheDocument();
+    expect(screen.getByText('台積電')).toBeInTheDocument();
     expect(screen.getByText('AAPL')).toBeInTheDocument();
     expect(screen.getByLabelText('任務狀態：分析中')).toBeInTheDocument();
     expect(screen.getByText('執行診斷')).toBeInTheDocument();

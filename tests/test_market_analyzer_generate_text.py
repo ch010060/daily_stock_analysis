@@ -620,16 +620,16 @@ class TestAnalyzerGenerateText:
 
         progress_updates = []
         first_result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=80,
             trend_prediction="看多",
             operation_advice="持有",
             analysis_summary="首輪結果",
         )
         second_result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=82,
             trend_prediction="看多",
             operation_advice="持有",
@@ -657,7 +657,7 @@ class TestAnalyzerGenerateText:
              patch.object(analyzer, "_build_integrity_retry_prompt", return_value="retry prompt"), \
              patch("src.analyzer.persist_llm_usage"):
             result = analyzer.analyze(
-                {"code": "600519", "stock_name": "貴州茅臺"},
+                {"code": "2330", "stock_name": "台積電"},
                 progress_callback=lambda progress, message: progress_updates.append((progress, message)),
             )
 
@@ -673,10 +673,10 @@ class TestAnalyzerGenerateText:
 
         from src.analyzer import GeminiAnalyzer
 
-        result = GeminiAnalyzer._parse_response(analyzer, "這是一段純文字分析，沒有 JSON。", "600519", "貴州茅臺")
+        result = GeminiAnalyzer._parse_response(analyzer, "這是一段純文字分析，沒有 JSON。", "2330", "台積電")
         assert result.success is False
         assert result.error_message is not None
-        assert result.code == "600519"
+        assert result.code == "2330"
 
     def test_parse_response_malformed_json_returns_failure(self):
         """_parse_response must return success=False when JSON extraction fails."""
@@ -704,7 +704,7 @@ class TestAnalyzerGenerateText:
             "operation_advice": "持有",
             "analysis_summary": "測試分析",
         })
-        result = GeminiAnalyzer._parse_response(analyzer, valid_response, "600519", "貴州茅臺")
+        result = GeminiAnalyzer._parse_response(analyzer, valid_response, "2330", "台積電")
         assert result.success is True
         assert result.error_message is None
 
@@ -796,8 +796,8 @@ class TestAnalyzerGenerateText:
 
         # _parse_response on non-JSON text produces a text fallback result
         text_fallback_result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=50,
             trend_prediction="震盪",
             operation_advice="持有",
@@ -829,7 +829,7 @@ class TestAnalyzerGenerateText:
              patch("src.analyzer.persist_llm_usage") as mock_usage:
 
             result = analyzer.analyze(
-                {"code": "600519", "stock_name": "貴州茅臺"},
+                {"code": "2330", "stock_name": "台積電"},
                 news_context="some news",
             )
 
@@ -838,7 +838,7 @@ class TestAnalyzerGenerateText:
 
         # _parse_response called twice (initial + retry)
         assert mock_parse.call_count == 2
-        mock_parse.assert_called_with("這不是 JSON，而是純文字分析結果", "600519", "貴州茅臺")
+        mock_parse.assert_called_with("這不是 JSON，而是純文字分析結果", "2330", "台積電")
 
         # Placeholder fill was applied after retry exhaustion
         mock_fill.assert_called_once()
@@ -850,11 +850,11 @@ class TestAnalyzerGenerateText:
         assert usage_args[0][0] == {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
         assert usage_args[0][1] == "provider/fallback-model"
         assert usage_args[1]["call_type"] == "analysis"
-        assert usage_args[1]["stock_code"] == "600519"
+        assert usage_args[1]["stock_code"] == "2330"
 
         # Result is success=False (text fallback), but all fields exist
         assert result.success is False
-        assert result.code == "600519"
+        assert result.code == "2330"
         assert result.search_performed is True
 
 
@@ -1158,7 +1158,7 @@ Sector text.
 
         result = ma._build_news_block([
             {
-                "title": "A股收評：科創50指數放量反彈漲5.47% 兩市成交額重回3萬億元",
+                "title": "台股收評：科創50指數放量反彈漲5.47% 兩市成交額重回3萬億元",
                 "snippet": long_snippet,
                 "source": "東方財富",
                 "published_date": "2026-05-06",
@@ -1172,7 +1172,7 @@ Sector text.
         assert "關注點" not in result
         assert "成交額放大" not in result
         assert (
-            "- 1. [A股收評：科創50指數放量反彈漲5.47% 兩市成交額重回3萬億元]"
+            "- 1. [台股收評：科創50指數放量反彈漲5.47% 兩市成交額重回3萬億元]"
             "(https://example.com/news/1)（東方財富 / 2026-05-06）"
         ) in result
 
@@ -1227,7 +1227,7 @@ Sector text.
             MarketOverview(date="2026-05-06"),
             [
                 {
-                    "title": "A股收評：指數放量反彈",
+                    "title": "台股收評：指數放量反彈",
                     "snippet": "科技成長方向領漲",
                     "source": "測試來源",
                     "published_date": "2026-05-06",

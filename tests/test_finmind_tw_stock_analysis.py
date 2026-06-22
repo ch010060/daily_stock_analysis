@@ -159,7 +159,7 @@ class TestNormalizeTWSymbol(unittest.TestCase):
         self.assertIn("pure-alpha", err)
 
     def test_reject_cn_6digit(self):
-        stock_id, err = normalize_tw_symbol("600519")
+        stock_id, err = normalize_tw_symbol("2330")
         self.assertIsNone(stock_id)
         self.assertIn("CN A-share", err)
 
@@ -331,7 +331,7 @@ class TestTWStockAnalysisCollector(unittest.TestCase):
     def test_snapshot_cn_symbol_rejected(self):
         collector = self._make_collector()
         snap = collector.collect_stock_analysis_snapshot(
-            symbol="600519", start_date="2025-06-01", end_date="2026-06-14"
+            symbol="2330", start_date="2025-06-01", end_date="2026-06-14"
         )
         self.assertFalse(snap.ok)
         self.assertIsNone(snap.stock_id)

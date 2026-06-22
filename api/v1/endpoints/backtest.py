@@ -80,10 +80,10 @@ def run_backtest(
         500: {"description": "伺服器錯誤", "model": ErrorResponse},
     },
     summary="獲取回測結果",
-    description="分頁獲取回測結果，支援按股票程式碼過濾",
+    description="分頁獲取回測結果，支援按股票代號過濾",
 )
 def get_backtest_results(
-    code: Optional[str] = Query(None, description="股票程式碼篩選"),
+    code: Optional[str] = Query(None, description="股票代號篩選"),
     eval_window_days: Optional[int] = Query(None, ge=1, le=120, description="評估視窗過濾"),
     analysis_date_from: Optional[date] = Query(None, description="分析日期起始（含）"),
     analysis_date_to: Optional[date] = Query(None, description="分析日期結束（含）"),

@@ -6,7 +6,7 @@ All tests are offline and mock-only. Verifies:
 - CN/A-share market review is blocked under Route B enforce mode.
 - TW market review is explicitly deferred (not yet implemented), not CN fallback.
 - US market review is accepted when supported.
-- "A股 大盤 覆盤" search query is not generated for non-CN regions.
+- "台股 大盤 覆盤" search query is not generated for non-CN regions.
 - CN index providers are not called.
 - If all regions are rejected/deferred, the review is skipped (not fallen back to CN).
 """
@@ -230,20 +230,20 @@ class TestMarketReviewDefaultUnderRouteB(unittest.TestCase):
 
 
 class TestNoAShareSearchQuery(unittest.TestCase):
-    """CN profile uses 'A股 大盤 覆盤' query that must not appear in TW/US profiles."""
+    """CN profile uses '台股 大盤 覆盤' query that must not appear in TW/US profiles."""
 
     def test_cn_profile_has_a_share_query(self):
         """Confirm the CN profile contains the forbidden query."""
-        self.assertTrue(any("A股" in q for q in CN_PROFILE.news_queries))
+        self.assertTrue(any("台股" in q for q in CN_PROFILE.news_queries))
 
     def test_us_profile_no_a_share_query(self):
         for q in US_PROFILE.news_queries:
-            self.assertNotIn("A股", q, f"US profile must not contain 'A股' in query: {q!r}")
+            self.assertNotIn("台股", q, f"US profile must not contain '台股' in query: {q!r}")
 
     def test_hk_profile_no_a_share_market_query(self):
         """HK profile should not use the A-share 大盤覆盤 query."""
         for q in HK_PROFILE.news_queries:
-            self.assertNotIn("A股 大盤 覆盤", q, f"HK query should not be A-share: {q!r}")
+            self.assertNotIn("台股 大盤 覆盤", q, f"HK query should not be A-share: {q!r}")
 
     def test_us_profile_region_no_cn_context(self):
         self.assertEqual(US_PROFILE.region, "us")
@@ -258,7 +258,7 @@ class TestNoAShareSearchQuery(unittest.TestCase):
             self.assertNotEqual(profile.region, "cn",
                 f"Route B region {region!r} must not resolve to CN profile")
             for q in profile.news_queries:
-                self.assertNotIn("A股 大盤 覆盤", q,
+                self.assertNotIn("台股 大盤 覆盤", q,
                     f"Route B region {region!r} must not generate A-share query: {q!r}")
 
 

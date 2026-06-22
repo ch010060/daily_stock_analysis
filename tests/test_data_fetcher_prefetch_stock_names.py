@@ -57,7 +57,7 @@ class _ThreadUnsafeStockListFetcher:
             time.sleep(0.05)
             return pd.DataFrame(
                 [
-                    {"code": "600519", "name": "贵州茅台"},
+                    {"code": "2330", "name": "台積電"},
                     {"code": "000001", "name": "平安银行"},
                 ]
             )
@@ -79,11 +79,11 @@ class TestPrefetchStockNames(unittest.TestCase):
         manager = DataFetcherManager.__new__(DataFetcherManager)
         manager.get_stock_name = MagicMock(return_value="")
 
-        DataFetcherManager.prefetch_stock_names(manager, ["SH600519", "000001"], use_bulk=False)
+        DataFetcherManager.prefetch_stock_names(manager, ["SH2330", "000001"], use_bulk=False)
 
         manager.get_stock_name.assert_has_calls(
             [
-                call("600519", allow_realtime=False),
+                call("2330", allow_realtime=False),
                 call("000001", allow_realtime=False),
             ]
         )
@@ -107,12 +107,12 @@ class TestPrefetchStockNames(unittest.TestCase):
         manager.get_realtime_quote = MagicMock()
 
         with patch("data_provider.base.get_index_stock_name", return_value=None):
-            name = DataFetcherManager.get_stock_name(manager, "600519", allow_realtime=False)
+            name = DataFetcherManager.get_stock_name(manager, "2330", allow_realtime=False)
 
-        self.assertEqual(name, "贵州茅台")
+        self.assertEqual(name, "台積電")
         manager.get_realtime_quote.assert_not_called()
         remote_fetcher.get_stock_name.assert_not_called()
-        self.assertEqual(manager._stock_name_cache["600519"], "贵州茅台")
+        self.assertEqual(manager._stock_name_cache["2330"], "台積電")
 
     def test_get_stock_name_prefers_index_mapping_before_remote_fetchers(self):
         manager = DataFetcherManager.__new__(DataFetcherManager)
@@ -172,7 +172,7 @@ class TestPrefetchStockNames(unittest.TestCase):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
         pipeline.fetcher_manager = MagicMock()
         pipeline.db = MagicMock()
-        pipeline.fetcher_manager.get_stock_name.return_value = "贵州茅台"
+        pipeline.fetcher_manager.get_stock_name.return_value = "台積電"
         pipeline.db.has_today_data.return_value = False
         pipeline.fetcher_manager.get_daily_data.return_value = (
             pd.DataFrame(
@@ -193,11 +193,11 @@ class TestPrefetchStockNames(unittest.TestCase):
         )
         pipeline.db.save_daily_data.return_value = 1
 
-        success, error = StockAnalysisPipeline.fetch_and_save_stock_data(pipeline, "600519")
+        success, error = StockAnalysisPipeline.fetch_and_save_stock_data(pipeline, "2330")
 
         self.assertTrue(success)
         self.assertIsNone(error)
-        pipeline.fetcher_manager.get_stock_name.assert_called_once_with("600519", allow_realtime=False)
+        pipeline.fetcher_manager.get_stock_name.assert_called_once_with("2330", allow_realtime=False)
 
     def test_pytdx_get_stock_name_reads_all_security_list_pages(self):
         fetcher = PytdxFetcher(hosts=[])
@@ -295,7 +295,7 @@ class TestPrefetchStockNames(unittest.TestCase):
         def worker():
             try:
                 barrier.wait(timeout=1)
-                result = DataFetcherManager.batch_get_stock_names(manager, ["600519", "000001"])
+                result = DataFetcherManager.batch_get_stock_names(manager, ["2330", "000001"])
                 results.append(result)
             except Exception as exc:  # pragma: no cover - thread collection
                 errors.append(exc)
@@ -309,10 +309,10 @@ class TestPrefetchStockNames(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(len(results), 2)
         for result in results:
-            self.assertEqual(result["600519"], "贵州茅台")
+            self.assertEqual(result["2330"], "台積電")
             self.assertEqual(result["000001"], "平安银行")
         self.assertGreaterEqual(manager._fetchers[0].call_count, 1)
-        self.assertEqual(manager._stock_name_cache["600519"], "贵州茅台")
+        self.assertEqual(manager._stock_name_cache["2330"], "台積電")
         self.assertEqual(manager._stock_name_cache["000001"], "平安银行")
 
 

@@ -5,7 +5,7 @@ Unit tests for LongbridgeFetcher integration.
 Real API / credentials: use ``tests/longbridge_live_smoke.py`` (not this file).
 
 Verifies:
-1. Symbol conversion logic (AAPL -> AAPL.US, HK00700 -> 0700.HK)
+1. Symbol conversion logic (AAPL -> AAPL.US, AAPL -> 0700.HK)
 2. get_realtime_quote builds correct UnifiedRealtimeQuote with computed fields
 3. _supplement_from_longbridge merges missing fields into yfinance quote
 4. Graceful degradation when credentials are missing
@@ -47,27 +47,27 @@ class TestSymbolConversion(unittest.TestCase):
         self.assertEqual(_to_longbridge_symbol("AAPL.US"), "AAPL.US")
 
     def test_hk_stock_with_prefix(self):
-        self.assertEqual(_to_longbridge_symbol("HK00700"), "0700.HK")
+        self.assertEqual(_to_longbridge_symbol("AAPL"), "0700.HK")
         self.assertEqual(_to_longbridge_symbol("HK09988"), "9988.HK")
         self.assertEqual(_to_longbridge_symbol("HK01810"), "1810.HK")
 
     def test_hk_stock_pure_digits(self):
-        self.assertEqual(_to_longbridge_symbol("00700"), "0700.HK")
+        self.assertEqual(_to_longbridge_symbol("AAPL"), "0700.HK")
         self.assertEqual(_to_longbridge_symbol("09988"), "9988.HK")
 
     def test_hk_stock_already_suffixed(self):
         self.assertEqual(_to_longbridge_symbol("0700.HK"), "0700.HK")
 
     def test_a_share_returns_none(self):
-        self.assertIsNone(_to_longbridge_symbol("600519"))
+        self.assertIsNone(_to_longbridge_symbol("2330"))
         self.assertIsNone(_to_longbridge_symbol("000001"))
 
     def test_code_detection(self):
         self.assertTrue(_is_us_code("AAPL"))
         self.assertTrue(_is_us_code("TSLA"))
-        self.assertFalse(_is_us_code("600519"))
-        self.assertTrue(_is_hk_code("HK00700"))
-        self.assertTrue(_is_hk_code("00700"))
+        self.assertFalse(_is_us_code("2330"))
+        self.assertTrue(_is_hk_code("AAPL"))
+        self.assertTrue(_is_hk_code("AAPL"))
         self.assertFalse(_is_hk_code("AAPL"))
 
 
@@ -610,10 +610,10 @@ class TestLongbridgeFetcherMocked(unittest.TestCase):
         ctx.static_info.return_value = [self._make_mock_static(name_cn="騰訊控股")]
         ctx.history_candlesticks_by_offset.return_value = []
 
-        quote = fetcher.get_realtime_quote("HK00700")
+        quote = fetcher.get_realtime_quote("AAPL")
 
         self.assertIsNotNone(quote)
-        self.assertEqual(quote.code, "HK00700")
+        self.assertEqual(quote.code, "AAPL")
         ctx.quote.assert_called_with(["0700.HK"])
 
 

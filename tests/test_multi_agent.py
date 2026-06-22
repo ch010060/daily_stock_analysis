@@ -49,20 +49,20 @@ class TestExtractStockCode(unittest.TestCase):
     # --- A-share ---
 
     def test_a_share_plain(self):
-        self.assertEqual(_extract_stock_code("600519"), "600519")
+        self.assertEqual(_extract_stock_code("2330"), "2330")
 
     def test_a_share_chinese_prefix(self):
         """Critical: Chinese char + digits must still match (no \\b)."""
-        self.assertEqual(_extract_stock_code("分析600519"), "600519")
+        self.assertEqual(_extract_stock_code("分析2330"), "2330")
 
     def test_a_share_chinese_suffix(self):
-        self.assertEqual(_extract_stock_code("600519怎麼樣"), "600519")
+        self.assertEqual(_extract_stock_code("2330怎麼樣"), "2330")
 
     def test_a_share_in_sentence(self):
-        self.assertEqual(_extract_stock_code("請幫我看看600519的走勢"), "600519")
+        self.assertEqual(_extract_stock_code("請幫我看看2330的走勢"), "2330")
 
     def test_a_share_with_prefix_0(self):
-        self.assertEqual(_extract_stock_code("分析000858"), "000858")
+        self.assertEqual(_extract_stock_code("分析2454"), "2454")
 
     def test_a_share_with_prefix_3(self):
         self.assertEqual(_extract_stock_code("分析300750"), "300750")
@@ -73,23 +73,23 @@ class TestExtractStockCode(unittest.TestCase):
 
     def test_a_share_embedded_in_longer_number(self):
         """Should not extract from within a longer number."""
-        self.assertEqual(_extract_stock_code("86006005190001"), "")
+        self.assertEqual(_extract_stock_code("860023300001"), "")
 
     # --- HK ---
 
     def test_hk_lowercase(self):
-        self.assertEqual(_extract_stock_code("look at hk00700"), "HK00700")
+        self.assertEqual(_extract_stock_code("look at hkAAPL"), "AAPL")
 
     def test_hk_uppercase(self):
-        self.assertEqual(_extract_stock_code("HK00700 analysis"), "HK00700")
+        self.assertEqual(_extract_stock_code("AAPL analysis"), "AAPL")
 
     def test_hk_chinese(self):
-        self.assertEqual(_extract_stock_code("分析hk00700"), "HK00700")
+        self.assertEqual(_extract_stock_code("分析hkAAPL"), "AAPL")
 
     def test_hk_not_match_alpha_prefix(self):
         """Letters before 'hk' should not prevent match."""
-        # "xhk00700" has alpha before hk, lookbehind should block
-        self.assertNotEqual(_extract_stock_code("xhk00700"), "HK00700")
+        # "xhkAAPL" has alpha before hk, lookbehind should block
+        self.assertNotEqual(_extract_stock_code("xhkAAPL"), "AAPL")
 
     # --- US ---
 
@@ -144,7 +144,7 @@ class TestExtractStockCode(unittest.TestCase):
 
     def test_a_share_takes_priority_over_us(self):
         """When both A-share code and US ticker appear, A-share wins."""
-        self.assertEqual(_extract_stock_code("600519 vs AAPL"), "600519")
+        self.assertEqual(_extract_stock_code("2330 vs AAPL"), "2330")
 
     # --- Empty / irrelevant ---
 
@@ -176,7 +176,7 @@ class TestAgentContext(unittest.TestCase):
     """Test AgentContext helpers."""
 
     def test_add_opinion(self):
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
         op = AgentOpinion(agent_name="tech", signal="buy", confidence=0.8)
         ctx.add_opinion(op)
         self.assertEqual(len(ctx.opinions), 1)
@@ -418,12 +418,12 @@ class TestDecisionAgentPostProcess(unittest.TestCase):
         from src.agent.agents.decision_agent import DecisionAgent
 
         agent = DecisionAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
         dashboard = {
             "decision_type": "strong_buy",
             "sentiment_score": 88,
             "analysis_summary": "High conviction",
-            "stock_name": "貴州茅臺",
+            "stock_name": "台積電",
         }
 
         opinion = agent.post_process(ctx, json.dumps(dashboard))
@@ -440,7 +440,7 @@ class TestIntelAgentPostProcess(unittest.TestCase):
         from src.agent.agents.intel_agent import IntelAgent
 
         agent = IntelAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
         raw = """```json
         {
           "signal": "hold",
@@ -478,21 +478,21 @@ class TestOrchestratorModes(unittest.TestCase):
 
     def test_quick_mode(self):
         orch = self._make_orchestrator("quick")
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
         chain = orch._build_agent_chain(ctx)
         names = [a.agent_name for a in chain]
         self.assertEqual(names, ["technical", "decision"])
 
     def test_standard_mode(self):
         orch = self._make_orchestrator("standard")
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
         chain = orch._build_agent_chain(ctx)
         names = [a.agent_name for a in chain]
         self.assertEqual(names, ["technical", "intel", "decision"])
 
     def test_full_mode(self):
         orch = self._make_orchestrator("full")
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
         chain = orch._build_agent_chain(ctx)
         names = [a.agent_name for a in chain]
         self.assertEqual(names, ["technical", "intel", "risk", "decision"])
@@ -505,21 +505,21 @@ class TestOrchestratorModes(unittest.TestCase):
         """Default/lowered limits cap agents; raised limits hard-override all agents."""
         orch = self._make_orchestrator("full")
         orch.max_steps = AGENT_MAX_STEPS_DEFAULT
-        high_limit_chain = orch._build_agent_chain(AgentContext(query="test", stock_code="600519"))
+        high_limit_chain = orch._build_agent_chain(AgentContext(query="test", stock_code="2330"))
         self.assertEqual(
             {agent.agent_name: agent.max_steps for agent in high_limit_chain},
             {"technical": 6, "intel": 4, "risk": 4, "decision": 3},
         )
 
         orch.max_steps = 5
-        low_limit_chain = orch._build_agent_chain(AgentContext(query="test", stock_code="600519"))
+        low_limit_chain = orch._build_agent_chain(AgentContext(query="test", stock_code="2330"))
         self.assertEqual(
             {agent.agent_name: agent.max_steps for agent in low_limit_chain},
             {"technical": 5, "intel": 4, "risk": 4, "decision": 3},
         )
 
         orch.max_steps = AGENT_MAX_STEPS_DEFAULT + 2
-        raised_limit_chain = orch._build_agent_chain(AgentContext(query="test", stock_code="600519"))
+        raised_limit_chain = orch._build_agent_chain(AgentContext(query="test", stock_code="2330"))
         self.assertEqual(
             {agent.agent_name: agent.max_steps for agent in raised_limit_chain},
             {"technical": AGENT_MAX_STEPS_DEFAULT + 2, "intel": AGENT_MAX_STEPS_DEFAULT + 2, "risk": AGENT_MAX_STEPS_DEFAULT + 2, "decision": AGENT_MAX_STEPS_DEFAULT + 2},
@@ -538,11 +538,11 @@ class TestOrchestratorModes(unittest.TestCase):
     def test_build_context_from_dict(self):
         orch = self._make_orchestrator()
         ctx = orch._build_context(
-            "Analyze 600519",
-            context={"stock_code": "600519", "stock_name": "貴州茅臺", "skills": ["bull_trend"]},
+            "Analyze 2330",
+            context={"stock_code": "2330", "stock_name": "台積電", "skills": ["bull_trend"]},
         )
-        self.assertEqual(ctx.stock_code, "600519")
-        self.assertEqual(ctx.stock_name, "貴州茅臺")
+        self.assertEqual(ctx.stock_code, "2330")
+        self.assertEqual(ctx.stock_name, "台積電")
         self.assertEqual(ctx.meta["skills_requested"], ["bull_trend"])
 
     def test_build_context_keeps_market_phase_context_in_meta_not_data(self):
@@ -551,10 +551,10 @@ class TestOrchestratorModes(unittest.TestCase):
         pack_summary = "\n## 分析上下文包摘要\n- 資料塊狀態：行情 available\n"
 
         ctx = orch._build_context(
-            "Analyze 600519",
+            "Analyze 2330",
             context={
-                "stock_code": "600519",
-                "stock_name": "貴州茅臺",
+                "stock_code": "2330",
+                "stock_name": "台積電",
                 "market_phase_context": phase_context,
                 "analysis_context_pack_summary": pack_summary,
             },
@@ -567,16 +567,16 @@ class TestOrchestratorModes(unittest.TestCase):
 
     def test_build_context_extracts_code_from_query(self):
         orch = self._make_orchestrator()
-        ctx = orch._build_context("分析600519的走勢")
-        self.assertEqual(ctx.stock_code, "600519")
+        ctx = orch._build_context("分析2330的走勢")
+        self.assertEqual(ctx.stock_code, "2330")
 
     def test_fallback_summary(self):
         orch = self._make_orchestrator()
-        ctx = AgentContext(query="test", stock_code="600519", stock_name="貴州茅臺")
+        ctx = AgentContext(query="test", stock_code="2330", stock_name="台積電")
         ctx.add_opinion(AgentOpinion(agent_name="tech", signal="buy", confidence=0.8, reasoning="Strong trend"))
         ctx.add_risk_flag("insider", "Minor sell-down", severity="low")
         summary = orch._fallback_summary(ctx)
-        self.assertIn("600519", summary)
+        self.assertIn("2330", summary)
         self.assertIn("Strong trend", summary)
         self.assertIn("Minor sell-down", summary)
 
@@ -632,7 +632,7 @@ class TestOrchestratorExecution(unittest.TestCase):
 
     def test_execute_pipeline_degrades_on_intel_failure(self):
         orch = self._make_orchestrator()
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
         ctx.add_opinion(AgentOpinion(agent_name="technical", signal="buy", confidence=0.8, reasoning="Strong trend"))
 
         intel = MagicMock(agent_name="intel")
@@ -649,7 +649,7 @@ class TestOrchestratorExecution(unittest.TestCase):
     def test_execute_pipeline_degrades_on_skill_agent_failure_and_continues_to_decision(self):
         orch = self._make_orchestrator()
         orch.mode = "specialist"
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
         ctx.add_opinion(AgentOpinion(agent_name="technical", signal="buy", confidence=0.8, reasoning="Strong trend"))
 
         technical = MagicMock(agent_name="technical")
@@ -674,7 +674,7 @@ class TestOrchestratorExecution(unittest.TestCase):
 
     def test_execute_pipeline_skips_stage_when_remaining_budget_below_minimum(self):
         orch = self._make_orchestrator(config=SimpleNamespace(agent_orchestrator_timeout_s=20))
-        ctx = AgentContext(query="test", stock_code="600519", stock_name="貴州茅臺")
+        ctx = AgentContext(query="test", stock_code="2330", stock_name="台積電")
 
         technical = MagicMock(agent_name="technical")
 
@@ -710,7 +710,7 @@ class TestOrchestratorExecution(unittest.TestCase):
 
     def test_execute_pipeline_skips_toolless_decision_with_low_remaining_budget(self):
         orch = self._make_orchestrator(config=SimpleNamespace(agent_orchestrator_timeout_s=20))
-        ctx = AgentContext(query="test", stock_code="600519", stock_name="貴州茅臺")
+        ctx = AgentContext(query="test", stock_code="2330", stock_name="台積電")
 
         technical = MagicMock(agent_name="technical")
 
@@ -755,7 +755,7 @@ class TestOrchestratorExecution(unittest.TestCase):
 
     def test_execute_pipeline_first_stage_still_runs_when_timeout_short(self):
         orch = self._make_orchestrator(config=SimpleNamespace(agent_orchestrator_timeout_s=10))
-        ctx = AgentContext(query="test", stock_code="600519", stock_name="貴州茅臺")
+        ctx = AgentContext(query="test", stock_code="2330", stock_name="台積電")
 
         technical = MagicMock(agent_name="technical")
         technical.run.side_effect = lambda run_ctx, progress_callback=None: self._stage_result("technical")
@@ -787,12 +787,12 @@ class TestOrchestratorExecution(unittest.TestCase):
 
     def test_execute_pipeline_timeout_after_decision_preserves_dashboard(self):
         orch = self._make_orchestrator(config=SimpleNamespace(agent_orchestrator_timeout_s=1, agent_risk_override=True))
-        ctx = AgentContext(query="test", stock_code="600519", stock_name="貴州茅臺")
+        ctx = AgentContext(query="test", stock_code="2330", stock_name="台積電")
         decision = MagicMock(agent_name="decision")
 
         def _run_decision(run_ctx, progress_callback=None):
             dashboard = {
-                "stock_name": "貴州茅臺",
+                "stock_name": "台積電",
                 "decision_type": "strong_buy",
                 "sentiment_score": 88,
                 "operation_advice": {
@@ -875,7 +875,7 @@ class TestOrchestratorExecution(unittest.TestCase):
         orch = self._make_orchestrator()
         fake_result = OrchestratorResult(success=True, content="done", total_steps=2, total_tokens=11, model="x")
         with patch.object(orch, "_execute_pipeline", return_value=fake_result):
-            result = orch.run("Analyze 600519")
+            result = orch.run("Analyze 2330")
 
         self.assertTrue(result.success)
         self.assertEqual(result.content, "done")
@@ -996,7 +996,7 @@ class TestOrchestratorExecution(unittest.TestCase):
 
     def test_execute_pipeline_fails_when_dashboard_parse_fails(self):
         orch = self._make_orchestrator()
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
         decision = MagicMock(agent_name="decision")
 
         def fake_run(pipeline_ctx, progress_callback=None):
@@ -1013,7 +1013,7 @@ class TestOrchestratorExecution(unittest.TestCase):
 
     def test_execute_pipeline_chat_prefers_free_form_response(self):
         orch = self._make_orchestrator()
-        ctx = AgentContext(query="請總結一下", stock_code="600519")
+        ctx = AgentContext(query="請總結一下", stock_code="2330")
         ctx.meta["response_mode"] = "chat"
         decision = MagicMock(agent_name="decision")
 
@@ -1033,7 +1033,7 @@ class TestOrchestratorExecution(unittest.TestCase):
     def test_strategy_agents_are_selected_after_technical_stage(self):
         orch = self._make_orchestrator()
         orch.mode = "specialist"
-        ctx = AgentContext(query="分析600519", stock_code="600519")
+        ctx = AgentContext(query="分析2330", stock_code="2330")
         ctx.meta["response_mode"] = "chat"
 
         technical = MagicMock(agent_name="technical")
@@ -1093,7 +1093,7 @@ class TestDecisionAgentChatMode(unittest.TestCase):
         from src.agent.agents.decision_agent import DecisionAgent
 
         agent = DecisionAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
-        ctx = AgentContext(query="幫我總結一下", stock_code="600519")
+        ctx = AgentContext(query="幫我總結一下", stock_code="2330")
         ctx.meta["response_mode"] = "chat"
         ctx.add_opinion(AgentOpinion(agent_name="technical", signal="buy", confidence=0.8, reasoning="趨勢偏強"))
 
@@ -1108,7 +1108,7 @@ class TestDecisionAgentChatMode(unittest.TestCase):
         from src.agent.agents.decision_agent import DecisionAgent
 
         agent = DecisionAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
-        prompt = agent.system_prompt(AgentContext(query="分析 600519", stock_code="600519"))
+        prompt = agent.system_prompt(AgentContext(query="分析 2330", stock_code="2330"))
 
         self.assertIn("phase_decision", prompt)
         self.assertIn("watch_conditions", prompt)
@@ -1128,7 +1128,7 @@ class TestTechnicalAgentSkillPolicy(unittest.TestCase):
             skill_instructions="### 技能 1: 纏論",
             technical_skill_policy="",
         )
-        prompt = agent.system_prompt(AgentContext(query="分析 600519", stock_code="600519"))
+        prompt = agent.system_prompt(AgentContext(query="分析 2330", stock_code="2330"))
 
         self.assertNotIn("Bias from MA5 < 2%", prompt)
         self.assertIn("### 技能 1: 纏論", prompt)
@@ -1143,7 +1143,7 @@ class TestTechnicalAgentSkillPolicy(unittest.TestCase):
             skill_instructions="### 技能 1: 預設多頭趨勢",
             technical_skill_policy=TECHNICAL_SKILL_RULES_EN,
         )
-        prompt = agent.system_prompt(AgentContext(query="分析 600519", stock_code="600519"))
+        prompt = agent.system_prompt(AgentContext(query="分析 2330", stock_code="2330"))
 
         self.assertIn("Bias from MA5 < 2%", prompt)
         self.assertIn("### 技能 1: 預設多頭趨勢", prompt)
@@ -1183,7 +1183,7 @@ class TestBaseAgentMessageAssembly(unittest.TestCase):
 
     def test_build_messages_injects_market_phase_before_cached_data(self):
         agent = self._make_agent()
-        ctx = AgentContext(query="hello", stock_code="600519")
+        ctx = AgentContext(query="hello", stock_code="2330")
         ctx.meta["market_phase_context"] = {
             "market": "cn",
             "phase": "intraday",
@@ -1235,9 +1235,9 @@ class TestEventMonitor(unittest.TestCase):
     def test_round_trip(self):
         from src.agent.events import EventMonitor, PriceAlert, PriceChangeAlert, VolumeAlert
         monitor = EventMonitor()
-        monitor.add_alert(PriceAlert(stock_code="600519", direction="above", price=1800.0))
+        monitor.add_alert(PriceAlert(stock_code="2330", direction="above", price=1800.0))
         monitor.add_alert(PriceChangeAlert(stock_code="300750", direction="down", change_pct=3.5))
-        monitor.add_alert(VolumeAlert(stock_code="000858", multiplier=3.0))
+        monitor.add_alert(VolumeAlert(stock_code="2454", multiplier=3.0))
 
         data = monitor.to_dict_list()
         self.assertEqual(len(data), 3)
@@ -1246,9 +1246,9 @@ class TestEventMonitor(unittest.TestCase):
 
         restored = EventMonitor.from_dict_list(data)
         self.assertEqual(len(restored.rules), 3)
-        self.assertEqual(restored.rules[0].stock_code, "600519")
+        self.assertEqual(restored.rules[0].stock_code, "2330")
         self.assertEqual(restored.rules[1].stock_code, "300750")
-        self.assertEqual(restored.rules[2].stock_code, "000858")
+        self.assertEqual(restored.rules[2].stock_code, "2454")
 
     def test_serialization_contract_keeps_supported_rule_keys_stable(self):
         from src.agent.events import (
@@ -1260,9 +1260,9 @@ class TestEventMonitor(unittest.TestCase):
         )
 
         monitor = EventMonitor()
-        monitor.add_alert(PriceAlert(stock_code="600519", direction="above", price=1800.0))
+        monitor.add_alert(PriceAlert(stock_code="2330", direction="above", price=1800.0))
         monitor.add_alert(PriceChangeAlert(stock_code="300750", direction="down", change_pct=3.5))
-        monitor.add_alert(VolumeAlert(stock_code="000858", multiplier=3.0))
+        monitor.add_alert(VolumeAlert(stock_code="2454", multiplier=3.0))
         monitor.rules[1].status = AlertStatus.TRIGGERED
         monitor.rules[2].status = AlertStatus.EXPIRED
 
@@ -1295,7 +1295,7 @@ class TestEventMonitor(unittest.TestCase):
         import time
         from src.agent.events import EventMonitor, PriceAlert
         monitor = EventMonitor()
-        alert = PriceAlert(stock_code="600519", direction="above", price=1800.0, ttl_hours=0.0)
+        alert = PriceAlert(stock_code="2330", direction="above", price=1800.0, ttl_hours=0.0)
         alert.created_at = time.time() - 3600  # 1 hour ago
         monitor.rules.append(alert)
         removed = monitor.remove_expired()
@@ -1308,15 +1308,15 @@ class TestEventMonitor(unittest.TestCase):
         monitor = EventMonitor()
 
         with self.assertRaises(ValueError):
-            monitor.add_alert(SentimentAlert(stock_code="600519"))
+            monitor.add_alert(SentimentAlert(stock_code="2330"))
 
     def test_from_dict_list_skips_unsupported_placeholder_rule_type(self):
         from src.agent.events import EventMonitor
 
         data = [
-            {"stock_code": "600519", "alert_type": "sentiment_shift"},
+            {"stock_code": "2330", "alert_type": "sentiment_shift"},
             {
-                "stock_code": "000858",
+                "stock_code": "2454",
                 "alert_type": "volume_spike",
                 "multiplier": 2.5,
             },
@@ -1325,7 +1325,7 @@ class TestEventMonitor(unittest.TestCase):
         monitor = EventMonitor.from_dict_list(data)
 
         self.assertEqual(len(monitor.rules), 1)
-        self.assertEqual(monitor.rules[0].stock_code, "000858")
+        self.assertEqual(monitor.rules[0].stock_code, "2454")
 
     def test_from_dict_list_skips_price_change_without_change_pct(self):
         from src.agent.events import EventMonitor
@@ -1350,14 +1350,14 @@ class TestEventMonitorAsync(unittest.IsolatedAsyncioTestCase):
         from src.agent.events import EventMonitor, PriceAlert
 
         monitor = EventMonitor()
-        rule = PriceAlert(stock_code="600519", direction="above", price=1800.0)
+        rule = PriceAlert(stock_code="2330", direction="above", price=1800.0)
         quote = SimpleNamespace(price=1810.0)
 
         with patch("src.agent.events.asyncio.to_thread", new=AsyncMock(return_value=quote)) as to_thread:
             triggered = await monitor._check_price(rule)
 
         self.assertIsNotNone(triggered)
-        self.assertEqual(triggered.rule.stock_code, "600519")
+        self.assertEqual(triggered.rule.stock_code, "2330")
         to_thread.assert_awaited_once()
 
     async def test_check_price_change_uses_to_thread_and_triggers(self):
@@ -1392,8 +1392,8 @@ class TestEventMonitorAsync(unittest.IsolatedAsyncioTestCase):
         from src.agent.events import EventMonitor, PriceAlert, PriceChangeAlert
 
         monitor = EventMonitor()
-        monitor.add_alert(PriceAlert(stock_code="600519", direction="above", price=1800.0))
-        monitor.add_alert(PriceChangeAlert(stock_code="600519", direction="up", change_pct=3.0))
+        monitor.add_alert(PriceAlert(stock_code="2330", direction="above", price=1800.0))
+        monitor.add_alert(PriceChangeAlert(stock_code="2330", direction="up", change_pct=3.0))
         managers = [MagicMock(), MagicMock()]
         for manager in managers:
             manager.get_realtime_quote.return_value = SimpleNamespace(price=1810.0, change_pct=3.25)
@@ -1408,7 +1408,7 @@ class TestEventMonitorAsync(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(manager_factory.call_count, 2)
         for manager in managers:
-            manager.get_realtime_quote.assert_called_once_with("600519")
+            manager.get_realtime_quote.assert_called_once_with("2330")
         self.assertEqual(len(triggered), 2)
 
     async def test_check_volume_safe_when_fetch_returns_none(self):
@@ -1416,7 +1416,7 @@ class TestEventMonitorAsync(unittest.IsolatedAsyncioTestCase):
         from src.agent.events import EventMonitor, VolumeAlert
 
         monitor = EventMonitor()
-        rule = VolumeAlert(stock_code="600519", multiplier=2.0)
+        rule = VolumeAlert(stock_code="2330", multiplier=2.0)
 
         with patch("src.agent.events.asyncio.to_thread", new=AsyncMock(return_value=None)):
             result = await monitor._check_volume(rule)
@@ -1428,7 +1428,7 @@ class TestEventMonitorAsync(unittest.IsolatedAsyncioTestCase):
         from src.agent.events import EventMonitor, PriceAlert
 
         monitor = EventMonitor()
-        rule = PriceAlert(stock_code="600519", direction="above", price=1800.0)
+        rule = PriceAlert(stock_code="2330", direction="above", price=1800.0)
         monitor.add_alert(rule)
 
         callback_values = []
@@ -1451,7 +1451,7 @@ class TestEventMonitorConfigIntegration(unittest.TestCase):
 
         config = SimpleNamespace(
             agent_event_monitor_enabled=True,
-            agent_event_alert_rules_json='[{"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800}]',
+            agent_event_alert_rules_json='[{"stock_code":"2330","alert_type":"price_cross","direction":"above","price":1800}]',
         )
 
         with patch("src.notification.NotificationService", return_value=MagicMock()):
@@ -1459,14 +1459,14 @@ class TestEventMonitorConfigIntegration(unittest.TestCase):
 
         self.assertIsNotNone(monitor)
         self.assertEqual(len(monitor.rules), 1)
-        self.assertEqual(monitor.rules[0].stock_code, "600519")
+        self.assertEqual(monitor.rules[0].stock_code, "2330")
 
     def test_configured_event_monitor_notification_uses_alert_route(self):
         from src.agent.events import TriggeredAlert, build_event_monitor_from_config
 
         config = SimpleNamespace(
             agent_event_monitor_enabled=True,
-            agent_event_alert_rules_json='[{"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800}]',
+            agent_event_alert_rules_json='[{"stock_code":"2330","alert_type":"price_cross","direction":"above","price":1800}]',
         )
         notifier = MagicMock()
         notifier.send.return_value = True
@@ -1515,8 +1515,8 @@ class TestEventMonitorConfigIntegration(unittest.TestCase):
         config = SimpleNamespace(
             agent_event_monitor_enabled=True,
             agent_event_alert_rules_json=(
-                '[{"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800},'
-                '{"stock_code":"000858","alert_type":"price_cross","status":"bad","direction":"above","price":120}]'
+                '[{"stock_code":"2330","alert_type":"price_cross","direction":"above","price":1800},'
+                '{"stock_code":"2454","alert_type":"price_cross","status":"bad","direction":"above","price":120}]'
             ),
         )
 
@@ -1525,7 +1525,7 @@ class TestEventMonitorConfigIntegration(unittest.TestCase):
 
         self.assertIsNotNone(monitor)
         self.assertEqual(len(monitor.rules), 1)
-        self.assertEqual(monitor.rules[0].stock_code, "600519")
+        self.assertEqual(monitor.rules[0].stock_code, "2330")
 
     def test_build_event_monitor_skips_unsupported_rule_types(self):
         from src.agent.events import build_event_monitor_from_config
@@ -1533,8 +1533,8 @@ class TestEventMonitorConfigIntegration(unittest.TestCase):
         config = SimpleNamespace(
             agent_event_monitor_enabled=True,
             agent_event_alert_rules_json=(
-                '[{"stock_code":"600519","alert_type":"sentiment_shift"},'
-                '{"stock_code":"000858","alert_type":"price_cross","direction":"above","price":120}]'
+                '[{"stock_code":"2330","alert_type":"sentiment_shift"},'
+                '{"stock_code":"2454","alert_type":"price_cross","direction":"above","price":120}]'
             ),
         )
 
@@ -1543,7 +1543,7 @@ class TestEventMonitorConfigIntegration(unittest.TestCase):
 
         self.assertIsNotNone(monitor)
         self.assertEqual(len(monitor.rules), 1)
-        self.assertEqual(monitor.rules[0].stock_code, "000858")
+        self.assertEqual(monitor.rules[0].stock_code, "2454")
 
 
 # ============================================================
@@ -1585,7 +1585,7 @@ class TestAgentMemory(unittest.TestCase):
 
         with patch("src.storage.get_db", return_value=db):
             mem = AgentMemory(enabled=True)
-            history = mem.get_stock_history("600519", limit=1)
+            history = mem.get_stock_history("2330", limit=1)
 
         self.assertEqual(len(history), 1)
         self.assertEqual(history[0].signal, "buy")
@@ -1628,7 +1628,7 @@ class TestBaseAgentMemoryIntegration(unittest.TestCase):
         memory.get_stock_history.return_value = [entry]
         agent = self._make_agent(memory)
 
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
         injected = agent._inject_cached_data(ctx)
 
         self.assertIn("Memory: recent analysis history", injected)
@@ -1637,7 +1637,7 @@ class TestBaseAgentMemoryIntegration(unittest.TestCase):
     def test_market_phase_meta_is_not_injected_as_prefetched_data(self):
         memory = MagicMock(enabled=False)
         agent = self._make_agent(memory)
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
         ctx.meta["market_phase_context"] = {"phase": "intraday"}
         ctx.meta["analysis_context_pack_summary"] = "\n## 分析上下文包摘要\n- 資料塊狀態：行情 available\n"
         ctx.set_data("realtime_quote", {"price": 1880.0})
@@ -1660,7 +1660,7 @@ class TestBaseAgentMemoryIntegration(unittest.TestCase):
             total_samples=40,
         )
         agent = self._make_agent(memory)
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
 
         loop_result = SimpleNamespace(
             success=True,
@@ -1703,7 +1703,7 @@ class TestBaseAgentMemoryIntegration(unittest.TestCase):
 
         with patch("src.agent.agents.base_agent.AgentMemory.from_config", return_value=memory):
             agent = DummyStrategyAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
 
         loop_result = SimpleNamespace(
             success=True,
@@ -1719,7 +1719,7 @@ class TestBaseAgentMemoryIntegration(unittest.TestCase):
         self.assertAlmostEqual(result.opinion.confidence, 0.4)
         memory.get_calibration.assert_called_once_with(
             agent_name="strategy_chan_theory",
-            stock_code="600519",
+            stock_code="2330",
             skill_id="chan_theory",
         )
 
@@ -1754,7 +1754,7 @@ class TestRiskOverride(unittest.TestCase):
             llm_adapter=MagicMock(),
             config=SimpleNamespace(agent_risk_override=True),
         )
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
         ctx.set_data("final_dashboard", self._make_dashboard())
         ctx.add_opinion(AgentOpinion(agent_name="decision", signal="buy", confidence=0.8, reasoning="原始結論"))
         ctx.add_opinion(AgentOpinion(
@@ -1782,7 +1782,7 @@ class TestRiskOverride(unittest.TestCase):
             llm_adapter=MagicMock(),
             config=SimpleNamespace(agent_risk_override=True),
         )
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
         dashboard = self._make_dashboard()
         dashboard["decision_type"] = "strong_buy"
         dashboard["sentiment_score"] = 92
@@ -1809,7 +1809,7 @@ class TestRiskOverride(unittest.TestCase):
             llm_adapter=MagicMock(),
             config=SimpleNamespace(agent_risk_override=False),
         )
-        ctx = AgentContext(query="test", stock_code="600519")
+        ctx = AgentContext(query="test", stock_code="2330")
         dashboard = self._make_dashboard()
         ctx.set_data("final_dashboard", dashboard)
         ctx.add_opinion(AgentOpinion(
@@ -1863,7 +1863,7 @@ class TestResearchCommandTimeout(unittest.TestCase):
                  error="Deep research timed out after 0.01s",
                  timed_out=True,
              )):
-            response = cmd.execute(msg, ["600519"])
+            response = cmd.execute(msg, ["2330"])
 
         self.assertIn("超時", response.text)
 
@@ -1947,7 +1947,7 @@ class TestResearchAgentFilteredRegistry(unittest.TestCase):
         )
         agent = ResearchAgent(tool_registry=MagicMock(), llm_adapter=llm_adapter)
 
-        result = agent._decompose_query("分析 600519", {"stock_code": "600519"})
+        result = agent._decompose_query("分析 2330", {"stock_code": "2330"})
 
         self.assertEqual(result["questions"], ["Q1", "Q2"])
         llm_adapter.call_text.assert_called_once()
@@ -1964,9 +1964,9 @@ class TestResearchAgentFilteredRegistry(unittest.TestCase):
         agent = ResearchAgent(tool_registry=MagicMock(), llm_adapter=llm_adapter)
 
         result = agent._synthesise_report(
-            "分析 600519",
+            "分析 2330",
             [{"question": "Q1", "content": "A1"}],
-            {"stock_code": "600519"},
+            {"stock_code": "2330"},
         )
 
         self.assertEqual(result["content"], "Final research report")
@@ -1979,7 +1979,7 @@ class TestResearchAgentFilteredRegistry(unittest.TestCase):
         with patch.object(agent, "_decompose_query", return_value={"questions": ["Q1"], "tokens": 3}), \
              patch.object(agent, "_research_sub_question", return_value={"summary": "done", "tokens": 7}), \
              patch.object(agent, "_synthesise_report", return_value={"content": "fallback", "tokens": 5, "error": "boom"}):
-            result = agent.research("分析 600519")
+            result = agent.research("分析 2330")
 
         self.assertFalse(result.success)
         self.assertEqual(result.error, "boom")
@@ -2018,7 +2018,7 @@ class TestResearchAgentFilteredRegistry(unittest.TestCase):
 
         with patch.object(agent, "_decompose_query", return_value={"questions": ["Q1"], "tokens": 3}), \
              patch.object(agent, "_research_sub_question", side_effect=_slow_sub_question):
-            result = agent.research("分析 600519", timeout_seconds=0.01)
+            result = agent.research("分析 2330", timeout_seconds=0.01)
 
         self.assertFalse(result.success)
         self.assertTrue(result.timed_out)
@@ -2053,7 +2053,7 @@ class TestAgentResearchEndpoint(unittest.IsolatedAsyncioTestCase):
             patch("src.agent.factory.get_tool_registry", return_value=MagicMock()),
             patch("src.agent.llm_adapter.LLMToolAdapter", return_value=MagicMock()),
         ):
-            response = await agent_research(ResearchRequest(question="600519 風險"))
+            response = await agent_research(ResearchRequest(question="2330 風險"))
 
         self.assertFalse(response.success)
         self.assertIn("timed out", response.error)

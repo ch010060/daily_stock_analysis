@@ -41,11 +41,11 @@ class TestYfinanceSymbolConversion(unittest.TestCase):
 
     def test_hk_prefix_strip(self) -> None:
         self.assertEqual(_convert_to_yf_symbol("HK09988"), "9988.HK")
-        self.assertEqual(_convert_to_yf_symbol("HK00700"), "0700.HK")
+        self.assertEqual(_convert_to_yf_symbol("AAPL"), "0700.HK")
 
     def test_already_suffixed(self) -> None:
         self.assertEqual(_convert_to_yf_symbol("0700.HK"), "0700.HK")
-        self.assertEqual(_convert_to_yf_symbol("600519.SS"), "600519.SS")
+        self.assertEqual(_convert_to_yf_symbol("2330.SS"), "2330.SS")
 
     def test_empty(self) -> None:
         self.assertEqual(_convert_to_yf_symbol(""), "")

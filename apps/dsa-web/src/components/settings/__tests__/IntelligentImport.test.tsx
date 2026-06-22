@@ -35,7 +35,7 @@ describe('IntelligentImport', () => {
   it('opens the matching hidden file input when the picker buttons are clicked', () => {
     const { container } = render(
       <IntelligentImport
-        stockListValue="SH600000"
+        stockListValue="2330"
         configVersion="v1"
         maskToken="******"
         onMerged={onMerged}
@@ -67,7 +67,7 @@ describe('IntelligentImport', () => {
   it('does not open hidden file inputs when the import actions are disabled', () => {
     const { container } = render(
       <IntelligentImport
-        stockListValue="SH600000"
+        stockListValue="2330"
         configVersion="v1"
         maskToken="******"
         onMerged={onMerged}
@@ -99,7 +99,7 @@ describe('IntelligentImport', () => {
 
   it('refreshes config state after a config version conflict', async () => {
     parseImport.mockResolvedValue({
-      items: [{ code: 'SZ000001', name: 'Ping An Bank', confidence: 'high' }],
+      items: [{ code: '00981A', name: '主動統一台股增長', confidence: 'high' }],
       codes: [],
     });
     update.mockRejectedValue(
@@ -108,7 +108,7 @@ describe('IntelligentImport', () => {
 
     render(
       <IntelligentImport
-        stockListValue="SH600000"
+        stockListValue="2330"
         configVersion="v1"
         maskToken="******"
         onMerged={onMerged}
@@ -116,11 +116,11 @@ describe('IntelligentImport', () => {
     );
 
     fireEvent.change(screen.getByPlaceholderText('或貼上 CSV/Excel 複製的文字...'), {
-      target: { value: '000001' },
+      target: { value: '00981A' },
     });
     fireEvent.click(screen.getByRole('button', { name: '解析' }));
 
-    await screen.findByText('SZ000001');
+    await screen.findByText('00981A');
 
     fireEvent.click(screen.getByRole('button', { name: '合併到自選股' }));
 
@@ -128,7 +128,7 @@ describe('IntelligentImport', () => {
       expect(update).toHaveBeenCalled();
     });
     await waitFor(() => {
-      expect(onMerged).toHaveBeenCalledWith('SH600000,SZ000001');
+      expect(onMerged).toHaveBeenCalledWith('2330,00981A');
     });
     expect(await screen.findByText('配置已更新，請再次點選「合併到自選股」')).toBeInTheDocument();
   });

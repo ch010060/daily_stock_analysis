@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自選股智慧分析系統 - 環境驗證測試
+台股自選股智慧分析系統 - 環境驗證測試
 ===================================
 
 用於驗證 .env 配置是否正確，包括：
@@ -203,7 +203,7 @@ def view_database():
     return True
 
 
-def check_data_fetch(stock_code: str = "600519"):
+def check_data_fetch(stock_code: str = "2330"):
     """測試資料獲取"""
     print_header("3. 資料獲取測試")
     
@@ -276,7 +276,7 @@ def check_llm():
     
     # 構造測試上下文
     test_context = {
-        'code': '600519',
+        'code': '2330',
         'date': date.today().isoformat(),
         'today': {
             'open': 1420.0,
@@ -297,7 +297,7 @@ def check_llm():
     }
     
     print_section("傳送測試請求")
-    print(f"  測試股票: 貴州茅臺 (600519)")
+    print(f"  測試股票: 台積電 (2330)")
     print(f"  正在呼叫 Gemini API（超時: 60秒）...")
     
     start_time = time.time()
@@ -364,7 +364,7 @@ def check_notification():
     
     test_message = f"""## 🧪 系統測試訊息
 
-這是一條來自 **A股自選股智慧分析系統** 的測試訊息。
+這是一條來自 **台股自選股智慧分析系統** 的測試訊息。
 
 - 測試時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 - 測試目的: 驗證企業微信 Webhook 配置
@@ -391,7 +391,7 @@ def check_notification():
 def run_all_tests():
     """執行所有測試"""
     print("\n" + "🚀" * 20)
-    print("  A股自選股智慧分析系統 - 環境驗證")
+    print("  台股自選股智慧分析系統 - 環境驗證")
     print("  " + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print("🚀" * 20)
     
@@ -466,7 +466,7 @@ def main():
     configure_console_encoding()
 
     parser = argparse.ArgumentParser(
-        description='A股自選股智慧分析系統 - 環境驗證測試',
+        description='台股自選股智慧分析系統 - 環境驗證測試',
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     
@@ -475,7 +475,7 @@ def main():
     parser.add_argument('--fetch', action='store_true', help='測試資料獲取')
     parser.add_argument('--notify', action='store_true', help='測試通知推送')
     parser.add_argument('--config', action='store_true', help='檢視配置')
-    parser.add_argument('--stock', type=str, help='查詢指定股票資料，如 --stock 600519')
+    parser.add_argument('--stock', type=str, help='查詢指定股票資料，如 --stock 2330')
     parser.add_argument('--all', action='store_true', help='執行所有測試（包括 LLM）')
     
     args = parser.parse_args()

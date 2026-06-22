@@ -21,7 +21,7 @@ class HistoryItem(BaseModel):
 
     id: Optional[int] = Field(None, description="分析歷史記錄主鍵 ID")
     query_id: str = Field(..., description="分析記錄關聯 query_id（批次分析時重複）")
-    stock_code: str = Field(..., description="股票程式碼")
+    stock_code: str = Field(..., description="股票代號")
     stock_name: Optional[str] = Field(None, description="股票名稱")
     report_type: Optional[str] = Field(None, description="報告型別")
     trend_prediction: Optional[str] = Field(None, description="趨勢預測")
@@ -45,8 +45,8 @@ class HistoryItem(BaseModel):
         "example": {
             "id": 1234,
             "query_id": "abc123",
-            "stock_code": "600519",
-            "stock_name": "貴州茅臺",
+            "stock_code": "2330",
+            "stock_name": "台積電",
             "report_type": "detailed",
             "sentiment_score": 75,
             "operation_advice": "持有",
@@ -122,7 +122,7 @@ class ReportMeta(BaseModel):
 
     id: Optional[int] = Field(None, description="分析歷史記錄主鍵 ID（僅歷史報告有此欄位）")
     query_id: str = Field(..., description="分析記錄關聯 query_id（批次分析時重複）")
-    stock_code: str = Field(..., description="股票程式碼")
+    stock_code: str = Field(..., description="股票代號")
     stock_name: Optional[str] = Field(None, description="股票名稱")
     report_type: Optional[str] = Field(None, description="報告型別")
     report_language: Optional[str] = Field(None, description="報告輸出語言（zh/en）")
@@ -164,7 +164,7 @@ class ReportStrategy(BaseModel):
 class AnalysisContextPackOverviewSubject(BaseModel):
     """AnalysisContextPack 可見摘要標的資訊"""
 
-    code: str = Field(..., description="股票程式碼")
+    code: str = Field(..., description="股票代號")
     stock_name: Optional[str] = Field(None, description="股票名稱")
     market: Optional[str] = Field(None, description="市場")
 
@@ -265,8 +265,8 @@ class AnalysisReport(BaseModel):
         "example": {
             "meta": {
                 "query_id": "abc123",
-                "stock_code": "600519",
-                "stock_name": "貴州茅臺",
+                "stock_code": "2330",
+                "stock_name": "台積電",
                 "report_type": "detailed",
                 "report_language": "zh",
                 "created_at": "2024-01-01T12:00:00"
@@ -296,7 +296,7 @@ class MarkdownReportResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={
         "example": {
-            "content": "# 📊 貴州茅臺 (600519) 分析報告\n\n> 分析日期：**2024-01-01**\n\n..."
+            "content": "# 📊 台積電 (2330) 分析報告\n\n> 分析日期：**2024-01-01**\n\n..."
         }
     })
 
@@ -305,7 +305,7 @@ class StockBarItem(BaseModel):
     """個股欄條目（去重後的股票維度摘要）"""
 
     id: int = Field(..., description="該股最新一次分析的歷史記錄主鍵 ID")
-    stock_code: str = Field(..., description="股票程式碼")
+    stock_code: str = Field(..., description="股票代號")
     stock_name: Optional[str] = Field(None, description="股票名稱")
     report_type: Optional[str] = Field(None, description="報告型別")
     sentiment_score: Optional[int] = Field(
@@ -322,8 +322,8 @@ class StockBarItem(BaseModel):
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "id": 1234,
-            "stock_code": "600519",
-            "stock_name": "貴州茅臺",
+            "stock_code": "2330",
+            "stock_name": "台積電",
             "report_type": "detailed",
             "sentiment_score": 75,
             "operation_advice": "持有",
@@ -344,13 +344,13 @@ class StockBarResponse(BaseModel):
 class WatchlistRequest(BaseModel):
     """自選佇列操作請求"""
 
-    stock_code: str = Field(..., description="股票程式碼", min_length=1)
+    stock_code: str = Field(..., description="股票代號", min_length=1)
 
 
 class WatchlistResponse(BaseModel):
     """自選佇列響應"""
 
-    stock_codes: List[str] = Field(default_factory=list, description="當前自選佇列股票程式碼列表")
+    stock_codes: List[str] = Field(default_factory=list, description="當前自選佇列股票代號列表")
     message: str = Field(..., description="操作結果描述")
 
 
@@ -370,7 +370,7 @@ class RunDiagnosticSummaryResponse(BaseModel):
     trace_id: Optional[str] = Field(None, description="診斷 trace ID")
     task_id: Optional[str] = Field(None, description="任務 ID")
     query_id: Optional[str] = Field(None, description="分析 query ID")
-    stock_code: Optional[str] = Field(None, description="股票程式碼")
+    stock_code: Optional[str] = Field(None, description="股票代號")
     trigger_source: Optional[str] = Field(None, description="觸發來源")
     status: str = Field(..., description="總體狀態：normal/degraded/failed/unknown")
     status_label: str = Field(..., description="總體狀態中文標籤")
@@ -382,11 +382,11 @@ class RunDiagnosticSummaryResponse(BaseModel):
         "example": {
             "trace_id": "task_abc123",
             "query_id": "task_abc123",
-            "stock_code": "600519",
+            "stock_code": "2330",
             "status": "degraded",
             "status_label": "部分降級",
             "reason": "實時行情失敗：timeout",
             "components": {},
-            "copy_text": "trace_id: task_abc123\nstock_code: 600519\n...",
+            "copy_text": "trace_id: task_abc123\nstock_code: 2330\n...",
         }
     })

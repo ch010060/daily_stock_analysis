@@ -71,7 +71,7 @@ class TestIsBseCode(unittest.TestCase):
 
     def test_shanghai_shenzhen_not_bse(self):
         """Shanghai/Shenzhen A-shares should return False."""
-        self.assertFalse(is_bse_code("600519"))
+        self.assertFalse(is_bse_code("2330"))
         self.assertFalse(is_bse_code("000001"))
         self.assertFalse(is_bse_code("300750"))
 
@@ -99,14 +99,14 @@ class TestNormalizeStockCode(unittest.TestCase):
         self.assertEqual(normalize_stock_code("bj920748"), "920748")
 
     def test_hk_suffix_normalized_to_canonical_prefix(self):
-        """港股 .HK 字尾格式應歸一為 HK+5 位數字。"""
+        """美股 .HK 字尾格式應歸一為 HK+5 位數字。"""
         self.assertEqual(normalize_stock_code("1810.HK"), "HK01810")
-        self.assertEqual(normalize_stock_code("0700.hk"), "HK00700")
+        self.assertEqual(normalize_stock_code("0700.hk"), "AAPL")
 
     def test_hk_prefix_is_zero_padded(self):
         """HK 字首的短數字格式應補足到 5 位，便於後續快取與去重。"""
         self.assertEqual(normalize_stock_code("hk1810"), "HK01810")
-        self.assertEqual(normalize_stock_code("HK700"), "HK00700")
+        self.assertEqual(normalize_stock_code("HK700"), "AAPL")
 
 
 @unittest.skipIf(not _TUSHARE_IMPORTS_OK, f"tushare fetcher imports failed: {_TUSHARE_IMPORT_ERROR}")
@@ -143,7 +143,7 @@ class TestAkshareToSinaTxSymbol(unittest.TestCase):
 
     def test_shanghai_shenzhen(self):
         """Shanghai/Shenzhen should map correctly."""
-        self.assertEqual(_to_sina_tx_symbol("600519"), "sh600519")
+        self.assertEqual(_to_sina_tx_symbol("2330"), "sh2330")
         self.assertEqual(_to_sina_tx_symbol("000001"), "sz000001")
         self.assertEqual(_to_sina_tx_symbol("512400"), "sh512400")
 

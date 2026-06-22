@@ -47,7 +47,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.env_path.write_text(
             "\n".join(
                 [
-                    "STOCK_LIST=600519,000001",
+                    "STOCK_LIST=2330,000001",
                     "GEMINI_API_KEY=secret-key-value",
                     "SCHEDULE_TIME=18:00",
                     "LOG_LEVEL=INFO",
@@ -132,7 +132,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
                 [
                     "LITELLM_MODEL=gemini/gemini-3-flash-preview",
                     "GEMINI_API_KEY=secret-key-value",
-                    "STOCK_LIST=600519",
+                    "STOCK_LIST=2330",
                     "ADMIN_AUTH_ENABLED=false",
                 ]
             )
@@ -159,7 +159,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
                 reload_now=False,
                 items=[
                     {"key": "GEMINI_API_KEY", "value": "new-secret-value"},
-                    {"key": "STOCK_LIST", "value": "600519,300750"},
+                    {"key": "STOCK_LIST", "value": "2330,300750"},
                 ],
             ),
             service=self.service,
@@ -169,7 +169,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(payload["skipped_masked_count"], 0)
 
         env_content = self.env_path.read_text(encoding="utf-8")
-        self.assertIn("STOCK_LIST=600519,300750", env_content)
+        self.assertIn("STOCK_LIST=2330,300750", env_content)
         self.assertIn("GEMINI_API_KEY=new-secret-value", env_content)
 
     def test_put_config_returns_conflict_when_version_is_stale(self) -> None:
@@ -177,7 +177,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             system_config.update_system_config(
                 request=UpdateSystemConfigRequest(
                     config_version="stale-version",
-                    items=[{"key": "STOCK_LIST", "value": "600519"}],
+                    items=[{"key": "STOCK_LIST", "value": "2330"}],
                 ),
                 service=self.service,
             )
@@ -190,7 +190,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             "\n".join(
                 [
                     "# Base settings",
-                    "STOCK_LIST=600519,000001",
+                    "STOCK_LIST=2330,000001",
                     "",
                     "# Secrets",
                     "GEMINI_API_KEY=secret-key-value",
@@ -207,7 +207,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
                 config_version=current["config_version"],
                 mask_token="******",
                 reload_now=False,
-                items=[{"key": "STOCK_LIST", "value": "600519,300750"}],
+                items=[{"key": "STOCK_LIST", "value": "2330,300750"}],
             ),
             service=self.service,
         ).model_dump()
@@ -216,7 +216,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         env_content = self.env_path.read_text(encoding="utf-8")
         self.assertIn("# Base settings\n", env_content)
         self.assertIn("\n\n# Secrets\n", env_content)
-        self.assertIn("STOCK_LIST=600519,300750\n", env_content)
+        self.assertIn("STOCK_LIST=2330,300750\n", env_content)
 
     def test_put_config_returns_startup_only_schedule_warning(self) -> None:
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
@@ -277,7 +277,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
     def test_export_system_config_returns_raw_env_content(self) -> None:
         self.env_path.write_text(
-            "# Web config\nSTOCK_LIST=600519,000001\nGEMINI_API_KEY=secret-key-value\nADMIN_AUTH_ENABLED=true\n",
+            "# Web config\nSTOCK_LIST=2330,000001\nGEMINI_API_KEY=secret-key-value\nADMIN_AUTH_ENABLED=true\n",
             encoding="utf-8",
         )
         self.manager = ConfigManager(env_path=self.env_path)
@@ -291,7 +291,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
         self.assertEqual(
             payload["content"],
-            "# Web config\nSTOCK_LIST=600519,000001\nGEMINI_API_KEY=secret-key-value\nADMIN_AUTH_ENABLED=true\n",
+            "# Web config\nSTOCK_LIST=2330,000001\nGEMINI_API_KEY=secret-key-value\nADMIN_AUTH_ENABLED=true\n",
         )
         self.assertEqual(payload["config_version"], self.manager.get_config_version())
 
@@ -381,7 +381,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
                 service=self.service,
             ).model_dump()
 
-            self.assertIn("STOCK_LIST=600519,000001", export_payload["content"])
+            self.assertIn("STOCK_LIST=2330,000001", export_payload["content"])
             self.assertTrue(import_payload["success"])
             self.assertEqual(self.manager.read_config_map()["STOCK_LIST"], "300750")
 
@@ -394,7 +394,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             self.env_path.write_text(
                 "\n".join(
                     [
-                        "STOCK_LIST=600519,000001",
+                        "STOCK_LIST=2330,000001",
                         "GEMINI_API_KEY=secret-key-value",
                         "SCHEDULE_TIME=18:00",
                         "LOG_LEVEL=INFO",
@@ -466,7 +466,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             self.env_path.write_text(
                 "\n".join(
                     [
-                        "STOCK_LIST=600519,000001",
+                        "STOCK_LIST=2330,000001",
                         "GEMINI_API_KEY=secret-key-value",
                         "SCHEDULE_TIME=18:00",
                         "LOG_LEVEL=INFO",
@@ -521,7 +521,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.env_path.write_text(
             "\n".join(
                 [
-                    "STOCK_LIST=600519,000001",
+                    "STOCK_LIST=2330,000001",
                     "GEMINI_API_KEY=secret-key-value",
                     "SCHEDULE_TIME=18:00",
                     "LOG_LEVEL=INFO",
@@ -538,7 +538,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.env_path.write_text(
             "\n".join(
                 [
-                    "STOCK_LIST=600519,000001",
+                    "STOCK_LIST=2330,000001",
                     "GEMINI_API_KEY=secret-key-value",
                     "SCHEDULE_TIME=18:00",
                     "LOG_LEVEL=INFO",

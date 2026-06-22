@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自選股智慧分析系統 - 通知服務單元測試
+台股自選股智慧分析系統 - 通知服務單元測試
 ===================================
 
 職責：
@@ -58,7 +58,7 @@ def _make_feishu_message() -> BotMessage:
         user_name="tester",
         chat_id="chat-1",
         chat_type=ChatType.GROUP,
-        content="/a 600519",
+        content="/a 2330",
     )
 
 
@@ -70,7 +70,7 @@ def _make_dingtalk_message() -> BotMessage:
         user_name="tester",
         chat_id="dingtalk-chat",
         chat_type=ChatType.GROUP,
-        content="/a 600519",
+        content="/a 2330",
         raw_data={
             "sessionWebhook": "https://oapi.dingtalk.com/robot/sendBySession?session=abc123",
         },
@@ -85,7 +85,7 @@ def _make_telegram_message() -> BotMessage:
         user_name="tester",
         chat_id="100200300",
         chat_type=ChatType.PRIVATE,
-        content="/a 600519",
+        content="/a 2330",
         raw_data={"chat_id": "100200300"},
     )
 
@@ -427,8 +427,8 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
         service = NotificationService()
 
         with mock.patch.object(service, "send_to_custom", return_value=True) as mock_custom:
-            self.assertTrue(service.send("content at 12:00", route_type="report", dedup_key="report:aggregate:simple:600519"))
-            self.assertFalse(service.send("content at 12:01", route_type="report", dedup_key="report:aggregate:simple:600519"))
+            self.assertTrue(service.send("content at 12:00", route_type="report", dedup_key="report:aggregate:simple:2330"))
+            self.assertFalse(service.send("content at 12:01", route_type="report", dedup_key="report:aggregate:simple:2330"))
 
         mock_custom.assert_called_once_with("content at 12:00")
 
@@ -447,14 +447,14 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
                 service.send(
                     "content at 12:00",
                     route_type="report",
-                    dedup_key="report:aggregate:simple:600519",
+                    dedup_key="report:aggregate:simple:2330",
                 )
             )
             self.assertTrue(
                 service.send(
                     "content at 12:01",
                     route_type="report",
-                    dedup_key="report:aggregate:simple:600519",
+                    dedup_key="report:aggregate:simple:2330",
                 )
             )
 
@@ -472,8 +472,8 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
 
         with mock.patch.object(service, "send_to_context", return_value=True) as mock_context, \
              mock.patch.object(service, "send_to_custom", return_value=True) as mock_custom:
-            self.assertTrue(service.send("content at 12:00", route_type="report", dedup_key="report:aggregate:simple:600519"))
-            self.assertTrue(service.send("content at 12:01", route_type="report", dedup_key="report:aggregate:simple:600519"))
+            self.assertTrue(service.send("content at 12:00", route_type="report", dedup_key="report:aggregate:simple:2330"))
+            self.assertTrue(service.send("content at 12:01", route_type="report", dedup_key="report:aggregate:simple:2330"))
 
         self.assertEqual(mock_context.call_count, 2)
         mock_custom.assert_called_once_with("content at 12:00")
@@ -554,8 +554,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config()
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -578,8 +578,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config(report_renderer_enabled=True)
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -590,16 +590,16 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
             out = service.generate_single_stock_report(result)
 
         mock_render.assert_not_called()
-        self.assertIn("貴州茅臺", out)
-        self.assertIn("600519", out)
+        self.assertIn("台積電", out)
+        self.assertIn("2330", out)
 
     @mock.patch("src.notification.get_config")
     def test_generate_brief_report_shows_model_by_default(self, mock_get_config: mock.MagicMock):
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -616,8 +616,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -634,8 +634,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -665,8 +665,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         )
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -845,8 +845,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -882,8 +882,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -904,8 +904,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -1040,8 +1040,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -1074,8 +1074,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -1174,8 +1174,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -1207,8 +1207,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -1239,8 +1239,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config(report_history_compare_n=3)
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="貴州茅臺",
+            code="2330",
+            name="台積電",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -1250,13 +1250,13 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
 
         with mock.patch(
             "src.services.history_comparison_service.get_signal_changes_batch",
-            return_value={"600519": []},
+            return_value={"2330": []},
         ) as mock_batch:
             first = service._get_history_compare_context([result])
             second = service._get_history_compare_context([result])
 
-        self.assertEqual(first, {"history_by_code": {"600519": []}})
-        self.assertEqual(second, {"history_by_code": {"600519": []}})
+        self.assertEqual(first, {"history_by_code": {"2330": []}})
+        self.assertEqual(second, {"history_by_code": {"2330": []}})
         mock_batch.assert_called_once()
 
     @mock.patch("src.notification.get_config")
@@ -1289,7 +1289,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
             email_sender="user@qq.com",
             email_password="PASS",
             email_receivers=["default@example.com"],
-            stock_email_groups=[(["000001", "600519"], ["group@example.com"])],
+            stock_email_groups=[(["000001", "2330"], ["group@example.com"])],
         )
         mock_get_config.return_value = cfg
 

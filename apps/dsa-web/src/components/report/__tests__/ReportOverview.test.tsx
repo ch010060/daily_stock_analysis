@@ -4,8 +4,8 @@ import { ReportOverview } from '../ReportOverview';
 
 const baseMeta = {
   queryId: 'q-1',
-  stockCode: '600519',
-  stockName: '貴州茅臺',
+  stockCode: '2330',
+  stockName: '台積電',
   reportType: 'detailed' as const,
   reportLanguage: 'zh' as const,
   createdAt: '2026-03-21T08:00:00Z',

@@ -18,6 +18,7 @@ import logging
 import json
 import os
 import random
+import re
 import time
 from pathlib import Path
 from threading import BoundedSemaphore, RLock, Thread
@@ -79,72 +80,39 @@ def summarize_exception(exc: Exception) -> Tuple[str, str]:
 
 def normalize_stock_code(stock_code: str) -> str:
     """
-    Normalize stock code by stripping exchange prefixes/suffixes.
+    Normalize supported TW/US stock codes.
 
     Accepted formats and their normalized results:
-    - '600519'      -> '600519'   (already clean)
-    - 'SH600519'    -> '600519'   (strip SH prefix)
-    - 'SH.600519'   -> '600519'   (strip SH. prefix)
-    - 'SZ000001'    -> '000001'   (strip SZ prefix)
-    - 'SZ.000001'   -> '000001'   (strip SZ. prefix)
-    - 'BJ920748'    -> '920748'   (strip BJ prefix, BSE)
-    - 'BJ.920748'   -> '920748'   (strip BJ. prefix, BSE)
-    - 'sh600519'    -> '600519'   (case-insensitive)
-    - '600519.SH'   -> '600519'   (strip .SH suffix)
-    - '000001.SZ'   -> '000001'   (strip .SZ suffix)
-    - '920748.BJ'   -> '920748'   (strip .BJ suffix, BSE)
-    - 'HK00700'     -> 'HK00700'  (keep HK prefix for HK stocks)
-    - '1810.HK'     -> 'HK01810'  (normalize HK suffix to canonical prefix form)
-    - 'AAPL'        -> 'AAPL'     (keep US stock ticker as-is)
+    - '2330'      -> '2330'
+    - 'TW:2330'   -> '2330'
+    - '2330.TW'   -> '2330'
+    - 'AAPL'      -> 'AAPL'
+    - 'US:AAPL'   -> 'AAPL'
+    - 'AAPL.US'   -> 'AAPL'
 
     This function is applied at the DataProviderManager layer so that
-    all individual fetchers receive a clean 6-digit code (for A-shares/ETFs).
+    individual fetchers receive the active TW/US symbol format only.
     """
     code = stock_code.strip()
     upper = code.upper()
+    tw_pattern = re.compile(r"^(?:\d{4,6}|\d{4,5}[A-Z])$")
 
-    # Normalize HK prefix to a canonical 5-digit form (e.g. hk1810 -> HK01810)
-    if upper.startswith('HK') and not upper.startswith('HK.'):
-        candidate = upper[2:]
-        if candidate.isdigit() and 1 <= len(candidate) <= 5:
-            return f"HK{candidate.zfill(5)}"
-
-    # Strip SH/SZ prefix (e.g. SH600519 -> 600519)
-    if upper.startswith(('SH', 'SZ')) and not upper.startswith('SH.') and not upper.startswith('SZ.'):
-        candidate = code[2:]
-        # Only strip if the remainder looks like a valid numeric code
-        if candidate.isdigit() and len(candidate) in (5, 6):
+    if upper.startswith("TW:"):
+        candidate = upper[3:]
+        if tw_pattern.fullmatch(candidate):
             return candidate
-
-    # Strip dotted SH/SZ prefix (e.g. SH.600519 -> 600519)
-    if upper.startswith(('SH.', 'SZ.')):
-        candidate = code[3:]
-        if candidate.isdigit() and len(candidate) in (5, 6):
-            return candidate
-
-    # Strip BJ prefix (e.g. BJ920748 -> 920748)
-    if upper.startswith('BJ') and not upper.startswith('BJ.'):
-        candidate = code[2:]
-        if candidate.isdigit() and len(candidate) == 6:
-            return candidate
-
-    # Strip dotted BJ prefix (e.g. BJ.920748 -> 920748)
-    if upper.startswith('BJ.'):
-        candidate = code[3:]
-        if candidate.isdigit() and len(candidate) == 6:
-            return candidate
-
-    # Strip .SH/.SZ/.BJ suffix (e.g. 600519.SH -> 600519, 920748.BJ -> 920748)
-    if '.' in code:
+    if upper.startswith("US:"):
+        return upper[3:]
+    if "." in code:
         base, suffix = code.rsplit('.', 1)
-        if suffix.upper() == 'HK' and base.isdigit() and 1 <= len(base) <= 5:
-            return f"HK{base.zfill(5)}"
-        if base.upper() in ('SH', 'SS', 'SZ', 'BJ') and suffix.isdigit():
-            return suffix
-        if suffix.upper() in ('SH', 'SZ', 'SS', 'BJ') and base.isdigit():
-            return base
+        if suffix.upper() == "TW" and tw_pattern.fullmatch(base.upper()):
+            return base.upper()
+        if suffix.upper() == "US" and base:
+            return base.upper()
 
-    return code
+    if tw_pattern.fullmatch(upper):
+        return upper
+    return upper if upper.isalpha() else code
 
 
 ETF_PREFIXES = ("51", "52", "56", "58", "15", "16", "18")

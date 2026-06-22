@@ -246,16 +246,16 @@ class TestSymbolSafety(unittest.TestCase):
 
     def test_cn_symbol_rejected(self):
         r = _make_runner()
-        cfg = DailyProfileConfig(symbols=["600519"], start_date=_START, end_date=_END)
+        cfg = DailyProfileConfig(symbols=["2330"], start_date=_START, end_date=_END)
         result = r.run(cfg)
         self.assertFalse(result.get("ok"))
 
     def test_cn_symbol_warning(self):
         r = _make_runner()
-        cfg = DailyProfileConfig(symbols=["600519"], start_date=_START, end_date=_END)
+        cfg = DailyProfileConfig(symbols=["2330"], start_date=_START, end_date=_END)
         result = r.run(cfg)
         warnings = result.get("warnings", [])
-        self.assertTrue(any("600519" in w for w in warnings))
+        self.assertTrue(any("2330" in w for w in warnings))
 
     def test_mixed_valid_invalid_partial_ok(self):
         r = _make_runner()
@@ -374,7 +374,7 @@ class TestPromptCardAggregation(unittest.TestCase):
 
 class TestNoCNTerms(unittest.TestCase):
 
-    _CN_TERMS = ["A股", "上證", "上證", "深證", "深證", "創業板", "創業板", "科創50", "科創50"]
+    _CN_TERMS = ["台股", "上證", "上證", "深證", "深證", "創業板", "創業板", "科創50", "科創50"]
 
     def test_no_cn_terms_in_result(self):
         r = _make_runner()
@@ -481,7 +481,7 @@ class TestFailureResilience(unittest.TestCase):
 
     def test_all_symbols_invalid_returns_ok_false(self):
         r = _make_runner()
-        cfg = DailyProfileConfig(symbols=["US:AAPL", "600519"], start_date=_START, end_date=_END)
+        cfg = DailyProfileConfig(symbols=["US:AAPL", "2330"], start_date=_START, end_date=_END)
         result = r.run(cfg)
         self.assertFalse(result.get("ok"))
 

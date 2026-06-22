@@ -19,14 +19,14 @@ logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_STOCK_INDEX_REMOTE_URL = (
-    "https://raw.githubusercontent.com/ZhuLinsen/daily_stock_analysis/"
+    "https://raw.githubusercontent.com/ch010060/daily_stock_analysis/"
     "main/apps/dsa-web/public/stocks.index.json"
 )
 DEFAULT_STOCK_INDEX_CACHE_PATH = REPO_ROOT / "data" / "cache" / "stocks.index.json"
 DEFAULT_STOCK_INDEX_REMOTE_TTL_HOURS = 48
 DEFAULT_STOCK_INDEX_REMOTE_TIMEOUT_SECONDS = 10
 DEFAULT_STOCK_INDEX_REMOTE_MAX_FAILURES = 3
-SUPPORTED_STOCK_INDEX_MARKETS = {"CN", "HK", "US", "BSE"}
+SUPPORTED_STOCK_INDEX_MARKETS = {"TW", "US"}
 
 _REMOTE_REFRESH_LOCK = Lock()
 _REMOTE_FAILURE_LOCK = Lock()
@@ -38,7 +38,7 @@ _REMOTE_SUPPRESS_UNTIL = 0.0
 class RemoteStockIndexSettings:
     """Runtime settings for remote stock-index refresh."""
 
-    enabled: bool = True
+    enabled: bool = False
     url: str = DEFAULT_STOCK_INDEX_REMOTE_URL
     ttl_hours: int = DEFAULT_STOCK_INDEX_REMOTE_TTL_HOURS
     timeout_seconds: int = DEFAULT_STOCK_INDEX_REMOTE_TIMEOUT_SECONDS
@@ -58,7 +58,7 @@ class RemoteStockIndexResult:
 def settings_from_config(config: Any) -> RemoteStockIndexSettings:
     """Build remote stock-index settings from the application config object."""
     return RemoteStockIndexSettings(
-        enabled=bool(getattr(config, "stock_index_remote_update_enabled", True)),
+        enabled=bool(getattr(config, "stock_index_remote_update_enabled", False)),
         url=DEFAULT_STOCK_INDEX_REMOTE_URL,
         ttl_hours=DEFAULT_STOCK_INDEX_REMOTE_TTL_HOURS,
         timeout_seconds=DEFAULT_STOCK_INDEX_REMOTE_TIMEOUT_SECONDS,

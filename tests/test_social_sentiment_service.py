@@ -303,13 +303,13 @@ class TestUSStockGating(unittest.TestCase):
 
     def test_a_share_code_not_us(self):
         from data_provider.us_index_mapping import is_us_stock_code
-        self.assertFalse(is_us_stock_code("600519"))
+        self.assertFalse(is_us_stock_code("2330"))
         self.assertFalse(is_us_stock_code("000001"))
         self.assertFalse(is_us_stock_code("300750"))
 
     def test_hk_code_not_us(self):
         from data_provider.us_index_mapping import is_us_stock_code
-        self.assertFalse(is_us_stock_code("HK00700"))
+        self.assertFalse(is_us_stock_code("AAPL"))
 
     def test_us_code_detected(self):
         from data_provider.us_index_mapping import is_us_stock_code

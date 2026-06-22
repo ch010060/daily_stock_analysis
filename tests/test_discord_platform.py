@@ -73,7 +73,7 @@ def test_signed_interaction_request_returns_deferred_ack():
         "data": {
             "name": "analyze",
             "options": [
-                {"name": "stock_code", "value": "600519"},
+                {"name": "stock_code", "value": "2330"},
             ],
         },
     }
@@ -97,7 +97,7 @@ def test_signed_interaction_request_returns_deferred_ack():
     assert message.chat_type == ChatType.GROUP
     assert message.user_id == "user-1"
     assert message.user_name == "tester"
-    assert message.content == "/analyze 600519"
+    assert message.content == "/analyze 2330"
     # follow-up 需要的欄位存在於 raw_data
     assert message.raw_data.get("application_id") == "app-123"
     assert message.raw_data.get("token") == "interaction-token"
@@ -193,7 +193,7 @@ def test_format_response_wraps_interaction_callback():
         user_name="tester",
         chat_id="channel-1",
         chat_type=ChatType.GROUP,
-        content="/analyze 600519",
+        content="/analyze 2330",
         raw_data={"type": 2, "data": {"name": "analyze"}},
     )
     response = BotResponse.text_response("分析結果")
@@ -219,7 +219,7 @@ def test_send_followup_patches_original_message():
         user_name="tester",
         chat_id="channel-1",
         chat_type=ChatType.GROUP,
-        content="/analyze 600519",
+        content="/analyze 2330",
         raw_data={
             "type": 2,
             "application_id": "app-123",
@@ -252,7 +252,7 @@ def test_send_followup_chunks_long_content():
         user_name="tester",
         chat_id="channel-1",
         chat_type=ChatType.GROUP,
-        content="/analyze 600519",
+        content="/analyze 2330",
         raw_data={
             "type": 2,
             "application_id": "app-123",
@@ -292,7 +292,7 @@ def test_send_followup_missing_token_returns_false():
         user_name="tester",
         chat_id="channel-1",
         chat_type=ChatType.GROUP,
-        content="/analyze 600519",
+        content="/analyze 2330",
         raw_data={"type": 2},
     )
     response = BotResponse.text_response("分析結果")
@@ -323,12 +323,12 @@ def test_boolean_option_true_emits_name():
     interaction_data = {
         "name": "analyze",
         "options": [
-            {"name": "stock_code", "value": "600519"},
+            {"name": "stock_code", "value": "2330"},
             {"name": "full", "value": True},
         ],
     }
     content = platform._build_command_content(interaction_data)
-    assert content == "/analyze 600519 full"
+    assert content == "/analyze 2330 full"
 
 
 def test_boolean_option_false_is_omitted():
@@ -337,9 +337,9 @@ def test_boolean_option_false_is_omitted():
     interaction_data = {
         "name": "analyze",
         "options": [
-            {"name": "stock_code", "value": "600519"},
+            {"name": "stock_code", "value": "2330"},
             {"name": "full", "value": False},
         ],
     }
     content = platform._build_command_content(interaction_data)
-    assert content == "/analyze 600519"
+    assert content == "/analyze 2330"

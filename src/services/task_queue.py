@@ -6,7 +6,7 @@ A股自選股智慧分析系統 - 非同步任務佇列
 
 職責：
 1. 管理非同步分析任務的生命週期
-2. 防止相同股票程式碼重複提交
+2. 防止相同股票代號重複提交
 3. 提供 SSE 事件廣播機制
 4. 任務完成後持久化到資料庫
 """
@@ -149,7 +149,7 @@ class AnalysisTaskQueue:
     單例模式，全域性唯一例項
     
     特性：
-    1. 防止相同股票程式碼重複提交
+    1. 防止相同股票代號重複提交
     2. 執行緒池執行分析任務
     3. SSE 事件廣播機制
     4. 任務完成後自動持久化
@@ -273,7 +273,7 @@ class AnalysisTaskQueue:
         檢查股票是否正在分析中
         
         Args:
-            stock_code: 股票程式碼
+            stock_code: 股票代號
             
         Returns:
             True 表示正在分析中
@@ -287,7 +287,7 @@ class AnalysisTaskQueue:
         獲取正在分析該股票的任務 ID
         
         Args:
-            stock_code: 股票程式碼
+            stock_code: 股票代號
             
         Returns:
             任務 ID，如果沒有則返回 None
@@ -622,7 +622,7 @@ class AnalysisTaskQueue:
         
         Args:
             task_id: 任務 ID
-            stock_code: 股票程式碼
+            stock_code: 股票代號
             report_type: 報告型別
             force_refresh: 是否強制重新整理
             

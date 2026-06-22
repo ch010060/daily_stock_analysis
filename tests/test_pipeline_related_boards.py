@@ -20,7 +20,7 @@ class PipelineRelatedBoardsTestCase(unittest.TestCase):
             "boards": {"status": "ok", "data": {"top": [], "bottom": []}},
         }
 
-        enriched = pipeline._attach_belong_boards_to_fundamental_context("600519", cached_context)
+        enriched = pipeline._attach_belong_boards_to_fundamental_context("2330", cached_context)
 
         self.assertIsNot(enriched, cached_context)
         self.assertNotIn("belong_boards", cached_context)
@@ -39,7 +39,7 @@ class PipelineRelatedBoardsTestCase(unittest.TestCase):
             "boards": {"status": "ok", "data": {"top": [], "bottom": []}},
         }
 
-        enriched = pipeline._attach_belong_boards_to_fundamental_context("600519", context)
+        enriched = pipeline._attach_belong_boards_to_fundamental_context("2330", context)
 
         self.assertIsNot(enriched, context)
         self.assertEqual(enriched["belong_boards"], existing_boards)
@@ -100,7 +100,7 @@ class PipelineRelatedBoardsTestCase(unittest.TestCase):
             "errors": ["fundamental pipeline disabled"],
         }
 
-        enriched = pipeline._attach_belong_boards_to_fundamental_context("600519", context)
+        enriched = pipeline._attach_belong_boards_to_fundamental_context("2330", context)
 
         self.assertEqual(enriched["belong_boards"], [])
         pipeline.fetcher_manager.get_belong_boards.assert_not_called()
@@ -116,10 +116,10 @@ class PipelineRelatedBoardsTestCase(unittest.TestCase):
             "boards": {"status": "ok", "data": {"top": [], "bottom": []}},
         }
 
-        enriched = pipeline._attach_belong_boards_to_fundamental_context("SH600519", context)
+        enriched = pipeline._attach_belong_boards_to_fundamental_context("SH2330", context)
 
         self.assertEqual(enriched["belong_boards"], [{"name": "白酒"}])
-        pipeline.fetcher_manager.get_belong_boards.assert_called_once_with("SH600519")
+        pipeline.fetcher_manager.get_belong_boards.assert_called_once_with("SH2330")
 
 if __name__ == "__main__":
     unittest.main()

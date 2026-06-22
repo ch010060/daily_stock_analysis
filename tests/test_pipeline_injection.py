@@ -304,7 +304,7 @@ class TestAHRegression(unittest.TestCase):
             p.start()
         self.addCleanup(lambda: [p.stop() for p in patches])
 
-        result = self.pipeline.process_single_stock("600519", skip_analysis=True)
+        result = self.pipeline.process_single_stock("2330", skip_analysis=True)
         self.assertIsNone(result)
         self.pipeline.analyze_stock.assert_not_called()
 

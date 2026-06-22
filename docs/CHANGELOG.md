@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修復] 修正持股組合彙總幣種 `aggregate_currency` 硬編碼 CNY 的問題，現依帳戶基準幣種或預設 TWD 顯示，不再於空帳戶或台股/美股帳戶情境下誤顯示 CNY。
 - [修復] 持股帳戶與每日快照資料庫欄位預設值由 `cn`/`CNY` 改為 `tw`/`TWD`，與既有 Pydantic schema 預設值對齊。
 - [改進] Web 持股頁面新建帳戶市場下拉選單移除 A 股 / 港股選項，僅保留台股、美股。
+- [改進] 根 README 改為繁體中文 TW/US-only 首頁，移除簡體中文入口、贊助商、聯絡合作與非台股/美股範例。
 - [改進] AlphaSift 篩選請求的 `market` 欄位移除隱式 `cn` 預設值，改為必填欄位；AlphaSift 維持預設停用，不影響主流程。
 
 ## [3.22.0] - 2026-06-13

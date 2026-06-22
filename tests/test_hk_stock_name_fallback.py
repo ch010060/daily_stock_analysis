@@ -41,7 +41,7 @@ class _DummyCircuitBreaker:
 def _make_spot_em_df():
     """Simulate stock_hk_spot_em() return value."""
     return pd.DataFrame([{
-        '程式碼': '00700',
+        '程式碼': 'AAPL',
         '名稱': '騰訊控股',
         '最新價': 370.0,
         '漲跌幅': 1.5,
@@ -63,7 +63,7 @@ def _make_spot_em_df():
 def _make_spot_df():
     """Simulate stock_hk_spot() return value (sina source)."""
     return pd.DataFrame([{
-        '程式碼': '00700',
+        '程式碼': 'AAPL',
         '名稱': '騰訊控股',
         '最新價': 368.0,
         '漲跌額': 3.5,
@@ -96,7 +96,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
         ak_mock.stock_hk_spot_em.return_value = _make_spot_em_df()
 
         with patch.dict(sys.modules, {"akshare": ak_mock}):
-            quote = self.fetcher._get_hk_realtime_quote("HK00700")
+            quote = self.fetcher._get_hk_realtime_quote("AAPL")
 
         self.assertIsNotNone(quote)
         self.assertEqual(quote.name, "騰訊控股")
@@ -111,7 +111,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
         ak_mock.stock_hk_spot.return_value = _make_spot_df()
 
         with patch.dict(sys.modules, {"akshare": ak_mock}):
-            quote = self.fetcher._get_hk_realtime_quote("HK00700")
+            quote = self.fetcher._get_hk_realtime_quote("AAPL")
 
         self.assertIsNotNone(quote)
         self.assertEqual(quote.name, "騰訊控股")
@@ -127,7 +127,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
         ak_mock.stock_hk_spot.side_effect = Exception("新浪介面超時")
 
         with patch.dict(sys.modules, {"akshare": ak_mock}):
-            quote = self.fetcher._get_hk_realtime_quote("HK00700")
+            quote = self.fetcher._get_hk_realtime_quote("AAPL")
 
         self.assertIsNone(quote)
 
@@ -140,7 +140,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
         ak_mock.stock_hk_spot.return_value = _make_spot_df()
 
         with patch.dict(sys.modules, {"akshare": ak_mock}):
-            quote = self.fetcher._get_hk_realtime_quote("HK00700")
+            quote = self.fetcher._get_hk_realtime_quote("AAPL")
 
         self.assertIsNotNone(quote)
         self.assertEqual(quote.name, "騰訊控股")
@@ -154,7 +154,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
         ak_mock = MagicMock()
 
         with patch.dict(sys.modules, {"akshare": ak_mock}):
-            quote = self.fetcher._get_hk_realtime_quote("HK00700")
+            quote = self.fetcher._get_hk_realtime_quote("AAPL")
 
         self.assertIsNone(quote)
         ak_mock.stock_hk_spot_em.assert_not_called()

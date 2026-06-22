@@ -376,14 +376,14 @@ class TestSafety(unittest.TestCase):
 
     def test_cn_symbol_rejected(self):
         analyzer = _make_analyzer()
-        result = analyzer.analyze(_default_cfg(symbol="600519"))
+        result = analyzer.analyze(_default_cfg(symbol="2330"))
         self.assertFalse(result["ok"])
 
     def test_no_cn_a_share_terms(self):
         analyzer = _make_analyzer()
         result = analyzer.analyze(_default_cfg())
         result_str = str(result)
-        cn_terms = ["A股", "上證", "上證", "深證", "深證", "創業板", "創業板"]
+        cn_terms = ["台股", "上證", "上證", "深證", "深證", "創業板", "創業板"]
         found = [t for t in cn_terms if t in result_str]
         self.assertEqual(found, [], f"CN/A-share terms found: {found}")
 

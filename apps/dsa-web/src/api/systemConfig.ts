@@ -237,7 +237,7 @@ export const systemConfigApi = {
   },
 
   /**
-   * 獲取自選佇列股票程式碼列表
+   * 獲取自選佇列股票代號列表
    */
   getWatchlist: async (): Promise<string[]> => {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/stocks/watchlist');

@@ -56,7 +56,7 @@ const mockStoreState = {
   sessions: [
     {
       session_id: 'session-1',
-      title: '請簡要分析 600519',
+      title: '請簡要分析 2330',
       message_count: 2,
       created_at: '2026-03-15T09:00:00Z',
       last_active: '2026-03-15T09:05:00Z',
@@ -154,7 +154,7 @@ beforeEach(() => {
   mockStoreState.sessions = [
     {
       session_id: 'session-1',
-      title: '請簡要分析 600519',
+      title: '請簡要分析 2330',
       message_count: 2,
       created_at: '2026-03-15T09:00:00Z',
       last_active: '2026-03-15T09:05:00Z',
@@ -302,7 +302,7 @@ describe('ChatPage', () => {
     );
 
     const sessionCard = await screen.findByRole('button', {
-      name: /切換到對話 請簡要分析 600519/,
+      name: /切換到對話 請簡要分析 2330/,
     });
 
     fireEvent.click(sessionCard);
@@ -318,7 +318,7 @@ describe('ChatPage', () => {
     );
 
     const deleteButton = await screen.findByRole('button', {
-      name: /刪除對話 請簡要分析 600519/,
+      name: /刪除對話 請簡要分析 2330/,
     });
 
     fireEvent.click(deleteButton);
@@ -342,7 +342,7 @@ describe('ChatPage', () => {
 
   it('exports the current session from the header action', async () => {
     mockStoreState.messages = [
-      { id: 'user-1', role: 'user', content: '請分析 600519' },
+      { id: 'user-1', role: 'user', content: '請分析 2330' },
       { id: 'assistant-1', role: 'assistant', content: '趨勢偏強', skillName: '趨勢分析' },
     ];
 
@@ -424,14 +424,14 @@ describe('ChatPage', () => {
 
     fireEvent.click(await screen.findByRole('checkbox', { name: '均線金叉' }));
     fireEvent.change(screen.getByPlaceholderText(/分析 2330/), {
-      target: { value: '分析 600519' },
+      target: { value: '分析 2330' },
     });
     fireEvent.click(screen.getByRole('button', { name: '傳送' }));
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: '分析 600519',
+          message: '分析 2330',
           skills: ['bull_trend', 'ma_golden_cross'],
         }),
         expect.objectContaining({
@@ -549,7 +549,7 @@ describe('ChatPage', () => {
 
   it('sends exported markdown to notification channel and shows success feedback', async () => {
     mockStoreState.messages = [
-      { id: 'user-1', role: 'user', content: '請分析 600519' },
+      { id: 'user-1', role: 'user', content: '請分析 2330' },
       { id: 'assistant-1', role: 'assistant', content: '趨勢偏強', skillName: '趨勢分析' },
     ];
     mockFormatSessionAsMarkdown.mockReturnValue('# exported markdown');
@@ -632,12 +632,12 @@ describe('ChatPage', () => {
     vi.mocked(historyApi.getDetail).mockImplementation(() => deferred.promise);
 
     render(
-      <MemoryRouter initialEntries={['/chat?stock=600519&name=%E8%B2%B4%E5%B7%9E%E8%8C%85%E8%87%BA&recordId=1']}>
+      <MemoryRouter initialEntries={['/chat?stock=2330&name=%E8%B2%B4%E5%B7%9E%E8%8C%85%E8%87%BA&recordId=1']}>
         <ChatPage />
       </MemoryRouter>
     );
 
-    expect(await screen.findByDisplayValue('請深入分析 貴州茅臺(600519)')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('請深入分析 台積電(2330)')).toBeInTheDocument();
 
     const sendButton = screen.getByRole('button', { name: /傳送|處理中\.\.\./ });
     expect(sendButton).not.toBeDisabled();
@@ -648,10 +648,10 @@ describe('ChatPage', () => {
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: '請深入分析 貴州茅臺(600519)',
+          message: '請深入分析 台積電(2330)',
           context: {
-            stock_code: '600519',
-            stock_name: '貴州茅臺',
+            stock_code: '2330',
+            stock_name: '台積電',
           },
         }),
         expect.objectContaining({
@@ -664,8 +664,8 @@ describe('ChatPage', () => {
       meta: {
         id: 1,
         queryId: 'q-1',
-        stockCode: '600519',
-        stockName: '貴州茅臺',
+        stockCode: '2330',
+        stockName: '台積電',
         reportType: 'detailed',
         createdAt: '2026-03-18T08:00:00Z',
         currentPrice: 1523.6,
@@ -709,8 +709,8 @@ describe('ChatPage', () => {
       meta: {
         id: 1,
         queryId: 'q-1',
-        stockCode: '600519',
-        stockName: '貴州茅臺',
+        stockCode: '2330',
+        stockName: '台積電',
         reportType: 'detailed',
         createdAt: '2026-03-18T08:00:00Z',
         currentPrice: 1523.6,
@@ -728,12 +728,12 @@ describe('ChatPage', () => {
     });
 
     render(
-      <MemoryRouter initialEntries={['/chat?stock=600519&name=%E8%B2%B4%E5%B7%9E%E8%8C%85%E8%87%BA&recordId=1']}>
+      <MemoryRouter initialEntries={['/chat?stock=2330&name=%E8%B2%B4%E5%B7%9E%E8%8C%85%E8%87%BA&recordId=1']}>
         <ChatPage />
       </MemoryRouter>
     );
 
-    expect(await screen.findByDisplayValue('請深入分析 貴州茅臺(600519)')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('請深入分析 台積電(2330)')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.queryByText('正在載入歷史分析上下文；現在可直接傳送追問。')).not.toBeInTheDocument();
@@ -744,10 +744,10 @@ describe('ChatPage', () => {
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: '請深入分析 貴州茅臺(600519)',
+          message: '請深入分析 台積電(2330)',
           context: expect.objectContaining({
-            stock_code: '600519',
-            stock_name: '貴州茅臺',
+            stock_code: '2330',
+            stock_name: '台積電',
             previous_price: 1523.6,
             previous_change_pct: 1.8,
             previous_strategy: expect.objectContaining({
@@ -813,13 +813,13 @@ describe('ChatPage', () => {
     const router = createMemoryRouter(
       [{ path: '/chat', element: <ChatPage /> }],
       {
-        initialEntries: ['/chat?stock=600519&name=%E8%B2%B4%E5%B7%9E%E8%8C%85%E8%87%BA&recordId=1'],
+        initialEntries: ['/chat?stock=2330&name=%E8%B2%B4%E5%B7%9E%E8%8C%85%E8%87%BA&recordId=1'],
       },
     );
 
     render(<RouterProvider router={router} />);
 
-    expect(await screen.findByDisplayValue('請深入分析 貴州茅臺(600519)')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('請深入分析 台積電(2330)')).toBeInTheDocument();
     expect(screen.getByText('正在載入歷史分析上下文；現在可直接傳送追問。')).toBeInTheDocument();
 
     await router.navigate('/chat?stock=AAPL&name=Apple&recordId=2');
@@ -830,8 +830,8 @@ describe('ChatPage', () => {
       meta: {
         id: 1,
         queryId: 'q-1',
-        stockCode: '600519',
-        stockName: '貴州茅臺',
+        stockCode: '2330',
+        stockName: '台積電',
         reportType: 'detailed',
         createdAt: '2026-03-18T08:00:00Z',
         currentPrice: 1523.6,
@@ -899,7 +899,7 @@ describe('ChatPage', () => {
 
   it('shows a jump-to-latest action when new content arrives while the user is away from bottom', async () => {
     mockStoreState.messages = [
-      { id: 'user-1', role: 'user', content: '請分析 600519' },
+      { id: 'user-1', role: 'user', content: '請分析 2330' },
       { id: 'assistant-1', role: 'assistant', content: '趨勢偏強', skillName: '趨勢分析' },
     ];
 
@@ -937,23 +937,15 @@ describe('ChatPage', () => {
 });
 
 describe('extractStockCodeFromMessage', () => {
-  it('returns 6-digit A-share code', () => {
-    expect(extractStockCodeFromMessage('分析 600519 趨勢')).toBe('600519');
-    expect(extractStockCodeFromMessage('002460')).toBe('002460');
+  it('returns TW stock and ETF codes', () => {
+    expect(extractStockCodeFromMessage('分析 2330 趨勢')).toBe('2330');
+    expect(extractStockCodeFromMessage('006208')).toBe('006208');
+    expect(extractStockCodeFromMessage('00981A')).toBe('00981A');
   });
 
-  it('returns HK prefixed code (normalized)', () => {
-    expect(extractStockCodeFromMessage('分析 hk00700')).toBe('HK00700');
-  });
-
-  it('returns .HK suffix code (normalized to canonical)', () => {
-    expect(extractStockCodeFromMessage('00700.HK')).toBe('HK00700');
-    expect(extractStockCodeFromMessage('1810.HK')).toBe('HK01810');
-  });
-
-  it('returns code with .SH/.SZ suffix (normalized)', () => {
-    expect(extractStockCodeFromMessage('看 600519.SH')).toBe('600519');
-    expect(extractStockCodeFromMessage('000001.SZ')).toBe('000001');
+  it('returns TW-prefixed and TW-suffixed code', () => {
+    expect(extractStockCodeFromMessage('分析 TW:00981A')).toBe('00981A');
+    expect(extractStockCodeFromMessage('看 2330.TW')).toBe('2330');
   });
 
   it('returns US ticker like AAPL', () => {
@@ -962,31 +954,23 @@ describe('extractStockCodeFromMessage', () => {
   });
 
   it('does NOT return exchange prefixes as tickers', () => {
-    expect(extractStockCodeFromMessage('分析 SH 走勢')).toBeNull();
-    expect(extractStockCodeFromMessage('看看 BJ')).toBeNull();
-    expect(extractStockCodeFromMessage('HK')).toBeNull();
-    expect(extractStockCodeFromMessage('買進 SZ')).toBeNull();
+    expect(extractStockCodeFromMessage('分析 TW 市場')).toBeNull();
     expect(extractStockCodeFromMessage('US 市場')).toBeNull();
-    expect(extractStockCodeFromMessage('SS')).toBeNull();
   });
 
   it('returns null for messages without stock codes', () => {
-    expect(extractStockCodeFromMessage('茅臺現在適合買進嗎')).toBeNull();
+    expect(extractStockCodeFromMessage('台積電現在適合買進嗎')).toBeNull();
     expect(extractStockCodeFromMessage('大盤走勢如何')).toBeNull();
   });
 
-  it('matches prefixed code like SH600519 (normalized)', () => {
-    expect(extractStockCodeFromMessage('分析 SH600519')).toBe('600519');
-  });
-
-  it('returns SZ-prefixed code when standalone (normalized)', () => {
-    expect(extractStockCodeFromMessage('SZ000001')).toBe('000001');
+  it('matches prefixed US code', () => {
+    expect(extractStockCodeFromMessage('分析 US:AAPL')).toBe('AAPL');
   });
 });
 
 describe('watchlist button with code variants', () => {
   it('shows "從自選刪除" when canonical code is in watchlist and user inputs variant', async () => {
-    mockGetWatchlist.mockResolvedValue(['600519', 'HK01810']);
+    mockGetWatchlist.mockResolvedValue(['2330', 'AAPL']);
 
     render(
       <MemoryRouter>
@@ -995,14 +979,14 @@ describe('watchlist button with code variants', () => {
     );
 
     const textarea = await screen.findByPlaceholderText(/例如/);
-    fireEvent.change(textarea, { target: { value: '分析 600519.SH' } });
+    fireEvent.change(textarea, { target: { value: '分析 2330.TW' } });
     fireEvent.keyDown(textarea, { key: 'Enter' });
 
     expect(await screen.findByText('從自選刪除')).toBeInTheDocument();
   });
 
-  it('shows "從自選刪除" for HK variant codes', async () => {
-    mockGetWatchlist.mockResolvedValue(['HK01810']);
+  it('shows "從自選刪除" for US variant codes', async () => {
+    mockGetWatchlist.mockResolvedValue(['AAPL']);
 
     render(
       <MemoryRouter>
@@ -1011,7 +995,7 @@ describe('watchlist button with code variants', () => {
     );
 
     const textarea = await screen.findByPlaceholderText(/例如/);
-    fireEvent.change(textarea, { target: { value: '分析 1810.HK' } });
+    fireEvent.change(textarea, { target: { value: '分析 AAPL.US' } });
     fireEvent.keyDown(textarea, { key: 'Enter' });
 
     expect(await screen.findByText('從自選刪除')).toBeInTheDocument();

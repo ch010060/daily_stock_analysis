@@ -19,7 +19,7 @@ describe('ReportNews', () => {
       total: 1,
       items: [
         {
-          title: '茅臺釋出最新經營資料',
+          title: '台積電釋出最新經營資料',
           snippet: '公司披露季度經營情況，市場關注度提升。',
           url: 'https://example.com/news',
         },
@@ -28,7 +28,7 @@ describe('ReportNews', () => {
 
     const { container } = render(<ReportNews recordId={1} />);
 
-    expect(await screen.findByText('茅臺釋出最新經營資料')).toBeInTheDocument();
+    expect(await screen.findByText('台積電釋出最新經營資料')).toBeInTheDocument();
     expect(screen.queryByText('暫無相關資訊')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '跳轉' })).toHaveAttribute('href', 'https://example.com/news');
     expect(container.querySelector('.home-panel-card')).toBeTruthy();

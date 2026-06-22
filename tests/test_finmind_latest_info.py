@@ -32,7 +32,7 @@ from src.finmind.latest_info import (
 
 _FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "finmind" / "latest_info"
 
-_CN_TERMS = ["A股", "上證", "上證", "深證", "深證", "創業板", "創業板", "科創50", "A-share"]
+_CN_TERMS = ["台股", "上證", "上證", "深證", "深證", "創業板", "創業板", "科創50", "A-share"]
 _BUYSELL_TERMS = ["買進", "賣出", "買進", "賣出", "強烈推薦", "強力推薦"]
 
 

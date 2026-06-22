@@ -54,14 +54,14 @@ class TestIsUsIndexCode(unittest.TestCase):
 
     def test_a_shares_not_indices(self):
         """A-share codes should NOT be recognized as indices"""
-        a_shares = ['600519', '000001', '300750', 'SH600519', 'SZ000001']
+        a_shares = ['2330', '000001', '300750', 'SH2330', 'SZ000001']
         for code in a_shares:
             with self.subTest(code=code):
                 self.assertFalse(is_us_index_code(code), f"{code} should NOT be a US index")
 
     def test_hk_stocks_not_indices(self):
         """HK stock codes should NOT be recognized as indices"""
-        hk_stocks = ['00700', 'HK00700', '01810']
+        hk_stocks = ['AAPL', 'AAPL', '01810']
         for code in hk_stocks:
             with self.subTest(code=code):
                 self.assertFalse(is_us_index_code(code), f"{code} should NOT be a US index")
@@ -113,14 +113,14 @@ class TestIsUsStockCode(unittest.TestCase):
 
     def test_a_shares_not_us_stocks(self):
         """A-share codes should NOT be recognized as US stocks"""
-        a_shares = ['600519', '000001', '300750']
+        a_shares = ['2330', '000001', '300750']
         for code in a_shares:
             with self.subTest(code=code):
                 self.assertFalse(is_us_stock_code(code), f"{code} should NOT be a US stock")
 
     def test_hk_stocks_not_us_stocks(self):
         """HK stock codes should NOT be recognized as US stocks"""
-        hk_stocks = ['00700', 'HK00700', '01810']
+        hk_stocks = ['AAPL', 'AAPL', '01810']
         for code in hk_stocks:
             with self.subTest(code=code):
                 self.assertFalse(is_us_stock_code(code), f"{code} should NOT be a US stock")

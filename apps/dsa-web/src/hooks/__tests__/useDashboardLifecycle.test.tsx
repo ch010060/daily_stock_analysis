@@ -9,8 +9,8 @@ vi.mock('../useTaskStream', () => ({
 
 const createTask = () => ({
   taskId: 'task-1',
-  stockCode: '600519',
-  stockName: '貴州茅臺',
+  stockCode: '2330',
+  stockName: '台積電',
   status: 'completed' as const,
   progress: 100,
   reportType: 'detailed',

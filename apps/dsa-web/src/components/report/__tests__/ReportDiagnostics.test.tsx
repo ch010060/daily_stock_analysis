@@ -22,7 +22,7 @@ const diagnosticSummary: RunDiagnosticSummary = {
   traceId: 'trace-1234567890abcdef',
   taskId: 'task-1',
   queryId: 'query-1',
-  stockCode: '600519',
+  stockCode: '2330',
   triggerSource: 'web',
   status: 'degraded',
   statusLabel: '部分降級',

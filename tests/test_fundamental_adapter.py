@@ -31,16 +31,16 @@ class TestFundamentalAdapter(unittest.TestCase):
     def test_extract_latest_row_returns_none_when_code_mismatch(self) -> None:
         df = pd.DataFrame(
             {
-                "股票程式碼": ["600000", "000001"],
+                "股票代號": ["600000", "000001"],
                 "值": [1, 2],
             }
         )
-        row = _extract_latest_row(df, "600519")
+        row = _extract_latest_row(df, "2330")
         self.assertIsNone(row)
 
     def test_extract_latest_row_fallback_when_no_code_column(self) -> None:
         df = pd.DataFrame({"值": [1, 2]})
-        row = _extract_latest_row(df, "600519")
+        row = _extract_latest_row(df, "2330")
         self.assertIsNotNone(row)
         self.assertEqual(row["值"], 1)
 
@@ -48,12 +48,12 @@ class TestFundamentalAdapter(unittest.TestCase):
         adapter = AkshareFundamentalAdapter()
         df = pd.DataFrame(
             {
-                "股票程式碼": ["600000"],
+                "股票代號": ["600000"],
                 "日期": ["2026-01-01"],
             }
         )
         with patch.object(adapter, "_call_df_candidates", return_value=(df, "stock_lhb_stock_statistic_em", [])):
-            result = adapter.get_dragon_tiger_flag("600519")
+            result = adapter.get_dragon_tiger_flag("2330")
         self.assertEqual(result["status"], "ok")
         self.assertFalse(result["is_on_list"])
         self.assertEqual(result["recent_count"], 0)
@@ -63,12 +63,12 @@ class TestFundamentalAdapter(unittest.TestCase):
         today = pd.Timestamp.now().strftime("%Y-%m-%d")
         df = pd.DataFrame(
             {
-                "股票程式碼": ["600519"],
+                "股票代號": ["2330"],
                 "日期": [today],
             }
         )
         with patch.object(adapter, "_call_df_candidates", return_value=(df, "stock_lhb_stock_statistic_em", [])):
-            result = adapter.get_dragon_tiger_flag("600519")
+            result = adapter.get_dragon_tiger_flag("2330")
         self.assertEqual(result["status"], "ok")
         self.assertTrue(result["is_on_list"])
         self.assertGreaterEqual(result["recent_count"], 1)
@@ -81,7 +81,7 @@ class TestFundamentalAdapter(unittest.TestCase):
         old_day = (now - timedelta(days=500)).strftime("%Y-%m-%d")
         fin_df = pd.DataFrame(
             {
-                "股票程式碼": ["600519"],
+                "股票代號": ["2330"],
                 "報告期": [within_ttm],
                 "營業總收入": [1000.0],
                 "歸母淨利潤": [300.0],
@@ -91,11 +91,11 @@ class TestFundamentalAdapter(unittest.TestCase):
                 "淨利潤同比": [9.5],
             }
         )
-        forecast_df = pd.DataFrame({"股票程式碼": ["600519"], "預告": ["預增"]})
-        quick_df = pd.DataFrame({"股票程式碼": ["600519"], "快報": ["快報摘要"]})
+        forecast_df = pd.DataFrame({"股票代號": ["2330"], "預告": ["預增"]})
+        quick_df = pd.DataFrame({"股票代號": ["2330"], "快報": ["快報摘要"]})
         dividend_df = pd.DataFrame(
             {
-                "股票程式碼": ["600519", "600519", "600519", "600519"],
+                "股票代號": ["2330", "2330", "2330", "2330"],
                 "除息日": [within_ttm, within_ttm, future_day, old_day],
                 "分配方案": ["10派3元(含稅)", "10派3元(含稅)", "10派5元", "10派1元"],
             }
@@ -113,7 +113,7 @@ class TestFundamentalAdapter(unittest.TestCase):
                 (None, None, []),
             ],
         ):
-            result = adapter.get_fundamental_bundle("600519")
+            result = adapter.get_fundamental_bundle("2330")
 
         financial_report = result["earnings"].get("financial_report", {})
         self.assertEqual(financial_report.get("report_date"), within_ttm)
@@ -132,26 +132,26 @@ class TestFundamentalAdapter(unittest.TestCase):
         now = datetime.now().strftime("%Y-%m-%d")
         df = pd.DataFrame(
             {
-                "股票程式碼": ["000001"],
+                "股票代號": ["000001"],
                 "除息日": [now],
                 "分配方案": ["10派3元(含稅)"],
             }
         )
 
-        payload = _build_dividend_payload(df, stock_code="600519")
+        payload = _build_dividend_payload(df, stock_code="2330")
         self.assertEqual(payload, {})
 
     def test_build_dividend_payload_skips_after_tax_plan(self) -> None:
         now = datetime.now().strftime("%Y-%m-%d")
         df = pd.DataFrame(
             {
-                "股票程式碼": ["600519"],
+                "股票代號": ["2330"],
                 "除息日": [now],
                 "分配方案": ["10派3元(稅後)"],
             }
         )
 
-        payload = _build_dividend_payload(df, stock_code="600519")
+        payload = _build_dividend_payload(df, stock_code="2330")
         self.assertEqual(payload, {})
 
     def test_build_dividend_payload_ttm_window_boundary(self) -> None:
@@ -160,13 +160,13 @@ class TestFundamentalAdapter(unittest.TestCase):
         day_366 = (now - timedelta(days=366)).strftime("%Y-%m-%d")
         df = pd.DataFrame(
             {
-                "股票程式碼": ["600519", "600519"],
+                "股票代號": ["2330", "2330"],
                 "除息日": [day_365, day_366],
                 "分配方案": ["10派3元(含稅)", "10派5元(含稅)"],
             }
         )
 
-        payload = _build_dividend_payload(df, stock_code="600519")
+        payload = _build_dividend_payload(df, stock_code="2330")
         self.assertEqual(payload.get("ttm_event_count"), 1)
         self.assertAlmostEqual(payload.get("ttm_cash_dividend_per_share"), 0.3, places=6)
 

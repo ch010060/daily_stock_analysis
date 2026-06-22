@@ -143,7 +143,7 @@ class TestAlphaVantageFetcherRealtimeQuote(unittest.TestCase):
         self.assertAlmostEqual(quote.price, 150.0)
 
     def test_realtime_quote_non_us_stock(self):
-        quote = self.fetcher.get_realtime_quote('600519')
+        quote = self.fetcher.get_realtime_quote('2330')
         self.assertIsNone(quote)
 
 

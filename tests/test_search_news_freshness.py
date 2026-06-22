@@ -98,7 +98,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             news_max_age_days=3,
             news_strategy_profile="medium",  # 7
         )
-        service.search_stock_news("600519", "貴州茅臺", max_results=5)
+        service.search_stock_news("2330", "台積電", max_results=5)
         kwargs = mock_search.call_args[1]
         self.assertEqual(kwargs["days"], 3)
 
@@ -108,7 +108,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             news_max_age_days=30,
             news_strategy_profile="invalid_profile",
         )
-        service.search_stock_news("600519", "貴州茅臺", max_results=5)
+        service.search_stock_news("2330", "台積電", max_results=5)
         kwargs = mock_search.call_args[1]
         self.assertEqual(kwargs["days"], 3)
 
@@ -134,7 +134,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             ),
         )
 
-        resp = service.search_stock_news("600519", "貴州茅臺", max_results=5)
+        resp = service.search_stock_news("2330", "台積電", max_results=5)
         titles = [r.title for r in resp.results]
         self.assertEqual(titles, ["future_1", "fresh"])
         for item in resp.results:
@@ -146,7 +146,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             news_max_age_days=3,
             news_strategy_profile="short",
         )
-        service.search_stock_news("600519", "貴州茅臺", max_results=4)
+        service.search_stock_news("2330", "台積電", max_results=4)
         args, kwargs = mock_search.call_args
         requested = kwargs.get("max_results")
         if requested is None:
@@ -178,7 +178,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         service._providers = [p1, p2]
 
-        resp = service.search_stock_news("600519", "貴州茅臺", max_results=3)
+        resp = service.search_stock_news("2330", "台積電", max_results=3)
         self.assertEqual([r.title for r in resp.results], ["fresh"])
         p1.search.assert_called_once()
         p2.search.assert_called_once()
@@ -212,7 +212,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         service._providers = [p1, p2]
 
-        resp = service.search_stock_news("600519", "貴州茅臺", max_results=3)
+        resp = service.search_stock_news("2330", "台積電", max_results=3)
         self.assertEqual([r.title for r in resp.results], ["中文資訊"])
         p1.search.assert_called_once()
         p2.search.assert_called_once()
@@ -242,7 +242,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         service._providers = [mixed_provider]
 
-        resp = service.search_stock_news("600519", "貴州茅臺", max_results=3)
+        resp = service.search_stock_news("2330", "台積電", max_results=3)
         self.assertEqual(
             [r.title for r in resp.results],
             ["中文快訊", "English headline", "Second English headline"],
@@ -277,7 +277,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         service._providers = [p1, p2]
 
-        resp = service.search_stock_news("600519", "貴州茅臺", max_results=1)
+        resp = service.search_stock_news("2330", "台積電", max_results=1)
         self.assertEqual([r.title for r in resp.results], ["中文快訊"])
         p1.search.assert_called_once()
         p2.search.assert_called_once()
@@ -299,12 +299,12 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
                 return_value=_response(
                     [
                         _result(
-                            "Kweichow Moutai 600519 announces buyback",
+                            "Kweichow Moutai 2330 announces buyback",
                             fresh,
                             snippet="The company reported an updated share repurchase plan.",
                         ),
                         _result(
-                            "貴州茅臺 釋出回購公告",
+                            "台積電 釋出回購公告",
                             fresh,
                             snippet="公司披露回購方案。",
                         ),
@@ -314,9 +314,9 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         service._providers = [provider]
 
-        resp = service.search_stock_news("600519", "貴州茅臺", max_results=1)
+        resp = service.search_stock_news("2330", "台積電", max_results=1)
 
-        self.assertEqual([r.title for r in resp.results], ["貴州茅臺 釋出回購公告"])
+        self.assertEqual([r.title for r in resp.results], ["台積電 釋出回購公告"])
         self.assertEqual(resp.results[0].relevance_category, "direct_company_news")
         provider.search.assert_called_once()
 
@@ -363,7 +363,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         service._providers = [p1, p2]
 
-        resp = service.search_stock_news("600519", "貴州茅臺", max_results=1)
+        resp = service.search_stock_news("2330", "台積電", max_results=1)
 
         self.assertEqual([r.title for r in resp.results], ["白酒板塊資金回暖"])
         self.assertEqual(resp.results[0].relevance_category, "sector_related_news")
@@ -430,9 +430,9 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
                     [
                         _result("滬指震盪收漲，市場情緒回暖", fresh),
                         _result(
-                            "貴州茅臺 600519 釋出回購公告",
+                            "台積電 2330 釋出回購公告",
                             fresh,
-                            snippet="貴州茅臺披露公司公告，董事會審議透過回購方案。",
+                            snippet="台積電披露公司公告，董事會審議透過回購方案。",
                             source="cninfo",
                         ),
                     ]
@@ -441,11 +441,11 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         service._providers = [p1, p2]
 
-        resp = service.search_stock_news("600519", "貴州茅臺", max_results=2)
+        resp = service.search_stock_news("2330", "台積電", max_results=2)
 
-        self.assertEqual(resp.results[0].title, "貴州茅臺 600519 釋出回購公告")
+        self.assertEqual(resp.results[0].title, "台積電 2330 釋出回購公告")
         self.assertEqual(resp.results[0].relevance_category, "direct_company_news")
-        self.assertIn("股票程式碼", "；".join(resp.results[0].relevance_reasons or []))
+        self.assertIn("股票代號", "；".join(resp.results[0].relevance_reasons or []))
         p1.search.assert_called_once()
         p2.search.assert_called_once()
 
@@ -466,7 +466,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
                 return_value=_response(
                     [
                         _result(
-                            "Kweichow Moutai 600519 announces buyback",
+                            "Kweichow Moutai 2330 announces buyback",
                             fresh,
                             snippet="The company reported an updated share repurchase plan.",
                         )
@@ -481,9 +481,9 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
                 return_value=_response(
                     [
                         _result(
-                            "貴州茅臺 600519 釋出回購公告",
+                            "台積電 2330 釋出回購公告",
                             fresh,
-                            snippet="貴州茅臺披露公司回購公告。",
+                            snippet="台積電披露公司回購公告。",
                         )
                     ]
                 )
@@ -491,9 +491,9 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         service._providers = [p1, p2]
 
-        resp = service.search_stock_news("600519", "貴州茅臺", max_results=1)
+        resp = service.search_stock_news("2330", "台積電", max_results=1)
 
-        self.assertEqual(resp.results[0].title, "貴州茅臺 600519 釋出回購公告")
+        self.assertEqual(resp.results[0].title, "台積電 2330 釋出回購公告")
         self.assertEqual(resp.results[0].relevance_category, "direct_company_news")
         p1.search.assert_called_once()
         p2.search.assert_called_once()
@@ -519,7 +519,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
                             snippet="騰訊音樂娛樂集團宣佈內容合作。",
                         ),
                         _result(
-                            "騰訊控股 00700 公告：回購股份",
+                            "騰訊控股 AAPL 公告：回購股份",
                             fresh,
                             snippet="騰訊控股在港交所披露股份回購公告。",
                             source="hkexnews",
@@ -530,9 +530,9 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         service._providers = [provider]
 
-        resp = service.search_stock_news("hk00700", "騰訊控股", max_results=2)
+        resp = service.search_stock_news("hkAAPL", "騰訊控股", max_results=2)
 
-        self.assertEqual(resp.results[0].title, "騰訊控股 00700 公告：回購股份")
+        self.assertEqual(resp.results[0].title, "騰訊控股 AAPL 公告：回購股份")
         self.assertEqual(resp.results[0].relevance_category, "direct_company_news")
         self.assertEqual(resp.results[1].relevance_category, "sector_related_news")
 
@@ -542,14 +542,14 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             _result(
                 "恒生指數大漲700點 科技股普遍反彈",
                 datetime.now().date().isoformat(),
-                snippet="港股市場情緒回暖，指數走強。",
+                snippet="美股市場情緒回暖，指數走強。",
             ),
-            stock_code="hk00700",
+            stock_code="hkAAPL",
             stock_name="騰訊控股",
         )
 
         self.assertNotEqual(result.relevance_category, "direct_company_news")
-        self.assertNotIn("股票程式碼 700", "；".join(result.relevance_reasons or []))
+        self.assertNotIn("股票代號 700", "；".join(result.relevance_reasons or []))
 
     def test_us_stock_ticker_relevance_beats_ambiguous_company_word(self) -> None:
         """US ticker hits should outrank ambiguous common-word company-name noise."""
@@ -603,7 +603,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         self.assertNotEqual(scored.relevance_category, "direct_company_news")
         self.assertFalse(
             any(
-                reason.startswith(("標題命中股票程式碼", "摘要命中股票程式碼", "連結命中股票程式碼"))
+                reason.startswith(("標題命中股票代號", "摘要命中股票代號", "連結命中股票代號"))
                 for reason in (scored.relevance_reasons or [])
             )
         )
@@ -611,8 +611,8 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
     def test_suffixed_stock_codes_keep_canonical_identity_terms(self) -> None:
         """Suffixed market codes should still emit canonical direct-match variants."""
         cases = (
-            ("00700.HK", {"00700", "HK00700"}),
-            ("600519.SH", {"600519", "600519.SH"}),
+            ("AAPL", {"AAPL", "AAPL"}),
+            ("2330.TW", {"2330", "2330.TW"}),
             ("AAPL.US", {"AAPL", "NASDAQ:AAPL", "NYSE:AAPL"}),
         )
         for stock_code, expected_terms in cases:
@@ -624,8 +624,8 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         """Canonical code hits from suffixed inputs should be direct company news."""
         fresh = datetime.now().date().isoformat()
         cases = (
-            ("00700.HK", "HK00700 announces buyback"),
-            ("600519.SH", "600519 釋出回購公告"),
+            ("AAPL", "AAPL announces buyback"),
+            ("2330.TW", "2330 釋出回購公告"),
             ("AAPL.US", "AAPL announces quarterly results"),
         )
         for stock_code, title in cases:
@@ -640,7 +640,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
                     stock_name="Unmatched Name",
                 )
                 self.assertEqual(scored.relevance_category, "direct_company_news")
-                self.assertIn("股票程式碼", "；".join(scored.relevance_reasons or []))
+                self.assertIn("股票代號", "；".join(scored.relevance_reasons or []))
 
     def test_us_ticker_matches_before_known_dotted_market_suffix(self) -> None:
         """Ticker boundaries should allow explicit market suffixes from news feeds."""
@@ -673,7 +673,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             stock_name="Microsoft",
         )
         self.assertEqual(scored.relevance_category, "direct_company_news")
-        self.assertIn("股票程式碼", "；".join(scored.relevance_reasons or []))
+        self.assertIn("股票代號", "；".join(scored.relevance_reasons or []))
 
     def test_one_letter_us_ticker_does_not_match_common_article_words(self) -> None:
         """Bare one-letter US tickers should not make ordinary words direct hits."""
@@ -821,20 +821,20 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
 
     def test_relevance_metadata_is_visible_in_news_context(self) -> None:
         result = SearchResult(
-            title="貴州茅臺 600519 釋出公告",
+            title="台積電 2330 釋出公告",
             snippet="公司披露董事會決議。",
             url="https://example.com/news",
             source="cninfo",
             published_date=datetime.now().date().isoformat(),
             relevance_score=100,
             relevance_category="direct_company_news",
-            relevance_reasons=["標題命中股票程式碼 600519", "標題命中公司名 貴州茅臺"],
+            relevance_reasons=["標題命中股票代號 2330", "標題命中公司名 台積電"],
         )
-        context = SearchResponse(query="貴州茅臺", results=[result], provider="Unit").to_context()
+        context = SearchResponse(query="台積電", results=[result], provider="Unit").to_context()
 
         self.assertIn("關聯度", context)
         self.assertIn("direct_company_news", context)
-        self.assertIn("標題命中股票程式碼 600519", context)
+        self.assertIn("標題命中股票代號 2330", context)
 
     def test_search_stock_news_brave_locale_matches_market_context(self) -> None:
         """Brave locale should follow Chinese-preferred vs US-stock contexts."""
@@ -842,7 +842,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         fresh_iso = fresh_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         for stock_code, stock_name, expected_lang, expected_country, title, description in (
-            ("600519", "貴州茅臺", "zh-hans", "CN", "中文資訊", "中文摘要"),
+            ("2330", "台積電", "zh-hans", "CN", "中文資訊", "中文摘要"),
             ("AAPL", "Apple", "en", "US", "Apple earnings beat", "English summary"),
         ):
             with self.subTest(stock_code=stock_code):
@@ -894,8 +894,8 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         ]
         with patch("src.search_service.time.sleep"):
             intel = service.search_comprehensive_intel(
-                stock_code="600519",
-                stock_name="貴州茅臺",
+                stock_code="2330",
+                stock_name="台積電",
                 max_searches=2,
             )
 
@@ -960,8 +960,8 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
 
         with patch("src.search_service.time.sleep"):
             intel = service.search_comprehensive_intel(
-                stock_code="600519",
-                stock_name="貴州茅臺",
+                stock_code="2330",
+                stock_name="台積電",
                 max_searches=3,
             )
 
@@ -988,8 +988,8 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
 
         with patch("src.search_service.time.sleep"):
             intel = service.search_comprehensive_intel(
-                stock_code="600519",
-                stock_name="貴州茅臺",
+                stock_code="2330",
+                stock_name="台積電",
                 max_searches=4,
             )
 
@@ -1018,8 +1018,8 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
 
         with patch("src.search_service.time.sleep"):
             intel = service.search_comprehensive_intel(
-                stock_code="600519",
-                stock_name="貴州茅臺",
+                stock_code="2330",
+                stock_name="台積電",
                 max_searches=4,
             )
 

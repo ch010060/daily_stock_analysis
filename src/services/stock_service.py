@@ -34,7 +34,7 @@ class StockService:
         獲取股票實時行情
         
         Args:
-            stock_code: 股票程式碼
+            stock_code: 股票代號
             
         Returns:
             實時行情資料字典
@@ -95,7 +95,7 @@ class StockService:
         獲取股票歷史行情
         
         Args:
-            stock_code: 股票程式碼
+            stock_code: 股票代號
             period: K 線週期 (daily/weekly/monthly)
             days: 獲取天數
             
@@ -165,7 +165,7 @@ class StockService:
         獲取佔位行情資料（用於測試）
         
         Args:
-            stock_code: 股票程式碼
+            stock_code: 股票代號
             
         Returns:
             佔位行情資料

@@ -68,7 +68,7 @@ describe('agentChatStore.startStream', () => {
 
     await useAgentChatStore
       .getState()
-      .startStream({ message: '分析茅臺', session_id: 'session-test' }, { skillName: '趨勢技能' });
+      .startStream({ message: '分析台積電', session_id: 'session-test' }, { skillName: '趨勢技能' });
 
     const state = useAgentChatStore.getState();
     expect(state.loading).toBe(false);
@@ -76,7 +76,7 @@ describe('agentChatStore.startStream', () => {
     expect(state.messages).toHaveLength(2);
     expect(state.messages[0]).toMatchObject({
       role: 'user',
-      content: '分析茅臺',
+      content: '分析台積電',
       skillName: '趨勢技能',
     });
     expect(state.messages[1]).toMatchObject({
@@ -99,7 +99,7 @@ describe('agentChatStore.startStream', () => {
       .getState()
       .startStream(
         {
-          message: '分析茅臺',
+          message: '分析台積電',
           session_id: 'session-test',
           skills: ['bull_trend', 'ma_golden_cross'],
         },
@@ -136,7 +136,7 @@ describe('agentChatStore.startStream', () => {
 
     await useAgentChatStore
       .getState()
-      .startStream({ message: '分析茅臺', session_id: 'session-test' }, { skillName: '趨勢技能' });
+      .startStream({ message: '分析台積電', session_id: 'session-test' }, { skillName: '趨勢技能' });
 
     const state = useAgentChatStore.getState();
     expect(state.loading).toBe(false);
@@ -158,7 +158,7 @@ describe('agentChatStore.startStream', () => {
 
     await useAgentChatStore
       .getState()
-      .startStream({ message: '分析茅臺', session_id: 'session-test' }, { skillName: '趨勢技能' });
+      .startStream({ message: '分析台積電', session_id: 'session-test' }, { skillName: '趨勢技能' });
 
     const state = useAgentChatStore.getState();
     expect(state.loading).toBe(false);
@@ -180,7 +180,7 @@ describe('agentChatStore.startStream', () => {
 
     await useAgentChatStore
       .getState()
-      .startStream({ message: '分析茅臺', session_id: 'session-test' }, { skillName: '趨勢技能' });
+      .startStream({ message: '分析台積電', session_id: 'session-test' }, { skillName: '趨勢技能' });
 
     const state = useAgentChatStore.getState();
     expect(state.loading).toBe(false);

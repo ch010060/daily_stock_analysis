@@ -46,18 +46,15 @@ class TestSymbolNormalization(unittest.TestCase):
         self.assertEqual(result.canonical, "US:AAPL")
         self.assertEqual(result.provider_symbol, "AAPL")
 
-    def test_a_share_without_market_fails_fast(self):
-        """Bare 5-digit CN codes still fail normalization.
-        4-digit codes are now accepted as TW stock codes (Phase 9C)."""
-        with self.assertRaises(SymbolNormalizationError):
-            normalize_symbol("600519")
-
-    def test_tw_like_bare_symbol_without_market_fails_fast(self):
-        """4-digit codes are now accepted as TW stock codes (Phase 9C).
-        The Route B scope gate handles CN filtering at a higher layer."""
+    def test_tw_bare_symbol_defaults_to_tw_when_supported(self):
+        """Bare supported TW symbols resolve through the TW/US universe."""
         result = normalize_symbol("2330")
         self.assertEqual(result.market, "TW")
         self.assertEqual(result.canonical, "TW:2330")
+
+    def test_unknown_symbol_without_market_fails_fast(self):
+        with self.assertRaises(SymbolNormalizationError):
+            normalize_symbol("UNKNOWN_TARGET")
 
     def test_tw_4digit_etf_symbol(self):
         result = normalize_symbol("TW:0050")
@@ -83,11 +80,11 @@ class TestSymbolNormalization(unittest.TestCase):
         self.assertEqual(result.canonical, "TW:00981A")
         self.assertEqual(result.provider_symbol, "00981A")
 
-    def test_existing_a_h_code_path_helpers_are_unchanged(self):
-        self.assertEqual(normalize_stock_code("SH600519"), "600519")
-        self.assertEqual(normalize_stock_code("SZ000001"), "000001")
-        self.assertEqual(normalize_stock_code("1810.HK"), "HK01810")
-        self.assertEqual(normalize_stock_code("HK700"), "HK00700")
+    def test_stock_code_helper_supports_tw_us_only(self):
+        self.assertEqual(normalize_stock_code("TW:00981A"), "00981A")
+        self.assertEqual(normalize_stock_code("006208.TW"), "006208")
+        self.assertEqual(normalize_stock_code("US:AAPL"), "AAPL")
+        self.assertEqual(normalize_stock_code("AAPL.US"), "AAPL")
 
     def test_us_multiclass_dot_suffix(self):
         result = normalize_symbol("US:BRK.B")

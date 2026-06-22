@@ -64,8 +64,8 @@ vi.mock('../../hooks/useTaskStream', () => ({
 const historyItem = {
   id: 1,
   queryId: 'q-1',
-  stockCode: '600519',
-  stockName: '貴州茅臺',
+  stockCode: '2330',
+  stockName: '台積電',
   sentimentScore: 82,
   operationAdvice: '買進',
   createdAt: '2026-03-18T08:00:00Z',
@@ -75,8 +75,8 @@ const historyReport = {
   meta: {
     id: 1,
     queryId: 'q-1',
-    stockCode: '600519',
-    stockName: '貴州茅臺',
+    stockCode: '2330',
+    stockName: '台積電',
     reportType: 'detailed' as const,
     reportLanguage: 'zh' as const,
     createdAt: '2026-03-18T08:00:00Z',
@@ -332,7 +332,7 @@ describe('HomePage', () => {
       items: [],
     });
     vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(
-      new DuplicateTaskError('600519', 'task-1', '股票 600519 正在分析中'),
+      new DuplicateTaskError('2330', 'task-1', '股票 2330 正在分析中'),
     );
 
     render(
@@ -342,13 +342,13 @@ describe('HomePage', () => {
     );
 
     const input = await screen.findByPlaceholderText('輸入股票代號或名稱，如 2330、AAPL');
-    fireEvent.change(input, { target: { value: '600519' } });
+    fireEvent.change(input, { target: { value: '2330' } });
     fireEvent.click(screen.getByRole('button', { name: '分析' }));
 
     await waitFor(() => {
-      expect(screen.getByText(/股票 600519 正在分析中/)).toBeInTheDocument();
+      expect(screen.getByText(/股票 2330 正在分析中/)).toBeInTheDocument();
     });
-    expect(screen.getByText(/股票 600519 正在分析中/).closest('[role="alert"]')).toBeInTheDocument();
+    expect(screen.getByText(/股票 2330 正在分析中/).closest('[role="alert"]')).toBeInTheDocument();
   });
 
   it('submits market review from the home toolbar', async () => {
@@ -532,7 +532,7 @@ describe('HomePage', () => {
     fireEvent.click(followUpButton);
 
     expect(navigateMock).toHaveBeenCalledWith(
-      '/chat?stock=600519&name=%E8%B2%B4%E5%B7%9E%E8%8C%85%E8%87%BA&recordId=1',
+      '/chat?stock=2330&name=%E8%B2%B4%E5%B7%9E%E8%8C%85%E8%87%BA&recordId=1',
     );
   });
 
@@ -577,8 +577,8 @@ describe('HomePage', () => {
       items: [
         {
           id: 1,
-          stockCode: '600519',
-          stockName: '貴州茅臺',
+          stockCode: '2330',
+          stockName: '台積電',
           reportType: 'detailed',
           sentimentScore: 58,
           operationAdvice: '繼續觀察買點',
@@ -629,10 +629,10 @@ describe('HomePage', () => {
     await waitFor(() => {
       expect(screen.queryByText('暫無更多同股歷史分析')).not.toBeInTheDocument();
     });
-    expect(screen.getAllByRole('button', { name: /貴州茅臺/ }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole('button', { name: /台積電/ }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/2次/)).toBeInTheDocument();
 
-    const historyCalls = vi.mocked(historyApi.getList).mock.calls.filter((call) => call[0]?.stockCode === '600519');
+    const historyCalls = vi.mocked(historyApi.getList).mock.calls.filter((call) => call[0]?.stockCode === '2330');
     expect(historyCalls).toHaveLength(3);
     expect(historyCalls[1][0]).toHaveProperty('startDate');
     expect(historyCalls[2][0]).not.toHaveProperty('startDate');
@@ -641,8 +641,8 @@ describe('HomePage', () => {
   it('renders active task panel content from dashboard state', async () => {
     const activeTask = {
       taskId: 'task-1',
-      stockCode: '600519',
-      stockName: '貴州茅臺',
+      stockCode: '2330',
+      stockName: '台積電',
       status: 'processing' as const,
       progress: 45,
       message: '正在抓取最新行情',
@@ -708,8 +708,8 @@ describe('HomePage', () => {
 
     // Verify that analyzeAsync is called with the report's stock code, not the search box text
     expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
-      stockCode: '600519',
-      originalQuery: '600519',
+      stockCode: '2330',
+      originalQuery: '2330',
       forceRefresh: true,
     }));
   });
@@ -743,12 +743,12 @@ describe('HomePage', () => {
     fireEvent.click(screen.getByRole('menuitemradio', { name: /成長質量/ }));
 
     const input = screen.getByPlaceholderText('輸入股票代號或名稱，如 2330、AAPL');
-    fireEvent.change(input, { target: { value: '600519' } });
+    fireEvent.change(input, { target: { value: '2330' } });
     fireEvent.click(screen.getByRole('button', { name: '分析' }));
 
     await waitFor(() => {
       expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
-        stockCode: '600519',
+        stockCode: '2330',
         skills: ['growth_quality'],
       }));
     });

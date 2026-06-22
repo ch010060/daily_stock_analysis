@@ -157,7 +157,7 @@ class TestFixtureNoNetworkRouting(unittest.TestCase):
         env = {"DSA_FIXTURE_MODE": "false", "DSA_ALLOW_EXTERNAL_NETWORK": "false"}
         with patch.dict(os.environ, env):
             manager = DataFetcherManager(fetchers=[live_fetcher])
-            chip = manager.get_chip_distribution("600519")
+            chip = manager.get_chip_distribution("2330")
 
         self.assertIsNone(chip)
 
@@ -183,7 +183,7 @@ class TestFixtureNoNetworkRouting(unittest.TestCase):
             manager.get_realtime_quote = MagicMock(
                 side_effect=AssertionError("realtime quote must not be called")
             )
-            context = manager.get_fundamental_context("600519")
+            context = manager.get_fundamental_context("2330")
 
         self.assertEqual(context["status"], "not_supported")
         self.assertEqual(context["market"], "tw")

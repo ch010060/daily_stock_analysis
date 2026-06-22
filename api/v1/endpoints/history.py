@@ -64,7 +64,7 @@ def _normalize_code_for_grouping(code: str) -> str:
     """Normalize stock code for deduplication grouping.
 
     Delegates to data_provider.base.normalize_stock_code which handles
-    SH600519, 600519.SH, HK00700, 00700.HK, BJ920748, etc.
+    SH2330, 2330.TW, AAPL, AAPL, BJ920748, etc.
     """
     from data_provider.base import normalize_stock_code
     return normalize_stock_code(code or "")
@@ -78,10 +78,10 @@ def _normalize_code_for_grouping(code: str) -> str:
         500: {"description": "伺服器錯誤", "model": ErrorResponse},
     },
     summary="獲取歷史分析列表",
-    description="分頁獲取歷史分析記錄摘要，支援按股票程式碼和日期範圍篩選"
+    description="分頁獲取歷史分析記錄摘要，支援按股票代號和日期範圍篩選"
 )
 def get_history_list(
-    stock_code: Optional[str] = Query(None, description="股票程式碼篩選"),
+    stock_code: Optional[str] = Query(None, description="股票代號篩選"),
     start_date: Optional[str] = Query(None, description="開始日期 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="結束日期 (YYYY-MM-DD)"),
     page: int = Query(1, ge=1, description="頁碼（從 1 開始）"),
@@ -91,10 +91,10 @@ def get_history_list(
     """
     獲取歷史分析列表
     
-    分頁獲取歷史分析記錄摘要，支援按股票程式碼和日期範圍篩選
+    分頁獲取歷史分析記錄摘要，支援按股票代號和日期範圍篩選
     
     Args:
-        stock_code: 股票程式碼篩選
+        stock_code: 股票代號篩選
         start_date: 開始日期
         end_date: 結束日期
         page: 頁碼
@@ -164,8 +164,8 @@ def get_history_list(
         404: {"description": "未找到記錄", "model": ErrorResponse},
         500: {"description": "伺服器錯誤", "model": ErrorResponse},
     },
-    summary="按股票程式碼刪除歷史分析記錄",
-    description="刪除指定股票程式碼的所有分析歷史記錄（支援程式碼變體歸一化匹配）",
+    summary="按股票代號刪除歷史分析記錄",
+    description="刪除指定股票代號的所有分析歷史記錄（支援程式碼變體歸一化匹配）",
 )
 def delete_history_by_code(
     stock_code: str,
@@ -180,7 +180,7 @@ def delete_history_by_code(
         deleted = db_manager.delete_analysis_history_records(record_ids)
         return DeleteHistoryResponse(deleted=deleted)
     except Exception as e:
-        logger.error(f"按股票程式碼刪除歷史記錄失敗: {e}", exc_info=True)
+        logger.error(f"按股票代號刪除歷史記錄失敗: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": f"刪除失敗: {str(e)}"},

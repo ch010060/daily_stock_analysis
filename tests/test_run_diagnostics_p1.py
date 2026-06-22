@@ -66,7 +66,7 @@ class _SuccessfulDailyFetcher(BaseFetcher):
 
 
 class _Quote:
-    name = "貴州茅臺"
+    name = "台積電"
     price = 100
     change_pct = 1.2
     volume_ratio = 1.1
@@ -122,7 +122,7 @@ class RunDiagnosticsP1TestCase(unittest.TestCase):
         AnalysisTaskQueue._instance = self._original_queue
 
     def test_task_info_exposes_trace_id_for_sse_and_status_payloads(self) -> None:
-        task = TaskInfo(task_id="task-1", stock_code="600519")
+        task = TaskInfo(task_id="task-1", stock_code="2330")
 
         self.assertEqual(task.to_dict()["trace_id"], "task-1")
         self.assertEqual(task.copy().trace_id, "task-1")
@@ -149,11 +149,11 @@ class RunDiagnosticsP1TestCase(unittest.TestCase):
         token = activate_run_diagnostic_context(
             trace_id="trace-daily",
             query_id="query-daily",
-            stock_code="600519",
+            stock_code="2330",
             trigger_source="api",
         )
         try:
-            df, source = manager.get_daily_data("600519")
+            df, source = manager.get_daily_data("2330")
             snapshot = current_diagnostic_snapshot()
         finally:
             reset_run_diagnostic_context(token)
@@ -177,12 +177,12 @@ class RunDiagnosticsP1TestCase(unittest.TestCase):
         token = activate_run_diagnostic_context(
             trace_id="trace-realtime",
             query_id="query-realtime",
-            stock_code="600519",
+            stock_code="2330",
             trigger_source="api",
         )
         try:
             with patch("src.config.get_config", return_value=config):
-                quote = manager.get_realtime_quote("600519")
+                quote = manager.get_realtime_quote("2330")
             snapshot = current_diagnostic_snapshot()
         finally:
             reset_run_diagnostic_context(token)

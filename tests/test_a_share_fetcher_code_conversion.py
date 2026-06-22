@@ -42,7 +42,7 @@ class TestBaostockAShareCodeConversion(unittest.TestCase):
         fetcher = BaostockFetcher()
 
         self.assertEqual(fetcher._convert_stock_code("601888"), "sh.601888")
-        self.assertEqual(fetcher._convert_stock_code("600519"), "sh.600519")
+        self.assertEqual(fetcher._convert_stock_code("2330"), "sh.2330")
         self.assertEqual(fetcher._convert_stock_code("605499"), "sh.605499")
         self.assertEqual(fetcher._convert_stock_code("688981"), "sh.688981")
         self.assertEqual(fetcher._convert_stock_code("000001"), "sz.000001")
@@ -60,7 +60,7 @@ class TestBaostockAShareCodeConversion(unittest.TestCase):
     def test_convert_suffix_code_uses_internal_provider_format(self) -> None:
         fetcher = BaostockFetcher()
 
-        self.assertEqual(fetcher._convert_stock_code("600519.SH"), "sh.600519")
+        self.assertEqual(fetcher._convert_stock_code("2330.TW"), "sh.2330")
         self.assertEqual(fetcher._convert_stock_code("000001.SZ"), "sz.000001")
 
     def test_convert_prefix_code_preserves_explicit_exchange_hint(self) -> None:
@@ -68,9 +68,9 @@ class TestBaostockAShareCodeConversion(unittest.TestCase):
 
         self.assertEqual(fetcher._convert_stock_code("SH000001"), "sh.000001")
         self.assertEqual(fetcher._convert_stock_code("SH.000001"), "sh.000001")
-        self.assertEqual(fetcher._convert_stock_code("SZ600519"), "sz.600519")
-        self.assertEqual(fetcher._convert_stock_code("SZ.600519"), "sz.600519")
-        self.assertEqual(fetcher._convert_stock_code("ss.600519"), "sh.600519")
+        self.assertEqual(fetcher._convert_stock_code("SZ2330"), "sz.2330")
+        self.assertEqual(fetcher._convert_stock_code("SZ.2330"), "sz.2330")
+        self.assertEqual(fetcher._convert_stock_code("ss.2330"), "sh.2330")
 
 
 class TestPytdxAShareCodeConversion(unittest.TestCase):
@@ -87,9 +87,9 @@ class TestPytdxAShareCodeConversion(unittest.TestCase):
 
         self.assertEqual(fetcher._get_market_code("SH000001"), (1, "000001"))
         self.assertEqual(fetcher._get_market_code("SH.000001"), (1, "000001"))
-        self.assertEqual(fetcher._get_market_code("SZ600519"), (0, "600519"))
-        self.assertEqual(fetcher._get_market_code("SZ.600519"), (0, "600519"))
-        self.assertEqual(fetcher._get_market_code("ss.600519"), (1, "600519"))
+        self.assertEqual(fetcher._get_market_code("SZ2330"), (0, "2330"))
+        self.assertEqual(fetcher._get_market_code("SZ.2330"), (0, "2330"))
+        self.assertEqual(fetcher._get_market_code("ss.2330"), (1, "2330"))
 
 
 class TestTushareAShareCodeConversion(unittest.TestCase):
@@ -106,15 +106,15 @@ class TestTushareAShareCodeConversion(unittest.TestCase):
 
         self.assertEqual(fetcher._convert_stock_code("SH000001"), "000001.SH")
         self.assertEqual(fetcher._convert_stock_code("SH.000001"), "000001.SH")
-        self.assertEqual(fetcher._convert_stock_code("SZ600519"), "600519.SZ")
-        self.assertEqual(fetcher._convert_stock_code("SZ.600519"), "600519.SZ")
-        self.assertEqual(fetcher._convert_stock_code("ss.600519"), "600519.SH")
+        self.assertEqual(fetcher._convert_stock_code("SZ2330"), "2330.SZ")
+        self.assertEqual(fetcher._convert_stock_code("SZ.2330"), "2330.SZ")
+        self.assertEqual(fetcher._convert_stock_code("ss.2330"), "2330.TW")
 
 
 class TestNormalizeStockCode(unittest.TestCase):
     def test_normalize_prefixed_dot_code(self) -> None:
-        self.assertEqual(normalize_stock_code("SH.600519"), "600519")
-        self.assertEqual(normalize_stock_code("sh.600519"), "600519")
+        self.assertEqual(normalize_stock_code("SH.2330"), "2330")
+        self.assertEqual(normalize_stock_code("sh.2330"), "2330")
         self.assertEqual(normalize_stock_code("SZ.000001"), "000001")
         self.assertEqual(normalize_stock_code("sz.000001"), "000001")
         self.assertEqual(normalize_stock_code("BJ.920748"), "920748")

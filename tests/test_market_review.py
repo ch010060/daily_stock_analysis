@@ -168,9 +168,9 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                 notifier, send_notification=False, override_region="cn,us"
             )
 
-        self.assertIn("# A股大盤回顧\n\nCN body", result)
+        self.assertIn("# 台股大盤回顧\n\nCN body", result)
         self.assertIn("# 美股大盤回顧\n\nUS body", result)
-        self.assertNotIn("港股", result)
+        self.assertNotIn("美股", result)
         self.assertNotIn("HK", result)
 
     def test_run_market_review_comma_joined_subset_cn_hk(self) -> None:
@@ -201,8 +201,8 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                 notifier, send_notification=False, override_region="cn,hk"
             )
 
-        self.assertIn("# A股大盤回顧\n\nCN body", result)
-        self.assertIn("# 港股大盤回顧\n\nHK body", result)
+        self.assertIn("# 台股大盤回顧\n\nCN body", result)
+        self.assertIn("# 美股大盤回顧\n\nHK body", result)
         self.assertNotIn("美股", result)
         self.assertNotIn("US Market", result)
 

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-圖片股票程式碼提取 (Vision LLM)
+圖片股票代號提取 (Vision LLM)
 ===================================
 
-從截圖/圖片中提取股票程式碼，使用 Vision LLM。
+從截圖/圖片中提取股票代號，使用 Vision LLM。
 優先順序：Gemini -> Anthropic -> OpenAI（首個可用）。
 """
 
@@ -33,25 +33,24 @@ class _LiteLLMPlaceholder:
 # Keep a patchable module attribute while still avoiding a hard import at module load.
 litellm = sys.modules.get("litellm") or _LiteLLMPlaceholder()
 
-EXTRACT_PROMPT = """請分析這張股票市場截圖或圖片，提取其中所有可見的股票程式碼及名稱。
+EXTRACT_PROMPT = """請分析這張股票市場截圖或圖片，提取其中所有可見的股票代號及名稱。
 
-重要：若圖中同時顯示股票名稱和程式碼（如自選股列表、ETF 列表），必須同時提取兩者，每個元素必須包含 code 和 name 欄位。
+重要：若圖中同時顯示股票名稱和代號（如自選股列表、ETF 列表），必須同時提取兩者，每個元素必須包含 code 和 name 欄位。
 
 輸出格式：僅返回有效的 JSON 陣列，不要 markdown、不要解釋。
-每個元素為物件：{"code":"股票程式碼","name":"股票名稱","confidence":"high|medium|low"}
-- code: 必填，股票程式碼（A股6位、港股5位、美股1-5字母、ETF 如 159887/512880）
-- name: 若圖中有名稱則必填（如 貴州茅臺、銀行ETF、證券ETF），與程式碼一一對應；僅當圖中確實無名稱時可省略
+每個元素為物件：{"code":"股票代號","name":"股票名稱","confidence":"high|medium|low"}
+- code: 必填，股票代號（台股 4-6 位或含英文字尾如 00981A；美股 1-5 字母或 BRK.B 類別股）
+- name: 若圖中有名稱則必填（如 台積電、群聯、Apple、NVIDIA、主動統一台股增長），與代號一一對應；僅當圖中確實無名稱時可省略
 - confidence: 必填，識別置信度，high=確定、medium=較確定、low=不確定
 
-示例（圖中同時有名稱和程式碼時）：
-- 個股：600519 貴州茅臺、300750 寧德時代
-- 港股：00700 騰訊控股、09988 阿里巴巴
-- 美股：AAPL 蘋果、TSLA 特斯拉
-- ETF：159887 銀行ETF、512880 證券ETF、512000 券商ETF、512480 半導體ETF、515030 新能源車ETF
+示例（圖中同時有名稱和代號時）：
+- 台股個股：2330 台積電、8299 群聯、2308 台達電
+- 美股個股：AAPL Apple、NVDA NVIDIA、META Meta Platforms
+- ETF：006208 富邦台50、00981A 主動統一台股增長、SPY SPDR S&P 500 ETF
 
-輸出示例：[{"code":"600519","name":"貴州茅臺","confidence":"high"},{"code":"159887","name":"銀行ETF","confidence":"high"}]
+輸出示例：[{"code":"2330","name":"台積電","confidence":"high"},{"code":"00981A","name":"主動統一台股增長","confidence":"high"}]
 
-禁止只返回程式碼陣列如 ["159887","512880"]，必須使用物件格式。若未找到任何股票程式碼，返回：[]"""
+禁止只返回代號陣列如 ["2330","00981A"]，必須使用物件格式。若未找到任何股票代號，返回：[]"""
 
 # Valid confidence values; invalid ones normalized to medium
 _VALID_CONFIDENCE = frozenset({"high", "medium", "low"})
@@ -89,27 +88,29 @@ def _verify_image_magic_bytes(image_bytes: bytes, mime_type: str) -> None:
 
 
 def _normalize_code(raw: str) -> Optional[str]:
-    """Normalize and validate a single stock code. A-shares & HK: 5-6 digits; US: 1-5 letters."""
+    """Normalize and validate a single TW/US stock symbol."""
     s = raw.strip().upper()
     if not s:
         return None
-    # A-shares & HK: 5-6 digit codes (600519, 00700, 09988)
-    if s.isdigit() and len(s) in (5, 6):
+    if s.startswith("TW:"):
+        s = s[3:]
+    elif s.startswith("US:"):
+        s = s[3:]
+    if s.endswith(".TW"):
+        s = s[:-3]
+    elif s.endswith(".US"):
+        s = s[:-3]
+    # TW stocks and ETFs: 4-6 digits or 4-5 digits plus one letter.
+    if re.match(r"^(?:\d{4,6}|\d{4,5}[A-Z])$", s):
         return s
-    # US stocks: 1-5 letters, optionally with . (e.g. BRK.B)
-    if re.match(r"^[A-Z]{1,5}(\.[A-Z])?$", s):
+    # US stocks: 1-5 letters, optionally with class suffix (e.g. BRK.B).
+    if re.match(r"^[A-Z]{1,5}([.-][A-Z])?$", s):
         return s
-    # 嘗試去除 SH/SZ 字尾
-    for suffix in (".SH", ".SZ", ".SS"):
-        if s.endswith(suffix):
-            base = s[: -len(suffix)].strip()
-            if base.isdigit() and len(base) in (5, 6):
-                return base
     return None
 
 
 def _parse_codes_from_text(text: str) -> List[str]:
-    """從 LLM 響應文字解析股票程式碼（legacy format）。"""
+    """從 LLM 響應文字解析股票代號（legacy format）。"""
     seen: set[str] = set()
     result: List[str] = []
 
@@ -136,8 +137,12 @@ def _parse_codes_from_text(text: str) -> List[str]:
     except json.JSONDecodeError:
         pass
 
-    # 兜底：查詢 5-6 位數字及美股程式碼
-    for m in re.finditer(r"\b([0-9]{5,6}|[A-Z]{1,5}(\.[A-Z])?)\b", text, re.IGNORECASE):
+    # 兜底：查詢台股 / 美股股票代號
+    for m in re.finditer(
+        r"\b((?:\d{4,6}|\d{4,5}[A-Z])|[A-Z]{1,5}(?:[.-][A-Z])?)\b",
+        text,
+        re.IGNORECASE,
+    ):
         c = _normalize_code(m.group(1))
         if c and c not in seen and c not in _FAKE_CODES:
             seen.add(c)
@@ -285,7 +290,7 @@ def extract_stock_codes_from_image(
     mime_type: str,
 ) -> Tuple[List[Tuple[str, Optional[str], str]], str]:
     """
-    從圖片中提取股票程式碼及名稱（使用 Vision LLM）。
+    從圖片中提取股票代號及名稱（使用 Vision LLM）。
 
     優先順序：Gemini -> Anthropic -> OpenAI（首個可用）。
     支援多 Key 輪詢與重試（最多 3 次，指數退避）。

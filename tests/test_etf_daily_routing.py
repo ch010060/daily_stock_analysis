@@ -32,7 +32,7 @@ def _make_akshare_fetcher() -> AkshareFetcher:
 def _history_frame(code: str = "563230") -> pd.DataFrame:
     return pd.DataFrame(
         {
-            "股票程式碼": [code] * 5,
+            "股票代號": [code] * 5,
             "日期": pd.date_range("2026-01-01", periods=5).strftime("%Y-%m-%d"),
             "開盤": [10.0, 10.1, 10.2, 10.3, 10.4],
             "收盤": [10.1, 10.2, 10.3, 10.4, 10.5],

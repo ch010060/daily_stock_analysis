@@ -59,8 +59,8 @@ beforeEach(() => {
     items: [
       {
         analysisHistoryId: 101,
-        code: '600519',
-        stockName: '貴州茅臺',
+        code: '2330',
+        stockName: '台積電',
         analysisDate: '2026-03-20',
         evalWindowDays: 10,
         engineVersion: 'test-engine',
@@ -99,8 +99,8 @@ describe('BacktestPage', () => {
 
     expect(await screen.findByText('盈利')).toBeInTheDocument();
     expect(screen.getByText('已完成')).toBeInTheDocument();
-    expect(screen.getByText('600519')).toBeInTheDocument();
-    expect(screen.getByText('貴州茅臺')).toBeInTheDocument();
+    expect(screen.getByText('2330')).toBeInTheDocument();
+    expect(screen.getByText('台積電')).toBeInTheDocument();
     expect(screen.getByText('震盪偏多')).toBeInTheDocument();
     expect(screen.getByText('上漲')).toBeInTheDocument();
     expect(screen.getByText('視窗收益')).toBeInTheDocument();

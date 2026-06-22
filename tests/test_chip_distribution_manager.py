@@ -24,9 +24,9 @@ class _ChipFetcher:
 @patch.dict(os.environ, {"DSA_ALLOW_EXTERNAL_NETWORK": "true", "DSA_FIXTURE_MODE": "false"})
 def test_manager_skips_placeholder_chip_distribution_and_tries_next_fetcher():
     get_chip_circuit_breaker().reset()
-    empty_chip = ChipDistribution(code="600519")
+    empty_chip = ChipDistribution(code="2330")
     valid_chip = ChipDistribution(
-        code="600519",
+        code="2330",
         profit_ratio=0.61,
         avg_cost=12.3,
         concentration_90=0.13,
@@ -39,7 +39,7 @@ def test_manager_skips_placeholder_chip_distribution_and_tries_next_fetcher():
     )
 
     with patch("src.config.get_config", return_value=SimpleNamespace(enable_chip_distribution=True)):
-        chip = manager.get_chip_distribution("600519")
+        chip = manager.get_chip_distribution("2330")
 
     assert chip is valid_chip
 
@@ -48,14 +48,14 @@ def test_manager_skips_placeholder_chip_distribution_and_tries_next_fetcher():
 def test_manager_accepts_zero_concentration_chip_distribution():
     get_chip_circuit_breaker().reset()
     zero_concentration_chip = ChipDistribution(
-        code="600519",
+        code="2330",
         profit_ratio=0.61,
         avg_cost=12.3,
         concentration_90=0.0,
         concentration_70=0.0,
     )
     fallback_chip = ChipDistribution(
-        code="600519",
+        code="2330",
         profit_ratio=0.62,
         avg_cost=12.5,
         concentration_90=0.13,
@@ -65,7 +65,7 @@ def test_manager_accepts_zero_concentration_chip_distribution():
     manager = DataFetcherManager(fetchers=[zero_fetcher, fallback_fetcher])
 
     with patch("src.config.get_config", return_value=SimpleNamespace(enable_chip_distribution=True)):
-        chip = manager.get_chip_distribution("600519")
+        chip = manager.get_chip_distribution("2330")
 
     assert chip is zero_concentration_chip
     assert zero_fetcher.calls == 1

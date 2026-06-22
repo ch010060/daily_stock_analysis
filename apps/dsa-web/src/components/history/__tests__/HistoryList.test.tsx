@@ -19,8 +19,8 @@ const items: HistoryItem[] = [
   {
     id: 1,
     queryId: 'q-1',
-    stockCode: '600519',
-    stockName: '貴州茅臺',
+    stockCode: '2330',
+    stockName: '台積電',
     sentimentScore: 82,
     operationAdvice: '買進',
     createdAt: '2026-03-15T08:00:00Z',
@@ -30,8 +30,8 @@ const items: HistoryItem[] = [
 const longChineseNameItem: HistoryItem = {
   id: 2,
   queryId: 'q-2',
-  stockCode: '600519',
-  stockName: '貴州茅台股票股份有限公司',
+  stockCode: '2330',
+  stockName: '台積電股份有限公司',
   sentimentScore: 75,
   operationAdvice: '持有',
   createdAt: '2026-03-16T08:00:00Z',
@@ -70,7 +70,7 @@ describe('HistoryList', () => {
     expect(screen.getByText('已選 1')).toBeInTheDocument();
     expect(screen.getByText('買進 82')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /貴州茅臺/i }));
+    fireEvent.click(screen.getByRole('button', { name: /台積電/i }));
     expect(onItemClick).toHaveBeenCalledWith(1);
 
     fireEvent.click(screen.getAllByRole('checkbox')[1]);
@@ -107,12 +107,12 @@ describe('HistoryList', () => {
       />,
     );
 
-    // '貴州茅台股票股份有限公司' (12 Chinese chars) should be truncated to '貴州茅台股票股份.' (8 chars + dot)
-    expect(screen.getByText('貴州茅台股票股份.')).toBeInTheDocument();
-    expect(screen.queryByText('貴州茅台股票股份有限公司')).not.toBeInTheDocument();
+    // '台積電股份有限公司' (12 Chinese chars) should be truncated to '台積電股票股份.' (8 chars + dot)
+    expect(screen.getByText('台積電股票股份.')).toBeInTheDocument();
+    expect(screen.queryByText('台積電股份有限公司')).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', {
-        name: /^貴州茅台股票股份有限公司 600519 歷史記錄$/,
+        name: /^台積電股份有限公司 2330 歷史記錄$/,
       }),
     ).toBeInTheDocument();
 

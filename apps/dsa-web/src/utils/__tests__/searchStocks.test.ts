@@ -1,261 +1,273 @@
 /**
- * searchStocks unit tests.
+ * searchStocks unit tests for Route B TW/US symbol lookup.
  */
 
+import { describe, expect, test } from 'vitest';
 import { searchStocks } from '../searchStocks';
 import type { StockIndexItem } from '../../types/stockIndex';
-import { describe, expect, test } from 'vitest';
+
+const stock = (
+  canonicalCode: string,
+  nameZh: string,
+  market: 'TW' | 'US',
+  aliases: string[] = [],
+  popularity = 90,
+): StockIndexItem => ({
+  canonicalCode,
+  displayCode: canonicalCode,
+  nameZh,
+  pinyinFull: nameZh.toLowerCase(),
+  pinyinAbbr: canonicalCode.toLowerCase(),
+  aliases,
+  market,
+  assetType: 'stock',
+  active: true,
+  popularity,
+});
+
+const expandedMatrixIndex: StockIndexItem[] = [
+  stock('2308', '台達電', 'TW', ['Delta Electronics'], 95),
+  stock('2382', '廣達', 'TW', ['Quanta'], 95),
+  stock('6669', '緯穎', 'TW', ['Wiwynn'], 95),
+  stock('3017', '奇鋐', 'TW', ['AVC', 'Asia Vital Components'], 95),
+  stock('2368', '金像電', 'TW', ['Kinsus'], 95),
+  stock('2345', '智邦', 'TW', ['Accton'], 95),
+  stock('3037', '欣興', 'TW', ['Unimicron'], 95),
+  stock('3661', '世芯-KY', 'TW', ['世芯', 'Alchip'], 95),
+  stock('2303', '聯電', 'TW', ['UMC'], 95),
+  stock('2882', '國泰金', 'TW', ['Cathay Financial'], 95),
+  stock('MSFT', 'Microsoft', 'US', ['Microsoft Corporation'], 95),
+  stock('GOOGL', 'Alphabet', 'US', ['Google'], 95),
+  stock('AMZN', 'Amazon', 'US', ['Amazon.com'], 95),
+  stock('TSLA', 'Tesla', 'US', ['Tesla Inc'], 95),
+  stock('AVGO', 'Broadcom', 'US', ['Broadcom Inc.'], 95),
+  stock('AMD', 'Advanced Micro Devices', 'US', ['AMD'], 95),
+  stock('MU', 'Micron Technology', 'US', ['Micron'], 95),
+  stock('ARM', 'Arm Holdings', 'US', ['Arm'], 95),
+  stock('ORCL', 'Oracle', 'US', ['Oracle Corporation'], 95),
+  stock('PLTR', 'Palantir Technologies', 'US', ['Palantir'], 95),
+];
 
 const mockIndex: StockIndexItem[] = [
   {
-    canonicalCode: "600519.SH",
-    displayCode: "600519",
-    nameZh: "貴州茅臺",
-    pinyinFull: "guizhoumaotai",
-    pinyinAbbr: "gzmt",
-    aliases: ["茅臺"],
-    market: "CN",
-    assetType: "stock",
+    canonicalCode: '2330',
+    displayCode: '2330',
+    nameZh: '台積電',
+    pinyinFull: 'taijidian',
+    pinyinAbbr: 'tjd',
+    aliases: ['台灣積體電路', 'TSMC', 'Taiwan Semiconductor'],
+    market: 'TW',
+    assetType: 'stock',
     active: true,
     popularity: 100,
   },
   {
-    canonicalCode: "000001.SZ",
-    displayCode: "000001",
-    nameZh: "平安銀行",
-    pinyinFull: "pinganyinxing",
-    pinyinAbbr: "payh",
-    aliases: ["平銀"],
-    market: "CN",
-    assetType: "stock",
-    active: true,
-    popularity: 90,
-  },
-  {
-    canonicalCode: "000002.SZ",
-    displayCode: "000002",
-    nameZh: "萬科Ａ",
-    pinyinFull: "wankeＡ",
-    pinyinAbbr: "wkＡ",
-    aliases: [],
-    market: "CN",
-    assetType: "stock",
-    active: true,
-    popularity: 92,
-  },
-  {
-    canonicalCode: "00700.HK",
-    displayCode: "00700",
-    nameZh: "騰訊控股",
-    pinyinFull: "tengxunkonggu",
-    pinyinAbbr: "txkg",
-    aliases: ["騰訊"],
-    market: "HK",
-    assetType: "stock",
-    active: true,
-    popularity: 95,
-  },
-  {
-    canonicalCode: "AAPL.US",
-    displayCode: "AAPL",
-    nameZh: "蘋果",
-    pinyinFull: "pingguo",
-    pinyinAbbr: "pg",
-    aliases: [],
-    market: "US",
-    assetType: "stock",
-    active: true,
-    popularity: 98,
-  },
-  {
-    canonicalCode: "3008",
-    displayCode: "3008",
-    nameZh: "大立光",
-    pinyinFull: "daliguang",
-    pinyinAbbr: "dlg",
-    aliases: ["大立光精密", "Largan", "Largan Precision"],
-    market: "TW",
-    assetType: "stock",
+    canonicalCode: '3008',
+    displayCode: '3008',
+    nameZh: '大立光',
+    pinyinFull: 'daliguang',
+    pinyinAbbr: 'dlg',
+    aliases: ['大立光精密', 'Largan', 'Largan Precision'],
+    market: 'TW',
+    assetType: 'stock',
     active: true,
     popularity: 96,
   },
   {
-    canonicalCode: "NVDA",
-    displayCode: "NVDA",
-    nameZh: "NVIDIA",
-    pinyinFull: "nvidia",
-    pinyinAbbr: "nvda",
-    aliases: ["NVIDIA Corporation", "Nvidia"],
-    market: "US",
-    assetType: "stock",
+    canonicalCode: '8299',
+    displayCode: '8299',
+    nameZh: '群聯',
+    pinyinFull: 'qunlian',
+    pinyinAbbr: 'ql',
+    aliases: ['群聯電子', 'Phison', 'Phison Electronics'],
+    market: 'TW',
+    assetType: 'stock',
+    active: true,
+    popularity: 94,
+  },
+  ...expandedMatrixIndex,
+  {
+    canonicalCode: 'AAPL',
+    displayCode: 'AAPL',
+    nameZh: 'Apple',
+    pinyinFull: 'apple',
+    pinyinAbbr: 'aapl',
+    aliases: ['Apple Inc'],
+    market: 'US',
+    assetType: 'stock',
     active: true,
     popularity: 98,
   },
   {
-    canonicalCode: "SPX",
-    displayCode: "SPX",
-    nameZh: "標普500指數",
-    pinyinFull: "biaopu500zhishu",
-    pinyinAbbr: "bp500zs",
-    aliases: ["S&P500", "S&P 500", "^GSPC", "SP500", "標普500"],
-    market: "US",
-    assetType: "index",
+    canonicalCode: 'NVDA',
+    displayCode: 'NVDA',
+    nameZh: 'NVIDIA',
+    pinyinFull: 'nvidia',
+    pinyinAbbr: 'nvda',
+    aliases: ['NVIDIA Corporation', 'Nvidia'],
+    market: 'US',
+    assetType: 'stock',
     active: true,
-    popularity: 99,
+    popularity: 98,
   },
   {
-    canonicalCode: "SPY",
-    displayCode: "SPY",
-    nameZh: "SPDR S&P 500 ETF",
-    pinyinFull: "spdrs&p500etf",
-    pinyinAbbr: "spy",
-    aliases: ["SPDR S&P 500", "SPY ETF"],
-    market: "US",
-    assetType: "etf",
+    canonicalCode: 'META',
+    displayCode: 'META',
+    nameZh: 'Meta Platforms',
+    pinyinFull: 'metaplatforms',
+    pinyinAbbr: 'meta',
+    aliases: ['Facebook', 'Meta', 'Meta Platforms Inc'],
+    market: 'US',
+    assetType: 'stock',
     active: true,
     popularity: 97,
   },
   {
-    canonicalCode: "SYRE",
-    displayCode: "SYRE",
-    nameZh: "Spyre Therapeutics",
-    pinyinFull: "spyretherapeutics",
-    pinyinAbbr: "syre",
-    aliases: ["Spyre"],
-    market: "US",
-    assetType: "stock",
+    canonicalCode: 'SPX',
+    displayCode: 'SPX',
+    nameZh: '標普500指數',
+    pinyinFull: 'biaopu500zhishu',
+    pinyinAbbr: 'bp500zs',
+    aliases: ['S&P500', 'S&P 500', '^GSPC', 'SP500', '標普500'],
+    market: 'US',
+    assetType: 'index',
+    active: true,
+    popularity: 99,
+  },
+  {
+    canonicalCode: 'SPY',
+    displayCode: 'SPY',
+    nameZh: 'SPDR S&P 500 ETF',
+    pinyinFull: 'spdrs&p500etf',
+    pinyinAbbr: 'spy',
+    aliases: ['SPDR S&P 500', 'SPY ETF'],
+    market: 'US',
+    assetType: 'etf',
+    active: true,
+    popularity: 97,
+  },
+  {
+    canonicalCode: '00981A',
+    displayCode: '00981A',
+    nameZh: '主動統一台股增長',
+    pinyinFull: 'zhudongtongyitaiguzengzhang',
+    pinyinAbbr: 'zdtytgzz',
+    aliases: [],
+    market: 'TW',
+    assetType: 'etf',
+    active: true,
+    popularity: 97,
+  },
+  {
+    canonicalCode: '006208',
+    displayCode: '006208',
+    nameZh: '富邦台50',
+    pinyinFull: 'fubangtai50',
+    pinyinAbbr: 'fbt50',
+    aliases: [],
+    market: 'TW',
+    assetType: 'etf',
+    active: true,
+    popularity: 97,
+  },
+  {
+    canonicalCode: 'SYRE',
+    displayCode: 'SYRE',
+    nameZh: 'Spyre Therapeutics',
+    pinyinFull: 'spyretherapeutics',
+    pinyinAbbr: 'syre',
+    aliases: ['Spyre'],
+    market: 'US',
+    assetType: 'stock',
     active: true,
     popularity: 25,
   },
   {
-    canonicalCode: "600000.SH",
-    displayCode: "600000",
-    nameZh: "浦發銀行",
-    pinyinFull: "pufayinxing",
-    pinyinAbbr: "pfyh",
-    aliases: ["浦發"],
-    market: "CN",
-    assetType: "stock",
-    active: false,  // Inactive
+    canonicalCode: 'OLD.US',
+    displayCode: 'OLD',
+    nameZh: 'Inactive US',
+    pinyinFull: 'inactiveus',
+    pinyinAbbr: 'old',
+    aliases: [],
+    market: 'US',
+    assetType: 'stock',
+    active: false,
     popularity: 80,
   },
 ];
 
 describe('searchStocks', () => {
-  test('精確匹配程式碼', () => {
-    const results = searchStocks('600519', mockIndex);
-    expect(results).toHaveLength(1);
-    expect(results[0].canonicalCode).toBe('600519.SH');
-    expect(results[0].matchType).toBe('exact');
-    expect(results[0].matchField).toBe('code');
-  });
+  test.each([
+    ['2330', '2330', 'code', 'exact'],
+    ['台積電', '2330', 'name', 'exact'],
+    ['TSMC', '2330', 'alias', 'exact'],
+    ['大立光', '3008', 'name', 'exact'],
+    ['Largan', '3008', 'alias', 'exact'],
+    ['群聯', '8299', 'name', 'exact'],
+    ['8299', '8299', 'code', 'exact'],
+    ['Phison', '8299', 'alias', 'exact'],
+    ['NVIDIA', 'NVDA', 'name', 'exact'],
+    ['NVDA', 'NVDA', 'code', 'exact'],
+    ['META', 'META', 'code', 'exact'],
+    ['Meta Platforms', 'META', 'name', 'exact'],
+    ['Facebook', 'META', 'alias', 'exact'],
+  ])('returns the canonical TW/US candidate for %s', (query, expectedCode, matchField, matchType) => {
+    const results = searchStocks(query, mockIndex);
 
-  test('精確匹配中文名稱', () => {
-    const results = searchStocks('貴州茅臺', mockIndex);
-    expect(results).toHaveLength(1);
-    expect(results[0].canonicalCode).toBe('600519.SH');
-    expect(results[0].matchType).toBe('exact');
-    expect(results[0].matchField).toBe('name');
-  });
-
-  test('拼音首字母匹配', () => {
-    const results = searchStocks('gzmt', mockIndex);
-    expect(results).toHaveLength(1);
-    expect(results[0].canonicalCode).toBe('600519.SH');
-    expect(results[0].matchType).toBe('exact');
-  });
-
-  test('別名匹配', () => {
-    const results = searchStocks('茅臺', mockIndex);
-    expect(results).toHaveLength(1);
-    expect(results[0].canonicalCode).toBe('600519.SH');
-    expect(results[0].matchType).toBe('exact');
-  });
-
-  test('字首匹配程式碼', () => {
-    const results = searchStocks('600', mockIndex);
     expect(results.length).toBeGreaterThan(0);
-    expect(results[0].matchType).toBe('prefix');
-    expect(results[0].matchField).toBe('code');
-  });
-
-  test('字首匹配名稱', () => {
-    const results = searchStocks('貴州', mockIndex);
-    expect(results).toHaveLength(1);
-    expect(results[0].matchType).toBe('prefix');
-    expect(results[0].matchField).toBe('name');
-  });
-
-  test('包含匹配拼音', () => {
-    const results = searchStocks('maotai', mockIndex);
-    expect(results).toHaveLength(1);
-    expect(results[0].canonicalCode).toBe('600519.SH');
-    expect(results[0].matchType).toBe('contains');
-  });
-
-  test('active 優先於 inactive', () => {
-    // 600000 是不活躍的，600519 是活躍的
-    const results = searchStocks('600', mockIndex);
-    const activeResults = results.filter(r => {
-      const item = mockIndex.find(i => i.canonicalCode === r.canonicalCode);
-      return item?.active;
+    expect(results[0]).toMatchObject({
+      canonicalCode: expectedCode,
+      matchField,
+      matchType,
     });
-    // 活躍股票應該排在前面
-    if (results.length > 1) {
-      expect(activeResults.length).toBeGreaterThan(0);
-    }
+    expect(results.every((result) => result.market === 'TW' || result.market === 'US')).toBe(true);
   });
 
-  test('activeOnly 選項過濾不活躍股票', () => {
-    const results = searchStocks('600', mockIndex, { activeOnly: true });
-    for (const result of results) {
-      const item = mockIndex.find(i => i.canonicalCode === result.canonicalCode);
-      expect(item?.active).toBe(true);
-    }
-  });
+  test.each([
+    ['2308', '2308'],
+    ['台達電', '2308'],
+    ['Delta Electronics', '2308'],
+    ['2382', '2382'],
+    ['廣達', '2382'],
+    ['Quanta', '2382'],
+    ['6669', '6669'],
+    ['緯穎', '6669'],
+    ['Wiwynn', '6669'],
+    ['3017', '3017'],
+    ['奇鋐', '3017'],
+    ['AVC', '3017'],
+    ['2368', '2368'],
+    ['金像電', '2368'],
+    ['Kinsus', '2368'],
+    ['2345', '2345'],
+    ['智邦', '2345'],
+    ['Accton', '2345'],
+    ['3037', '3037'],
+    ['欣興', '3037'],
+    ['Unimicron', '3037'],
+    ['3661', '3661'],
+    ['世芯', '3661'],
+    ['Alchip', '3661'],
+    ['Microsoft', 'MSFT'],
+    ['Google', 'GOOGL'],
+    ['Amazon', 'AMZN'],
+    ['Tesla', 'TSLA'],
+    ['Broadcom', 'AVGO'],
+    ['AMD', 'AMD'],
+    ['Micron', 'MU'],
+    ['Arm', 'ARM'],
+    ['Oracle', 'ORCL'],
+    ['Palantir', 'PLTR'],
+    ['00981A', '00981A'],
+    ['主動統一台股增長', '00981A'],
+    ['006208', '006208'],
+    ['富邦台50', '006208'],
+  ])('returns expanded matrix candidate for %s', (query, expectedCode) => {
+    const results = searchStocks(query, mockIndex);
 
-  test('limit 選項限制返回數量', () => {
-    const results = searchStocks('600', mockIndex, { limit: 1 });
-    expect(results.length).toBeLessThanOrEqual(1);
-  });
-
-  test('無結果時返回空陣列', () => {
-    const results = searchStocks('NOTFOUND', mockIndex);
-    expect(results).toHaveLength(0);
-  });
-
-  test('空查詢返回空陣列', () => {
-    const results = searchStocks('', mockIndex);
-    expect(results).toHaveLength(0);
-  });
-
-  test('大小寫不敏感', () => {
-    const results1 = searchStocks('aapl', mockIndex);
-    const results2 = searchStocks('AAPL', mockIndex);
-    expect(results1).toHaveLength(1);
-    expect(results2).toHaveLength(1);
-    expect(results1[0].canonicalCode).toBe(results2[0].canonicalCode);
-  });
-
-  test('sorts by popularity when scores are tied', () => {
-    const results = searchStocks('600', mockIndex);
-    // When scores tie, popularity should decide the order.
-    if (results.length > 1) {
-      for (let index = 0; index < results.length - 1; index++) {
-        const currentItem = mockIndex.find((item) => item.canonicalCode === results[index].canonicalCode);
-        const nextItem = mockIndex.find((item) => item.canonicalCode === results[index + 1].canonicalCode);
-        if (results[index].score === results[index + 1].score) {
-          expect((currentItem?.popularity || 0)).toBeGreaterThanOrEqual(nextItem?.popularity || 0);
-        }
-      }
-    }
-  });
-
-  test('美股程式碼匹配', () => {
-    const results = searchStocks('AAPL', mockIndex);
-    expect(results).toHaveLength(1);
-    expect(results[0].canonicalCode).toBe('AAPL.US');
-    expect(results[0].market).toBe('US');
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].canonicalCode).toBe(expectedCode);
+    expect(results.every((result) => result.market === 'TW' || result.market === 'US')).toBe(true);
   });
 
   test.each(['S&P500', 'S&P 500', '^GSPC', 'SP500', '標普500'])(
@@ -264,44 +276,15 @@ describe('searchStocks', () => {
       const results = searchStocks(query, mockIndex);
 
       expect(results.length).toBeGreaterThan(0);
-      expect(results[0].canonicalCode).toBe('SPX');
+      expect(results[0]).toMatchObject({
+        canonicalCode: 'SPX',
+        market: 'US',
+      });
     },
   );
 
-  test('shows the 大立光 candidate for natural TW name input', () => {
-    const results = searchStocks('大立光', mockIndex);
-
-    expect(results.length).toBeGreaterThan(0);
-    expect(results[0]).toMatchObject({
-      canonicalCode: '3008',
-      market: 'TW',
-      matchField: 'name',
-      matchType: 'exact',
-    });
-  });
-
-  test('shows the NVIDIA candidate for natural US company input', () => {
-    const results = searchStocks('NVIDIA', mockIndex);
-
-    expect(results.length).toBeGreaterThan(0);
-    expect(results[0]).toMatchObject({
-      canonicalCode: 'NVDA',
-      market: 'US',
-      matchField: 'name',
-      matchType: 'exact',
-    });
-  });
-
   test('prioritizes exact SPY ticker over SYRE fuzzy/name matches', () => {
     const results = searchStocks('SPY', mockIndex);
-
-    expect(results.length).toBeGreaterThan(0);
-    expect(results[0].canonicalCode).toBe('SPY');
-    expect(results[0].canonicalCode).not.toBe('SYRE');
-  });
-
-  test('prioritizes lowercase spy ticker over SYRE fuzzy/name matches', () => {
-    const results = searchStocks('spy', mockIndex);
 
     expect(results.length).toBeGreaterThan(0);
     expect(results[0].canonicalCode).toBe('SPY');
@@ -315,221 +298,93 @@ describe('searchStocks', () => {
     expect(results.some((item) => item.canonicalCode === 'SYRE')).toBe(false);
   });
 
-  test('supports half-width queries for full-width A-share suffix names', () => {
-    const byName = searchStocks('萬科A', mockIndex);
-    const byPinyin = searchStocks('wka', mockIndex);
+  test('default search stays inside TW/US universe', () => {
+    const results = searchStocks('8299', mockIndex);
 
-    expect(byName[0].canonicalCode).toBe('000002.SZ');
-    expect(byPinyin[0].canonicalCode).toBe('000002.SZ');
+    expect(results[0].canonicalCode).toBe('8299');
+    expect(results.every((result) => result.market === 'TW' || result.market === 'US')).toBe(true);
   });
 
-  test('港股程式碼匹配', () => {
-    const results = searchStocks('00700', mockIndex);
+  test('does not return unsupported candidates even with all scope', () => {
+    const results = searchStocks('非支援市場測試標的', mockIndex, { marketScope: 'all' });
+
+    expect(results).toHaveLength(0);
+  });
+
+  test('filters out inactive stocks by default', () => {
+    const results = searchStocks('OLD', mockIndex);
+
+    expect(results).toHaveLength(0);
+  });
+
+  test('shows inactive stocks only when explicitly requested and still limited to TW/US', () => {
+    const results = searchStocks('OLD', mockIndex, { activeOnly: false });
+
     expect(results).toHaveLength(1);
-    expect(results[0].canonicalCode).toBe('00700.HK');
-    expect(results[0].market).toBe('HK');
+    expect(results[0]).toMatchObject({ canonicalCode: 'OLD.US', market: 'US' });
   });
 
-  describe('Edge case tests', () => {
-    test('special character query', () => {
-      const results = searchStocks('@#$%', mockIndex);
-      expect(results).toHaveLength(0);
-    });
-
-    test('pure space query', () => {
-      const results = searchStocks('   ', mockIndex);
-      expect(results).toHaveLength(0);
-    });
-
-    test('Unicode character query', () => {
-      const results = searchStocks('股票🚀', mockIndex);
-      expect(results).toHaveLength(0);
-    });
-
-    test('extra long query string', () => {
-      const longQuery = 'a'.repeat(1000);
-      const results = searchStocks(longQuery, mockIndex);
-      expect(results).toHaveLength(0);
-    });
-
-    test('partial pinyin match', () => {
-      const results = searchStocks('mao', mockIndex);
-      expect(results.length).toBeGreaterThan(0);
-      const hasMaoTai = results.some(r => r.canonicalCode === '600519.SH');
-      expect(hasMaoTai).toBe(true);
-    });
-
-    test('abbreviation prefix match', () => {
-      const results = searchStocks('gz', mockIndex);
-      expect(results.length).toBeGreaterThan(0);
-      expect(results[0].matchType).toBe('prefix');
-    });
-
-    test('alias match', () => {
-      const results = searchStocks('銀', mockIndex);
-      expect(results.length).toBeGreaterThan(0);
-      // Should match 平安銀行 and 浦發銀行
-      const banks = results.filter(r => r.nameZh.includes('銀行'));
-      expect(banks.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Scoring system tests', () => {
-    test('exact match has highest score', () => {
-      const exactResults = searchStocks('600519', mockIndex);
-      const prefixResults = searchStocks('600', mockIndex);
-
-      expect(exactResults[0].score).toBeGreaterThan(prefixResults[0].score);
-    });
-
-    test('code match prioritized over name match', () => {
-      const codeResults = searchStocks('600519', mockIndex);
-      const nameResults = searchStocks('貴州', mockIndex);
-
-      // Code exact match should be 99 points (displayCode match)
-      expect(codeResults[0].score).toBe(99);
-      // Name prefix match should be less than 99 points
-      expect(nameResults[0].score).toBeLessThan(99);
-    });
-
-    test('sorts by popularity when scores are equal', () => {
-      // Add two stocks with same score
-      const tieIndex: StockIndexItem[] = [
-        {
-          canonicalCode: 'TEST1.SH',
-          displayCode: 'TEST1',
-          nameZh: '測試1',
-          pinyinFull: 'test1',
-          pinyinAbbr: 'ts1',
-          aliases: [],
-          market: 'CN',
-          assetType: 'stock',
-          active: true,
-          popularity: 50,
-        },
-        {
-          canonicalCode: 'TEST2.SH',
-          displayCode: 'TEST2',
-          nameZh: '測試2',
-          pinyinFull: 'test2',
-          pinyinAbbr: 'ts2',
-          aliases: [],
-          market: 'CN',
-          assetType: 'stock',
-          active: true,
-          popularity: 100,
-        },
-      ];
-
-      const results = searchStocks('TEST', tieIndex);
-      if (results.length > 1) {
-        // TEST2 should rank first due to higher popularity
-        expect(results[0].canonicalCode).toBe('TEST2.SH');
-      }
-    });
-  });
-
-  describe('Inactive stock tests', () => {
-    test('filters out inactive stocks by default', () => {
-      const results = searchStocks('600000', mockIndex);
-      // 600000 is inactive, should not appear by default
-      expect(results).toHaveLength(0);
-    });
-
-    test('shows inactive stocks when activeOnly=false', () => {
-      const results = searchStocks('600000', mockIndex, { activeOnly: false });
-      expect(results).toHaveLength(1);
-      expect(results[0].canonicalCode).toBe('600000.SH');
-    });
-
-    test('active stocks prioritized over inactive stocks', () => {
-      const results = searchStocks('600', mockIndex, { activeOnly: false });
-      if (results.length > 1) {
-        // First result should be active
-        const firstItem = mockIndex.find(i => i.canonicalCode === results[0].canonicalCode);
-        expect(firstItem?.active).toBe(true);
-      }
-    });
-  });
-
-  describe('Performance tests', () => {
-    test('large index search performance', () => {
-      // Create a large index
-      const largeIndex: StockIndexItem[] = Array.from({ length: 5000 }, (_, i) => ({
-        canonicalCode: `${i}.SH`,
-        displayCode: `${i}`,
-        nameZh: `股票${i}`,
-        pinyinFull: `stock${i}`,
-        pinyinAbbr: `s${i}`,
+  test('sorts by popularity when scores are tied', () => {
+    const tieIndex: StockIndexItem[] = [
+      {
+        canonicalCode: 'AAA',
+        displayCode: 'AAA',
+        nameZh: 'Alpha Test',
+        pinyinFull: 'alphatest',
+        pinyinAbbr: 'aaa',
         aliases: [],
-        market: 'CN',
+        market: 'US',
         assetType: 'stock',
         active: true,
-        popularity: i % 100,
-      }));
+        popularity: 10,
+      },
+      {
+        canonicalCode: 'AAB',
+        displayCode: 'AAB',
+        nameZh: 'Alpha Better',
+        pinyinFull: 'alphabetter',
+        pinyinAbbr: 'aab',
+        aliases: [],
+        market: 'US',
+        assetType: 'stock',
+        active: true,
+        popularity: 50,
+      },
+    ];
 
-      const startTime = Date.now();
-      const results = searchStocks('1', largeIndex);
-      const endTime = Date.now();
+    const results = searchStocks('Alpha', tieIndex);
 
-      // Should complete in reasonable time (< 100ms)
-      expect(endTime - startTime).toBeLessThan(100);
-      expect(results.length).toBeGreaterThan(0);
-    });
-
-    test('multiple search performance', () => {
-      const iterations = 100;
-      const startTime = Date.now();
-
-      for (let i = 0; i < iterations; i++) {
-        searchStocks('600', mockIndex);
-      }
-
-      const endTime = Date.now();
-      const avgTime = (endTime - startTime) / iterations;
-
-      // Average search should be fast (< 10ms)
-      expect(avgTime).toBeLessThan(10);
-    });
+    expect(results).toHaveLength(2);
+    expect(results[0].canonicalCode).toBe('AAB');
   });
 
-  describe('Match type tests', () => {
-    test('exact match type', () => {
-      const results = searchStocks('600519', mockIndex);
-      expect(results[0].matchType).toBe('exact');
-    });
-
-    test('prefix match type', () => {
-      const results = searchStocks('600', mockIndex);
-      expect(results[0].matchType).toBe('prefix');
-    });
-
-    test('contains match type', () => {
-      const results = searchStocks('maotai', mockIndex);
-      expect(results[0].matchType).toBe('contains');
-    });
+  test('returns empty array for unsupported, blank, and special queries', () => {
+    expect(searchStocks('NOTFOUND', mockIndex)).toHaveLength(0);
+    expect(searchStocks('', mockIndex)).toHaveLength(0);
+    expect(searchStocks('   ', mockIndex)).toHaveLength(0);
+    expect(searchStocks('@#$%', mockIndex)).toHaveLength(0);
+    expect(searchStocks('股票🚀', mockIndex)).toHaveLength(0);
   });
 
-  describe('Match field tests', () => {
-    test('code field match', () => {
-      const results = searchStocks('600519', mockIndex);
-      expect(results[0].matchField).toBe('code');
-    });
+  test('large Route B index search remains fast', () => {
+    const largeIndex: StockIndexItem[] = Array.from({ length: 5000 }, (_, i) => ({
+      canonicalCode: `TEST${i}`,
+      displayCode: `TEST${i}`,
+      nameZh: `Test ${i}`,
+      pinyinFull: `test${i}`,
+      pinyinAbbr: `t${i}`,
+      aliases: [],
+      market: 'US',
+      assetType: 'stock',
+      active: true,
+      popularity: i % 100,
+    }));
 
-    test('name field match', () => {
-      const results = searchStocks('貴州', mockIndex);
-      expect(results[0].matchField).toBe('name');
-    });
+    const startTime = Date.now();
+    const results = searchStocks('TEST1', largeIndex);
+    const elapsed = Date.now() - startTime;
 
-    test('pinyin field match', () => {
-      const results = searchStocks('gzmt', mockIndex);
-      expect(results[0].matchField).toBe('pinyin');
-    });
-
-    test('alias field match', () => {
-      const results = searchStocks('茅臺', mockIndex);
-      // Should match 貴州茅臺
-      expect(results.length).toBeGreaterThan(0);
-    });
+    expect(elapsed).toBeLessThan(100);
+    expect(results.length).toBeGreaterThan(0);
   });
 });

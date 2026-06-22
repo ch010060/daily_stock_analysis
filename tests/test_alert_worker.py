@@ -164,7 +164,7 @@ class AlertIndicatorHelperTestCase(unittest.TestCase):
         self.assertEqual(kdj.status, "triggered")
         self.assertAlmostEqual(kdj.observed_value, 4.166666666666664)
         self.assertEqual(cci.status, "triggered")
-        self.assertAlmostEqual(cci.observed_value, 100.00000000000001)
+        self.assertAlmostEqual(cci.observed_value, 100.00000000AAPL)
 
     def test_indicator_degraded_paths_cover_missing_data_and_partial_bar(self) -> None:
         missing_columns = evaluate_indicator_alert(
@@ -229,7 +229,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.db_path = self.data_dir / "alert_worker_test.db"
         self.env_path.write_text(
             "\n".join([
-                "STOCK_LIST=600519",
+                "STOCK_LIST=2330",
                 "GEMINI_API_KEY=test",
                 "ADMIN_AUTH_ENABLED=false",
                 f"DATABASE_PATH={self.db_path}",
@@ -261,7 +261,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         payload = {
             "name": "Moutai breakout",
             "target_scope": "single_symbol",
-            "target": "600519",
+            "target": "2330",
             "alert_type": "price_cross",
             "parameters": {"direction": "above", "price": 1800},
             "severity": "warning",
@@ -315,10 +315,10 @@ class AlertWorkerTestCase(unittest.TestCase):
         return notifier
 
     def test_enabled_db_rule_triggers_and_disabled_rule_is_ignored(self) -> None:
-        enabled_rule = self._create_rule(target="600519")
+        enabled_rule = self._create_rule(target="2330")
         self._create_rule(
             name="Disabled",
-            target="000001",
+            target="AAPL",
             parameters={"direction": "above", "price": 10},
             enabled=False,
         )
@@ -335,11 +335,11 @@ class AlertWorkerTestCase(unittest.TestCase):
 
         self.assertEqual(stats["loaded"], 1)
         self.assertEqual(stats["triggered"], 1)
-        self.assertEqual(seen_codes, ["600519"])
+        self.assertEqual(seen_codes, ["2330"])
         triggers = self._triggers(rule_id=enabled_rule["id"])
         self.assertEqual(len(triggers), 1)
         self.assertEqual(triggers[0]["status"], "triggered")
-        self.assertEqual(triggers[0]["target"], "600519")
+        self.assertEqual(triggers[0]["target"], "2330")
         self.assertEqual(triggers[0]["observed_value"], 1810.0)
         self.assertEqual(triggers[0]["threshold"], 1800.0)
         notifier.send_with_results.assert_called_once()
@@ -355,7 +355,7 @@ class AlertWorkerTestCase(unittest.TestCase):
                 "name": "non_triggered_status",
                 "fields": {
                     "rule_id": 1,
-                    "target": "600519",
+                    "target": "2330",
                     "status": "skipped",
                     "data_timestamp": date(2026, 5, 15),
                 },
@@ -363,7 +363,7 @@ class AlertWorkerTestCase(unittest.TestCase):
             {
                 "name": "missing_rule_id",
                 "fields": {
-                    "target": "600519",
+                    "target": "2330",
                     "status": "triggered",
                     "data_timestamp": date(2026, 5, 15),
                 },
@@ -372,7 +372,7 @@ class AlertWorkerTestCase(unittest.TestCase):
                 "name": "missing_data_timestamp",
                 "fields": {
                     "rule_id": 1,
-                    "target": "600519",
+                    "target": "2330",
                     "status": "triggered",
                     "data_timestamp": None,
                 },
@@ -384,14 +384,14 @@ class AlertWorkerTestCase(unittest.TestCase):
                     self.service.repo.create_trigger_if_absent(case["fields"])
 
     def test_legacy_rules_coexist_with_db_rules_and_db_rule_wins_duplicate_key(self) -> None:
-        self._create_rule(target="600519")
+        self._create_rule(target="2330")
         legacy_rules = (
-            '[{"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800},'
-            '{"stock_code":"300750","alert_type":"price_change_percent","direction":"down","change_pct":3.5}]'
+            '[{"stock_code":"2330","alert_type":"price_cross","direction":"above","price":1800},'
+            '{"stock_code":"00981A","alert_type":"price_change_percent","direction":"down","change_pct":3.5}]'
         )
 
         async def _quote(_monitor, stock_code):
-            if stock_code == "300750":
+            if stock_code == "00981A":
                 return {"pct_chg": "-3.75%"}
             return SimpleNamespace(price=1810.0)
 
@@ -406,11 +406,11 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(stats["loaded"], 2)
         self.assertEqual(stats["triggered"], 2)
         targets = {item["target"] for item in self._triggers()}
-        self.assertEqual(targets, {"600519", "300750"})
+        self.assertEqual(targets, {"2330", "00981A"})
 
     def test_legacy_rules_keep_existing_duplicate_trigger_history(self) -> None:
         legacy_rules = (
-            '[{"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800}]'
+            '[{"stock_code":"2330","alert_type":"price_cross","direction":"above","price":1800}]'
         )
         notifier = self._notifier()
 
@@ -438,7 +438,7 @@ class AlertWorkerTestCase(unittest.TestCase):
 
     def test_legacy_json_parse_failure_does_not_crash_or_block_persisted_rules(self) -> None:
         before = self.env_path.read_text(encoding="utf-8")
-        self._create_rule(target="600519")
+        self._create_rule(target="2330")
         notifier = self._notifier()
         worker = AlertWorker(config_provider=lambda: self._config("[invalid"), service=self.service, notifier=notifier)
 
@@ -455,8 +455,8 @@ class AlertWorkerTestCase(unittest.TestCase):
 
     def test_all_invalid_legacy_rules_do_not_crash(self) -> None:
         invalid_rules = (
-            '[{"stock_code":"600519","alert_type":"price_cross","direction":"sideways","price":1800},'
-            '{"stock_code":"300750","alert_type":"price_change_percent","direction":"down","change_pct":0}]'
+            '[{"stock_code":"2330","alert_type":"price_cross","direction":"sideways","price":1800},'
+            '{"stock_code":"00981A","alert_type":"price_change_percent","direction":"down","change_pct":0}]'
         )
         worker = AlertWorker(config_provider=lambda: self._config(invalid_rules), service=self.service)
 
@@ -476,7 +476,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(self._triggers(), [])
 
     def test_missing_quote_writes_skipped_trigger_without_notification(self) -> None:
-        self._create_rule(target="600519")
+        self._create_rule(target="2330")
         notifier = self._notifier()
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service, notifier=notifier)
 
@@ -486,12 +486,12 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(stats["skipped"], 1)
         triggers = self._triggers(status="skipped")
         self.assertEqual(len(triggers), 1)
-        self.assertEqual(triggers[0]["target"], "600519")
+        self.assertEqual(triggers[0]["target"], "2330")
         self.assertIn("No realtime quote", triggers[0]["diagnostics"])
         notifier.send_with_results.assert_not_called()
 
     def test_price_cross_numeric_yyyymmdd_quote_date_writes_correct_timestamp(self) -> None:
-        rule = self._create_rule(target="600519")
+        rule = self._create_rule(target="2330")
         notifier = self._notifier()
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service, notifier=notifier)
 
@@ -507,7 +507,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(triggers[0]["data_timestamp"], "2026-05-17T00:00:00")
 
     def test_price_cross_space_separated_quote_time_writes_timestamp(self) -> None:
-        rule = self._create_rule(target="600519")
+        rule = self._create_rule(target="2330")
         notifier = self._notifier()
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service, notifier=notifier)
 
@@ -523,7 +523,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(triggers[0]["data_timestamp"], "2026-05-17T15:00:00")
 
     def test_ambiguous_numeric_quote_timestamp_is_not_written_as_epoch(self) -> None:
-        rule = self._create_rule(target="600519")
+        rule = self._create_rule(target="2330")
         notifier = self._notifier()
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service, notifier=notifier)
 
@@ -539,7 +539,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertIsNone(triggers[0]["data_timestamp"])
 
     def test_service_test_rule_exception_uses_same_sanitized_reason_and_message(self) -> None:
-        rule = self._create_rule(target="600519")
+        rule = self._create_rule(target="2330")
 
         async def _raise(_rule, _monitor, **_kwargs):
             raise RuntimeError("token=secret-token failed at https://example.com/webhook")
@@ -556,7 +556,7 @@ class AlertWorkerTestCase(unittest.TestCase):
     def test_daily_data_unavailable_writes_degraded_trigger(self) -> None:
         self._create_rule(
             name="Volume",
-            target="000858",
+            target="2454",
             alert_type="volume_spike",
             parameters={"multiplier": 2.5},
         )
@@ -574,13 +574,13 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(stats["degraded"], 1)
         triggers = self._triggers(status="degraded")
         self.assertEqual(len(triggers), 1)
-        self.assertEqual(triggers[0]["target"], "000858")
+        self.assertEqual(triggers[0]["target"], "2454")
         self.assertIn("No daily volume data", triggers[0]["diagnostics"])
 
     def test_malformed_daily_data_response_writes_degraded_trigger(self) -> None:
         self._create_rule(
             name="Volume",
-            target="000858",
+            target="2454",
             alert_type="volume_spike",
             parameters={"multiplier": 2.5},
         )
@@ -598,13 +598,13 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(stats["degraded"], 1)
         triggers = self._triggers(status="degraded")
         self.assertEqual(len(triggers), 1)
-        self.assertEqual(triggers[0]["target"], "000858")
+        self.assertEqual(triggers[0]["target"], "2454")
         self.assertIn("Malformed daily volume data", triggers[0]["diagnostics"])
 
     def test_volume_spike_trigger_writes_expected_trigger_fields(self) -> None:
         rule = self._create_rule(
             name="Volume",
-            target="000858",
+            target="2454",
             alert_type="volume_spike",
             parameters={"multiplier": 2.0},
         )
@@ -631,7 +631,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(stats["notified"], 1)
         triggers = self._triggers(rule_id=rule["id"], status="triggered")
         self.assertEqual(len(triggers), 1)
-        self.assertEqual(triggers[0]["target"], "000858")
+        self.assertEqual(triggers[0]["target"], "2454")
         self.assertEqual(triggers[0]["observed_value"], 5000.0)
         self.assertAlmostEqual(triggers[0]["threshold"], 4666.666666666667)
         self.assertEqual(triggers[0]["data_source"], "daily_data")
@@ -641,7 +641,7 @@ class AlertWorkerTestCase(unittest.TestCase):
     def test_volume_spike_history_deduplicates_same_daily_signal(self) -> None:
         rule = self._create_rule(
             name="Volume",
-            target="000858",
+            target="2454",
             alert_type="volume_spike",
             parameters={"multiplier": 2.0},
             cooldown_policy={"cooldown_seconds": 60},
@@ -671,7 +671,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(second["recorded"], 0)
         triggers = self._triggers(rule_id=rule["id"], status="triggered")
         self.assertEqual(len(triggers), 1)
-        self.assertEqual(triggers[0]["target"], "000858")
+        self.assertEqual(triggers[0]["target"], "2454")
         self.assertEqual(triggers[0]["data_source"], "daily_data")
         self.assertEqual(triggers[0]["data_timestamp"], "2026-05-15T00:00:00")
         cooldown_attempts = self._notifications(channel="__cooldown__")
@@ -682,13 +682,13 @@ class AlertWorkerTestCase(unittest.TestCase):
     def test_technical_indicator_rules_share_run_once_daily_cache(self) -> None:
         self._create_rule(
             name="MA one",
-            target="600519",
+            target="2330",
             alert_type="ma_price_cross",
             parameters={"window": 2, "direction": "above"},
         )
         self._create_rule(
             name="MA two",
-            target="600519",
+            target="2330",
             alert_type="ma_price_cross",
             parameters={"window": 2, "direction": "above"},
         )
@@ -715,12 +715,12 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(second["triggered"], 2)
         self.assertEqual(len(self._triggers(status="triggered")), 2)
         self.assertEqual(manager.get_daily_data.call_count, 2)
-        manager.get_daily_data.assert_called_with("600519", days=33)
+        manager.get_daily_data.assert_called_with("2330", days=33)
 
     def test_db_triggered_history_deduplicates_same_daily_signal(self) -> None:
         rule = self._create_rule(
             name="MA",
-            target="600519",
+            target="2330",
             alert_type="ma_price_cross",
             parameters={"window": 2, "direction": "above"},
             cooldown_policy={"cooldown_seconds": 60},
@@ -759,7 +759,7 @@ class AlertWorkerTestCase(unittest.TestCase):
     def test_db_triggered_history_keeps_distinct_data_timestamps(self) -> None:
         rule = self._create_rule(
             name="MA",
-            target="600519",
+            target="2330",
             alert_type="ma_price_cross",
             parameters={"window": 2, "direction": "above"},
             cooldown_policy={"cooldown_seconds": 60},
@@ -803,7 +803,7 @@ class AlertWorkerTestCase(unittest.TestCase):
     def test_cooldown_zero_reuses_same_trigger_history_but_keeps_notifications(self) -> None:
         rule = self._create_rule(
             name="MA",
-            target="600519",
+            target="2330",
             alert_type="ma_price_cross",
             parameters={"window": 2, "direction": "above"},
             cooldown_policy={"cooldown_seconds": 0},
@@ -839,14 +839,14 @@ class AlertWorkerTestCase(unittest.TestCase):
     def test_db_triggered_history_deduplicates_per_rule_id(self) -> None:
         first_rule = self._create_rule(
             name="MA one",
-            target="600519",
+            target="2330",
             alert_type="ma_price_cross",
             parameters={"window": 2, "direction": "above"},
             cooldown_policy={"cooldown_seconds": 60},
         )
         second_rule = self._create_rule(
             name="MA two",
-            target="600519",
+            target="2330",
             alert_type="ma_price_cross",
             parameters={"window": 2, "direction": "above"},
             cooldown_policy={"cooldown_seconds": 60},
@@ -876,23 +876,23 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual({item["rule_id"] for item in triggers}, {first_rule["id"], second_rule["id"]})
 
     def test_non_triggered_status_history_is_not_deduplicated(self) -> None:
-        self._create_rule(name="Skipped", target="600519")
+        self._create_rule(name="Skipped", target="2330")
         self._create_rule(
             name="Degraded",
-            target="000858",
+            target="2454",
             alert_type="volume_spike",
             parameters={"multiplier": 2.5},
         )
         self._create_rule(
             name="Failed",
-            target="300750",
+            target="00981A",
             alert_type="price_change_percent",
             parameters={"direction": "down", "change_pct": 3.0},
         )
         status_by_target = {
-            "600519": "skipped",
-            "000858": "degraded",
-            "300750": "failed",
+            "2330": "skipped",
+            "2454": "degraded",
+            "00981A": "failed",
         }
 
         async def _evaluate(rule, _monitor, **_kwargs):
@@ -922,7 +922,7 @@ class AlertWorkerTestCase(unittest.TestCase):
     def test_technical_indicator_insufficient_data_writes_degraded_trigger(self) -> None:
         rule = self._create_rule(
             name="MA insufficient",
-            target="600519",
+            target="2330",
             alert_type="ma_price_cross",
             parameters={"window": 20, "direction": "above"},
         )
@@ -947,15 +947,15 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(stats["degraded"], 1)
         triggers = self._triggers(rule_id=rule["id"], status="degraded")
         self.assertEqual(len(triggers), 1)
-        self.assertEqual(triggers[0]["target"], "600519")
+        self.assertEqual(triggers[0]["target"], "2330")
         self.assertIn("insufficient data: need 21 bars, got 3", triggers[0]["diagnostics"])
-        manager.get_daily_data.assert_called_once_with("600519", days=63)
+        manager.get_daily_data.assert_called_once_with("2330", days=63)
         notifier.send_with_results.assert_not_called()
 
     def test_technical_indicator_fetch_exception_writes_failed_trigger(self) -> None:
         self._create_rule(
             name="MA",
-            target="600519",
+            target="2330",
             alert_type="ma_price_cross",
             parameters={"window": 2, "direction": "above"},
         )
@@ -981,7 +981,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.service.repo.create_rule({
             "name": "Future rule",
             "target_scope": "single_symbol",
-            "target": "600519",
+            "target": "2330",
             "alert_type": "future_indicator",
             "parameters": "{}",
             "severity": "warning",
@@ -1000,12 +1000,12 @@ class AlertWorkerTestCase(unittest.TestCase):
         rule = self._create_rule(
             name="Market risk-off",
             target_scope="market",
-            target="cn",
+            target="tw",
             alert_type="market_light_status",
             parameters={"statuses": ["red", "yellow"]},
         )
         snapshot = {
-            "region": "cn",
+            "region": "tw",
             "trade_date": "2026-03-07",
             "status": "red",
             "score": 35,
@@ -1035,7 +1035,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(notifier.send_with_results.call_args.kwargs["route_type"], "alert")
         triggers = self._triggers(rule_id=rule["id"], status="triggered")
         self.assertEqual(len(triggers), 1)
-        self.assertEqual(triggers[0]["target"], "cn")
+        self.assertEqual(triggers[0]["target"], "tw")
         self.assertEqual(triggers[0]["observed_value"], 35.0)
         self.assertEqual(triggers[0]["data_source"], "market_light")
         self.assertEqual(triggers[0]["data_timestamp"], "2026-03-07T00:00:00")
@@ -1044,7 +1044,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self._create_rule(
             name="Market risk-off",
             target_scope="market",
-            target="cn",
+            target="tw",
             alert_type="market_light_status",
             parameters={"statuses": ["red"]},
         )
@@ -1064,21 +1064,21 @@ class AlertWorkerTestCase(unittest.TestCase):
         build_snapshot.assert_not_called()
         triggers = self._triggers(status="skipped")
         self.assertEqual(len(triggers), 1)
-        self.assertEqual(triggers[0]["target"], "cn")
+        self.assertEqual(triggers[0]["target"], "tw")
         self.assertEqual(triggers[0]["data_source"], "market_light")
 
     def test_single_rule_failure_does_not_block_other_rules(self) -> None:
-        self._create_rule(target="600519")
+        self._create_rule(target="2330")
         self._create_rule(
             name="CATL drop",
-            target="300750",
+            target="00981A",
             alert_type="price_change_percent",
             parameters={"direction": "down", "change_pct": 3.0},
         )
         notifier = self._notifier()
 
         async def _quote(_monitor, stock_code):
-            if stock_code == "600519":
+            if stock_code == "2330":
                 raise RuntimeError("token=secret-token failed at https://example.com/webhook")
             return {"pct_chg": "-3.25%"}
 
@@ -1095,17 +1095,17 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(len(self._triggers(status="triggered")), 1)
 
     def test_notification_failure_does_not_block_other_rules(self) -> None:
-        self._create_rule(target="600519")
+        self._create_rule(target="2330")
         self._create_rule(
             name="CATL drop",
-            target="300750",
+            target="00981A",
             alert_type="price_change_percent",
             parameters={"direction": "down", "change_pct": 3.0},
         )
         notifier = self._notifier(RuntimeError("webhook secret failed"), self._dispatch_result(True))
 
         async def _quote(_monitor, stock_code):
-            if stock_code == "600519":
+            if stock_code == "2330":
                 return SimpleNamespace(price=1810.0)
             return {"pct_chg": "-3.25%"}
 
@@ -1120,7 +1120,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(notifier.send_with_results.call_count, 2)
 
     def test_notification_dispatch_results_are_recorded_and_success_updates_cooldown(self) -> None:
-        rule = self._create_rule(target="600519", cooldown_policy={"cooldown_seconds": 60})
+        rule = self._create_rule(target="2330", cooldown_policy={"cooldown_seconds": 60})
 
         class FakeNotifier:
             def send_with_results(self, *_args, **_kwargs):
@@ -1151,13 +1151,13 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertTrue(by_channel["custom"]["success"])
         cooldown = self.service.repo.get_rule_cooldown_summary(
             rule_id=rule["id"],
-            target="600519",
+            target="2330",
             severity="warning",
         )
         self.assertIsNotNone(cooldown)
 
     def test_noise_suppression_records_synthetic_attempt_without_upserting_cooldown(self) -> None:
-        rule = self._create_rule(target="600519", cooldown_policy={"cooldown_seconds": 60})
+        rule = self._create_rule(target="2330", cooldown_policy={"cooldown_seconds": 60})
 
         class FakeNotifier:
             def send_with_results(self, *_args, **_kwargs):
@@ -1184,13 +1184,13 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(notifications[0]["error_code"], "noise_suppressed")
         cooldown = self.service.repo.get_rule_cooldown_summary(
             rule_id=rule["id"],
-            target="600519",
+            target="2330",
             severity="warning",
         )
         self.assertIsNone(cooldown)
 
     def test_no_channel_and_all_failed_do_not_upsert_cooldown(self) -> None:
-        rule = self._create_rule(target="600519", cooldown_policy={"cooldown_seconds": 60})
+        rule = self._create_rule(target="2330", cooldown_policy={"cooldown_seconds": 60})
         dispatches = [
             NotificationDispatchResult(dispatched=False, success=False, status="no_channel", message="no channel"),
             NotificationDispatchResult(
@@ -1219,16 +1219,16 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(channels, {"__no_channel__", "wechat"})
         cooldown = self.service.repo.get_rule_cooldown_summary(
             rule_id=rule["id"],
-            target="600519",
+            target="2330",
             severity="warning",
         )
         self.assertIsNone(cooldown)
 
     def test_trigger_record_failure_does_not_block_other_rules(self) -> None:
-        self._create_rule(target="600519")
+        self._create_rule(target="2330")
         self._create_rule(
             name="CATL drop",
-            target="300750",
+            target="00981A",
             alert_type="price_change_percent",
             parameters={"direction": "down", "change_pct": 3.0},
         )
@@ -1236,12 +1236,12 @@ class AlertWorkerTestCase(unittest.TestCase):
         original_create_trigger = self.service.repo.create_trigger
 
         def _create_trigger(fields):
-            if fields["target"] == "600519":
+            if fields["target"] == "2330":
                 raise RuntimeError("database locked")
             return original_create_trigger(fields)
 
         async def _quote(_monitor, stock_code):
-            if stock_code == "600519":
+            if stock_code == "2330":
                 return SimpleNamespace(price=1810.0)
             return {"pct_chg": "-3.25%"}
 
@@ -1255,10 +1255,10 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(stats["notified"], 2)
         triggers = self._triggers(status="triggered")
         self.assertEqual(len(triggers), 1)
-        self.assertEqual(triggers[0]["target"], "300750")
+        self.assertEqual(triggers[0]["target"], "00981A")
 
     def test_db_cooldown_suppresses_duplicate_notifications_but_expires(self) -> None:
-        self._create_rule(target="600519", cooldown_policy={"cooldown_seconds": 60})
+        self._create_rule(target="2330", cooldown_policy={"cooldown_seconds": 60})
         notifier = self._notifier()
         now = {"value": 1000.0}
 
@@ -1286,7 +1286,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(cooldown_attempts[0]["error_code"], "cooldown_active")
 
     def test_db_cooldown_read_failure_uses_fingerprint_fallback(self) -> None:
-        self._create_rule(target="600519", cooldown_policy={"cooldown_seconds": 60})
+        self._create_rule(target="2330", cooldown_policy={"cooldown_seconds": 60})
         notifier = self._notifier()
         now = {"value": 1000.0}
 
@@ -1322,7 +1322,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertNotIn("secret-token", suppressed_attempts[0]["diagnostics"] or "")
 
     def test_failed_db_notification_does_not_start_read_failure_fallback_window(self) -> None:
-        self._create_rule(target="600519", cooldown_policy={"cooldown_seconds": 60})
+        self._create_rule(target="2330", cooldown_policy={"cooldown_seconds": 60})
         notifier = self._notifier(self._dispatch_result(False), self._dispatch_result(True))
         now = {"value": 1000.0}
 
@@ -1354,7 +1354,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(len(self._notifications(channel="__cooldown_read_failed__")), 1)
 
     def test_db_rule_with_cooldown_zero_is_not_suppressed_by_fingerprint(self) -> None:
-        self._create_rule(target="600519", cooldown_policy={"cooldown_seconds": 0})
+        self._create_rule(target="2330", cooldown_policy={"cooldown_seconds": 0})
         notifier = self._notifier()
         now = {"value": 1000.0}
 
@@ -1378,7 +1378,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(self._notifications(channel="__cooldown__"), [])
 
     def test_legacy_rule_still_uses_fingerprint_suppression(self) -> None:
-        raw_rules = '[{"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800}]'
+        raw_rules = '[{"stock_code":"2330","alert_type":"price_cross","direction":"above","price":1800}]'
         notifier = self._notifier()
         now = {"value": 1000.0}
 
@@ -1403,7 +1403,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(len(self._triggers(status="triggered")), 3)
 
     def test_failed_db_notification_attempts_do_not_start_cooldown_window(self) -> None:
-        self._create_rule(target="600519")
+        self._create_rule(target="2330")
         notifier = self._notifier(
             self._dispatch_result(False),
             RuntimeError("temporary webhook failure"),
@@ -1448,7 +1448,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         )
         notifier = self._notifier()
         config = self._config()
-        config.stock_list = ["600519", "000001"]
+        config.stock_list = ["2330", "AAPL"]
         now = {"value": 1000.0}
 
         async def _quote(_monitor, _stock_code):
@@ -1475,7 +1475,7 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(second["cooldown_suppressed"], 2)
         self.assertEqual(notifier.send_with_results.call_count, 2)
         targets = {item["target"] for item in self._triggers(status="triggered")}
-        self.assertEqual(targets, {"600519", "000001"})
+        self.assertEqual(targets, {"2330", "AAPL"})
 
     def test_p6_empty_watchlist_writes_skipped_trigger(self) -> None:
         self._create_rule(
@@ -1561,7 +1561,7 @@ class AlertWorkerTestCase(unittest.TestCase):
                 "data_timestamp": None,
                 "reason": "account all concentration top weight 42.00%",
                 "message": "account all concentration top weight 42.00%",
-                "diagnostics": '{"account_id":"all","currency":"CNY","as_of":"2026-05-20"}',
+                "diagnostics": '{"account_id":"all","currency":"TWD","as_of":"2026-05-20"}',
             }
 
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service, notifier=notifier)

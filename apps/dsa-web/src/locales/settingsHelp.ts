@@ -16,7 +16,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.base.STOCK_LIST': {
     title: '自選股列表',
     summary: '配置需要分析的股票代號列表，是手動分析、定時任務和通知報告的基礎輸入。',
-    usage: '多個股票代號使用英文逗號分隔。A 股可直接填寫 6 位代號，港股可使用 hk 字首，美股可填寫 ticker。',
+    usage: '多個股票代號使用英文逗號分隔。A 股可直接填寫 6 位代號，美股可使用 hk 字首，美股可填寫 ticker。',
     valueNotes: [
       '定時模式每次觸發前會重新讀取當前儲存的 STOCK_LIST。',
       '如果命令列臨時傳入 --stocks，隻影響本次手動執行，不會鎖定後續計劃任務。',
@@ -515,7 +515,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
     title: '交易日檢查',
     summary: '控制非交易日是否跳過分析。',
     usage: '預設 true；需要強制執行可設為 false 或使用 --force-run。',
-    valueNotes: ['會結合市場日曆判斷 A 股、港股、美股等市場是否開市。'],
+    valueNotes: ['會結合市場日曆判斷 A 股、美股、美股等市場是否開市。'],
     impact: ['影響定時任務和手動執行是否在休市日執行。'],
     notes: ['關閉後休市日可能生成缺少實時行情的報告。'],
   },

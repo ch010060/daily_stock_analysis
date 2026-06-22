@@ -21,27 +21,27 @@ describe('DashboardStateBlock', () => {
     const { rerender } = render(
       <DashboardStateBlock
         title="開始分析"
-        description="輸入股票程式碼進行分析"
+        description="輸入股票代號進行分析"
         icon={<span data-testid="icon">icon</span>}
         action={<button type="button">立即開始</button>}
       />,
     );
 
     expect(screen.getByTestId('icon')).toBeInTheDocument();
-    expect(screen.getByText('輸入股票程式碼進行分析')).toBeInTheDocument();
+    expect(screen.getByText('輸入股票代號進行分析')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '立即開始' })).toBeInTheDocument();
 
     rerender(
       <DashboardStateBlock
         title="開始分析"
         titleAs="h3"
-        description="輸入股票程式碼進行分析"
+        description="輸入股票代號進行分析"
         loading
       />,
     );
 
     expect(screen.getByRole('heading', { name: '開始分析', level: 3 })).toBeInTheDocument();
-    expect(screen.getByText('輸入股票程式碼進行分析')).toBeInTheDocument();
+    expect(screen.getByText('輸入股票代號進行分析')).toBeInTheDocument();
     expect(document.querySelector('.home-spinner')).not.toBeNull();
     expect(screen.queryByTestId('icon')).not.toBeInTheDocument();
   });

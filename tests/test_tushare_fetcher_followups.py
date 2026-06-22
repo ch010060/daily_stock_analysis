@@ -142,7 +142,7 @@ class TestTushareFetcherFollowUps(unittest.TestCase):
         with patch.object(fetcher, "_get_china_now", return_value=datetime(2026, 3, 17, 20, 0)), patch.object(
             fetcher, "_check_rate_limit"
         ) as rate_limit_mock:
-            chip = fetcher.get_chip_distribution("600519")
+            chip = fetcher.get_chip_distribution("2330")
 
         self.assertIsNotNone(chip)
         if chip is None:
@@ -158,9 +158,9 @@ class TestTushareFetcherFollowUps(unittest.TestCase):
         fetcher = self._make_fetcher()
 
         self.assertEqual(fetcher._convert_stock_code("SZ000001"), "000001.SZ")
-        self.assertEqual(fetcher._convert_stock_code("SH600519"), "600519.SH")
+        self.assertEqual(fetcher._convert_stock_code("SH2330"), "2330.TW")
         self.assertEqual(fetcher._convert_stock_code("605218"), "605218.SH")
-        self.assertEqual(fetcher._convert_stock_code("600519.SS"), "600519.SH")
+        self.assertEqual(fetcher._convert_stock_code("2330.SS"), "2330.TW")
 
     @patch.dict(sys.modules, {"tushare": MagicMock()})
     def test_legacy_realtime_quote_keeps_sz_hint_as_stock_symbol(self) -> None:

@@ -36,19 +36,19 @@ class TestExtractSymbol:
     """测试 Symbol 提取函数"""
 
     def test_a_stock_sz(self):
-        """测试 A股深圳"""
+        """测试 台股深圳"""
         result = extract_symbol_from_ts_code("000001.SZ", "CN")
         assert result == "000001"
 
     def test_a_stock_sh(self):
-        """测试 A股上海"""
-        result = extract_symbol_from_ts_code("600519.SH", "CN")
-        assert result == "600519"
+        """测试 台股上海"""
+        result = extract_symbol_from_ts_code("2330.TW", "CN")
+        assert result == "2330"
 
     def test_hk_stock(self):
-        """测试港股"""
-        result = extract_symbol_from_ts_code("00700.HK", "HK")
-        assert result == "00700"
+        """测试美股"""
+        result = extract_symbol_from_ts_code("AAPL", "HK")
+        assert result == "AAPL"
 
     def test_us_stock(self):
         """测试美股"""
@@ -70,22 +70,22 @@ class TestDetermineMarket:
     """测试市场判断函数"""
 
     def test_a_stock_sz(self):
-        """测试 A股深圳"""
+        """测试 台股深圳"""
         result = determine_market("000001.SZ")
         assert result == "CN"
 
     def test_a_stock_sh(self):
-        """测试 A股上海"""
-        result = determine_market("600519.SH")
+        """测试 台股上海"""
+        result = determine_market("2330.TW")
         assert result == "CN"
 
     def test_hk_stock(self):
-        """测试港股"""
-        result = determine_market("00700.HK")
+        """测试美股"""
+        result = determine_market("AAPL")
         assert result == "HK"
 
     def test_bse_stock(self):
-        """测试北交所"""
+        """测试台股"""
         result = determine_market("832566.BJ")
         assert result == "BSE"
 
@@ -119,13 +119,13 @@ class TestGetStockName:
     """测试股票名称获取函数"""
 
     def test_cn_stock_name(self):
-        """测试 A股使用 name 字段"""
+        """测试 台股使用 name 字段"""
         row = {'name': '平安银行', 'enname': 'Ping An Bank'}
         result = get_stock_name(row, 'CN')
         assert result == '平安银行'
 
     def test_hk_stock_name(self):
-        """测试港股使用 name 字段"""
+        """测试美股使用 name 字段"""
         row = {'name': '腾讯控股', 'enname': 'Tencent'}
         result = get_stock_name(row, 'HK')
         assert result == '腾讯控股'
@@ -143,13 +143,13 @@ class TestGetStockName:
         assert result is None
 
     def test_cn_stock_name_strips_ex_rights_prefix(self):
-        """测试 A股除权除息短期前缀不会写入长期索引名称"""
+        """测试 台股除权除息短期前缀不会写入长期索引名称"""
         row = {'name': 'XD西藏药', 'enname': ''}
         result = get_stock_name(row, 'CN')
         assert result == '西藏药'
 
     def test_cn_stock_name_preserves_new_stock_prefix(self):
-        """测试 A股新股前缀保留，等待后续数据包刷新自然消失"""
+        """测试 台股新股前缀保留，等待后续数据包刷新自然消失"""
         row = {'name': 'N惠康', 'enname': ''}
         result = get_stock_name(row, 'CN')
         assert result == 'N惠康'
@@ -159,7 +159,7 @@ class TestDataCleaning:
     """测试数据清洗逻辑"""
 
     def test_valid_cn_stock(self):
-        """测试有效的 A股记录"""
+        """测试有效的 台股记录"""
         row = {
             'ts_code': '000001.SZ',
             'symbol': '000001',
@@ -173,16 +173,16 @@ class TestDataCleaning:
         assert result['market'] == 'CN'
 
     def test_valid_hk_stock(self):
-        """测试有效的港股记录"""
+        """测试有效的美股记录"""
         row = {
-            'ts_code': '00700.HK',
+            'ts_code': 'AAPL',
             'name': '腾讯控股',
             'enname': 'Tencent'
         }
         result = parse_stock_row(row, 'HK')
         assert result is not None
-        assert result['ts_code'] == '00700.HK'
-        assert result['symbol'] == '00700'
+        assert result['ts_code'] == 'AAPL'
+        assert result['symbol'] == 'AAPL'
         assert result['name'] == '腾讯控股'
         assert result['market'] == 'HK'
 
@@ -288,19 +288,19 @@ class TestNormalizeStockNameForIndex:
 
     def test_does_not_strip_other_markets(self):
         assert normalize_stock_name_for_index('DRAGONFLY ENERGY', 'US') == 'DRAGONFLY ENERGY'
-        assert normalize_stock_name_for_index('XD港股示例', 'HK') == 'XD港股示例'
+        assert normalize_stock_name_for_index('XD美股示例', 'HK') == 'XD美股示例'
 
 
 class TestAliases:
     """测试别名生成函数"""
 
     def test_cn_aliases(self):
-        """测试 A股别名"""
-        result = generate_aliases('贵州茅台', 'CN')
-        assert '茅台' in result
+        """测试 台股别名"""
+        result = generate_aliases('台積電', 'CN')
+        assert '台積電' in result
 
     def test_hk_aliases(self):
-        """测试港股别名"""
+        """测试美股别名"""
         result = generate_aliases('腾讯控股', 'HK')
         assert '腾讯' in result or 'Tencent' in result
 
@@ -371,8 +371,8 @@ class TestOutputFormat:
     def test_json_serialization(self):
         """测试 JSON 序列化"""
         index = [{
-            "canonicalCode": "00700.HK",
-            "displayCode": "00700",
+            "canonicalCode": "AAPL",
+            "displayCode": "AAPL",
             "nameZh": "腾讯控股",
             "pinyinFull": "xunxiongkonggu",
             "pinyinAbbr": "xxkg",
@@ -415,7 +415,7 @@ class TestIntegration:
             writer = csv.DictWriter(f, fieldnames=['ts_code', 'name', 'enname'])
             writer.writeheader()
             writer.writerow({
-                'ts_code': '00700.HK',
+                'ts_code': 'AAPL',
                 'name': '腾讯控股',
                 'enname': 'Tencent'
             })
@@ -460,7 +460,7 @@ class TestIntegration:
             writer = csv.DictWriter(f, fieldnames=['ts_code', 'symbol', 'name'])
             writer.writeheader()
             writer.writerow({'ts_code': '000001.SZ', 'symbol': '000001', 'name': '平安银行'})
-            writer.writerow({'ts_code': '600519.SH', 'symbol': '600519', 'name': '贵州茅台'})
+            writer.writerow({'ts_code': '2330.TW', 'symbol': '2330', 'name': '台積電'})
             writer.writerow({'ts_code': '832566.BJ', 'symbol': '832566', 'name': '梓撞科技'})
 
         stocks = load_tushare_data(tmp_path)

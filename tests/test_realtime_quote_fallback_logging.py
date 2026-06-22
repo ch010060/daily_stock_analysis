@@ -41,8 +41,8 @@ class _DummyFetcher:
 
 
 def _make_quote(
-    code: str = "600519",
-    name: str = "貴州茅臺",
+    code: str = "2330",
+    name: str = "台積電",
     source: RealtimeSource = RealtimeSource.AKSHARE_EM,
     **overrides,
 ) -> UnifiedRealtimeQuote:
@@ -67,7 +67,7 @@ def _make_pipeline(enable_realtime_quote: bool, realtime_quote=None) -> StockAna
         report_language="zh",
     )
     pipeline.fetcher_manager = MagicMock()
-    pipeline.fetcher_manager.get_stock_name.return_value = "貴州茅臺"
+    pipeline.fetcher_manager.get_stock_name.return_value = "台積電"
     pipeline.fetcher_manager.get_realtime_quote.return_value = realtime_quote
     pipeline.fetcher_manager.get_chip_distribution.return_value = None
     pipeline.fetcher_manager.get_fundamental_context.return_value = {
@@ -108,10 +108,10 @@ def test_manager_does_not_warn_when_fallback_source_succeeds(mock_get_config, ca
     )
 
     with caplog.at_level(logging.INFO):
-        quote = manager.get_realtime_quote("600519")
+        quote = manager.get_realtime_quote("2330")
 
     assert quote is not None
-    assert quote.name == "貴州茅臺"
+    assert quote.name == "台積電"
     assert quote.fetched_at is not None
     assert quote.fallback_from == "efinance"
     assert not [record for record in caplog.records if record.levelno >= logging.WARNING]
@@ -133,7 +133,7 @@ def test_manager_supplement_does_not_mark_fallback_from(mock_get_config):
         ]
     )
 
-    quote = manager.get_realtime_quote("600519")
+    quote = manager.get_realtime_quote("2330")
 
     assert quote is primary
     assert quote.fetched_at is not None
@@ -156,7 +156,7 @@ def test_manager_fallback_from_records_highest_priority_failed_source(mock_get_c
         ]
     )
 
-    quote = manager.get_realtime_quote("600519")
+    quote = manager.get_realtime_quote("2330")
 
     assert quote is not None
     assert quote.source == RealtimeSource.AKSHARE_EM
@@ -181,7 +181,7 @@ def test_manager_drops_invalid_provider_timestamp_before_return(mock_get_config)
         ]
     )
 
-    quote = manager.get_realtime_quote("600519")
+    quote = manager.get_realtime_quote("2330")
 
     assert quote is raw_quote
     assert quote.fetched_at is not None
@@ -194,17 +194,17 @@ def test_pipeline_warns_once_when_all_realtime_sources_fail(caplog):
     pipeline = _make_pipeline(enable_realtime_quote=True, realtime_quote=None)
 
     with caplog.at_level(logging.INFO):
-        result = pipeline.analyze_stock("600519", ReportType.SIMPLE, "q1")
+        result = pipeline.analyze_stock("2330", ReportType.SIMPLE, "q1")
 
     assert result is None
-    pipeline.fetcher_manager.get_stock_name.assert_called_once_with("600519", allow_realtime=False)
-    pipeline.fetcher_manager.get_realtime_quote.assert_called_once_with("600519", log_final_failure=False)
+    pipeline.fetcher_manager.get_stock_name.assert_called_once_with("2330", allow_realtime=False)
+    pipeline.fetcher_manager.get_realtime_quote.assert_called_once_with("2330", log_final_failure=False)
     downgrade_logs = [
         record.message
         for record in caplog.records
         if "歷史收盤價繼續分析" in record.message
     ]
-    assert downgrade_logs == ["貴州茅臺(600519) 所有實時行情資料來源均不可用，已降級為歷史收盤價繼續分析"]
+    assert downgrade_logs == ["台積電(2330) 所有實時行情資料來源均不可用，已降級為歷史收盤價繼續分析"]
 
 
 @patch("src.config.get_config")
@@ -221,7 +221,7 @@ def test_event_monitor_keeps_manager_failure_summary_for_direct_quote_call(mock_
         ]
     )
     monitor = EventMonitor()
-    rule = PriceAlert(stock_code="600519", direction="above", price=1800.0)
+    rule = PriceAlert(stock_code="2330", direction="above", price=1800.0)
 
     async def _run_inline(func, *args, **kwargs):
         return func(*args, **kwargs)
@@ -232,21 +232,21 @@ def test_event_monitor_keeps_manager_failure_summary_for_direct_quote_call(mock_
         result = asyncio.run(monitor._check_price(rule))
 
     assert result is None
-    assert "[實時行情] 600519 所有資料來源均失敗: [efinance] 失敗: efinance timeout" in caplog.text
+    assert "[實時行情] 2330 所有資料來源均失敗: [efinance] 失敗: efinance timeout" in caplog.text
 
 
 def test_pipeline_logs_disabled_realtime_once_without_fetching_quote(caplog):
     pipeline = _make_pipeline(enable_realtime_quote=False, realtime_quote=_make_quote())
 
     with caplog.at_level(logging.INFO):
-        result = pipeline.analyze_stock("600519", ReportType.SIMPLE, "q1")
+        result = pipeline.analyze_stock("2330", ReportType.SIMPLE, "q1")
 
     assert result is None
-    pipeline.fetcher_manager.get_stock_name.assert_called_once_with("600519", allow_realtime=False)
+    pipeline.fetcher_manager.get_stock_name.assert_called_once_with("2330", allow_realtime=False)
     pipeline.fetcher_manager.get_realtime_quote.assert_not_called()
     downgrade_logs = [
         record.message
         for record in caplog.records
         if "歷史收盤價繼續分析" in record.message
     ]
-    assert downgrade_logs == ["貴州茅臺(600519) 實時行情已禁用，使用歷史收盤價繼續分析"]
+    assert downgrade_logs == ["台積電(2330) 實時行情已禁用，使用歷史收盤價繼續分析"]

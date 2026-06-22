@@ -12,7 +12,7 @@ from src.services.history_service import HistoryService
 class HistoryNewsFallbackTestCase(unittest.TestCase):
     def test_fallback_filters_by_published_date_window(self) -> None:
         now = datetime.now()
-        analysis = SimpleNamespace(code="600519", created_at=now)
+        analysis = SimpleNamespace(code="2330", created_at=now)
 
         # All entries are within fetched_at window; only one should pass published_date window.
         candidates = [
@@ -46,7 +46,7 @@ class HistoryNewsFallbackTestCase(unittest.TestCase):
 
     def test_fallback_uses_analysis_date_as_window_anchor(self) -> None:
         analysis_time = datetime.now() - timedelta(days=40)
-        analysis = SimpleNamespace(code="600519", created_at=analysis_time)
+        analysis = SimpleNamespace(code="2330", created_at=analysis_time)
 
         candidates = [
             SimpleNamespace(

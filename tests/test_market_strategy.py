@@ -16,7 +16,7 @@ class TestMarketStrategyBlueprint(unittest.TestCase):
         blueprint = get_market_strategy_blueprint("cn")
         block = blueprint.to_prompt_block()
 
-        self.assertIn("A股市場三段式覆盤策略", block)
+        self.assertIn("台股市場三段式覆盤策略", block)
         self.assertIn("Action Framework", block)
         self.assertIn("進攻", block)
 
@@ -37,7 +37,7 @@ class TestMarketAnalyzerStrategyPrompt(unittest.TestCase):
         prompt = analyzer._build_review_prompt(MarketOverview(date="2026-02-24"), [])
 
         self.assertIn("明日交易計劃", prompt)
-        self.assertIn("A股市場三段式覆盤策略", prompt)
+        self.assertIn("台股市場三段式覆盤策略", prompt)
 
     def test_us_prompt_contains_strategy_plan_section(self):
         analyzer = MarketAnalyzer(region="us")
@@ -56,7 +56,7 @@ class TestMarketAnalyzerStrategyPrompt(unittest.TestCase):
         self.assertIn("### 1. Market Summary", prompt)
         self.assertIn("A-share Three-Phase Recap Strategy", prompt)
         self.assertNotIn("### 一、市場總結", prompt)
-        self.assertNotIn("A股市場三段式覆盤策略", prompt)
+        self.assertNotIn("台股市場三段式覆盤策略", prompt)
 
 
 if __name__ == "__main__":

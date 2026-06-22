@@ -74,12 +74,12 @@ class TestFetcherLogging(unittest.TestCase):
         fetcher = _SuccessFetcher()
 
         with self.assertLogs("data_provider.base", level="INFO") as captured:
-            df = fetcher.get_daily_data("600519", start_date="2026-03-01", end_date="2026-03-08")
+            df = fetcher.get_daily_data("2330", start_date="2026-03-01", end_date="2026-03-08")
 
         log_text = "\n".join(captured.output)
         self.assertFalse(df.empty)
-        self.assertIn("[SuccessFetcher] 開始獲取 600519 日線資料", log_text)
-        self.assertIn("[SuccessFetcher] 600519 獲取成功:", log_text)
+        self.assertIn("[SuccessFetcher] 開始獲取 2330 日線資料", log_text)
+        self.assertIn("[SuccessFetcher] 2330 獲取成功:", log_text)
         self.assertIn("rows=2", log_text)
 
     def test_manager_logs_fallback_and_final_success(self):
@@ -122,7 +122,7 @@ class TestFetcherLogging(unittest.TestCase):
                 fetcher.get_daily_data("1211.HK", start_date="2026-05-01", end_date="2026-05-08")
 
         mock_fetch_stock_data.assert_not_called()
-        self.assertIn("不支援港股日線", str(captured.exception))
+        self.assertIn("不支援美股日線", str(captured.exception))
 
     def test_efinance_logs_eastmoney_endpoint_on_remote_disconnect(self):
         fetcher = EfinanceFetcher()

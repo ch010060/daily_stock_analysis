@@ -32,7 +32,7 @@ const sampleConfig = {
   items: [
     {
       key: 'STOCK_LIST',
-      value: 'SH600000',
+      value: '2330',
       rawValueExists: true,
       isMasked: false,
       schema: {

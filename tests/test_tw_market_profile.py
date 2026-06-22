@@ -33,7 +33,7 @@ from src.core.market_review_scope_gate import filter_regions_for_route_b
 
 
 _FORBIDDEN_CN_TERMS = [
-    "A股", "上證", "上證", "深證", "深證",
+    "台股", "上證", "上證", "深證", "深證",
     "創業板", "創業板", "科創50", "科創50", "滬深", "滬深",
 ]
 
@@ -139,7 +139,7 @@ class TestTWBlueprint(unittest.TestCase):
 
     def test_tw_blueprint_no_cn_terms(self):
         block = TW_BLUEPRINT.to_prompt_block()
-        for term in ["A股", "上証", "深証", "創業板", "創業板"]:
+        for term in ["台股", "上証", "深証", "創業板", "創業板"]:
             self.assertNotIn(term, block, f"Forbidden term {term!r} in TW blueprint")
 
     def test_tw_blueprint_contains_tw_terms(self):

@@ -65,8 +65,8 @@ class TestTushareFetcherGetStockList(unittest.TestCase):
 
         fetcher._api.stock_basic.return_value = pd.DataFrame(
             {
-                "ts_code": ["600519.SH", "000001.SZ"],
-                "name": ["貴州茅臺", "平安銀行"],
+                "ts_code": ["2330.TW", "000001.SZ"],
+                "name": ["台積電", "平安銀行"],
                 "industry": ["白酒", "銀行"],
                 "area": ["貴州", "深圳"],
                 "market": ["主機板", "主機板"],
@@ -83,8 +83,8 @@ class TestTushareFetcherGetStockList(unittest.TestCase):
             {"code", "name", "industry", "area", "market"},
         )
         self.assertEqual(len(df), 2)
-        self.assertEqual(set(df["code"].tolist()), {"600519", "000001"})
-        self.assertEqual(fetcher._stock_name_cache.get("600519"), "貴州茅臺")
+        self.assertEqual(set(df["code"].tolist()), {"2330", "000001"})
+        self.assertEqual(fetcher._stock_name_cache.get("2330"), "台積電")
 
         fetcher._api.stock_basic.assert_called_once()
         self.assertFalse(fetcher._api.hk_basic.called)
@@ -115,11 +115,11 @@ class TestTushareFetcherFetchRawData(unittest.TestCase):
         fetcher._api.daily.return_value = pd.DataFrame({"trade_date": ["20260101"]})
 
         with patch.object(fetcher, "_check_rate_limit"):
-            out = fetcher._fetch_raw_data("600519", "2026-01-01", "2026-01-05")
+            out = fetcher._fetch_raw_data("2330", "2026-01-01", "2026-01-05")
 
         self.assertIsNotNone(out)
         fetcher._api.daily.assert_called_once_with(
-            ts_code="600519.SH",
+            ts_code="2330.TW",
             start_date="20260101",
             end_date="20260105",
         )
@@ -163,11 +163,11 @@ class TestTushareFetcherFetchRawData(unittest.TestCase):
         fetcher._api.hk_daily.return_value = pd.DataFrame({"trade_date": ["20260102"]})
 
         with patch.object(fetcher, "_check_rate_limit"):
-            out = fetcher._fetch_raw_data("HK00700", "2026-01-01", "2026-01-05")
+            out = fetcher._fetch_raw_data("AAPL", "2026-01-01", "2026-01-05")
 
         self.assertIsNotNone(out)
         fetcher._api.hk_daily.assert_called_once_with(
-            ts_code="00700.HK",
+            ts_code="AAPL",
             start_date="20260101",
             end_date="20260105",
         )
@@ -188,7 +188,7 @@ class TestTushareFetcherFetchRawData(unittest.TestCase):
         # __init__ leaves _api None when _init_api is a no-op mock
         self.assertIsNone(fetcher._api)
         with self.assertRaises(DataFetchError) as ctx:
-            fetcher._fetch_raw_data("600519", "2026-01-01", "2026-01-05")
+            fetcher._fetch_raw_data("2330", "2026-01-01", "2026-01-05")
         self.assertIn("未初始化", str(ctx.exception))
 
     def test_fetch_raw_data_quota_exception_becomes_rate_limit(self) -> None:
@@ -197,18 +197,18 @@ class TestTushareFetcherFetchRawData(unittest.TestCase):
 
         with patch.object(fetcher, "_check_rate_limit"):
             with self.assertRaises(RateLimitError):
-                fetcher._fetch_raw_data("600519", "20260101", "20260105")
+                fetcher._fetch_raw_data("2330", "20260101", "20260105")
 
     def test_convert_stock_code_normalizes(self) -> None:
         fetcher = self._make_fetcher()
-        self.assertEqual(fetcher._convert_stock_code("HK00700"), "HK00700")
+        self.assertEqual(fetcher._convert_stock_code("AAPL"), "AAPL")
     
 
     def test_convert_stock_code_for_tushare_normalizes_hk(self) -> None:
         fetcher = self._make_fetcher()
-        self.assertEqual(fetcher._convert_hk_stock_code_for_tushare("HK00700"), "00700.HK")
-        self.assertEqual(fetcher._convert_hk_stock_code_for_tushare("00700.HK"), "00700.HK")
-        self.assertEqual(fetcher._convert_hk_stock_code_for_tushare("600519"), "600519.SH")
+        self.assertEqual(fetcher._convert_hk_stock_code_for_tushare("AAPL"), "AAPL")
+        self.assertEqual(fetcher._convert_hk_stock_code_for_tushare("AAPL"), "AAPL")
+        self.assertEqual(fetcher._convert_hk_stock_code_for_tushare("2330"), "2330.TW")
 
 
 class TestTushareFetcherNormalizeData(unittest.TestCase):
@@ -239,21 +239,21 @@ class TestTushareFetcherNormalizeData(unittest.TestCase):
 
     def test_normalize_data_a_share_multiplies_volume_and_amount(self) -> None:
         fetcher = self._make_fetcher()
-        out = fetcher._normalize_data(self._sample_daily_frame(), "600519")
+        out = fetcher._normalize_data(self._sample_daily_frame(), "2330")
         self.assertEqual(out.iloc[0]["volume"], 10000.0)
         self.assertEqual(out.iloc[0]["amount"], 50000.0)
-        self.assertEqual(out.iloc[0]["code"], "600519")
+        self.assertEqual(out.iloc[0]["code"], "2330")
 
     def test_normalize_data_hk_skips_volume_amount_scaling(self) -> None:
         fetcher = self._make_fetcher()
-        out = fetcher._normalize_data(self._sample_daily_frame(), "HK00700")
+        out = fetcher._normalize_data(self._sample_daily_frame(), "AAPL")
         self.assertEqual(out.iloc[0]["volume"], 100.0)
         self.assertEqual(out.iloc[0]["amount"], 50.0)
-        self.assertEqual(out.iloc[0]["code"], "HK00700")
+        self.assertEqual(out.iloc[0]["code"], "AAPL")
 
     def test_normalize_data_hk_suffix_skips_scaling(self) -> None:
         fetcher = self._make_fetcher()
-        out = fetcher._normalize_data(self._sample_daily_frame(), "00700.HK")
+        out = fetcher._normalize_data(self._sample_daily_frame(), "AAPL")
         self.assertEqual(out.iloc[0]["volume"], 100.0)
         self.assertEqual(out.iloc[0]["amount"], 50.0)
 
@@ -278,13 +278,13 @@ class TestTushareFetcherChipDistribution(unittest.TestCase):
     def test_get_chip_distribution_returns_none_for_hk_canonical(self) -> None:
         fetcher = self._make_fetcher()
         with patch.object(fetcher, "_call_api_with_rate_limit") as api_mock:
-            self.assertIsNone(fetcher.get_chip_distribution("HK00700"))
+            self.assertIsNone(fetcher.get_chip_distribution("AAPL"))
         api_mock.assert_not_called()
 
     def test_get_chip_distribution_returns_none_for_hk_ts_suffix(self) -> None:
         fetcher = self._make_fetcher()
         with patch.object(fetcher, "_call_api_with_rate_limit") as api_mock:
-            self.assertIsNone(fetcher.get_chip_distribution("00700.HK"))
+            self.assertIsNone(fetcher.get_chip_distribution("AAPL"))
         api_mock.assert_not_called()
 
 

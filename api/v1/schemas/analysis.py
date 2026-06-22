@@ -33,13 +33,13 @@ class AnalyzeRequest(BaseModel):
     
     stock_code: Optional[str] = Field(
         None, 
-        description="單隻股票程式碼", 
-        json_schema_extra={"example": "600519"},
+        description="單隻股票代號",
+        json_schema_extra={"example": "2330"},
     )
     stock_codes: Optional[List[str]] = Field(
         None, 
-        description="多隻股票程式碼（與 stock_code 二選一）",
-        json_schema_extra={"example": ["600519", "000858"]},
+        description="多隻股票代號（與 stock_code 二選一）",
+        json_schema_extra={"example": ["2330", "2454"]},
     )
     report_type: str = Field(
         "detailed",
@@ -61,12 +61,12 @@ class AnalyzeRequest(BaseModel):
     stock_name: Optional[str] = Field(
         None,
         description="使用者選中的股票名稱（自動補全時提供）",
-        json_schema_extra={"example": "貴州茅臺"},
+        json_schema_extra={"example": "台積電"},
     )
     original_query: Optional[str] = Field(
         None,
-        description="使用者原始輸入（如茅臺、gzmt、600519）",
-        json_schema_extra={"example": "茅臺"},
+        description="使用者原始輸入（如台積電、gzmt、2330）",
+        json_schema_extra={"example": "台積電"},
     )
     selection_source: Optional[str] = Field(
         None,
@@ -87,13 +87,13 @@ class AnalyzeRequest(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={
         "example": {
-            "stock_code": "600519",
+            "stock_code": "2330",
             "report_type": "detailed",
             "force_refresh": False,
             "async_mode": False,
             "analysis_phase": "auto",
-            "stock_name": "貴州茅臺",
-            "original_query": "茅臺",
+            "stock_name": "台積電",
+            "original_query": "台積電",
             "selection_source": "autocomplete",
             "notify": True,
             "skills": ["bull_trend"]
@@ -131,7 +131,7 @@ class AnalysisResultResponse(BaseModel):
     
     query_id: str = Field(..., description="分析記錄唯一標識")
     trace_id: Optional[str] = Field(None, description="診斷 trace ID")
-    stock_code: str = Field(..., description="股票程式碼")
+    stock_code: str = Field(..., description="股票代號")
     stock_name: Optional[str] = Field(None, description="股票名稱")
     report: Optional[Any] = Field(None, description="分析報告")
     diagnostic_summary: Optional[Any] = Field(None, description="執行診斷摘要")
@@ -140,8 +140,8 @@ class AnalysisResultResponse(BaseModel):
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "query_id": "abc123def456",
-            "stock_code": "600519",
-            "stock_name": "貴州茅臺",
+            "stock_code": "2330",
+            "stock_name": "台積電",
             "report": {
                 "summary": {
                     "sentiment_score": 75,
@@ -181,7 +181,7 @@ class BatchTaskAcceptedItem(BaseModel):
 
     task_id: str = Field(..., description="任務 ID，用於查詢狀態")
     trace_id: Optional[str] = Field(None, description="診斷 trace ID")
-    stock_code: str = Field(..., description="股票程式碼")
+    stock_code: str = Field(..., description="股票代號")
     status: str = Field(
         ...,
         description="任務狀態",
@@ -193,9 +193,9 @@ class BatchTaskAcceptedItem(BaseModel):
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "task_id": "task_abc123",
-            "stock_code": "600519",
+            "stock_code": "2330",
             "status": "pending",
-            "message": "分析任務已加入佇列: 600519",
+            "message": "分析任務已加入佇列: 2330",
             "analysis_phase": "auto"
         }
     })
@@ -204,15 +204,15 @@ class BatchTaskAcceptedItem(BaseModel):
 class BatchDuplicateTaskItem(BaseModel):
     """批次非同步任務中的重複提交項。"""
 
-    stock_code: str = Field(..., description="股票程式碼")
+    stock_code: str = Field(..., description="股票代號")
     existing_task_id: str = Field(..., description="已存在的任務 ID")
     message: str = Field(..., description="錯誤資訊")
 
     model_config = ConfigDict(json_schema_extra={
         "example": {
-            "stock_code": "600519",
+            "stock_code": "2330",
             "existing_task_id": "task_existing_123",
-            "message": "股票 600519 正在分析中 (task_id: task_existing_123)"
+            "message": "股票 2330 正在分析中 (task_id: task_existing_123)"
         }
     })
 
@@ -229,17 +229,17 @@ class BatchTaskAcceptedResponse(BaseModel):
             "accepted": [
                 {
                     "task_id": "task_abc123",
-                    "stock_code": "600519",
+                    "stock_code": "2330",
                     "status": "pending",
-                    "message": "分析任務已加入佇列: 600519",
+                    "message": "分析任務已加入佇列: 2330",
                     "analysis_phase": "auto"
                 }
             ],
             "duplicates": [
                 {
-                    "stock_code": "000858",
+                    "stock_code": "2454",
                     "existing_task_id": "task_existing_456",
-                    "message": "股票 000858 正在分析中 (task_id: task_existing_456)"
+                    "message": "股票 2454 正在分析中 (task_id: task_existing_456)"
                 }
             ],
             "message": "已提交 1 個任務，1 個重複跳過"
@@ -298,8 +298,8 @@ class TaskStatus(BaseModel):
             "result": None,
             "market_review_report": None,
             "error": None,
-            "stock_name": "貴州茅臺",
-            "original_query": "茅臺",
+            "stock_name": "台積電",
+            "original_query": "台積電",
             "selection_source": "autocomplete",
             "analysis_phase": "auto",
             "skills": ["bull_trend"]
@@ -316,7 +316,7 @@ class TaskInfo(BaseModel):
     
     task_id: str = Field(..., description="任務 ID")
     trace_id: Optional[str] = Field(None, description="診斷 trace ID")
-    stock_code: str = Field(..., description="股票程式碼")
+    stock_code: str = Field(..., description="股票代號")
     stock_name: Optional[str] = Field(None, description="股票名稱")
     status: TaskStatusEnum = Field(..., description="任務狀態")
     progress: int = Field(0, description="進度百分比 (0-100)", ge=0, le=100)
@@ -338,8 +338,8 @@ class TaskInfo(BaseModel):
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "task_id": "abc123def456",
-            "stock_code": "600519",
-            "stock_name": "貴州茅臺",
+            "stock_code": "2330",
+            "stock_name": "台積電",
             "status": "processing",
             "progress": 50,
             "message": "正在分析中...",
@@ -348,7 +348,7 @@ class TaskInfo(BaseModel):
             "started_at": "2026-02-05T10:30:01",
             "completed_at": None,
             "error": None,
-            "original_query": "茅臺",
+            "original_query": "台積電",
             "selection_source": "autocomplete",
             "analysis_phase": "auto",
             "skills": ["bull_trend"]
@@ -379,14 +379,14 @@ class DuplicateTaskErrorResponse(BaseModel):
     
     error: str = Field("duplicate_task", description="錯誤型別")
     message: str = Field(..., description="錯誤資訊")
-    stock_code: str = Field(..., description="股票程式碼")
+    stock_code: str = Field(..., description="股票代號")
     existing_task_id: str = Field(..., description="已存在的任務 ID")
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "error": "duplicate_task",
-            "message": "股票 600519 正在分析中",
-            "stock_code": "600519",
+            "message": "股票 2330 正在分析中",
+            "stock_code": "2330",
             "existing_task_id": "abc123def456"
         }
     })

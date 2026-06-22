@@ -4,26 +4,26 @@
  * Stock data index for autocomplete functionality
  */
 
-export type Market = 'CN' | 'HK' | 'US' | 'TW' | 'INDEX' | 'ETF' | 'BSE';
+export type Market = 'US' | 'TW';
 export type AssetType = 'stock' | 'index' | 'etf';
 
 /**
  * Stock index item (full format)
  */
 export interface StockIndexItem {
-  /** Canonical code: 600519.SH */
+  /** Canonical code: 2330 or META */
   canonicalCode: string;
-  /** Display code: 600519 */
+  /** Display code: 2330 or META */
   displayCode: string;
-  /** Chinese name: 貴州茅臺 */
+  /** Display name: 台積電 or Meta Platforms */
   nameZh: string;
-  /** English name: Kweichow Moutai */
+  /** English name: Taiwan Semiconductor */
   nameEn?: string;
-  /** Pinyin full: guizhoumaotai */
+  /** Pinyin full: taijidian */
   pinyinFull?: string;
-  /** Pinyin abbreviation: gzmt */
+  /** Pinyin abbreviation: tjd */
   pinyinAbbr?: string;
-  /** Aliases: ["茅臺"] */
+  /** Aliases: ["TSMC"] */
   aliases?: string[];
   /** Market */
   market: Market;

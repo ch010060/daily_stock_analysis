@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class StockQuote(BaseModel):
     """股票實時行情"""
     
-    stock_code: str = Field(..., description="股票程式碼")
+    stock_code: str = Field(..., description="股票代號")
     stock_name: Optional[str] = Field(None, description="股票名稱")
     current_price: float = Field(..., description="當前價格")
     change: Optional[float] = Field(None, description="漲跌額")
@@ -32,8 +32,8 @@ class StockQuote(BaseModel):
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
-            "stock_code": "600519",
-            "stock_name": "貴州茅臺",
+            "stock_code": "2330",
+            "stock_name": "台積電",
             "current_price": 1800.00,
             "change": 15.00,
             "change_percent": 0.84,
@@ -77,15 +77,15 @@ class KLineData(BaseModel):
 class ExtractItem(BaseModel):
     """單條提取結果（程式碼、名稱、置信度）"""
 
-    code: Optional[str] = Field(None, description="股票程式碼，None 表示解析失敗")
+    code: Optional[str] = Field(None, description="股票代號，None 表示解析失敗")
     name: Optional[str] = Field(None, description="股票名稱（如有）")
     confidence: str = Field("medium", description="置信度：high/medium/low")
 
 
 class ExtractFromImageResponse(BaseModel):
-    """圖片股票程式碼提取響應"""
+    """圖片股票代號提取響應"""
 
-    codes: List[str] = Field(..., description="提取的股票程式碼（已去重，向後相容）")
+    codes: List[str] = Field(..., description="提取的股票代號（已去重，向後相容）")
     items: List[ExtractItem] = Field(default_factory=list, description="提取結果明細（程式碼+名稱+置信度）")
     raw_text: Optional[str] = Field(None, description="原始 LLM 響應（除錯用）")
 
@@ -93,16 +93,51 @@ class ExtractFromImageResponse(BaseModel):
 class StockHistoryResponse(BaseModel):
     """股票歷史行情響應"""
     
-    stock_code: str = Field(..., description="股票程式碼")
+    stock_code: str = Field(..., description="股票代號")
     stock_name: Optional[str] = Field(None, description="股票名稱")
     period: str = Field(..., description="K 線週期")
     data: List[KLineData] = Field(default_factory=list, description="K 線資料列表")
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
-            "stock_code": "600519",
-            "stock_name": "貴州茅臺",
+            "stock_code": "2330",
+            "stock_name": "台積電",
             "period": "daily",
             "data": []
         }
     })
+
+
+class SymbolCandidateResponse(BaseModel):
+    """TW/US symbol lookup candidate."""
+
+    canonical_symbol: str = Field(..., description="Canonical market-scoped symbol, e.g. TW:8299")
+    raw_symbol: str = Field(..., description="Provider/native symbol, e.g. 8299 or META")
+    symbol: str = Field(..., description="Alias of raw_symbol for frontend compatibility")
+    market: str = Field(..., description="Supported market: TW or US")
+    exchange: Optional[str] = Field(None, description="Exchange/source venue if known")
+    instrument_type: str = Field(..., description="stock / ETF / index")
+    name: str = Field(..., description="Display name")
+    aliases: List[str] = Field(default_factory=list, description="Known aliases")
+    provider_source: str = Field(..., description="Sanitized universe source")
+    is_active: bool = Field(True, description="Whether candidate is active")
+    last_updated: Optional[str] = Field(None, description="Source update timestamp")
+    confidence: float = Field(..., description="Deterministic match confidence")
+    match_reason: str = Field(..., description="Deterministic match reason")
+
+
+class SymbolSearchResponse(BaseModel):
+    """Symbol candidate search response."""
+
+    query: str
+    candidates: List[SymbolCandidateResponse] = Field(default_factory=list)
+
+
+class SymbolResolveResponse(BaseModel):
+    """Symbol resolve response."""
+
+    query: str
+    status: str = Field(..., description="resolved / ambiguous / not_found")
+    selected: Optional[SymbolCandidateResponse] = None
+    candidates: List[SymbolCandidateResponse] = Field(default_factory=list)
+    message: Optional[str] = None

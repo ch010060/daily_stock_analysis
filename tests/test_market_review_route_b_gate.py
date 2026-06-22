@@ -148,7 +148,7 @@ class TestRunMarketReviewRouteBGating(unittest.TestCase):
             result = run_market_review(notifier, send_notification=False)
 
         self.assertIsNotNone(result)
-        for cn_marker in ("A股", "上證", "深證", "創業板", "滬深"):
+        for cn_marker in ("台股", "上證", "深證", "創業板", "滬深"):
             self.assertNotIn(cn_marker, result,
                 f"Result must not contain CN marker {cn_marker!r} when CN is filtered")
 

@@ -34,7 +34,7 @@ def test_dedup_ttl_suppresses_until_expiry_with_explicit_key():
         config,
         content="content at 12:00",
         route_type="report",
-        dedup_key="report:aggregate:simple:600519",
+        dedup_key="report:aggregate:simple:2330",
         now=now,
     )
     assert first.should_send
@@ -44,7 +44,7 @@ def test_dedup_ttl_suppresses_until_expiry_with_explicit_key():
         config,
         content="content at 12:01",
         route_type="report",
-        dedup_key="report:aggregate:simple:600519",
+        dedup_key="report:aggregate:simple:2330",
         now=now + timedelta(seconds=10),
     )
     assert not duplicate.should_send
@@ -54,7 +54,7 @@ def test_dedup_ttl_suppresses_until_expiry_with_explicit_key():
         config,
         content="content at 12:02",
         route_type="report",
-        dedup_key="report:aggregate:simple:600519",
+        dedup_key="report:aggregate:simple:2330",
         now=now + timedelta(seconds=61),
     )
     assert expired.should_send
@@ -68,7 +68,7 @@ def test_cooldown_keys_are_independent():
         config,
         content="one",
         route_type="report",
-        cooldown_key="report:single:600519:simple",
+        cooldown_key="report:single:2330:simple",
         now=now,
     )
     assert first.should_send
@@ -78,7 +78,7 @@ def test_cooldown_keys_are_independent():
         config,
         content="two",
         route_type="report",
-        cooldown_key="report:single:600519:simple",
+        cooldown_key="report:single:2330:simple",
         now=now + timedelta(seconds=1),
     )
     other_key = evaluate_notification_noise(
@@ -102,7 +102,7 @@ def test_inflight_reservation_suppresses_same_key_until_released():
         config,
         content="first",
         route_type="report",
-        dedup_key="report:aggregate:simple:600519",
+        dedup_key="report:aggregate:simple:2330",
         now=now,
     )
     assert first.should_send
@@ -111,7 +111,7 @@ def test_inflight_reservation_suppresses_same_key_until_released():
         config,
         content="second",
         route_type="report",
-        dedup_key="report:aggregate:simple:600519",
+        dedup_key="report:aggregate:simple:2330",
         now=now + timedelta(seconds=1),
     )
     assert not duplicate.should_send
@@ -122,7 +122,7 @@ def test_inflight_reservation_suppresses_same_key_until_released():
         config,
         content="retry",
         route_type="report",
-        dedup_key="report:aggregate:simple:600519",
+        dedup_key="report:aggregate:simple:2330",
         now=now + timedelta(seconds=2),
     )
     assert retried.should_send
@@ -136,7 +136,7 @@ def test_cooldown_inflight_reservation_suppresses_same_key_until_released():
         config,
         content="first",
         route_type="report",
-        cooldown_key="report:single:600519:simple",
+        cooldown_key="report:single:2330:simple",
         now=now,
     )
     assert first.should_send
@@ -145,7 +145,7 @@ def test_cooldown_inflight_reservation_suppresses_same_key_until_released():
         config,
         content="second",
         route_type="report",
-        cooldown_key="report:single:600519:simple",
+        cooldown_key="report:single:2330:simple",
         now=now + timedelta(seconds=1),
     )
     assert not duplicate.should_send
@@ -156,7 +156,7 @@ def test_cooldown_inflight_reservation_suppresses_same_key_until_released():
         config,
         content="retry",
         route_type="report",
-        cooldown_key="report:single:600519:simple",
+        cooldown_key="report:single:2330:simple",
         now=now + timedelta(seconds=2),
     )
     assert retried.should_send
@@ -171,7 +171,7 @@ def test_record_uses_success_time_for_expiry_not_evaluate_time():
         config,
         content="content",
         route_type="report",
-        dedup_key="report:aggregate:simple:600519",
+        dedup_key="report:aggregate:simple:2330",
         now=evaluated_at,
     )
     assert first.should_send
@@ -181,7 +181,7 @@ def test_record_uses_success_time_for_expiry_not_evaluate_time():
         config,
         content="content",
         route_type="report",
-        dedup_key="report:aggregate:simple:600519",
+        dedup_key="report:aggregate:simple:2330",
         now=success_at + timedelta(seconds=59),
     )
     assert not duplicate.should_send
@@ -191,7 +191,7 @@ def test_record_uses_success_time_for_expiry_not_evaluate_time():
         config,
         content="content",
         route_type="report",
-        dedup_key="report:aggregate:simple:600519",
+        dedup_key="report:aggregate:simple:2330",
         now=success_at + timedelta(seconds=61),
     )
     assert expired.should_send
@@ -205,7 +205,7 @@ def test_stale_release_does_not_clear_newer_inflight_reservation():
         config,
         content="content",
         route_type="report",
-        dedup_key="report:aggregate:simple:600519",
+        dedup_key="report:aggregate:simple:2330",
         now=now,
     )
     assert first.should_send
@@ -214,7 +214,7 @@ def test_stale_release_does_not_clear_newer_inflight_reservation():
         config,
         content="content",
         route_type="report",
-        dedup_key="report:aggregate:simple:600519",
+        dedup_key="report:aggregate:simple:2330",
         now=now + timedelta(seconds=301),
     )
     assert newer.should_send
@@ -224,7 +224,7 @@ def test_stale_release_does_not_clear_newer_inflight_reservation():
         config,
         content="content",
         route_type="report",
-        dedup_key="report:aggregate:simple:600519",
+        dedup_key="report:aggregate:simple:2330",
         now=now + timedelta(seconds=302),
     )
     assert not duplicate.should_send

@@ -20,4 +20,42 @@ describe('stock input validation', () => {
       normalized: 'SPY',
     });
   });
+
+  it.each([
+    '群聯',
+    'Phison',
+    'Meta Platforms',
+    'Facebook',
+    '台達電',
+    'Delta Electronics',
+    '廣達',
+    'Quanta',
+    '緯穎',
+    'Wiwynn',
+    '奇鋐',
+    'Asia Vital Components',
+    '金像電',
+    'Kinsus',
+    '智邦',
+    'Accton',
+    '欣興',
+    'Unimicron',
+    '世芯-KY',
+    'Alchip',
+    'Microsoft',
+    'Google',
+    'Amazon',
+    'Tesla',
+    'Broadcom',
+    'Advanced Micro Devices',
+    'Micron',
+    'Arm Holdings',
+    'Oracle',
+    'Palantir',
+  ])(
+    'allows supported natural name %s to reach backend resolver',
+    (input) => {
+      expect(isObviouslyInvalidStockQuery(input)).toBe(false);
+    },
+  );
 });

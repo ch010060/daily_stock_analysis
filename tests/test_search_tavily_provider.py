@@ -274,7 +274,7 @@ class TestTavilySearchProvider(unittest.TestCase):
                 news_max_age_days=3,
                 news_strategy_profile="short",
             )
-            intel = service.search_comprehensive_intel("600519", "貴州茅臺", max_searches=3)
+            intel = service.search_comprehensive_intel("2330", "台積電", max_searches=3)
 
         self.assertIn("latest_news", intel)
         self.assertIn("market_analysis", intel)

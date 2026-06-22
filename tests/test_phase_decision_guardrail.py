@@ -9,8 +9,8 @@ from src.phase_decision_guardrail import apply_phase_decision_guardrails
 
 def _result(**kwargs) -> AnalysisResult:
     defaults = {
-        "code": "600519",
-        "name": "貴州茅臺",
+        "code": "2330",
+        "name": "台積電",
         "trend_prediction": "看多",
         "sentiment_score": 76,
         "operation_advice": "立即買進",
@@ -47,7 +47,7 @@ def _phase(phase: str = "intraday") -> dict:
 
 def _overview(status: str = "stale") -> dict:
     return {
-        "subject": {"code": "600519", "stock_name": "貴州茅臺", "market": "cn"},
+        "subject": {"code": "2330", "stock_name": "台積電", "market": "cn"},
         "blocks": [
             {
                 "key": "quote",

@@ -124,8 +124,8 @@ class TestAnalysisIntegration:
             "/api/v1/analysis/analyze",
             json={
                 "stock_codes": ["2330", "2454"],
-                "stock_name": "貴州茅臺",
-                "original_query": "茅臺",
+                "stock_name": "台積電",
+                "original_query": "台積電",
                 "async_mode": True
             }
         )

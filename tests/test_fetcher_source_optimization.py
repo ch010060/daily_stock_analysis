@@ -250,7 +250,7 @@ class TestFetcherSourceOptimization(unittest.TestCase):
 
         manager = DataFetcherManager(fetchers=[longbridge, akshare])
 
-        df, source = manager.get_daily_data("HK00700", start_date="2026-05-01", end_date="2026-05-08")
+        df, source = manager.get_daily_data("AAPL", start_date="2026-05-01", end_date="2026-05-08")
 
         self.assertFalse(df.empty)
         self.assertEqual(source, "AkshareFetcher")

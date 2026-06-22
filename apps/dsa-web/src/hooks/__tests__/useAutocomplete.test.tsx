@@ -15,13 +15,13 @@ vi.mock('../../utils/searchStocks', () => ({
 
 const mockIndex: StockIndexItem[] = [
   {
-    canonicalCode: '600519.SH',
-    displayCode: '600519',
-    nameZh: '貴州茅臺',
-    pinyinFull: 'guizhoumaotai',
-    pinyinAbbr: 'gzmt',
-    aliases: ['茅臺'],
-    market: 'CN',
+    canonicalCode: 'TW:2330',
+    displayCode: '2330',
+    nameZh: '台積電',
+    pinyinFull: 'taijidian',
+    pinyinAbbr: 'tjd',
+    aliases: ['台積電', 'TSMC'],
+    market: 'TW',
     assetType: 'stock',
     active: true,
     popularity: 100,
@@ -46,7 +46,7 @@ describe('useAutocomplete', () => {
     const { result } = renderHook(() => useAutocomplete(mockIndex, { debounceMs: 10 }));
 
     act(() => {
-      result.current.setQuery('600519');
+      result.current.setQuery('2330');
     });
 
     act(() => {
@@ -62,10 +62,10 @@ describe('useAutocomplete', () => {
   it('keeps suggestions open without auto-highlighting the first result', () => {
     searchStocksMock.mockReturnValue([
       {
-        canonicalCode: '600519.SH',
-        displayCode: '600519',
-        nameZh: '貴州茅臺',
-        market: 'CN',
+        canonicalCode: '2330.TW',
+        displayCode: '2330',
+        nameZh: '台積電',
+        market: 'TW',
         matchType: 'exact',
         matchField: 'code',
         score: 100,
@@ -75,7 +75,7 @@ describe('useAutocomplete', () => {
     const { result } = renderHook(() => useAutocomplete(mockIndex, { debounceMs: 10 }));
 
     act(() => {
-      result.current.setQuery('600519');
+      result.current.setQuery('2330');
     });
 
     act(() => {

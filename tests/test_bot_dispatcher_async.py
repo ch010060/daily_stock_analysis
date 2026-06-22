@@ -93,7 +93,7 @@ class TestCommandDispatcherAsync(unittest.IsolatedAsyncioTestCase):
 
     async def test_parse_intent_via_llm_offloads_to_thread(self):
         fake_response = SimpleNamespace(
-            content='{"intent":"analysis","codes":["600519"],"strategy":null}',
+            content='{"intent":"analysis","codes":["2330"],"strategy":null}',
             provider="gemini",
             usage={"total_tokens": 12},
         )
@@ -107,10 +107,10 @@ class TestCommandDispatcherAsync(unittest.IsolatedAsyncioTestCase):
                 adapter = MagicMock()
                 adapter.call_text.return_value = fake_response
                 adapter_cls.return_value = adapter
-                result = await CommandDispatcher._parse_intent_via_llm("分析600519", config)
+                result = await CommandDispatcher._parse_intent_via_llm("分析2330", config)
 
         self.assertEqual(result["intent"], "analysis")
-        self.assertEqual(result["codes"], ["600519"])
+        self.assertEqual(result["codes"], ["2330"])
         to_thread.assert_awaited_once()
         adapter.call_text.assert_called_once()
 
@@ -130,16 +130,16 @@ class TestCommandDispatcherAsync(unittest.IsolatedAsyncioTestCase):
         with patch("src.config.get_config", return_value=config):
             with patch.object(dispatcher, "_parse_intent_via_llm", new=AsyncMock(return_value={
                 "intent": "analysis",
-                "codes": ["600519"],
+                "codes": ["2330"],
                 "strategy": "纏論",
             })):
-                result = await dispatcher._try_nl_routing(_make_message("幫我分析600519", mentioned=True))
+                result = await dispatcher._try_nl_routing(_make_message("幫我分析2330", mentioned=True))
 
         self.assertIsNotNone(result)
         self.assertEqual(result.text, "ask-ok")
         ask_command.execute_async.assert_awaited_once()
 
-    async def test_try_nl_routing_resolves_name_only_analysis_request(self):
+    async def test_try_nl_routing_resolves_route_b_name_only_analysis_request(self):
         dispatcher = CommandDispatcher()
         ask_command = DummyCommand()
         ask_command.execute_async = AsyncMock(return_value=BotResponse.text_response("ask-ok"))
@@ -153,26 +153,22 @@ class TestCommandDispatcherAsync(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch("src.config.get_config", return_value=config):
-            with patch(
-                "src.services.name_to_code_resolver._get_akshare_name_to_code"
-            ) as mock_akshare:
-                with patch.object(
-                    dispatcher,
-                    "_parse_intent_via_llm",
-                    new=AsyncMock(return_value={
-                        "intent": "analysis",
-                        "codes": [],
-                        "strategy": None,
-                    }),
-                ):
-                    result = await dispatcher._try_nl_routing(_make_message("幫我分析茅臺", mentioned=True))
+            with patch.object(
+                dispatcher,
+                "_parse_intent_via_llm",
+                new=AsyncMock(return_value={
+                    "intent": "analysis",
+                    "codes": [],
+                    "strategy": None,
+                }),
+            ):
+                result = await dispatcher._try_nl_routing(_make_message("幫我分析群聯", mentioned=True))
 
         self.assertIsNotNone(result)
         self.assertEqual(result.text, "ask-ok")
         ask_command.execute_async.assert_awaited_once()
-        mock_akshare.assert_not_called()
         _, args = ask_command.execute_async.await_args.args
-        self.assertEqual(args, ["600519"])
+        self.assertEqual(args, ["8299"])
 
 
 class TestCommandDispatcherSyncCompatibility(unittest.TestCase):

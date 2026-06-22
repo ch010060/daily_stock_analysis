@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自選股智慧分析系統 - 配置管理模組
+台股 / 美股自選股智慧分析系統 - 配置管理模組
 ===================================
 
 職責：
@@ -630,7 +630,7 @@ class Config:
     longbridge_app_secret: Optional[str] = None
     longbridge_access_token: Optional[str] = None
     longbridge_oauth_client_id: Optional[str] = None
-    stock_index_remote_update_enabled: bool = True
+    stock_index_remote_update_enabled: bool = False
 
     # === AlphaSift optional stock screening integration ===
     alphasift_route_enabled: bool = False
@@ -918,7 +918,7 @@ class Config:
     enable_eastmoney_patch: bool = False
     # 實時行情資料來源優先順序（逗號分隔）
     # 推薦順序：tencent > akshare_sina > efinance > akshare_em > tushare
-    # - tencent: 騰訊財經，有量比/換手率/市盈率等，單股查詢穩定（推薦）
+    # - tencent: 第三方財經資料源，有量比/換手率/市盈率等，單股查詢穩定（推薦）
     # - akshare_sina: 新浪財經，基本行情穩定，但無量比
     # - efinance/akshare_em: 東財全量介面，資料最全但容易被封
     # - tushare: Tushare Pro，需要2000積分，資料全面（付費使用者可優先使用）
@@ -951,7 +951,7 @@ class Config:
     portfolio_fx_update_enabled: bool = True
 
     # Discord 機器人狀態
-    discord_bot_status: str = "A股智慧分析 | /help"
+    discord_bot_status: str = "台股 / 美股智慧分析 | /help"
 
     # === 流控配置（防封禁關鍵引數）===
     # Akshare 請求間隔範圍（秒）
@@ -1445,7 +1445,7 @@ class Config:
             longbridge_oauth_client_id=os.getenv('LONGBRIDGE_OAUTH_CLIENT_ID') or None,
             stock_index_remote_update_enabled=parse_env_bool(
                 os.getenv('STOCK_INDEX_REMOTE_UPDATE_ENABLED'),
-                default=True,
+                default=False,
             ),
             litellm_model=litellm_model,
             litellm_fallback_models=litellm_fallback_models,
@@ -1745,7 +1745,7 @@ class Config:
             # Telegram
             telegram_webhook_secret=os.getenv('TELEGRAM_WEBHOOK_SECRET'),
             # Discord 機器人擴充套件配置
-            discord_bot_status=os.getenv('DISCORD_BOT_STATUS', 'A股智慧分析 | /help'),
+            discord_bot_status=os.getenv('DISCORD_BOT_STATUS', '台股 / 美股智慧分析 | /help'),
             # 實時行情增強資料配置
             enable_realtime_quote=os.getenv('ENABLE_REALTIME_QUOTE', 'true').lower() == 'true',
             enable_realtime_technical_indicators=os.getenv(
@@ -1755,7 +1755,7 @@ class Config:
             # 東財介面補丁開關
             enable_eastmoney_patch=os.getenv('ENABLE_EASTMONEY_PATCH', 'false').lower() == 'true',
             # 實時行情資料來源優先順序：
-            # - tencent: 騰訊財經，有量比/換手率/PE/PB等，單股查詢穩定（推薦）
+            # - tencent: 第三方財經資料源，有量比/換手率/PE/PB等，單股查詢穩定（推薦）
             # - akshare_sina: 新浪財經，基本行情穩定，但無量比
             # - efinance/akshare_em: 東財全量介面，資料最全但容易被封
             # - tushare: Tushare Pro，需要2000積分，資料全面
@@ -2479,7 +2479,7 @@ class Config:
         if not self.stock_list:
             issues.append(ConfigIssue(
                 severity="error",
-                message="未配置 STOCK_LIST。請設定至少一個股票程式碼，例如：2330,2454,AAPL,NVDA。",
+                message="未配置 STOCK_LIST。請設定至少一個股票代號，例如：2330,2454,AAPL,NVDA。",
                 field="STOCK_LIST",
             ))
         elif self.stock_email_groups:
@@ -2884,7 +2884,7 @@ class Config:
                     message=(
                         "VISION_MODEL 已配置，但未找到可用的 Vision API Key "
                         f"（已檢查：{', '.join(_checked)}）。"
-                        "圖片股票程式碼提取功能將不可用，請配置對應的 API Key。"
+                        "圖片股票代號提取功能將不可用，請配置對應的 API Key。"
                     ),
                     field="VISION_MODEL",
                 ))

@@ -16,7 +16,7 @@ class TestEfinanceMainIndices(unittest.TestCase):
         fetcher = EfinanceFetcher()
         fake_df = pd.DataFrame(
             {
-                "股票程式碼": ["000001"],
+                "股票代號": ["000001"],
                 "最新價": [3200.0],
                 "漲跌幅": [0.63],
                 "漲跌額": [20.0],
@@ -50,7 +50,7 @@ class TestEfinanceMainIndices(unittest.TestCase):
         fetcher = EfinanceFetcher()
         fake_df = pd.DataFrame(
             {
-                "股票程式碼": ["000001"],
+                "股票代號": ["000001"],
                 "最新價": [3200.0],
                 "漲跌幅": [0.63],
                 "漲跌額": [20.0],

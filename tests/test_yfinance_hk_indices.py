@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-data_provider/yfinance_fetcher 中港股指數獲取邏輯的單元測試
+data_provider/yfinance_fetcher 中美股指數獲取邏輯的單元測試
 
 使用 unittest.mock 模擬 yfinance API 響應，覆蓋：
-- _get_hk_main_indices 港股指數批次獲取
-- 港股指數 Yahoo Finance 符號對映正確性
+- _get_hk_main_indices 美股指數批次獲取
+- 美股指數 Yahoo Finance 符號對映正確性
 - 部分/全部失敗的降級場景
 """
 import sys
@@ -44,14 +44,14 @@ def _make_mock_yf(hist_df: pd.DataFrame):
 
 
 class TestHkIndexSymbolMapping(unittest.TestCase):
-    """驗證港股指數 Yahoo Finance 符號對映的正確性"""
+    """驗證美股指數 Yahoo Finance 符號對映的正確性"""
 
     def setUp(self):
         from data_provider.yfinance_fetcher import YfinanceFetcher
         self.fetcher = YfinanceFetcher()
 
     def test_hk_indices_mapping_symbols(self):
-        """港股指數對映應使用正確的 Yahoo Finance 符號"""
+        """美股指數對映應使用正確的 Yahoo Finance 符號"""
         mock_yf = MagicMock()
         mock_ticker = MagicMock()
         mock_ticker.history.return_value = pd.DataFrame()
@@ -82,7 +82,7 @@ class TestHkIndexSymbolMapping(unittest.TestCase):
 
 
 class TestGetHkMainIndices(unittest.TestCase):
-    """_get_hk_main_indices 港股指數批次獲取測試"""
+    """_get_hk_main_indices 美股指數批次獲取測試"""
 
     def setUp(self):
         from data_provider.yfinance_fetcher import YfinanceFetcher

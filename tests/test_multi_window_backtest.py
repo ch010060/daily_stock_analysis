@@ -27,7 +27,7 @@ class MultiWindowBacktestTestCase(unittest.TestCase):
         )
 
         result = service.run_multi_window_backtest(
-            code="600519",
+            code="2330",
             windows=[1, 3, 5],
             force=True,
             min_age_days=0,
@@ -44,9 +44,9 @@ class MultiWindowBacktestTestCase(unittest.TestCase):
 
         service.run_backtest.assert_has_calls(
             [
-                call(code="600519", force=True, eval_window_days=1, min_age_days=0, limit=25),
-                call(code="600519", force=True, eval_window_days=3, min_age_days=0, limit=25),
-                call(code="600519", force=True, eval_window_days=5, min_age_days=0, limit=25),
+                call(code="2330", force=True, eval_window_days=1, min_age_days=0, limit=25),
+                call(code="2330", force=True, eval_window_days=3, min_age_days=0, limit=25),
+                call(code="2330", force=True, eval_window_days=5, min_age_days=0, limit=25),
             ]
         )
 
@@ -96,7 +96,7 @@ class MultiWindowBacktestTestCase(unittest.TestCase):
 
         self.assertIs(
             service.run_backtest(
-                code="600519",
+                code="2330",
                 force=False,
                 eval_window_days=3,
                 min_age_days=0,

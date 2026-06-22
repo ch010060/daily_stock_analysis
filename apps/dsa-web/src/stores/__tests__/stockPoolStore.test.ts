@@ -27,8 +27,8 @@ vi.mock('../../api/analysis', async () => {
 const historyItem = {
   id: 1,
   queryId: 'q-1',
-  stockCode: '600519',
-  stockName: '貴州茅臺',
+  stockCode: '2330',
+  stockName: '台積電',
   sentimentScore: 82,
   operationAdvice: '買進',
   createdAt: '2026-03-18T08:00:00Z',
@@ -38,8 +38,8 @@ const historyReport = {
   meta: {
     id: 1,
     queryId: 'q-1',
-    stockCode: '600519',
-    stockName: '貴州茅臺',
+    stockCode: '2330',
+    stockName: '台積電',
     reportType: 'detailed' as const,
     createdAt: '2026-03-18T08:00:00Z',
   },
@@ -66,8 +66,8 @@ const marketReviewHistoryReport = {
 function createTask(overrides: Partial<TaskInfo> = {}): TaskInfo {
   return {
     taskId: 'task-1',
-    stockCode: '600519',
-    stockName: '貴州茅臺',
+    stockCode: '2330',
+    stockName: '台積電',
     status: 'processing',
     progress: 50,
     reportType: 'detailed',
@@ -120,7 +120,7 @@ describe('stockPoolStore', () => {
 
     const state = useStockPoolStore.getState();
     expect(state.historyItems).toHaveLength(1);
-    expect(state.selectedReport?.meta.stockCode).toBe('600519');
+    expect(state.selectedReport?.meta.stockCode).toBe('2330');
     expect(state.isLoadingHistory).toBe(false);
     expect(state.isLoadingReport).toBe(false);
   });
@@ -155,7 +155,7 @@ describe('stockPoolStore', () => {
     expect(state.stockHistoryItems).toEqual([historyItem]);
     expect(state.stockHistoryHasMore).toBe(true);
     expect(historyApi.getList).toHaveBeenLastCalledWith({
-      stockCode: '600519',
+      stockCode: '2330',
       page: 1,
       limit: 20,
     });
@@ -166,7 +166,7 @@ describe('stockPoolStore', () => {
     expect(state.stockHistoryItems.map((item) => item.id)).toEqual([1, 2]);
     expect(state.stockHistoryHasMore).toBe(false);
     expect(historyApi.getList).toHaveBeenLastCalledWith({
-      stockCode: '600519',
+      stockCode: '2330',
       page: 2,
       limit: 20,
     });
@@ -253,7 +253,7 @@ describe('stockPoolStore', () => {
     expect(state.stockHistoryItems[0].id).toBe(6);
     expect(state.stockHistoryItems[0].id).not.toBe(5);
     expect(historyApi.getList).toHaveBeenCalledWith({
-      stockCode: '600519',
+      stockCode: '2330',
       startDate: getRecentStartDate(30),
       endDate: getTodayInShanghai(),
       page: 1,
@@ -375,14 +375,14 @@ describe('stockPoolStore', () => {
 
   it('surfaces duplicate task errors without replacing the dashboard error state', async () => {
     vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(
-      new DuplicateTaskError('600519', 'task-1', '股票 600519 正在分析中'),
+      new DuplicateTaskError('2330', 'task-1', '股票 2330 正在分析中'),
     );
 
-    useStockPoolStore.getState().setQuery('600519');
+    useStockPoolStore.getState().setQuery('2330');
     await useStockPoolStore.getState().submitAnalysis();
 
     const state = useStockPoolStore.getState();
-    expect(state.duplicateError).toContain('600519');
+    expect(state.duplicateError).toContain('2330');
     expect(state.error).toBeNull();
     expect(state.isAnalyzing).toBe(false);
   });
@@ -401,15 +401,15 @@ describe('stockPoolStore', () => {
   it('accepts HK suffix codes from autocomplete without local validation errors', async () => {
     vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
       taskId: 'task-hk-1',
-      stockCode: '00700.HK',
+      stockCode: 'AAPL',
       status: 'pending',
       message: 'accepted',
     } as never);
 
     await useStockPoolStore.getState().submitAnalysis({
-      stockCode: '00700.HK',
+      stockCode: 'AAPL',
       stockName: '騰訊控股',
-      originalQuery: '00700',
+      originalQuery: 'AAPL',
       selectionSource: 'autocomplete',
     });
 
@@ -417,10 +417,10 @@ describe('stockPoolStore', () => {
     expect(state.inputError).toBeUndefined();
     expect(state.isAnalyzing).toBe(false);
     expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
-      stockCode: '00700.HK',
+      stockCode: 'AAPL',
       reportType: 'detailed',
       stockName: '騰訊控股',
-      originalQuery: '00700',
+      originalQuery: 'AAPL',
       selectionSource: 'autocomplete',
       notify: true,
     }));
@@ -481,8 +481,8 @@ describe('stockPoolStore', () => {
   it('tracks task lifecycle updates and resets all dashboard state', () => {
     const pendingTask = {
       taskId: 'task-1',
-      stockCode: '600519',
-      stockName: '貴州茅臺',
+      stockCode: '2330',
+      stockName: '台積電',
       status: 'pending' as const,
       progress: 0,
       reportType: 'detailed',
@@ -531,8 +531,8 @@ describe('stockPoolStore', () => {
   it('ignores late task updates after a task has been removed', () => {
     const pendingTask = {
       taskId: 'task-1',
-      stockCode: '600519',
-      stockName: '貴州茅臺',
+      stockCode: '2330',
+      stockName: '台積電',
       status: 'pending' as const,
       progress: 0,
       reportType: 'detailed',
@@ -554,8 +554,8 @@ describe('stockPoolStore', () => {
   it('ignores unknown task updates after dashboard reset', () => {
     const pendingTask = {
       taskId: 'task-1',
-      stockCode: '600519',
-      stockName: '貴州茅臺',
+      stockCode: '2330',
+      stockName: '台積電',
       status: 'pending' as const,
       progress: 0,
       reportType: 'detailed',
@@ -718,12 +718,12 @@ describe('stockPoolStore', () => {
     } as never);
 
     await useStockPoolStore.getState().submitAnalysis({
-      stockCode: '600519',
+      stockCode: '2330',
       forceRefresh: true,
     });
 
     expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
-      stockCode: '600519',
+      stockCode: '2330',
       forceRefresh: true,
     }));
   });
