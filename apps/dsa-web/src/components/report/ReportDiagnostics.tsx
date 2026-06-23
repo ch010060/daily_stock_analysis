@@ -25,17 +25,23 @@ interface ReportDiagnosticsProps {
 type BadgeVariant = NonNullable<React.ComponentProps<typeof Badge>['variant']>;
 type StatusTone = NonNullable<React.ComponentProps<typeof StatusDot>['tone']>;
 
-type ProbeTargetValue = `${NewsProviderProbeMarket}:${string}`;
-
 interface NewsProbeState {
   loading: boolean;
   result: NewsProviderProbeResponse | null;
   error: string | null;
 }
 
+interface NewsProbeTarget {
+  symbol: string;
+  market: NewsProviderProbeMarket;
+  reportStockCode?: string;
+}
+
 interface NewsProbeControls {
-  target: ProbeTargetValue;
-  setTarget: (value: ProbeTargetValue) => void;
+  symbol: string;
+  setSymbol: (value: string) => void;
+  market: NewsProviderProbeMarket;
+  setMarket: (value: NewsProviderProbeMarket) => void;
   mode: NewsProviderProbeMode;
   setMode: (value: NewsProviderProbeMode) => void;
   run: () => void;
@@ -141,13 +147,12 @@ const TEXT = {
   },
 } as const;
 
-const NEWS_PROBE_TARGETS: Array<{ value: ProbeTargetValue; label: string; symbol: string; market: NewsProviderProbeMarket }> = [
-  { value: 'tw:2330', label: 'TW 2330', symbol: '2330', market: 'tw' },
-  { value: 'tw:2454', label: 'TW 2454', symbol: '2454', market: 'tw' },
-  { value: 'tw:3008', label: 'TW 3008', symbol: '3008', market: 'tw' },
-  { value: 'us:AAPL', label: 'US AAPL', symbol: 'AAPL', market: 'us' },
-  { value: 'us:NVDA', label: 'US NVDA', symbol: 'NVDA', market: 'us' },
+const NEWS_PROBE_MARKETS: Array<{ value: NewsProviderProbeMarket; label: string }> = [
+  { value: 'tw', label: 'TW' },
+  { value: 'us', label: 'US' },
 ];
+
+const NEWS_PROBE_SYMBOL_SUGGESTIONS = ['2379', 'INTC', '2330', '2454', '3008', 'AAPL', 'NVDA'];
 
 const NEWS_PROBE_MODES: Array<{ value: NewsProviderProbeMode; label: string }> = [
   { value: 'runtime', label: 'Runtime' },
@@ -192,6 +197,14 @@ const getOrderedComponents = (
 const asRecord = (value: unknown): Record<string, unknown> => (
   value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 );
+
+const isQuoteFallbackAvailable = (component: RunDiagnosticComponent): boolean => {
+  const details = asRecord(component.details);
+  return component.key === 'realtime_quote'
+    && component.status === 'degraded'
+    && (details.finalQuoteStatus === 'degraded' || details.final_quote_status === 'degraded')
+    && (details.quoteUsable === true || details.quote_usable === true);
+};
 
 const asStringList = (value: unknown): string[] => (
   Array.isArray(value)
@@ -248,9 +261,42 @@ const safeProbeItemUrl = (value: unknown): string | null => {
   return text;
 };
 
-const selectedProbeTarget = (target: ProbeTargetValue) => (
-  NEWS_PROBE_TARGETS.find((item) => item.value === target) || NEWS_PROBE_TARGETS[0]
+const inferProbeMarket = (symbol: string): NewsProviderProbeMarket => (
+  /^[A-Z][A-Z.]{0,5}$/i.test(symbol.trim()) ? 'us' : 'tw'
 );
+
+const parseProbeTarget = (
+  value: string,
+  currentMarket: NewsProviderProbeMarket,
+): { symbol: string; market: NewsProviderProbeMarket } => {
+  const text = value.trim();
+  const prefixed = text.match(/^(tw|us)\s*[:：]\s*(.+)$/i);
+  if (prefixed) {
+    const market = prefixed[1].toLowerCase() as NewsProviderProbeMarket;
+    return {
+      market,
+      symbol: prefixed[2].trim().toUpperCase(),
+    };
+  }
+  const symbol = text.toUpperCase();
+  return {
+    market: symbol ? inferProbeMarket(symbol) : currentMarket,
+    symbol,
+  };
+};
+
+const probeTargetFromSummary = (
+  summary: RunDiagnosticSummary | null | undefined,
+): NewsProbeTarget => {
+  const symbol = (summary?.stockCode || '').trim().toUpperCase();
+  if (!symbol) {
+    return { symbol: '2330', market: 'tw' };
+  }
+  return {
+    symbol,
+    market: inferProbeMarket(symbol),
+  };
+};
 
 const manualProbeStorageKey = (
   recordId: number | undefined,
@@ -386,20 +432,38 @@ const renderManualProbeControls = (
 ): React.ReactNode => (
   <div className="home-subpanel p-3">
     <div className="flex max-w-sm flex-col items-start gap-2">
-      <label className="sr-only" htmlFor="news-provider-probe-target">新聞來源測試標的</label>
+      <label className="sr-only" htmlFor="news-provider-probe-market">新聞來源測試市場</label>
       <select
-        id="news-provider-probe-target"
-        aria-label="新聞來源測試標的"
-        value={probeControls.target}
-        onChange={(event) => probeControls.setTarget(event.target.value as ProbeTargetValue)}
+        id="news-provider-probe-market"
+        aria-label="新聞來源測試市場"
+        value={probeControls.market}
+        onChange={(event) => probeControls.setMarket(event.target.value as NewsProviderProbeMarket)}
         className="min-h-8 w-full rounded-md border border-border bg-surface px-2 py-1 text-xs text-foreground"
       >
-        {NEWS_PROBE_TARGETS.map((target) => (
-          <option key={target.value} value={target.value}>
-            {target.label}
+        {NEWS_PROBE_MARKETS.map((market) => (
+          <option key={market.value} value={market.value}>
+            {market.label}
           </option>
         ))}
       </select>
+      <label className="sr-only" htmlFor="news-provider-probe-target">新聞來源測試標的</label>
+      <input
+        id="news-provider-probe-target"
+        aria-label="新聞來源測試標的"
+        list="news-provider-probe-symbols"
+        value={probeControls.symbol}
+        onChange={(event) => {
+          const parsed = parseProbeTarget(event.target.value, probeControls.market);
+          probeControls.setMarket(parsed.market);
+          probeControls.setSymbol(parsed.symbol);
+        }}
+        className="min-h-8 w-full rounded-md border border-border bg-surface px-2 py-1 text-xs text-foreground"
+      />
+      <datalist id="news-provider-probe-symbols">
+        {NEWS_PROBE_SYMBOL_SUGGESTIONS.map((symbol) => (
+          <option key={symbol} value={symbol} />
+        ))}
+      </datalist>
       <label className="sr-only" htmlFor="news-provider-probe-mode">新聞來源測試模式</label>
       <select
         id="news-provider-probe-mode"
@@ -493,7 +557,7 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
     failed: false,
   });
   const [copied, setCopied] = useState(false);
-  const [probeTarget, setProbeTarget] = useState<ProbeTargetValue>('tw:2330');
+  const [probeTargetOverride, setProbeTargetOverride] = useState<NewsProbeTarget | null>(null);
   const [probeMode, setProbeMode] = useState<NewsProviderProbeMode>('runtime');
   const [probeState, setProbeState] = useState<NewsProbeState>(
     () => readStoredProbeState(initialProbeStorageKey) ?? {
@@ -566,6 +630,7 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
       copyText: '',
     };
   }, [isLoading, loadFailed, loadedSummary, recordId, summary, text]);
+
   if (!visibleSummary) {
     return null;
   }
@@ -602,6 +667,13 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
   );
   const hasNewsDiagnostics = components.some((component) => component.key === 'news');
   const probeStorageKey = manualProbeStorageKey(recordId, visibleSummary);
+  const defaultProbeTarget = probeTargetFromSummary(visibleSummary);
+  const currentReportStockCode = (visibleSummary.stockCode || '').trim().toUpperCase();
+  const currentProbeTarget = (
+    probeTargetOverride?.reportStockCode === currentReportStockCode
+      ? probeTargetOverride
+      : defaultProbeTarget
+  );
 
   const copyDiagnostics = async () => {
     if (!hasCopyText || !navigator.clipboard?.writeText) {
@@ -624,7 +696,21 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
   };
 
   const runNewsProviderProbe = async () => {
-    const target = selectedProbeTarget(probeTarget);
+    const target = parseProbeTarget(currentProbeTarget.symbol, currentProbeTarget.market);
+    if (!target.symbol) {
+      const nextState = {
+        loading: false,
+        result: null,
+        error: '請輸入測試標的',
+      };
+      setProbeState(nextState);
+      writeStoredProbeState(probeStorageKey, nextState);
+      return;
+    }
+    setProbeTargetOverride({
+      ...target,
+      reportStockCode: currentReportStockCode,
+    });
     setProbeState({
       loading: true,
       result: null,
@@ -661,8 +747,22 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
   };
 
   const newsProbeControls: NewsProbeControls = {
-    target: probeTarget,
-    setTarget: setProbeTarget,
+    symbol: currentProbeTarget.symbol,
+    setSymbol: (symbol) => {
+      setProbeTargetOverride({
+        ...currentProbeTarget,
+        symbol,
+        reportStockCode: currentReportStockCode,
+      });
+    },
+    market: currentProbeTarget.market,
+    setMarket: (market) => {
+      setProbeTargetOverride({
+        symbol: currentProbeTarget.symbol,
+        market,
+        reportStockCode: currentReportStockCode,
+      });
+    },
     mode: probeMode,
     setMode: setProbeMode,
     run: () => void runNewsProviderProbe(),
@@ -747,8 +847,13 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
             ) : null}
             <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
               {components.length > 0 ? components.map((component) => {
-                const componentStyle = COMPONENT_STATUS_STYLE[component.status] || COMPONENT_STATUS_STYLE.unknown;
-                const componentLabel = text.component[component.status] || component.status;
+                const quoteFallbackAvailable = isQuoteFallbackAvailable(component);
+                const componentStyle = quoteFallbackAvailable
+                  ? COMPONENT_STATUS_STYLE.ok
+                  : COMPONENT_STATUS_STYLE[component.status] || COMPONENT_STATUS_STYLE.unknown;
+                const componentLabel = quoteFallbackAvailable
+                  ? (reportLanguage === 'en' ? 'Fallback available' : '備援可用')
+                  : text.component[component.status] || component.status;
                 return (
                   <div key={component.key} className="home-subpanel p-3">
                     <div className="flex items-start justify-between gap-3">

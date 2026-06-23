@@ -2,7 +2,7 @@
 """
 Market context detection for LLM prompts.
 
-Detects the market (A-shares, HK, US) from a stock code and returns
+Detects the Route B market (TW/US) from a stock code and returns
 market-specific role descriptions so prompts are not hardcoded to a
 single market.
 
@@ -17,42 +17,43 @@ def detect_market(stock_code: Optional[str]) -> str:
     """Detect market from stock code.
 
     Returns:
-        One of 'cn', 'hk', 'us', or 'cn' as fallback.
+        One of 'tw', 'us', or 'route_b' as fallback.
     """
     if not stock_code:
-        return "cn"
+        return "route_b"
 
     code = stock_code.strip().upper()
 
-    # HK stocks: HK00700, 00700.HK, or 5-digit pure numbers
-    if code.startswith("HK") or code.endswith(".HK"):
-        return "hk"
-    lower = code.lower()
-    if lower.endswith(".hk"):
-        return "hk"
-    # 5-digit pure numbers are HK (A-shares are 6-digit)
-    if code.isdigit() and len(code) == 5:
-        return "hk"
+    if code.startswith("TW:"):
+        return "tw"
+    if code.startswith("US:"):
+        return "us"
+    if code.endswith(".TW"):
+        return "tw"
+    if code.endswith(".US"):
+        return "us"
+
+    if re.match(r"^\d{4,6}[A-Z]?$", code):
+        return "tw"
 
     # US stocks: 1-5 uppercase letters (AAPL, TSLA, GOOGL)
     # Also handles suffixed forms like BRK.B
     if re.match(r'^[A-Z]{1,5}(\.[A-Z]{1,2})?$', code):
         return "us"
 
-    # Default: A-shares (6-digit numbers like 600519, 000001)
-    return "cn"
+    return "route_b"
 
 
 # -- Market-specific role descriptions --
 
 _MARKET_ROLES = {
-    "cn": {
-        "zh": " A 股",
-        "en": "China A-shares",
+    "route_b": {
+        "zh": "台股 / 美股",
+        "en": "Taiwan and US stock",
     },
-    "hk": {
-        "zh": "港股",
-        "en": "Hong Kong stock",
+    "tw": {
+        "zh": "台股",
+        "en": "Taiwan stock",
     },
     "us": {
         "zh": "美股",
@@ -61,24 +62,24 @@ _MARKET_ROLES = {
 }
 
 _MARKET_GUIDELINES = {
-    "cn": {
+    "route_b": {
         "zh": (
-            "- 本次分析物件為 **A 股**（中國滬深交易所上市股票）。\n"
-            "- 請關注 A 股特有的漲跌停機制（±10%/±20%/±30%）、T+1 交易制度及相關政策因素。"
+            "- 本次問答支援 **TW/US** 標的，請先使用系統提供的本地解析上下文確認標的。\n"
+            "- 可依資料可用性分析台灣與美國市場標的；資料缺漏時說明降級來源，但仍需回答使用者問題。"
         ),
         "en": (
-            "- This analysis covers a **China A-share** (listed on Shanghai/Shenzhen exchanges).\n"
-            "- Consider A-share-specific rules: daily price limits (±10%/±20%/±30%), T+1 settlement, and PRC policy factors."
+            "- This chat supports **TW/US** symbols. Use the provided local-resolution context to confirm the target.\n"
+            "- Analyze Taiwan and US listings when data is available; disclose degraded data sources without refusing the question."
         ),
     },
-    "hk": {
+    "tw": {
         "zh": (
-            "- 本次分析物件為 **港股**（香港交易所上市股票）。\n"
-            "- 港股無漲跌停限制，支援 T+0 交易，需關注港幣匯率、南北向資金流及聯交所特有規則。"
+            "- 本次分析物件為 **TW 台股** 標的。\n"
+            "- 請關注台灣市場交易制度、法人籌碼、產業鏈位置、匯率與國際科技循環對標的的影響。"
         ),
         "en": (
-            "- This analysis covers a **Hong Kong stock** (listed on HKEX).\n"
-            "- HK stocks have no daily price limits, allow T+0 trading. Consider HKD FX, Southbound/Northbound flows, and HKEX-specific rules."
+            "- This analysis covers a **TW Taiwan stock**.\n"
+            "- Consider Taiwan market structure, institutional flows, supply-chain exposure, FX, and global tech-cycle impact."
         ),
     },
     "us": {
@@ -102,11 +103,11 @@ def get_market_role(stock_code: Optional[str], lang: str = "zh") -> str:
         lang: 'zh' or 'en'.
 
     Returns:
-        Role string like 'A 股投資分析' or 'US stock investment analysis'.
+        Role string like '台股投資分析' or 'US stock investment analysis'.
     """
     market = detect_market(stock_code)
     lang_key = "en" if lang == "en" else "zh"
-    return _MARKET_ROLES.get(market, _MARKET_ROLES["cn"])[lang_key]
+    return _MARKET_ROLES.get(market, _MARKET_ROLES["route_b"])[lang_key]
 
 
 def get_market_guidelines(stock_code: Optional[str], lang: str = "zh") -> str:
@@ -121,4 +122,4 @@ def get_market_guidelines(stock_code: Optional[str], lang: str = "zh") -> str:
     """
     market = detect_market(stock_code)
     lang_key = "en" if lang == "en" else "zh"
-    return _MARKET_GUIDELINES.get(market, _MARKET_GUIDELINES["cn"])[lang_key]
+    return _MARKET_GUIDELINES.get(market, _MARKET_GUIDELINES["route_b"])[lang_key]

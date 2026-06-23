@@ -154,6 +154,35 @@ def _builder_artifacts(*, fundamental_context: dict) -> PipelineAnalysisArtifact
     )
 
 
+def test_builder_uses_daily_close_as_degraded_quote_when_realtime_missing() -> None:
+    pack = AnalysisContextBuilder.build(
+        PipelineAnalysisArtifacts(
+            code="2379",
+            stock_name="瑞昱",
+            market="tw",
+            phase=None,
+            base_context={
+                "today": {"close": 512.0},
+                "yesterday": {"close": 505.0},
+            },
+            enhanced_context={},
+            realtime_quote=None,
+            trend_result={"trend_status": "available"},
+            chip_data=None,
+            fundamental_context={},
+            news_context="瑞昱新聞摘要",
+            news_result_count=2,
+            metadata={"trigger_source": "api"},
+        )
+    )
+
+    quote = pack.blocks["quote"]
+    assert quote.status == ContextFieldStatus.FALLBACK
+    assert quote.items["price"].value == 512.0
+    assert quote.items["price"].missing_reason is None
+    assert "realtime_provider_fallback" in quote.warnings
+
+
 def test_empty_or_invalid_pack_returns_empty_section() -> None:
     assert format_analysis_context_pack_prompt_section(None) == ""
     assert format_analysis_context_pack_prompt_section({}) == ""

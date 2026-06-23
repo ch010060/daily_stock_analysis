@@ -816,6 +816,167 @@ def _sanitize_news_search_details(context_snapshot: Dict[str, Any]) -> Dict[str,
     return {key: value for key, value in details.items() if value not in (None, [], {})}
 
 
+_QUOTE_SOURCE_LABELS = {
+    "YfinanceFetcher": "Yahoo Finance / yfinance",
+    "yfinance": "Yahoo Finance / yfinance",
+    "fallback": "備援資料",
+    "realtime_quote": "即時行情",
+}
+
+
+def _safe_float(value: Any) -> Optional[float]:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number > 0:
+        return number
+    return None
+
+
+def _quote_source_label(source: Any) -> Optional[str]:
+    text = sanitize_diagnostic_text(source, max_length=80)
+    if not text:
+        return None
+    return _QUOTE_SOURCE_LABELS.get(text, text)
+
+
+def _quote_availability_from_snapshot(context_snapshot: Dict[str, Any]) -> Dict[str, Any]:
+    availability = _as_dict(context_snapshot.get("quote_availability"))
+    if availability:
+        return availability
+
+    has_raw_quote = (
+        "realtime_quote_raw" in context_snapshot
+        and context_snapshot.get("realtime_quote_raw") is not None
+    )
+    raw_quote = _as_dict(context_snapshot.get("realtime_quote_raw"))
+    enhanced = _as_dict(context_snapshot.get("enhanced_context"))
+    realtime = _as_dict(enhanced.get("realtime"))
+    has_realtime_context = bool(realtime)
+    quote = raw_quote or realtime
+
+    quote_price = _safe_float(raw_quote.get("price") or realtime.get("price"))
+    quote_code = (
+        raw_quote.get("code")
+        or raw_quote.get("symbol")
+        or enhanced.get("code")
+        or context_snapshot.get("stock_code")
+    )
+    quote_source = raw_quote.get("source") or realtime.get("source")
+    fallback_from = raw_quote.get("fallback_from") or realtime.get("fallback_from")
+    if quote_price is not None and quote_code:
+        degraded = bool(fallback_from) or str(quote_source or "").lower() == "fallback"
+        return {
+            "status": "degraded" if degraded else "available",
+            "usable": True,
+            "source_label": _quote_source_label("fallback" if degraded else quote_source),
+            "primary_source": quote_source or raw_quote.get("provider") or realtime.get("provider"),
+            "fallback_used": degraded,
+            "reason": "primary_quote_failed_fallback_used" if degraded else None,
+            "user_message": (
+                "即時行情部分降級，但已取得可用替代資料"
+                if degraded else
+                "即時行情可用"
+            ),
+        }
+
+    today = _as_dict(enhanced.get("today"))
+    yesterday = _as_dict(enhanced.get("yesterday"))
+    fallback_close = _safe_float(today.get("close") or yesterday.get("close"))
+    if fallback_close is not None and (enhanced.get("code") or context_snapshot.get("stock_code")):
+        return {
+            "status": "degraded",
+            "usable": True,
+            "source_label": "備援資料",
+            "primary_source": quote_source or raw_quote.get("provider") or realtime.get("provider"),
+            "fallback_used": True,
+            "reason": "primary_quote_failed_fallback_used",
+            "user_message": "即時行情部分降級，但已取得可用替代資料",
+        }
+
+    if quote or has_raw_quote or has_realtime_context:
+        return {
+            "status": "missing",
+            "usable": False,
+            "source_label": None,
+            "primary_source": quote_source or raw_quote.get("provider") or realtime.get("provider"),
+            "fallback_used": False,
+            "reason": "empty_or_incomplete_quote",
+            "user_message": "即時行情未取得可用資料",
+        }
+
+    return {}
+
+
+def _quote_component(
+    context_snapshot: Dict[str, Any],
+    provider_runs: List[Dict[str, Any]],
+) -> RunDiagnosticComponent:
+    label = "實時行情"
+    availability = _quote_availability_from_snapshot(context_snapshot)
+    if not availability:
+        return _provider_component(
+            key="realtime_quote",
+            label=label,
+            data_type="realtime_quote",
+            provider_runs=provider_runs,
+        )
+
+    status = sanitize_diagnostic_text(availability.get("status"), max_length=40) or "unknown"
+    usable = availability.get("usable") is True
+    source_label = _quote_source_label(
+        availability.get("source_label")
+        or availability.get("source")
+        or availability.get("primary_source")
+    )
+    primary_source = sanitize_diagnostic_text(availability.get("primary_source"), max_length=80)
+    reason = sanitize_diagnostic_text(availability.get("reason"), max_length=80)
+    user_message = sanitize_diagnostic_text(availability.get("user_message"), max_length=160)
+    details = {
+        "final_quote_status": status,
+        "quote_usable": usable,
+        "source_label": source_label,
+        "provider": source_label or primary_source,
+        "primary_source": primary_source,
+        "fallback_used": bool(availability.get("fallback_used")),
+        "reason": reason,
+    }
+    details = {key: value for key, value in details.items() if value not in (None, "", [], {})}
+
+    if status == "available" and usable:
+        return _component(
+            "realtime_quote",
+            label,
+            "ok",
+            user_message or "即時行情可用",
+            details,
+        )
+    if status == "degraded" and usable:
+        return _component(
+            "realtime_quote",
+            label,
+            "degraded",
+            user_message or "即時行情部分降級，但已取得可用替代資料",
+            details,
+        )
+    if status == "missing":
+        return _component(
+            "realtime_quote",
+            label,
+            "failed",
+            user_message or "即時行情未取得可用資料",
+            details,
+        )
+    return _component(
+        "realtime_quote",
+        label,
+        "unknown",
+        user_message or "即時行情狀態未完整記錄",
+        details,
+    )
+
+
 def _provider_component(
     *,
     key: str,
@@ -1074,12 +1235,7 @@ def build_run_diagnostic_summary(
     ]
 
     components = {
-        "realtime_quote": _provider_component(
-            key="realtime_quote",
-            label="實時行情",
-            data_type="realtime_quote",
-            provider_runs=provider_runs,
-        ),
+        "realtime_quote": _quote_component(snapshot, provider_runs),
         "daily_data": _provider_component(
             key="daily_data",
             label="日線資料",

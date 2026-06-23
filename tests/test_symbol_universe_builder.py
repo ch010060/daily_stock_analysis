@@ -255,3 +255,22 @@ def test_bundled_public_stock_index_contains_only_tw_us_snapshot_rows() -> None:
     canonical_codes = {str(row[0]) for row in rows}
     assert "ZZ:TEST" not in canonical_codes
     assert {row[6] for row in rows} == {"TW", "US"}
+
+
+def test_phase15_9i_bundled_public_stock_index_contains_live_blocker_aliases() -> None:
+    rows = json.loads(PUBLIC_STOCK_INDEX_PATH.read_text(encoding="utf-8"))
+    by_symbol = {str(row[1]): row for row in rows}
+
+    expected_aliases = {
+        "2379": {"Realtek"},
+        "2357": {"ASUS", "Asus"},
+        "2327": {"Yageo"},
+        "2395": {"Advantech"},
+        "3711": {"ASE", "ASE Technology"},
+        "CSCO": {"Cisco", "Cisco Systems"},
+        "COST": {"Costco", "Costco Wholesale"},
+    }
+
+    for symbol, aliases in expected_aliases.items():
+        assert symbol in by_symbol
+        assert aliases.issubset(set(by_symbol[symbol][5])), symbol

@@ -115,6 +115,25 @@ class AnalysisContextBuilder:
 def _build_quote_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextBlock:
     quote = _to_dict(artifacts.realtime_quote)
     if not quote:
+        fallback_close = _fallback_close(artifacts)
+        if fallback_close is not None:
+            return AnalysisContextBlock(
+                status=ContextFieldStatus.FALLBACK,
+                source="fallback",
+                warnings=[_REALTIME_FALLBACK_WARNING],
+                items={
+                    "price": AnalysisContextItem(
+                        status=ContextFieldStatus.FALLBACK,
+                        value=fallback_close,
+                        source="fallback",
+                        warnings=[_REALTIME_FALLBACK_WARNING],
+                    )
+                },
+                metadata={
+                    "quote_usable": True,
+                    "reason": "primary_quote_failed_fallback_used",
+                },
+            )
         return AnalysisContextBlock(
             status=ContextFieldStatus.MISSING,
             items={
@@ -171,6 +190,23 @@ def _build_quote_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextB
         warnings=warnings,
         metadata=_quote_metadata(artifacts, quote),
     )
+
+
+def _fallback_close(artifacts: PipelineAnalysisArtifacts) -> Optional[float]:
+    for context in (artifacts.enhanced_context, artifacts.base_context):
+        if not isinstance(context, Mapping):
+            continue
+        for key in ("today", "yesterday"):
+            row = context.get(key)
+            if not isinstance(row, Mapping):
+                continue
+            try:
+                value = float(row.get("close"))
+            except (TypeError, ValueError):
+                continue
+            if value > 0:
+                return value
+    return None
 
 
 def _build_daily_bars_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextBlock:

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自選股智慧分析系統 - 核心分析流水線
+台美股自選股智慧分析系統 - 核心分析流水線
 ===================================
 
 職責：
@@ -665,6 +665,13 @@ class StockAnalysisPipeline:
                 realtime_data = enhanced_context.get('realtime', {})
                 result.current_price = realtime_data.get('price')
                 result.change_pct = realtime_data.get('change_pct')
+                if result.current_price is None:
+                    fallback_price, fallback_change_pct = self._fallback_quote_from_context(
+                        enhanced_context
+                    )
+                    if fallback_price is not None:
+                        result.current_price = fallback_price
+                        result.change_pct = fallback_change_pct
 
             # Step 7.6: chip_structure fallback (Issue #589) and unavailable collapse
             if result:
@@ -1177,6 +1184,13 @@ class StockAnalysisPipeline:
                 if isinstance(realtime_data, dict):
                     result.current_price = realtime_data.get("price")
                     result.change_pct = realtime_data.get("change_pct")
+                if result.current_price is None:
+                    fallback_price, fallback_change_pct = self._fallback_quote_from_context(
+                        analysis_context
+                    )
+                    if fallback_price is not None:
+                        result.current_price = fallback_price
+                        result.change_pct = fallback_change_pct
                 stabilize_decision_with_structure(result, trend_result, fundamental_context)
                 adjustments = apply_phase_decision_guardrails(
                     result,
@@ -1226,6 +1240,7 @@ class StockAnalysisPipeline:
                 try:
                     agent_context_snapshot = self._build_context_snapshot(
                         enhanced_context={
+                            **analysis_context,
                             **self._without_runtime_prompt_context(initial_context),
                             "stock_name": resolved_stock_name,
                         },
@@ -1906,10 +1921,15 @@ class StockAnalysisPipeline:
         """
         構建分析上下文快照
         """
+        realtime_quote_raw = self._safe_to_dict(realtime_quote)
         snapshot = {
             "enhanced_context": self._without_runtime_prompt_context(enhanced_context),
             "news_content": news_content,
-            "realtime_quote_raw": self._safe_to_dict(realtime_quote),
+            "realtime_quote_raw": realtime_quote_raw,
+            "quote_availability": self._build_quote_availability_snapshot(
+                enhanced_context,
+                realtime_quote_raw,
+            ),
             "chip_distribution_raw": self._safe_to_dict(chip_data),
         }
         if news_content is not None:
@@ -1928,6 +1948,108 @@ class StockAnalysisPipeline:
         if self.analysis_skills is not None:
             snapshot["skills"] = list(self.analysis_skills)
         return snapshot
+
+    @staticmethod
+    def _positive_float(value: Any) -> Optional[float]:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        return number if number > 0 else None
+
+    @classmethod
+    def _fallback_quote_from_context(
+        cls,
+        context: Dict[str, Any],
+    ) -> Tuple[Optional[float], Optional[float]]:
+        today = context.get("today") if isinstance(context.get("today"), dict) else {}
+        yesterday = context.get("yesterday") if isinstance(context.get("yesterday"), dict) else {}
+        price = cls._positive_float(today.get("close") or yesterday.get("close"))
+        if price is None:
+            return None, None
+
+        pct_value = today.get("pct_chg") or today.get("pctChg")
+        try:
+            pct = float(pct_value) if pct_value is not None else None
+        except (TypeError, ValueError):
+            pct = None
+        if pct is None:
+            previous_close = cls._positive_float(yesterday.get("close"))
+            if previous_close is not None:
+                pct = round((price - previous_close) / previous_close * 100, 2)
+        return price, pct
+
+    @staticmethod
+    def _quote_source_label(source: Any) -> Optional[str]:
+        text = str(source or "").strip()
+        if not text:
+            return None
+        labels = {
+            "yfinance": "Yahoo Finance / yfinance",
+            "YfinanceFetcher": "Yahoo Finance / yfinance",
+            "fallback": "備援資料",
+            "realtime_quote": "即時行情",
+        }
+        return labels.get(text, text)
+
+    @classmethod
+    def _build_quote_availability_snapshot(
+        cls,
+        enhanced_context: Dict[str, Any],
+        realtime_quote_raw: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        enhanced = enhanced_context if isinstance(enhanced_context, dict) else {}
+        realtime = enhanced.get("realtime") if isinstance(enhanced.get("realtime"), dict) else {}
+        quote = realtime_quote_raw or {}
+        price = cls._positive_float(quote.get("price") or realtime.get("price"))
+        source = quote.get("source") or realtime.get("source")
+        symbol = (
+            quote.get("code")
+            or quote.get("symbol")
+            or enhanced.get("code")
+            or enhanced.get("stock_code")
+        )
+        fallback_from = quote.get("fallback_from") or realtime.get("fallback_from")
+
+        if price is not None and symbol:
+            degraded = bool(fallback_from) or str(source or "").strip().lower() == "fallback"
+            return {
+                "status": "degraded" if degraded else "available",
+                "usable": True,
+                "source_label": cls._quote_source_label("fallback" if degraded else source),
+                "primary_source": source,
+                "fallback_used": degraded,
+                "reason": "primary_quote_failed_fallback_used" if degraded else None,
+                "user_message": (
+                    "即時行情部分降級，但已取得可用替代資料"
+                    if degraded else
+                    "即時行情可用"
+                ),
+            }
+
+        today = enhanced.get("today") if isinstance(enhanced.get("today"), dict) else {}
+        yesterday = enhanced.get("yesterday") if isinstance(enhanced.get("yesterday"), dict) else {}
+        fallback_close = cls._positive_float(today.get("close") or yesterday.get("close"))
+        if fallback_close is not None and symbol:
+            return {
+                "status": "degraded",
+                "usable": True,
+                "source_label": "備援資料",
+                "primary_source": source,
+                "fallback_used": True,
+                "reason": "primary_quote_failed_fallback_used",
+                "user_message": "即時行情部分降級，但已取得可用替代資料",
+            }
+
+        return {
+            "status": "missing",
+            "usable": False,
+            "source_label": None,
+            "primary_source": source,
+            "fallback_used": False,
+            "reason": "empty_or_incomplete_quote",
+            "user_message": "即時行情未取得可用資料",
+        }
 
     @staticmethod
     def _build_notification_run_snapshot(

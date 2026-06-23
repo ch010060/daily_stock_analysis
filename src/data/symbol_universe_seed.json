@@ -183,6 +183,66 @@
       "last_updated": "2026-06-22"
     },
     {
+      "canonical_symbol": "TW:2379",
+      "raw_symbol": "2379",
+      "market": "TW",
+      "exchange": "TWSE",
+      "instrument_type": "stock",
+      "name": "瑞昱",
+      "aliases": ["Realtek", "Realtek Semiconductor"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-22"
+    },
+    {
+      "canonical_symbol": "TW:2357",
+      "raw_symbol": "2357",
+      "market": "TW",
+      "exchange": "TWSE",
+      "instrument_type": "stock",
+      "name": "華碩",
+      "aliases": ["ASUS", "Asus", "ASUSTeK", "ASUSTeK Computer"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-22"
+    },
+    {
+      "canonical_symbol": "TW:2327",
+      "raw_symbol": "2327",
+      "market": "TW",
+      "exchange": "TWSE",
+      "instrument_type": "stock",
+      "name": "國巨",
+      "aliases": ["Yageo", "Yageo Corporation"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-22"
+    },
+    {
+      "canonical_symbol": "TW:2395",
+      "raw_symbol": "2395",
+      "market": "TW",
+      "exchange": "TWSE",
+      "instrument_type": "stock",
+      "name": "研華",
+      "aliases": ["Advantech", "Advantech Co"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-22"
+    },
+    {
+      "canonical_symbol": "TW:3711",
+      "raw_symbol": "3711",
+      "market": "TW",
+      "exchange": "TWSE",
+      "instrument_type": "stock",
+      "name": "日月光投控",
+      "aliases": ["ASE", "ASE Technology", "ASE Technology Holding"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-22"
+    },
+    {
       "canonical_symbol": "US:AAPL",
       "raw_symbol": "AAPL",
       "market": "US",
@@ -190,6 +250,30 @@
       "instrument_type": "stock",
       "name": "Apple",
       "aliases": ["Apple Inc"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-22"
+    },
+    {
+      "canonical_symbol": "US:CSCO",
+      "raw_symbol": "CSCO",
+      "market": "US",
+      "exchange": "NASDAQ",
+      "instrument_type": "stock",
+      "name": "Cisco Systems",
+      "aliases": ["Cisco", "Cisco Systems", "Cisco Systems Inc"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-22"
+    },
+    {
+      "canonical_symbol": "US:COST",
+      "raw_symbol": "COST",
+      "market": "US",
+      "exchange": "NASDAQ",
+      "instrument_type": "stock",
+      "name": "Costco Wholesale",
+      "aliases": ["Costco", "Costco Wholesale", "Costco Wholesale Corporation"],
       "provider_source": "curated_seed",
       "is_active": true,
       "last_updated": "2026-06-22"

@@ -1,9 +1,13 @@
 import type React from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronDown, Database } from 'lucide-react';
+import { historyApi } from '../../api/history';
 import type {
   AnalysisContextPackBlockStatus,
   AnalysisContextPackOverview,
   ReportLanguage,
+  RunDiagnosticComponent,
+  RunDiagnosticSummary,
 } from '../../types/analysis';
 import { normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Badge, Card, StatusDot } from '../common';
@@ -11,6 +15,8 @@ import { DashboardPanelHeader } from '../dashboard';
 
 interface AnalysisContextSummaryProps {
   overview?: AnalysisContextPackOverview | null;
+  diagnosticSummary?: RunDiagnosticSummary | null;
+  recordId?: number;
   language?: ReportLanguage;
 }
 
@@ -21,7 +27,7 @@ const STATUS_STYLE: Record<AnalysisContextPackBlockStatus, { variant: BadgeVaria
   available: { variant: 'success', tone: 'success' },
   missing: { variant: 'danger', tone: 'danger' },
   not_supported: { variant: 'default', tone: 'neutral' },
-  fallback: { variant: 'warning', tone: 'warning' },
+  fallback: { variant: 'success', tone: 'success' },
   stale: { variant: 'warning', tone: 'warning' },
   estimated: { variant: 'info', tone: 'info' },
   partial: { variant: 'warning', tone: 'warning' },
@@ -84,7 +90,7 @@ const TEXT = {
       available: '可用',
       missing: '缺失',
       not_supported: '不支援',
-      fallback: '降級',
+      fallback: '備援可用',
       stale: '過期',
       estimated: '估算',
       partial: '部分可用',
@@ -112,7 +118,7 @@ const TEXT = {
       available: '可用',
       missing: '缺失',
       not_supported: '不支援',
-      fallback: '降級',
+      fallback: '備援可用',
       stale: '過期',
       estimated: '估算',
       partial: '部分可用',
@@ -140,7 +146,7 @@ const TEXT = {
       available: 'Available',
       missing: 'Missing',
       not_supported: 'Not supported',
-      fallback: 'Fallback',
+      fallback: 'Fallback available',
       stale: 'Stale',
       estimated: 'Estimated',
       partial: 'Partial',
@@ -156,8 +162,8 @@ const REASON_LABELS: Record<ReportLanguage, Record<string, string>> = {
     chip_distribution_missing: '此市場暫不支援籌碼資料',
     fundamentals_not_supported: '此資料源暫不支援基本面資料',
     fundamental_pipeline_failed: '基本面資料暫時無法取得',
-    realtime_quote_missing: '本次分析未取得即時行情資料',
-    realtime_provider_fallback: '即時行情來源已降級，但仍可繼續分析',
+    realtime_quote_missing: '即時行情未取得可用資料',
+    realtime_provider_fallback: '即時行情部分降級，但已取得可用替代資料',
     intraday_realtime_overlay: '盤中資料可能不完整，已以可用資料補足',
   },
   zh_TW: {
@@ -166,8 +172,8 @@ const REASON_LABELS: Record<ReportLanguage, Record<string, string>> = {
     chip_distribution_missing: '此市場暫不支援籌碼資料',
     fundamentals_not_supported: '此資料源暫不支援基本面資料',
     fundamental_pipeline_failed: '基本面資料暫時無法取得',
-    realtime_quote_missing: '本次分析未取得即時行情資料',
-    realtime_provider_fallback: '即時行情來源已降級，但仍可繼續分析',
+    realtime_quote_missing: '即時行情未取得可用資料',
+    realtime_provider_fallback: '即時行情部分降級，但已取得可用替代資料',
     intraday_realtime_overlay: '盤中資料可能不完整，已以可用資料補足',
   },
   en: {
@@ -176,9 +182,45 @@ const REASON_LABELS: Record<ReportLanguage, Record<string, string>> = {
     chip_distribution_missing: 'Chip distribution data is not supported for this market',
     fundamentals_not_supported: 'Fundamentals are not supported by this data source',
     fundamental_pipeline_failed: 'Fundamentals are temporarily unavailable',
-    realtime_quote_missing: 'Realtime quote data was not retrieved for this analysis',
-    realtime_provider_fallback: 'Realtime quote source was degraded, but analysis can continue',
+    realtime_quote_missing: 'No usable realtime quote was retrieved for this analysis',
+    realtime_provider_fallback: 'Realtime quote is partially degraded, but usable fallback data was retrieved',
     intraday_realtime_overlay: 'Intraday data may be incomplete and was supplemented with available data',
+  },
+};
+
+const SOURCE_LABELS: Record<ReportLanguage, Record<string, string>> = {
+  zh: {
+    fallback: '備援資料',
+    'storage.get_analysis_context': '已保存報告資料',
+    realtime_quote: '即時行情',
+    api: '手動/API 觸發',
+    mock_quote: '其他資料來源',
+    cached_quote: '快取行情',
+    fundamental_cache: '基本面快取',
+    fundamental_pipeline: '基本面資料',
+    YfinanceFetcher: 'Yahoo Finance / yfinance',
+  },
+  zh_TW: {
+    fallback: '備援資料',
+    'storage.get_analysis_context': '已保存報告資料',
+    realtime_quote: '即時行情',
+    api: '手動/API 觸發',
+    mock_quote: '其他資料來源',
+    cached_quote: '快取行情',
+    fundamental_cache: '基本面快取',
+    fundamental_pipeline: '基本面資料',
+    YfinanceFetcher: 'Yahoo Finance / yfinance',
+  },
+  en: {
+    fallback: 'Fallback data',
+    'storage.get_analysis_context': 'Saved report data',
+    realtime_quote: 'Realtime quote',
+    api: 'Manual/API',
+    mock_quote: 'Other data source',
+    cached_quote: 'Cached quote',
+    fundamental_cache: 'Fundamental cache',
+    fundamental_pipeline: 'Fundamental data',
+    YfinanceFetcher: 'Yahoo Finance / yfinance',
   },
 };
 
@@ -245,35 +287,201 @@ const formatReason = (value: string, language: ReportLanguage): string => {
 const formatReasons = (values: string[] | undefined, language: ReportLanguage): string[] =>
   values?.map((item) => formatReason(item, language)).filter(Boolean) || [];
 
+const sourceLabel = (value: string | null | undefined, language: ReportLanguage): string | null => {
+  const text = value?.trim();
+  if (!text) return null;
+  return SOURCE_LABELS[language][text] || text;
+};
+
+const isTwUsMarket = (overview: AnalysisContextPackOverview): boolean => {
+  const market = (overview.subject.market || '').trim().toLowerCase();
+  const code = overview.subject.code.trim();
+  return market === 'tw' || market === 'us' || /^[0-9]{4,6}[a-z]?$/i.test(code) || /^[A-Z]{1,5}$/.test(code);
+};
+
+const componentByKey = (
+  summary: RunDiagnosticSummary | null | undefined,
+  key: string,
+): RunDiagnosticComponent | null => (
+  Object.values(summary?.components || {}).find((component) => component.key === key) || null
+);
+
+const numberDetail = (component: RunDiagnosticComponent | null, ...keys: string[]): number => {
+  for (const key of keys) {
+    const value = component?.details?.[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+  }
+  return 0;
+};
+
+const stringDetail = (component: RunDiagnosticComponent | null, ...keys: string[]): string | null => {
+  for (const key of keys) {
+    const value = component?.details?.[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+};
+
+const normalizeOverview = (
+  overview: AnalysisContextPackOverview,
+  diagnosticSummary: RunDiagnosticSummary | null | undefined,
+  persistedNewsCount = 0,
+): AnalysisContextPackOverview => {
+  const twUs = isTwUsMarket(overview);
+  const quoteDiagnostic = componentByKey(diagnosticSummary, 'realtime_quote');
+  const newsDiagnostic = componentByKey(diagnosticSummary, 'news');
+  const newsResultCount = Math.max(
+    overview.metadata.newsResultCount || 0,
+    persistedNewsCount,
+    numberDetail(newsDiagnostic, 'resultCount', 'result_count'),
+  );
+
+  const blocks = overview.blocks
+    .filter((block) => !(twUs && block.key === 'chip'))
+    .map((block) => {
+      if (block.key === 'quote' && quoteDiagnostic) {
+        const finalQuoteStatus = stringDetail(quoteDiagnostic, 'finalQuoteStatus', 'final_quote_status');
+        const quoteSource = sourceLabel(
+          stringDetail(quoteDiagnostic, 'sourceLabel', 'source_label', 'provider') || block.source,
+          'zh_TW',
+        );
+        if (quoteDiagnostic.status === 'ok') {
+          return {
+            ...block,
+            status: 'available' as AnalysisContextPackBlockStatus,
+            source: quoteSource || block.source,
+            warnings: block.warnings || [],
+            missingReasons: [],
+          };
+        }
+        if (quoteDiagnostic.status === 'degraded') {
+          return {
+            ...block,
+            status: 'fallback' as AnalysisContextPackBlockStatus,
+            source: quoteSource || block.source || '',
+            warnings: [],
+            missingReasons: [],
+          };
+        }
+        if (quoteDiagnostic.status === 'failed' || finalQuoteStatus === 'missing') {
+          return {
+            ...block,
+            status: 'missing' as AnalysisContextPackBlockStatus,
+            source: null,
+            warnings: [],
+            missingReasons: ['realtime_quote_missing'],
+          };
+        }
+      }
+      if (block.key === 'news' && newsResultCount > 0) {
+        return {
+          ...block,
+          status: 'available' as AnalysisContextPackBlockStatus,
+          missingReasons: [],
+        };
+      }
+      return block;
+    });
+
+  const counts = {
+    available: 0,
+    missing: 0,
+    notSupported: 0,
+    fallback: 0,
+    stale: 0,
+    estimated: 0,
+    partial: 0,
+    fetchFailed: 0,
+  };
+  blocks.forEach((block) => {
+    if (block.status === 'not_supported') counts.notSupported += 1;
+    else if (block.status === 'fetch_failed') counts.fetchFailed += 1;
+    else counts[block.status] += 1;
+  });
+
+  const normalizedStatusByKey = Object.fromEntries(blocks.map((block) => [block.key, block.status]));
+
+  return {
+    ...overview,
+    blocks,
+    counts,
+    dataQuality: overview.dataQuality ? {
+      ...overview.dataQuality,
+      blockScores: Object.fromEntries(
+        Object.entries(overview.dataQuality.blockScores || {}).filter(([key]) => !(twUs && key === 'chip')),
+      ),
+      limitations: (overview.dataQuality.limitations || []).filter((item) => {
+        const [key, ...statusParts] = item.split(':');
+        const normalizedStatus = normalizedStatusByKey[key.trim()];
+        if (twUs && key.trim() === 'chip') return false;
+        return !normalizedStatus || normalizedStatus === statusParts.join(':').trim();
+      }),
+    } : overview.dataQuality,
+    metadata: {
+      ...overview.metadata,
+      newsResultCount,
+    },
+  };
+};
+
 export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
   overview,
+  diagnosticSummary,
+  recordId,
   language = 'zh_TW',
 }) => {
   const reportLanguage = normalizeReportLanguage(language);
   const text = TEXT[reportLanguage];
+  const [historyDiagnostics, setHistoryDiagnostics] = useState<RunDiagnosticSummary | null>(null);
+  const [historyNewsCount, setHistoryNewsCount] = useState(0);
+
+  useEffect(() => {
+    if (!recordId) return undefined;
+    let active = true;
+    if (!diagnosticSummary) {
+      void historyApi.getDiagnostics(recordId)
+        .then((summary) => {
+          if (active) setHistoryDiagnostics(summary);
+        })
+        .catch(() => {});
+    }
+    void historyApi.getNews(recordId, 1)
+      .then((news) => {
+        if (active) setHistoryNewsCount(news.total || news.items?.length || 0);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [diagnosticSummary, recordId]);
 
   if (!overview || !overview.blocks?.length) {
     return null;
   }
+  const finalOverview = normalizeOverview(
+    overview,
+    diagnosticSummary ?? historyDiagnostics,
+    historyNewsCount,
+  );
 
   const visibleCounts = STATUS_ORDER
-    .map((status) => ({ status, value: getCount(overview, status) }))
+    .map((status) => ({ status, value: getCount(finalOverview, status) }))
     .filter((item) => item.value > 0);
   const summaryCounts = STATUS_ORDER
-    .map((status) => ({ status, value: getCount(overview, status) }))
+    .map((status) => ({ status, value: getCount(finalOverview, status) }))
     .filter((item) => item.status === 'available' || item.status === 'missing' || item.value > 0);
   const metadataItems = [
-    typeof overview.metadata?.newsResultCount === 'number'
-      ? `${text.newsResultCount}: ${overview.metadata.newsResultCount}`
+    typeof finalOverview.metadata?.newsResultCount === 'number'
+      ? `${text.newsResultCount}: ${finalOverview.metadata.newsResultCount}`
       : null,
   ].filter((item): item is string => Boolean(item));
-  const triggerSource = overview.metadata?.triggerSource?.trim();
-  const quality = overview.dataQuality;
+  const triggerSource = sourceLabel(finalOverview.metadata?.triggerSource, reportLanguage);
+  const quality = finalOverview.dataQuality;
   const qualityLevel = quality?.level || undefined;
   const qualityStyle = qualityLevel ? QUALITY_STYLE[qualityLevel] : undefined;
   const qualityLabel = qualityLevel ? text.qualityLevel[qualityLevel] : undefined;
   const limitations = quality?.limitations?.map((item) => formatLimitation(item, reportLanguage, text)) || [];
-  const overviewWarnings = formatReasons(overview.warnings, reportLanguage);
+  const overviewWarnings = formatReasons(finalOverview.warnings, reportLanguage);
 
   return (
     <Card variant="bordered" padding="none" className="home-panel-card">
@@ -370,18 +578,19 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
           ) : null}
 
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            {overview.blocks.map((block) => {
+            {finalOverview.blocks.map((block) => {
               const style = STATUS_STYLE[block.status] || STATUS_STYLE.missing;
               const blockWarnings = formatReasons(block.warnings, reportLanguage);
               const missingReasons = formatReasons(block.missingReasons, reportLanguage);
+              const blockSource = sourceLabel(block.source, reportLanguage);
               return (
                 <div key={block.key} className="home-subpanel p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-foreground">{block.label}</p>
-                      {block.source ? (
+                      {blockSource ? (
                         <p className="mt-1 truncate text-xs text-secondary-text">
-                          {text.source}: {block.source}
+                          {text.source}: {blockSource}
                         </p>
                       ) : null}
                     </div>

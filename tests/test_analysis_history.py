@@ -542,6 +542,51 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(report.meta.current_price, 200.0)
         self.assertEqual(report.meta.change_pct, 1.23)
 
+    def test_history_detail_uses_quote_availability_daily_fallback_price(self) -> None:
+        """TW/US history meta should expose usable daily fallback quote data.
+
+        A missing realtime quote is still a usable quote state when the final
+        diagnostics mark daily close fallback as degraded. The report header
+        must not remain price-null in that case.
+        """
+        if get_history_detail is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        context_snapshot = {
+            "quote_availability": {
+                "status": "degraded",
+                "usable": True,
+                "source_label": "備援資料",
+                "fallback_used": True,
+                "reason": "primary_quote_failed_fallback_used",
+            },
+            "enhanced_context": {
+                "today": {"close": 2510.0, "pct_chg": 4.15},
+                "yesterday": {"close": 2410.0},
+            },
+            "realtime_quote_raw": {"source": "yfinance"},
+        }
+        query_id = "query_quote_availability_daily_fallback"
+        saved = self.db.save_analysis_history(
+            result=self._build_result(),
+            query_id=query_id,
+            report_type="simple",
+            news_content="新聞摘要",
+            context_snapshot=context_snapshot,
+            save_snapshot=True,
+        )
+        self.assertEqual(saved, 1)
+
+        with self.db.get_session() as session:
+            row = session.query(AnalysisHistory).filter(AnalysisHistory.query_id == query_id).first()
+            if row is None:
+                self.fail("未找到儲存的歷史記錄")
+            record_id = row.id
+
+        report = get_history_detail(str(record_id), db_manager=self.db)
+        self.assertEqual(report.meta.current_price, 2510.0)
+        self.assertEqual(report.meta.change_pct, 4.15)
+
     @patch("src.auth.is_auth_enabled", return_value=False)
     def test_history_detail_ignores_non_dict_realtime_quote_raw(self, mock_auth) -> None:
         """GET /api/v1/history/{id} should tolerate truthy non-dict realtime_quote_raw."""
