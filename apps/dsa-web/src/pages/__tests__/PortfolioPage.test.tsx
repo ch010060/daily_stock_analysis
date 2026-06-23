@@ -402,7 +402,7 @@ describe('PortfolioPage FX refresh', () => {
     await waitForInitialLoad();
 
     expect(screen.getAllByText('TWD 170,000.00').length).toBeGreaterThan(0);
-    expect(screen.getByText(/USD\/TWD/)).toBeInTheDocument();
+    expect(screen.getAllByText(/USD\/TWD/).length).toBeGreaterThan(0);
     expect(screen.getByText(/32\.0000/)).toBeInTheDocument();
     expect(screen.getByText('TWD 10,000.00')).toBeInTheDocument();
     expect(screen.getByText('USD 5,000.00')).toBeInTheDocument();
@@ -454,6 +454,238 @@ describe('PortfolioPage FX refresh', () => {
     expect(screen.queryByText('TWD 15,000.00')).not.toBeInTheDocument();
     expect(screen.getByText('TWD 10,000.00')).toBeInTheDocument();
     expect(screen.getByText('USD 5,000.00')).toBeInTheDocument();
+  });
+
+  it('shows the reporting basis and FX rate/source/date when a converted multi-currency total is available', async () => {
+    getSnapshot.mockResolvedValueOnce(
+      makeSnapshot({
+        currency: 'TWD',
+        fxStale: false,
+        totalCash: 170000,
+        totalMarketValue: 0,
+        totalEquity: 170000,
+        convertedTotalAvailable: true,
+        aggregateIsStale: false,
+        fxMissing: false,
+        fxRatesUsed: [
+          {
+            fromCurrency: 'TWD',
+            toCurrency: 'USD',
+            rate: 0.03125,
+            conversionFromCurrency: 'USD',
+            conversionToCurrency: 'TWD',
+            conversionRate: 32,
+            direction: 'inverse',
+            rateDate: '2026-03-19',
+            isStale: false,
+            source: 'yfinance',
+          },
+        ],
+        totalsByCurrency: {
+          twd: {
+            currency: 'TWD',
+            accountCount: 1,
+            totalCash: 10000,
+            totalMarketValue: 0,
+            totalEquity: 10000,
+            realizedPnl: 0,
+            unrealizedPnl: 0,
+            feeTotal: 0,
+            taxTotal: 0,
+          },
+          usd: {
+            currency: 'USD',
+            accountCount: 1,
+            totalCash: 5000,
+            totalMarketValue: 0,
+            totalEquity: 5000,
+            realizedPnl: 0,
+            unrealizedPnl: 0,
+            feeTotal: 0,
+            taxTotal: 0,
+          },
+        },
+      }),
+    );
+
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+
+    expect(await screen.findByText('總覽基準：TWD')).toBeInTheDocument();
+    expect(screen.getByText('換算依據：USD/TWD 32.00・更新於 2026-03-19・來源 yfinance')).toBeInTheDocument();
+    expect(screen.queryByText('匯率可能過期，總額僅供估算')).not.toBeInTheDocument();
+  });
+
+  it('shows a stale-FX warning next to the converted total when the aggregate is based on a stale rate', async () => {
+    getSnapshot.mockResolvedValueOnce(
+      makeSnapshot({
+        currency: 'TWD',
+        fxStale: true,
+        totalCash: 170000,
+        totalMarketValue: 0,
+        totalEquity: 170000,
+        convertedTotalAvailable: true,
+        aggregateIsStale: true,
+        fxMissing: false,
+        fxRatesUsed: [
+          {
+            fromCurrency: 'TWD',
+            toCurrency: 'USD',
+            rate: 0.03125,
+            conversionFromCurrency: 'USD',
+            conversionToCurrency: 'TWD',
+            conversionRate: 32,
+            direction: 'inverse',
+            rateDate: '2026-03-01',
+            isStale: true,
+            source: 'yfinance',
+          },
+        ],
+        totalsByCurrency: {
+          twd: {
+            currency: 'TWD',
+            accountCount: 1,
+            totalCash: 10000,
+            totalMarketValue: 0,
+            totalEquity: 10000,
+            realizedPnl: 0,
+            unrealizedPnl: 0,
+            feeTotal: 0,
+            taxTotal: 0,
+          },
+          usd: {
+            currency: 'USD',
+            accountCount: 1,
+            totalCash: 5000,
+            totalMarketValue: 0,
+            totalEquity: 5000,
+            realizedPnl: 0,
+            unrealizedPnl: 0,
+            feeTotal: 0,
+            taxTotal: 0,
+          },
+        },
+      }),
+    );
+
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+
+    expect(await screen.findByText('匯率可能過期，總額僅供估算')).toBeInTheDocument();
+  });
+
+  it('does not show a trustworthy converted headline total when FX is missing, but keeps the per-currency breakdown', async () => {
+    getSnapshot.mockResolvedValueOnce(
+      makeSnapshot({
+        currency: 'TWD',
+        totalCash: null,
+        totalMarketValue: null,
+        totalEquity: null,
+        convertedTotalAvailable: false,
+        aggregateIsStale: true,
+        fxMissing: true,
+        fxWarnings: ['匯率不可用，無法計算換算總額。'],
+        totalsByCurrency: {
+          twd: {
+            currency: 'TWD',
+            accountCount: 1,
+            totalCash: 10000,
+            totalMarketValue: 0,
+            totalEquity: 10000,
+            realizedPnl: 0,
+            unrealizedPnl: 0,
+            feeTotal: 0,
+            taxTotal: 0,
+          },
+          usd: {
+            currency: 'USD',
+            accountCount: 1,
+            totalCash: 5000,
+            totalMarketValue: 0,
+            totalEquity: 5000,
+            realizedPnl: 0,
+            unrealizedPnl: 0,
+            feeTotal: 0,
+            taxTotal: 0,
+          },
+        },
+      }),
+    );
+
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+
+    expect(await screen.findByText('缺少可用匯率，無法換算總額；請查看分幣別小計')).toBeInTheDocument();
+    expect(screen.getByText('TWD 10,000.00')).toBeInTheDocument();
+    expect(screen.getByText('USD 5,000.00')).toBeInTheDocument();
+  });
+
+  it('does not show FX basis copy for a single-currency portfolio', async () => {
+    getSnapshot.mockResolvedValueOnce(makeSnapshot({}));
+
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+
+    expect(screen.queryByText(/總覽基準/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/換算依據/)).not.toBeInTheDocument();
+  });
+
+  it('labels the headline totals as a converted estimate when accounts span multiple currencies', async () => {
+    getSnapshot.mockResolvedValueOnce(
+      makeSnapshot({
+        currency: 'TWD',
+        totalCash: 170000,
+        totalMarketValue: 0,
+        totalEquity: 170000,
+        totalsByCurrency: {
+          twd: {
+            currency: 'TWD',
+            accountCount: 1,
+            totalCash: 10000,
+            totalMarketValue: 0,
+            totalEquity: 10000,
+            realizedPnl: 0,
+            unrealizedPnl: 0,
+            feeTotal: 0,
+            taxTotal: 0,
+          },
+          usd: {
+            currency: 'USD',
+            accountCount: 1,
+            totalCash: 5000,
+            totalMarketValue: 0,
+            totalEquity: 5000,
+            realizedPnl: 0,
+            unrealizedPnl: 0,
+            feeTotal: 0,
+            taxTotal: 0,
+          },
+        },
+      }),
+    );
+
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+
+    expect(await screen.findByText('總權益（換算估計）')).toBeInTheDocument();
+    expect(screen.getByText('總市值（換算估計）')).toBeInTheDocument();
+    expect(screen.getByText('總現金（換算估計）')).toBeInTheDocument();
+  });
+
+  it('does not label the headline totals as an estimate for a single-currency portfolio', async () => {
+    getSnapshot.mockResolvedValueOnce(makeSnapshot({}));
+
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+
+    expect(await screen.findByText('總權益')).toBeInTheDocument();
+    expect(screen.queryByText('總權益（換算估計）')).not.toBeInTheDocument();
   });
 
   it('does not render the per-currency subtotal section for a single-currency portfolio', async () => {

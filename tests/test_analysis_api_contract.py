@@ -215,6 +215,37 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(getattr(ctx.exception, "status_code", None), 409)
         task_queue.submit_background_task.assert_not_called()
 
+    def test_compute_market_review_override_region_all_does_not_become_cn(self) -> None:
+        """Phase 15.9R: real MARKET_REVIEW_REGION=all must resolve to tw/us scope."""
+        if analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        config = SimpleNamespace(trading_day_check_enabled=True, market_review_region="all")
+
+        with patch(
+            "src.core.trading_calendar.get_open_markets_today",
+            return_value={"tw", "us"},
+        ):
+            result = analysis_endpoint_module._compute_market_review_override_region(config)
+
+        self.assertIsNotNone(result)
+        self.assertNotIn("cn", result)
+        self.assertIn("tw", result.split(","))
+
+    def test_compute_market_review_override_region_tw_only_open(self) -> None:
+        if analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        config = SimpleNamespace(trading_day_check_enabled=True, market_review_region="all")
+
+        with patch(
+            "src.core.trading_calendar.get_open_markets_today",
+            return_value={"tw"},
+        ):
+            result = analysis_endpoint_module._compute_market_review_override_region(config)
+
+        self.assertEqual(result, "tw")
+
     def test_trigger_market_review_skips_when_configured_markets_closed(self) -> None:
         if trigger_market_review is None or analysis_endpoint_module is None:
             self.skipTest("analysis endpoint helpers unavailable in this environment")
@@ -472,6 +503,35 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(status.status, "completed")
         self.assertEqual(status.market_review_report, "市場覆盤報告示例文字")
         self.assertIsNone(status.result)
+
+    def test_get_analysis_status_surfaces_market_review_skip_reason_from_queue(self) -> None:
+        if get_analysis_status is None or analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        queue = MagicMock()
+        queue.get_task.return_value = SimpleNamespace(
+            task_id="market-task-2",
+            stock_code="market_review",
+            stock_name="市場概覽",
+            status=analysis_endpoint_module.TaskStatusEnum.COMPLETED,
+            progress=100,
+            result={
+                "status": "skipped",
+                "result": None,
+                "message": "市場概覽已跳過：沒有可持久化的盤勢回顧內容",
+            },
+            error=None,
+            original_query=None,
+            selection_source=None,
+            analysis_phase="auto",
+        )
+
+        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue):
+            status = get_analysis_status("market-task-2")
+
+        self.assertEqual(status.status, "completed")
+        self.assertIsNone(status.market_review_report)
+        self.assertEqual(status.market_review_skip_reason, "市場概覽已跳過：沒有可持久化的盤勢回顧內容")
 
     def test_get_analysis_status_normalizes_completed_queue_result_contract(self) -> None:
         if get_analysis_status is None or analysis_endpoint_module is None:

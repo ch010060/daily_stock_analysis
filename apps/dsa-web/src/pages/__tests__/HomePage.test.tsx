@@ -386,6 +386,41 @@ describe('HomePage', () => {
     expect(analysisApi.getStatus).toHaveBeenCalledWith('task-1');
   });
 
+  it('shows an accurate skip notice instead of a false success message when market review is skipped', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      sendNotification: true,
+      message: '市場概覽任務已提交',
+      taskId: 'task-1',
+    });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: 'task-1',
+      status: 'completed',
+      marketReviewSkipReason: '市場概覽已跳過：沒有可持久化的盤勢回顧內容',
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '市場概覽' }));
+
+    await waitFor(() => {
+      expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
+    });
+    expect(await screen.findByText('市場概覽已跳過：沒有可持久化的盤勢回顧內容')).toBeInTheDocument();
+    expect(screen.queryByText('市場概覽已完成')).not.toBeInTheDocument();
+    expect(screen.queryByText('市場概覽任務已完成，結果已生成並按配置推送。')).not.toBeInTheDocument();
+  });
+
   it('scrolls the dashboard to market review feedback after toolbar clicks', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 1,

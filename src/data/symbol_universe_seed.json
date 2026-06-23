@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "last_updated": "2026-06-22",
+  "last_updated": "2026-06-23",
   "records": [
     {
       "canonical_symbol": "TW:2330",
@@ -589,6 +589,30 @@
       "provider_source": "curated_seed",
       "is_active": true,
       "last_updated": "2026-06-22"
+    },
+    {
+      "canonical_symbol": "TW:3443",
+      "raw_symbol": "3443",
+      "market": "TW",
+      "exchange": "TWSE",
+      "instrument_type": "stock",
+      "name": "創意",
+      "aliases": ["GUC", "Global Unichip"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-23"
+    },
+    {
+      "canonical_symbol": "TW:2912",
+      "raw_symbol": "2912",
+      "market": "TW",
+      "exchange": "TWSE",
+      "instrument_type": "stock",
+      "name": "統一超",
+      "aliases": ["PCSC", "President Chain Store"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-23"
     }
   ]
 }

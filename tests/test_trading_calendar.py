@@ -749,9 +749,61 @@ class ComputeEffectiveRegionTestCase(unittest.TestCase):
     def test_single_region_closed(self):
         self.assertEqual(trading_calendar.compute_effective_region("hk", {"cn", "us"}), "")
 
-    def test_invalid_region_defaults_to_cn(self):
+    def test_invalid_region_no_longer_silently_defaults_to_cn(self):
+        """Phase 15.9R: an unrecognized region must not silently masquerade as cn."""
         result = trading_calendar.compute_effective_region("invalid", {"cn"})
-        self.assertEqual(result, "cn")
+        self.assertEqual(result, "")
+
+    def test_legacy_cn_region_open_still_returns_cn(self):
+        """Legacy single-region cn/hk/both callers keep their exact prior behavior."""
+        self.assertEqual(trading_calendar.compute_effective_region("cn", {"cn", "us"}), "cn")
+
+    def test_legacy_cn_region_closed_still_returns_empty(self):
+        self.assertEqual(trading_calendar.compute_effective_region("cn", {"hk", "us"}), "")
+
+    def test_route_b_all_open_returns_comma_joined_tw_us(self):
+        result = trading_calendar.compute_effective_region("all", {"tw", "us"})
+        self.assertEqual(result, "tw,us")
+
+    def test_route_b_all_only_tw_open_returns_tw(self):
+        result = trading_calendar.compute_effective_region("all", {"tw"})
+        self.assertEqual(result, "tw")
+
+    def test_route_b_all_no_market_open_returns_empty(self):
+        result = trading_calendar.compute_effective_region("all", set())
+        self.assertEqual(result, "")
+
+    def test_route_b_all_ignores_legacy_cn_hk_even_if_open(self):
+        """all is Route B (tw/us) scope; cn/hk being open must not leak in."""
+        result = trading_calendar.compute_effective_region("all", {"cn", "hk", "tw"})
+        self.assertEqual(result, "tw")
+
+    def test_route_b_tw_region_open(self):
+        self.assertEqual(trading_calendar.compute_effective_region("tw", {"tw", "us"}), "tw")
+
+    def test_route_b_tw_region_closed(self):
+        self.assertEqual(trading_calendar.compute_effective_region("tw", {"us"}), "")
+
+
+class TaiwanMarketCalendarTestCase(unittest.TestCase):
+    """Phase 15.9R: tw must have its own exchange/timezone, not silently fold into cn."""
+
+    def test_market_timezone_has_tw_entry(self):
+        self.assertIn("tw", trading_calendar.MARKET_TIMEZONE)
+        self.assertEqual(trading_calendar.MARKET_TIMEZONE["tw"], "Asia/Taipei")
+
+    def test_market_exchange_has_tw_entry(self):
+        self.assertIn("tw", trading_calendar.MARKET_EXCHANGE)
+
+    def test_is_market_open_recognizes_tw_trading_day(self):
+        if not trading_calendar._XCALS_AVAILABLE:
+            self.skipTest("exchange-calendars not installed")
+        self.assertTrue(trading_calendar.is_market_open("tw", date(2026, 6, 23)))
+
+    def test_is_market_open_recognizes_tw_non_trading_day(self):
+        if not trading_calendar._XCALS_AVAILABLE:
+            self.skipTest("exchange-calendars not installed")
+        self.assertFalse(trading_calendar.is_market_open("tw", date(2026, 6, 21)))
 
 
 if __name__ == "__main__":
