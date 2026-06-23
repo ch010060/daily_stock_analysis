@@ -36,13 +36,14 @@ except ImportError:
     )
 
 # Market -> exchange code (exchange-calendars)
-MARKET_EXCHANGE = {"cn": "XSHG", "hk": "XHKG", "us": "XNYS"}
+MARKET_EXCHANGE = {"cn": "XSHG", "hk": "XHKG", "us": "XNYS", "tw": "XTAI"}
 
 # Market -> IANA timezone for "today"
 MARKET_TIMEZONE = {
     "cn": "Asia/Shanghai",
     "hk": "Asia/Hong_Kong",
     "us": "America/New_York",
+    "tw": "Asia/Taipei",
 }
 
 # P0 market phase baseline (Issue #1386). This is an intentionally small
@@ -535,20 +536,25 @@ def compute_effective_region(
     Compute effective market review region given config and open markets.
 
     Args:
-        config_region: From MARKET_REVIEW_REGION ('cn' | 'hk' | 'us' | 'both')
+        config_region: From MARKET_REVIEW_REGION. Single markets ('cn' | 'hk' |
+            'us' | 'tw') resolve to themselves. 'both' is the legacy cn/hk/us
+            multi-region scope; 'all' is the Route B tw/us multi-region scope.
+            Any other value (including unrecognized garbage) yields no override.
         open_markets: Markets open today
 
     Returns:
         None: caller uses config default (check disabled)
-        '': all relevant markets closed, skip market review
-        'cn' | 'hk' | 'us' | 'both': effective subset for today
+        '': all relevant markets closed (or region unrecognized), skip market review
+        'cn' | 'hk' | 'us' | 'tw' | comma-joined subset: effective subset for today
     """
-    if config_region not in ("cn", "hk", "us", "both"):
-        config_region = "cn"
-    if config_region in ("cn", "hk", "us"):
+    if config_region in ("cn", "hk", "us", "tw"):
         return config_region if config_region in open_markets else ""
-    # both: return only the markets that are actually open today
-    parts = [m for m in ("cn", "hk", "us") if m in open_markets]
+    if config_region == "both":
+        parts = [m for m in ("cn", "hk", "us") if m in open_markets]
+    elif config_region == "all":
+        parts = [m for m in ("tw", "us") if m in open_markets]
+    else:
+        return ""
     if not parts:
         return ""
     if len(parts) == 1:

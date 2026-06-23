@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [修復] 股票代號/名稱查詢中，純大寫英文代號（如 TEAM）不再因前端搜尋僅抑制名稱比對而靜默只顯示台股別名候選；現在會同時列出對應的美股精確比對候選並排序在前。
 - [修復] 新增「Global Unichip」「President Chain Store」作為台股創意（3443）、統一超（2912）的英文全名別名。
+- [修復] 大盤覆盤交易日檢查改為正確識別台股獨立交易日曆（Asia/Taipei / XTAI），`MARKET_REVIEW_REGION=all` 不再被舊版邏輯誤判轉換成 cn 並因而中止，可正常產生並持久化台股/美股大盤覆盤報告；cn/hk/both 等舊版區域語意維持不變。
+- [修復] 市場概覽在無可持久化報告而中止時，前端不再顯示「市場概覽任務已完成，結果已生成並按配置推送」的誤導性成功訊息，改為顯示實際的跳過原因。
 - [修復] WebUI/FastAPI 支援明確 opt-in 的 Mac mini LAN runtime：`DSA_ALLOW_EXTERNAL_NETWORK=true` 並使用 `WEBUI_HOST=0.0.0.0` 後可接受 private LAN Host/CORS，同時保留預設 localhost-only 與非 wildcard CORS。
 - [修復] 持股混合 TWD/USD 總額改為必須使用有效匯率換算；缺少匯率時顯示不可用警告與分幣別小計，匯率刷新後顯示實際 USD/TWD 換算總額與匯率資訊。
 - [修復] Web 持股手工錄入交易、資金流水、公司行為表單新增 TWD/USD 幣別下拉選單，並依選定帳戶基準幣別預設為 TWD 或 USD。

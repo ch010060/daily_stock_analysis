@@ -892,12 +892,17 @@ def get_analysis_status(task_id: str) -> TaskStatus:
     if task:
         result: Optional[AnalysisResultResponse] = None
         market_review_report = None
+        market_review_skip_reason = None
 
         if task.status == TaskStatusEnum.COMPLETED and isinstance(task.result, dict):
             if task.stock_code == "market_review":
                 report_text = task.result.get("result")
                 if isinstance(report_text, str) and report_text.strip():
                     market_review_report = report_text
+                elif task.result.get("status") == "skipped":
+                    skip_message = task.result.get("message")
+                    if isinstance(skip_message, str) and skip_message.strip():
+                        market_review_skip_reason = skip_message
             else:
                 try:
                     result = _build_task_analysis_result(task)
@@ -916,6 +921,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
             stage_label=getattr(task, "stage_label", None),
             result=result,
             market_review_report=market_review_report,
+            market_review_skip_reason=market_review_skip_reason,
             error=task.error,
             stock_name=task.stock_name,
             original_query=task.original_query,

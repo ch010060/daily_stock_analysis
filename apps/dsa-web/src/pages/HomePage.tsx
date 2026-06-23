@@ -431,12 +431,23 @@ const HomePage: React.FC = () => {
             const marketReviewText = typeof status.marketReviewReport === 'string'
               ? status.marketReviewReport
               : '';
+            const skipReason = typeof status.marketReviewSkipReason === 'string'
+              ? status.marketReviewSkipReason.trim()
+              : '';
             setMarketReviewReport(marketReviewText ? marketReviewText.trim() : null);
-            setMarketReviewNotice({
-              variant: 'success',
-              title: '市場概覽已完成',
-              message: marketReviewText ? '市場概覽任務已完成，結果如下：' : '市場概覽任務已完成，結果已生成並按配置推送。',
-            });
+            if (!marketReviewText && skipReason) {
+              setMarketReviewNotice({
+                variant: 'warning',
+                title: '市場概覽已跳過',
+                message: skipReason,
+              });
+            } else {
+              setMarketReviewNotice({
+                variant: 'success',
+                title: '市場概覽已完成',
+                message: marketReviewText ? '市場概覽任務已完成，結果如下：' : '市場概覽任務已完成，結果已生成並按配置推送。',
+              });
+            }
             setMarketReviewError(null);
             scrollMarketReviewFeedbackIntoView();
             return false;
