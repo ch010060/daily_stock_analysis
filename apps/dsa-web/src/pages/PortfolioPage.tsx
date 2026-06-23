@@ -575,6 +575,8 @@ const PortfolioPage: React.FC = () => {
     const byCurrency = snapshot?.totalsByCurrency ?? {};
     return Object.values(byCurrency).sort((a, b) => a.currency.localeCompare(b.currency));
   }, [snapshot]);
+  const isMultiCurrencyView = currencySubtotals.length > 1;
+  const primaryFxRateUsed = snapshot?.fxRatesUsed?.[0] ?? null;
   const fxWarnings = snapshot?.fxWarnings ?? [];
   const fxRatesUsed = snapshot?.fxRatesUsed ?? [];
 
@@ -1244,15 +1246,15 @@ const PortfolioPage: React.FC = () => {
 
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
         <Card variant="gradient" padding="md">
-          <p className="text-xs text-secondary">總權益</p>
+          <p className="text-xs text-secondary">總權益{isMultiCurrencyView ? '（換算估計）' : ''}</p>
           <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalEquity, snapshot?.currency || 'TWD')}</p>
         </Card>
         <Card variant="gradient" padding="md">
-          <p className="text-xs text-secondary">總市值</p>
+          <p className="text-xs text-secondary">總市值{isMultiCurrencyView ? '（換算估計）' : ''}</p>
           <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalMarketValue, snapshot?.currency || 'TWD')}</p>
         </Card>
         <Card variant="gradient" padding="md">
-          <p className="text-xs text-secondary">總現金</p>
+          <p className="text-xs text-secondary">總現金{isMultiCurrencyView ? '（換算估計）' : ''}</p>
           <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalCash, snapshot?.currency || 'TWD')}</p>
         </Card>
         <Card variant="gradient" padding="md">
@@ -1315,6 +1317,33 @@ const PortfolioPage: React.FC = () => {
           ) : null}
         </Card>
       </section>
+
+      {isMultiCurrencyView ? (
+        <section className="text-xs text-secondary space-y-1">
+          {snapshot?.convertedTotalAvailable === false ? (
+            <InlineAlert
+              variant="warning"
+              message="缺少可用匯率，無法換算總額；請查看分幣別小計"
+              className="rounded-xl px-3 py-2 text-xs shadow-none"
+            />
+          ) : (
+            <>
+              <p>總覽基準：{snapshot?.currency || 'TWD'}</p>
+              {primaryFxRateUsed ? (
+                <p>
+                  換算依據：
+                  {primaryFxRateUsed.conversionFromCurrency && primaryFxRateUsed.conversionToCurrency && primaryFxRateUsed.conversionRate
+                    ? `${primaryFxRateUsed.conversionFromCurrency}/${primaryFxRateUsed.conversionToCurrency} ${Number(primaryFxRateUsed.conversionRate).toFixed(2)}`
+                    : `${primaryFxRateUsed.fromCurrency}/${primaryFxRateUsed.toCurrency} ${Number(primaryFxRateUsed.rate).toFixed(4)}`}
+                  ・更新於 {primaryFxRateUsed.rateDate}
+                  {primaryFxRateUsed.source ? `・來源 ${primaryFxRateUsed.source}` : ''}
+                </p>
+              ) : null}
+              {snapshot?.aggregateIsStale ? <p>匯率可能過期，總額僅供估算</p> : null}
+            </>
+          )}
+        </section>
+      ) : null}
 
       {currencySubtotals.length > 1 ? (
         <section>
