@@ -87,9 +87,10 @@ def _coerce_symbol_lookup_limit(limit: int) -> int:
 def search_symbols(
     q: str = Query(..., min_length=1, description="股票代號或股票名稱"),
     limit: int = Query(8, ge=1, le=20, description="最大候選數"),
+    market: Optional[str] = Query(None, pattern="^(TW|US|tw|us)$", description="可選市場範圍"),
 ) -> SymbolSearchResponse:
     resolver = get_default_symbol_resolver()
-    candidates = resolver.search(q, limit=_coerce_symbol_lookup_limit(limit))
+    candidates = resolver.search(q, limit=_coerce_symbol_lookup_limit(limit), market=market)
     return SymbolSearchResponse(
         query=q,
         candidates=[_symbol_candidate_response(candidate) for candidate in candidates],
@@ -105,8 +106,13 @@ def search_symbols(
 def resolve_symbol(
     q: str = Query(..., min_length=1, description="股票代號或股票名稱"),
     limit: int = Query(8, ge=1, le=20, description="最大候選數"),
+    market: Optional[str] = Query(None, pattern="^(TW|US|tw|us)$", description="可選市場範圍"),
 ) -> SymbolResolveResponse:
-    result = get_default_symbol_resolver().resolve(q, limit=_coerce_symbol_lookup_limit(limit))
+    result = get_default_symbol_resolver().resolve(
+        q,
+        limit=_coerce_symbol_lookup_limit(limit),
+        market=market,
+    )
     candidates = [_symbol_candidate_response(candidate) for candidate in result.candidates]
     selected = candidates[0] if result.selected is not None and candidates else None
     return SymbolResolveResponse(

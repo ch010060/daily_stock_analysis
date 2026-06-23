@@ -17,6 +17,8 @@ from src.services.symbol_universe import (
     SymbolRecord,
     SymbolUniverseBuilder,
     SymbolUniverseCache,
+    TpexCompanyProfileProvider,
+    TwseCompanyProfileProvider,
 )
 
 
@@ -52,6 +54,13 @@ EXPANDED_US_TARGETS = {
     "ARM": ("Arm", "Arm Holdings"),
     "ORCL": ("Oracle",),
     "PLTR": ("Palantir", "Palantir Technologies"),
+}
+
+PHASE_15_9O_TW_OFFICIAL_ALIAS_TARGETS = {
+    "3231": ("Wistron",),
+    "2356": ("INVENTEC",),
+    "2376": ("GIGABYTE",),
+    "2409": ("AUO",),
 }
 
 
@@ -107,6 +116,19 @@ def test_committed_snapshot_is_local_database_not_seed_only() -> None:
     assert {record.market for record in cache.records} == {"TW", "US"}
 
     for raw_symbol, aliases in {**EXPANDED_TW_TARGETS, **EXPANDED_US_TARGETS}.items():
+        record = cache.get_by_raw_symbol(raw_symbol)
+        assert record is not None, raw_symbol
+        searchable = {record.name, *(record.aliases or [])}
+        for alias in aliases:
+            assert alias in searchable, (raw_symbol, alias)
+
+    tw_alias_records = [
+        record
+        for record in cache.records
+        if record.market == "TW" and record.aliases
+    ]
+    assert len(tw_alias_records) >= 1000
+    for raw_symbol, aliases in PHASE_15_9O_TW_OFFICIAL_ALIAS_TARGETS.items():
         record = cache.get_by_raw_symbol(raw_symbol)
         assert record is not None, raw_symbol
         searchable = {record.name, *(record.aliases or [])}
@@ -215,6 +237,56 @@ def test_us_screener_provider_uses_country_filtered_rows() -> None:
     assert "YUMC" not in records
 
 
+def test_twse_company_profile_provider_adds_official_english_aliases() -> None:
+    provider = TwseCompanyProfileProvider(
+        payload=[
+            {
+                "公司代號": "3231",
+                "公司簡稱": "緯創",
+                "英文簡稱": "Wistron",
+            },
+            {
+                "公司代號": "2356",
+                "公司簡稱": "英業達",
+                "英文簡稱": "INVENTEC",
+            },
+            {
+                "公司代號": "00739",
+                "公司簡稱": "排除測試",
+                "英文簡稱": "DROP",
+            },
+        ]
+    )
+
+    records = {record.raw_symbol: record for record in provider.records()}
+
+    assert records["3231"].aliases == ["Wistron"]
+    assert records["2356"].aliases == ["INVENTEC"]
+    assert "00739" not in records
+
+
+def test_tpex_company_profile_provider_adds_official_english_aliases() -> None:
+    provider = TpexCompanyProfileProvider(
+        payload=[
+            {
+                "SecuritiesCompanyCode": "8299",
+                "CompanyAbbreviation": "群聯",
+                "Symbol": "Phison　",
+            },
+            {
+                "SecuritiesCompanyCode": "1240",
+                "CompanyAbbreviation": "茂生農經",
+                "Symbol": "MORNSUN　",
+            },
+        ]
+    )
+
+    records = {record.raw_symbol: record for record in provider.records()}
+
+    assert records["8299"].aliases == ["Phison"]
+    assert records["1240"].aliases == ["MORNSUN"]
+
+
 def test_generated_frontend_stock_index_uses_same_tw_us_universe() -> None:
     cache = SymbolUniverseCache.from_json_snapshot(DEFAULT_SYMBOL_UNIVERSE_SNAPSHOT_PATH)
     index = generate_stock_index_from_symbol_universe(cache)
@@ -230,6 +302,10 @@ def test_generated_frontend_stock_index_uses_same_tw_us_universe() -> None:
     assert any(item["displayCode"] == "VOO" for item in index)
     for raw_symbol in (*EXPANDED_TW_TARGETS, *EXPANDED_US_TARGETS):
         assert any(item["displayCode"] == raw_symbol for item in index), raw_symbol
+    for raw_symbol, aliases in PHASE_15_9O_TW_OFFICIAL_ALIAS_TARGETS.items():
+        matching = [item for item in index if item["displayCode"] == raw_symbol]
+        assert matching, raw_symbol
+        assert set(aliases).issubset(set(matching[0]["aliases"])), raw_symbol
 
     display_codes = {str(item["displayCode"]) for item in index}
     canonical_codes = {str(item["canonicalCode"]) for item in index}
@@ -250,6 +326,10 @@ def test_bundled_public_stock_index_contains_only_tw_us_snapshot_rows() -> None:
     assert any(row[1] == "VOO" and row[7] == "etf" for row in rows)
     for raw_symbol in (*EXPANDED_TW_TARGETS, *EXPANDED_US_TARGETS):
         assert any(row[1] == raw_symbol for row in rows), raw_symbol
+    for raw_symbol, aliases in PHASE_15_9O_TW_OFFICIAL_ALIAS_TARGETS.items():
+        matching = [row for row in rows if row[1] == raw_symbol]
+        assert matching, raw_symbol
+        assert set(aliases).issubset(set(matching[0][5])), raw_symbol
 
     display_codes = {str(row[1]) for row in rows}
     canonical_codes = {str(row[0]) for row in rows}

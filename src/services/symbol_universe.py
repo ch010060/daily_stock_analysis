@@ -56,6 +56,8 @@ NASDAQ_SCREENER_STOCKS_URL = (
 )
 TWSE_ISIN_URL = "https://isin.twse.com.tw/isin/C_public.jsp?strMode=2"
 TPEX_ISIN_URL = "https://isin.twse.com.tw/isin/C_public.jsp?strMode=4"
+TWSE_COMPANY_PROFILE_URL = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
+TPEX_COMPANY_PROFILE_URL = "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O"
 TW_SYMBOL_RE = re.compile(r"(?:\d{4,6}|\d{4,5}[A-Z])")
 
 
@@ -135,6 +137,13 @@ def _normalize_explicit_symbol_query(value: str) -> str:
         if suffix.upper() in {"TW", "US"} and base.strip():
             return base.strip().upper()
     return text
+
+
+def _normalize_market_scope(value: str | None) -> str | None:
+    if value is None:
+        return None
+    market = str(value).strip().upper()
+    return market if market in SUPPORTED_MARKETS else None
 
 
 def _canonical(market: str, raw_symbol: str) -> str:
@@ -541,6 +550,90 @@ class NasdaqScreenerSymbolProvider:
             return json.loads(response.read().decode("utf-8", errors="replace"))
 
 
+class TwseCompanyProfileProvider:
+    """TWSE company profile source with official English abbreviations."""
+
+    source_name = "twse_company_profile"
+
+    def __init__(self, *, url: str | None = None, payload: list[dict] | None = None) -> None:
+        self.url = url or TWSE_COMPANY_PROFILE_URL
+        self.payload = payload
+
+    def records(self) -> Iterable[SymbolRecord]:
+        rows = self.payload if self.payload is not None else self._fetch_payload()
+        records: list[SymbolRecord] = []
+        for row in rows or []:
+            raw_symbol = str(row.get("公司代號") or "").strip()
+            name = str(row.get("公司簡稱") or "").strip()
+            if not raw_symbol or not name:
+                continue
+            if raw_symbol in EXCLUDED_TW_SYMBOLS or not TW_SYMBOL_RE.fullmatch(raw_symbol):
+                continue
+            aliases = _clean_aliases(
+                [
+                    str(row.get("英文簡稱") or ""),
+                ],
+                exclude={raw_symbol, name},
+            )
+            records.append(
+                _record(
+                    raw_symbol,
+                    "TW",
+                    name,
+                    aliases,
+                    exchange="TWSE",
+                    provider_source=self.source_name,
+                )
+            )
+        return records
+
+    def _fetch_payload(self) -> list[dict]:
+        with urllib.request.urlopen(self.url, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8", errors="replace"))
+
+
+class TpexCompanyProfileProvider:
+    """TPEx company profile source with official English abbreviations."""
+
+    source_name = "tpex_company_profile"
+
+    def __init__(self, *, url: str | None = None, payload: list[dict] | None = None) -> None:
+        self.url = url or TPEX_COMPANY_PROFILE_URL
+        self.payload = payload
+
+    def records(self) -> Iterable[SymbolRecord]:
+        rows = self.payload if self.payload is not None else self._fetch_payload()
+        records: list[SymbolRecord] = []
+        for row in rows or []:
+            raw_symbol = str(row.get("SecuritiesCompanyCode") or "").strip()
+            name = str(row.get("CompanyAbbreviation") or "").strip()
+            if not raw_symbol or not name:
+                continue
+            if raw_symbol in EXCLUDED_TW_SYMBOLS or not TW_SYMBOL_RE.fullmatch(raw_symbol):
+                continue
+            aliases = _clean_aliases(
+                [
+                    str(row.get("Symbol") or ""),
+                ],
+                exclude={raw_symbol, name},
+            )
+            records.append(
+                _record(
+                    raw_symbol,
+                    "TW",
+                    name,
+                    aliases,
+                    exchange="TPEx",
+                    provider_source=self.source_name,
+                )
+            )
+        return records
+
+    def _fetch_payload(self) -> list[dict]:
+        with urllib.request.urlopen(self.url, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8", errors="replace"))
+
+
 class SymbolUniverseCache:
     """Merged, queryable TW/US symbol universe cache."""
 
@@ -807,6 +900,24 @@ def _clean_us_security_name(symbol: str, security_name: str) -> tuple[str, list[
     return cleaned or security_name or symbol, list(dict.fromkeys(aliases))
 
 
+def _clean_aliases(values: Iterable[str], *, exclude: set[str] | None = None) -> list[str]:
+    excluded = {_norm_key(value) for value in (exclude or set()) if value}
+    aliases: list[str] = []
+    for value in values:
+        alias = unicodedata.normalize("NFKC", value or "").strip()
+        alias = re.sub(r"\s+", " ", alias)
+        alias = alias.strip(" ,;，；")
+        if not alias:
+            continue
+        if alias in {"-", "－", "--"}:
+            continue
+        key = _norm_key(alias)
+        if not key or key in excluded:
+            continue
+        aliases.append(alias)
+    return list(dict.fromkeys(aliases))
+
+
 def _tw_exchange_from_finmind_type(value: str) -> str | None:
     normalized = value.strip().casefold()
     if normalized == "twse":
@@ -952,11 +1063,19 @@ class SymbolResolver:
     def __init__(self, cache: SymbolUniverseCache) -> None:
         self.cache = cache
 
-    def search(self, query: str, limit: int = 8) -> list[SymbolCandidate]:
+    def search(
+        self,
+        query: str,
+        limit: int = 8,
+        market: str | None = None,
+    ) -> list[SymbolCandidate]:
         normalized = _normalize_explicit_symbol_query(query)
         if not normalized:
             return []
-        exact_candidates = _dedupe_candidates(self.cache.exact_matches(normalized))
+        market_scope = _normalize_market_scope(market)
+        exact_candidates = _dedupe_candidates(
+            self._filter_by_market(self.cache.exact_matches(normalized), market_scope)
+        )
         if exact_candidates:
             return _sort_candidates(exact_candidates)[:limit]
 
@@ -967,6 +1086,8 @@ class SymbolResolver:
         prefix: dict[str, SymbolCandidate] = {}
         contains: dict[str, SymbolCandidate] = {}
         for record, label, key, field_type in self.cache.search_terms():
+            if market_scope and record.market != market_scope:
+                continue
             if key.startswith(q):
                 score = 0.82 if field_type in {"symbol", "name"} else 0.80
                 _keep_best_candidate(
@@ -984,8 +1105,14 @@ class SymbolResolver:
         candidates = [*prefix.values(), *contains.values()]
         return _sort_candidates(candidates)[:limit]
 
-    def resolve(self, query: str, limit: int = 8) -> SymbolResolveResult:
-        candidates = self.search(query, limit=limit)
+    def resolve(
+        self,
+        query: str,
+        limit: int = 8,
+        market: str | None = None,
+    ) -> SymbolResolveResult:
+        market_scope = _normalize_market_scope(market)
+        candidates = self.search(query, limit=limit, market=market_scope)
         if not candidates:
             return SymbolResolveResult(
                 query=query,
@@ -995,6 +1122,14 @@ class SymbolResolver:
                 message="找不到支援的台股 / 美股標的",
             )
         top = candidates[0]
+        if market_scope is None and self._has_cross_market_exact_alias_collision(candidates):
+            return SymbolResolveResult(
+                query=query,
+                status="ambiguous",
+                selected=None,
+                candidates=candidates,
+                message="請選擇標的",
+            )
         if top.confidence >= AUTO_SELECT_CONFIDENCE and top.match_reason in AUTO_SELECT_REASONS:
             return SymbolResolveResult(
                 query=query,
@@ -1009,6 +1144,30 @@ class SymbolResolver:
             candidates=candidates,
             message="請選擇標的",
         )
+
+    @staticmethod
+    def _filter_by_market(
+        candidates: Iterable[SymbolCandidate],
+        market_scope: str | None,
+    ) -> list[SymbolCandidate]:
+        if market_scope is None:
+            return list(candidates)
+        return [candidate for candidate in candidates if candidate.record.market == market_scope]
+
+    @staticmethod
+    def _has_cross_market_exact_alias_collision(candidates: list[SymbolCandidate]) -> bool:
+        if len(candidates) < 2:
+            return False
+        top = candidates[0]
+        if top.match_reason != "exact_alias":
+            return False
+        exact_peers = [
+            candidate
+            for candidate in candidates
+            if candidate.match_reason == top.match_reason
+            and candidate.confidence == top.confidence
+        ]
+        return len({candidate.record.market for candidate in exact_peers}) > 1
 
     def _score_record(self, query: str, record: SymbolRecord) -> SymbolCandidate | None:
         q = _norm_key(query)
