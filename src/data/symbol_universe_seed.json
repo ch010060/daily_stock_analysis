@@ -243,6 +243,90 @@
       "last_updated": "2026-06-22"
     },
     {
+      "canonical_symbol": "TW:2408",
+      "raw_symbol": "2408",
+      "market": "TW",
+      "exchange": "TWSE",
+      "instrument_type": "stock",
+      "name": "南亞科",
+      "aliases": ["Nanya Technology", "Nanya"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-23"
+    },
+    {
+      "canonical_symbol": "TW:2002",
+      "raw_symbol": "2002",
+      "market": "TW",
+      "exchange": "TWSE",
+      "instrument_type": "stock",
+      "name": "中鋼",
+      "aliases": ["China Steel", "China Steel Corporation"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-23"
+    },
+    {
+      "canonical_symbol": "TW:2891",
+      "raw_symbol": "2891",
+      "market": "TW",
+      "exchange": "TWSE",
+      "instrument_type": "stock",
+      "name": "中信金",
+      "aliases": ["CTBC Financial", "CTBC Financial Holding"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-23"
+    },
+    {
+      "canonical_symbol": "TW:2892",
+      "raw_symbol": "2892",
+      "market": "TW",
+      "exchange": "TWSE",
+      "instrument_type": "stock",
+      "name": "第一金",
+      "aliases": ["First Financial", "First Financial Holding"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-23"
+    },
+    {
+      "canonical_symbol": "TW:5880",
+      "raw_symbol": "5880",
+      "market": "TW",
+      "exchange": "TWSE",
+      "instrument_type": "stock",
+      "name": "合庫金",
+      "aliases": ["Taiwan Cooperative Financial", "Taiwan Cooperative Financial Holding"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-23"
+    },
+    {
+      "canonical_symbol": "TW:1101",
+      "raw_symbol": "1101",
+      "market": "TW",
+      "exchange": "TWSE",
+      "instrument_type": "stock",
+      "name": "台泥",
+      "aliases": ["Taiwan Cement", "Taiwan Cement Corporation"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-23"
+    },
+    {
+      "canonical_symbol": "TW:1402",
+      "raw_symbol": "1402",
+      "market": "TW",
+      "exchange": "TWSE",
+      "instrument_type": "stock",
+      "name": "遠東新",
+      "aliases": ["Far Eastern New Century"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-23"
+    },
+    {
       "canonical_symbol": "US:AAPL",
       "raw_symbol": "AAPL",
       "market": "US",
@@ -421,6 +505,30 @@
       "provider_source": "curated_seed",
       "is_active": true,
       "last_updated": "2026-06-22"
+    },
+    {
+      "canonical_symbol": "US:JPM",
+      "raw_symbol": "JPM",
+      "market": "US",
+      "exchange": "NYSE",
+      "instrument_type": "stock",
+      "name": "JPMorgan Chase",
+      "aliases": ["JPMorgan Chase", "JPMorgan Chase & Co", "JP Morgan Chase"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-23"
+    },
+    {
+      "canonical_symbol": "US:GE",
+      "raw_symbol": "GE",
+      "market": "US",
+      "exchange": "NYSE",
+      "instrument_type": "stock",
+      "name": "General Electric",
+      "aliases": ["General Electric", "General Electric Company", "GE Aerospace"],
+      "provider_source": "curated_seed",
+      "is_active": true,
+      "last_updated": "2026-06-23"
     },
     {
       "canonical_symbol": "US:SPY",

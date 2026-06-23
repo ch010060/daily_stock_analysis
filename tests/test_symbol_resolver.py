@@ -54,6 +54,34 @@ PHASE_15_9I_US_ALIAS_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("COST", ("Costco", "Costco Wholesale")),
 )
 
+PHASE_15_9O_TW_ALIAS_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("3231", ("Wistron",)),
+    ("2356", ("Inventec",)),
+    ("2376", ("Gigabyte",)),
+    ("2408", ("Nanya Technology",)),
+    ("2409", ("AUO",)),
+    ("2002", ("China Steel",)),
+    ("2891", ("CTBC Financial",)),
+    ("2892", ("First Financial",)),
+    ("5880", ("Taiwan Cooperative Financial",)),
+    ("1101", ("Taiwan Cement",)),
+    ("1402", ("Far Eastern New Century",)),
+)
+
+PHASE_15_9O_US_ALIAS_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("CRM", ("Salesforce",)),
+    ("IBM", ("International Business Machines",)),
+    ("JPM", ("JPMorgan Chase",)),
+    ("BAC", ("Bank of America",)),
+    ("WMT", ("Walmart",)),
+    ("HD", ("Home Depot",)),
+    ("DIS", ("Disney",)),
+    ("UBER", ("Uber",)),
+    ("SNOW", ("Snowflake",)),
+    ("GE", ("General Electric",)),
+    ("CAT", ("Caterpillar",)),
+)
+
 
 def _resolver() -> SymbolResolver:
     return SymbolResolver(SymbolUniverseCache.from_json_snapshot(DEFAULT_SYMBOL_UNIVERSE_SNAPSHOT_PATH))
@@ -113,6 +141,64 @@ def test_phase15_9i_live_blocker_aliases_resolve_to_intended_us_targets() -> Non
             assert result.selected.market == "US"
             assert result.selected.raw_symbol == expected_symbol
             assert all(candidate.record.market in {"TW", "US"} for candidate in result.candidates)
+
+
+def test_phase15_9o_final_validation_tw_english_aliases_resolve() -> None:
+    resolver = _resolver()
+
+    for expected_symbol, queries in PHASE_15_9O_TW_ALIAS_TARGETS:
+        for query in queries:
+            market = "TW" if expected_symbol == "2892" and query == "First Financial" else None
+            result = resolver.resolve(query, market=market)
+
+            assert result.status == "resolved", query
+            assert result.selected is not None
+            assert result.selected.market == "TW"
+            assert result.selected.raw_symbol == expected_symbol
+            assert all(candidate.record.market in {"TW", "US"} for candidate in result.candidates)
+
+
+def test_phase15_9o_final_validation_us_common_names_resolve() -> None:
+    resolver = _resolver()
+
+    for expected_symbol, queries in PHASE_15_9O_US_ALIAS_TARGETS:
+        for query in queries:
+            result = resolver.resolve(query)
+
+            assert result.status == "resolved", query
+            assert result.selected is not None
+            assert result.selected.market == "US"
+            assert result.selected.raw_symbol == expected_symbol
+            assert all(candidate.record.market in {"TW", "US"} for candidate in result.candidates)
+
+
+def test_phase15_9o_wrong_substitution_guards() -> None:
+    resolver = _resolver()
+
+    general_electric = resolver.resolve("General Electric")
+    assert general_electric.status == "resolved"
+    assert general_electric.selected is not None
+    assert general_electric.selected.raw_symbol == "GE"
+    assert general_electric.selected.raw_symbol != "POR"
+
+    first_financial = resolver.resolve("First Financial")
+    assert first_financial.status == "ambiguous"
+    assert first_financial.selected is None
+    assert first_financial.candidates[0].record.market == "TW"
+    assert first_financial.candidates[0].record.raw_symbol == "2892"
+    assert any(candidate.record.raw_symbol == "THFF" for candidate in first_financial.candidates)
+
+    first_financial_tw = resolver.resolve("First Financial", market="TW")
+    assert first_financial_tw.status == "resolved"
+    assert first_financial_tw.selected is not None
+    assert first_financial_tw.selected.market == "TW"
+    assert first_financial_tw.selected.raw_symbol == "2892"
+
+    first_financial_us = resolver.resolve("First Financial", market="US")
+    assert first_financial_us.status == "resolved"
+    assert first_financial_us.selected is not None
+    assert first_financial_us.selected.market == "US"
+    assert first_financial_us.selected.raw_symbol == "THFF"
 
 
 def test_route_b_resolver_returns_not_found_for_unknown_query() -> None:

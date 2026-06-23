@@ -36,6 +36,17 @@ const expandedMatrixIndex: StockIndexItem[] = [
   stock('3661', '世芯-KY', 'TW', ['世芯', 'Alchip'], 95),
   stock('2303', '聯電', 'TW', ['UMC'], 95),
   stock('2882', '國泰金', 'TW', ['Cathay Financial'], 95),
+  stock('3231', '緯創', 'TW', ['Wistron'], 95),
+  stock('2356', '英業達', 'TW', ['Inventec'], 95),
+  stock('2376', '技嘉', 'TW', ['Gigabyte'], 95),
+  stock('2408', '南亞科', 'TW', ['Nanya Technology'], 95),
+  stock('2409', '友達', 'TW', ['AUO'], 95),
+  stock('2002', '中鋼', 'TW', ['China Steel'], 95),
+  stock('2891', '中信金', 'TW', ['CTBC Financial'], 95),
+  stock('2892', '第一金', 'TW', ['First Financial'], 95),
+  stock('5880', '合庫金', 'TW', ['Taiwan Cooperative Financial'], 95),
+  stock('1101', '台泥', 'TW', ['Taiwan Cement'], 95),
+  stock('1402', '遠東新', 'TW', ['Far Eastern New Century'], 95),
   stock('MSFT', 'Microsoft', 'US', ['Microsoft Corporation'], 95),
   stock('GOOGL', 'Alphabet', 'US', ['Google'], 95),
   stock('AMZN', 'Amazon', 'US', ['Amazon.com'], 95),
@@ -46,6 +57,21 @@ const expandedMatrixIndex: StockIndexItem[] = [
   stock('ARM', 'Arm Holdings', 'US', ['Arm'], 95),
   stock('ORCL', 'Oracle', 'US', ['Oracle Corporation'], 95),
   stock('PLTR', 'Palantir Technologies', 'US', ['Palantir'], 95),
+  stock('CRM', 'Salesforce', 'US', ['Salesforce Inc'], 95),
+  stock('IBM', 'IBM', 'US', ['International Business Machines'], 95),
+  stock('JPM', 'JPMorgan Chase', 'US', ['JPMorgan Chase & Co'], 95),
+  stock('BAC', 'Bank of America', 'US', ['Bank of America Corporation'], 95),
+  stock('WMT', 'Walmart', 'US', ['Walmart Inc'], 95),
+  stock('HD', 'Home Depot', 'US', ['The Home Depot'], 95),
+  stock('DIS', 'Disney', 'US', ['Walt Disney'], 95),
+  stock('UBER', 'Uber', 'US', ['Uber Technologies'], 95),
+  stock('SNOW', 'Snowflake', 'US', ['Snowflake Inc'], 95),
+  stock('GE', 'General Electric', 'US', ['GE Aerospace'], 95),
+  stock('CAT', 'Caterpillar', 'US', ['Caterpillar Inc'], 95),
+  stock('CSCO', 'Cisco', 'US', ['Cisco Systems'], 95),
+  stock('COST', 'Costco', 'US', ['Costco Wholesale'], 95),
+  stock('POR', 'Portland General Electric', 'US', [], 70),
+  stock('THFF', 'First Financial', 'US', ['First Financial Corporation'], 70),
 ];
 
 const mockIndex: StockIndexItem[] = [
@@ -258,6 +284,29 @@ describe('searchStocks', () => {
     ['Arm', 'ARM'],
     ['Oracle', 'ORCL'],
     ['Palantir', 'PLTR'],
+    ['Wistron', '3231'],
+    ['Inventec', '2356'],
+    ['Gigabyte', '2376'],
+    ['Nanya Technology', '2408'],
+    ['AUO', '2409'],
+    ['China Steel', '2002'],
+    ['CTBC Financial', '2891'],
+    ['Taiwan Cooperative Financial', '5880'],
+    ['Taiwan Cement', '1101'],
+    ['Far Eastern New Century', '1402'],
+    ['Salesforce', 'CRM'],
+    ['International Business Machines', 'IBM'],
+    ['JPMorgan Chase', 'JPM'],
+    ['Bank of America', 'BAC'],
+    ['Walmart', 'WMT'],
+    ['Home Depot', 'HD'],
+    ['Disney', 'DIS'],
+    ['Uber', 'UBER'],
+    ['Snowflake', 'SNOW'],
+    ['General Electric', 'GE'],
+    ['Caterpillar', 'CAT'],
+    ['Cisco', 'CSCO'],
+    ['Costco', 'COST'],
     ['00981A', '00981A'],
     ['主動統一台股增長', '00981A'],
     ['006208', '006208'],
@@ -303,6 +352,30 @@ describe('searchStocks', () => {
 
     expect(results[0].canonicalCode).toBe('8299');
     expect(results.every((result) => result.market === 'TW' || result.market === 'US')).toBe(true);
+  });
+
+  test('keeps exact aliases ahead of substring collisions', () => {
+    expect(searchStocks('General Electric', mockIndex)[0].canonicalCode).toBe('GE');
+    expect(searchStocks('General Electric', mockIndex)[0].canonicalCode).not.toBe('POR');
+  });
+
+  test('returns an explicit candidate list for exact cross-market aliases without market scope', () => {
+    const results = searchStocks('First Financial', mockIndex);
+    const codes = results.map((result) => result.canonicalCode);
+
+    expect(codes).toContain('2892');
+    expect(codes).toContain('THFF');
+    expect(results.filter((result) => result.matchType === 'exact').length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('can filter exact alias collisions by explicit market scope', () => {
+    const twResults = searchStocks('First Financial', mockIndex, { marketScope: 'TW' });
+    const usResults = searchStocks('First Financial', mockIndex, { marketScope: 'US' });
+
+    expect(twResults[0].canonicalCode).toBe('2892');
+    expect(twResults.every((result) => result.market === 'TW')).toBe(true);
+    expect(usResults[0].canonicalCode).toBe('THFF');
+    expect(usResults.every((result) => result.market === 'US')).toBe(true);
   });
 
   test('does not return unsupported candidates even with all scope', () => {

@@ -26,6 +26,8 @@ from src.services.symbol_universe import (  # noqa: E402
     SymbolUniverseBuilder,
     SymbolUniverseProvider,
     TaiwanIsinSymbolDirectoryProvider,
+    TpexCompanyProfileProvider,
+    TwseCompanyProfileProvider,
 )
 
 
@@ -43,6 +45,8 @@ def providers_for_markets(markets: set[str]) -> list[SymbolUniverseProvider]:
     providers: list[SymbolUniverseProvider] = []
     if "TW" in markets:
         providers.append(TaiwanIsinSymbolDirectoryProvider())
+        providers.append(TwseCompanyProfileProvider())
+        providers.append(TpexCompanyProfileProvider())
         providers.append(FinMindTaiwanStockInfoHttpProvider())
     if "US" in markets:
         providers.append(NasdaqScreenerSymbolProvider())

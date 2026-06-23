@@ -129,6 +129,75 @@ def test_search_symbols_supports_expanded_tw_us_matrix() -> None:
         assert all(candidate.market in {"TW", "US"} for candidate in response.candidates)
 
 
+def test_search_symbols_supports_phase15_9o_alias_matrix() -> None:
+    cases = {
+        "Wistron": ("TW", "3231"),
+        "Inventec": ("TW", "2356"),
+        "Gigabyte": ("TW", "2376"),
+        "Nanya Technology": ("TW", "2408"),
+        "AUO": ("TW", "2409"),
+        "China Steel": ("TW", "2002"),
+        "CTBC Financial": ("TW", "2891"),
+        "First Financial": ("TW", "2892"),
+        "Taiwan Cooperative Financial": ("TW", "5880"),
+        "Taiwan Cement": ("TW", "1101"),
+        "Far Eastern New Century": ("TW", "1402"),
+        "General Electric": ("US", "GE"),
+        "Cisco": ("US", "CSCO"),
+        "Costco": ("US", "COST"),
+        "Salesforce": ("US", "CRM"),
+    }
+
+    for query, (market, symbol) in cases.items():
+        response = stocks_endpoint.search_symbols(q=query, limit=5)
+        assert response.candidates, query
+        assert response.candidates[0].market == market
+        assert response.candidates[0].raw_symbol == symbol
+        assert all(candidate.market in {"TW", "US"} for candidate in response.candidates)
+
+
+def test_resolve_symbol_does_not_return_known_wrong_phase15_9o_substitutions() -> None:
+    ge = stocks_endpoint.resolve_symbol(q="General Electric", limit=5)
+    assert ge.status == "resolved"
+    assert ge.selected is not None
+    assert ge.selected.raw_symbol == "GE"
+    assert ge.selected.raw_symbol != "POR"
+
+    first_financial = stocks_endpoint.resolve_symbol(q="First Financial", limit=5)
+    assert first_financial.status == "ambiguous"
+    assert first_financial.selected is None
+    assert first_financial.candidates[0].market == "TW"
+    assert first_financial.candidates[0].raw_symbol == "2892"
+    assert any(candidate.raw_symbol == "THFF" for candidate in first_financial.candidates)
+
+    first_financial_tw = stocks_endpoint.resolve_symbol(q="First Financial", limit=5, market="TW")
+    assert first_financial_tw.status == "resolved"
+    assert first_financial_tw.selected is not None
+    assert first_financial_tw.selected.market == "TW"
+    assert first_financial_tw.selected.raw_symbol == "2892"
+
+    first_financial_us = stocks_endpoint.resolve_symbol(q="First Financial", limit=5, market="US")
+    assert first_financial_us.status == "resolved"
+    assert first_financial_us.selected is not None
+    assert first_financial_us.selected.market == "US"
+    assert first_financial_us.selected.raw_symbol == "THFF"
+
+
+def test_search_symbols_supports_market_scoped_exact_alias_collisions() -> None:
+    tw = stocks_endpoint.search_symbols(q="First Financial", limit=5, market="TW")
+    us = stocks_endpoint.search_symbols(q="First Financial", limit=5, market="US")
+
+    assert tw.candidates
+    assert tw.candidates[0].market == "TW"
+    assert tw.candidates[0].raw_symbol == "2892"
+    assert all(candidate.market == "TW" for candidate in tw.candidates)
+
+    assert us.candidates
+    assert us.candidates[0].market == "US"
+    assert us.candidates[0].raw_symbol == "THFF"
+    assert all(candidate.market == "US" for candidate in us.candidates)
+
+
 def test_resolve_symbol_returns_selected_candidate_for_high_confidence_matches() -> None:
     response = stocks_endpoint.resolve_symbol(q="群聯")
 

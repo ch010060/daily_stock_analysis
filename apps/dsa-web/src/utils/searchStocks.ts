@@ -16,8 +16,8 @@ export interface SearchOptions {
   limit?: number;
   /** Show only active stocks */
   activeOnly?: boolean;
-  /** Kept for compatibility; lookup is always restricted to supported TW/US markets. */
-  marketScope?: 'all' | 'route_b';
+  /** Kept for compatibility; lookup is always restricted to supported TW/US markets unless a market is explicit. */
+  marketScope?: 'all' | 'route_b' | 'TW' | 'US';
 }
 
 const ROUTE_B_MARKETS = new Set(['TW', 'US']);
@@ -48,6 +48,9 @@ export function searchStocks(
   const filteredIndex = index.filter(item => {
     if (activeOnly && !item.active) return false;
     if (!ROUTE_B_MARKETS.has(item.market)) return false;
+    if (options.marketScope === 'TW' || options.marketScope === 'US') {
+      return item.market === options.marketScope;
+    }
     return true;
   });
 

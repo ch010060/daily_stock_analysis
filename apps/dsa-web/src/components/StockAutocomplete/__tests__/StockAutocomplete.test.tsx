@@ -99,6 +99,27 @@ const metaSuggestion: StockSuggestion = {
   score: 97,
 };
 
+const ambiguousFirstFinancialSuggestions: StockSuggestion[] = [
+  {
+    canonicalCode: "THFF",
+    displayCode: "THFF",
+    nameZh: "First Financial",
+    market: "US" as const,
+    matchType: "exact" as const,
+    matchField: "name" as const,
+    score: 98,
+  },
+  {
+    canonicalCode: "2892",
+    displayCode: "2892",
+    nameZh: "第一金",
+    market: "TW" as const,
+    matchType: "exact" as const,
+    matchField: "alias" as const,
+    score: 97,
+  },
+];
+
 describe('StockAutocomplete', () => {
   const mockOnChange = vi.fn();
   const mockOnSubmit = vi.fn();
@@ -367,6 +388,41 @@ describe('StockAutocomplete', () => {
       fireEvent.keyDown(input, { key: 'Enter' });
 
       expect(mockOnSubmit).toHaveBeenCalledWith('230');
+    });
+
+    it('does not auto-submit the first candidate for ambiguous cross-market exact aliases', () => {
+      autocompleteHookImpl = () => ({
+        query: '',
+        setQuery: vi.fn(),
+        suggestions: ambiguousFirstFinancialSuggestions,
+        isOpen: true,
+        highlightedIndex: -1,
+        setHighlightedIndex: vi.fn(),
+        highlightPrevious: vi.fn(),
+        highlightNext: vi.fn(),
+        handleSelect: vi.fn(),
+        close: vi.fn(),
+        reset: vi.fn(),
+        isComposing: false,
+        setIsComposing: vi.fn(),
+        runtimeFallback: false,
+        error: null,
+      });
+
+      render(
+        <StockAutocomplete
+          value="First Financial"
+          onChange={mockOnChange}
+          onSubmit={mockOnSubmit}
+        />,
+      );
+
+      const input = screen.getByDisplayValue('First Financial');
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      expect(mockOnSubmit).toHaveBeenCalledWith('First Financial');
+      expect(mockOnSubmit).not.toHaveBeenCalledWith('THFF', 'First Financial', 'autocomplete');
+      expect(mockOnSubmit).not.toHaveBeenCalledWith('2892', '第一金', 'autocomplete');
     });
 
     it('submits the highlighted suggestion when one is explicitly selected', () => {
