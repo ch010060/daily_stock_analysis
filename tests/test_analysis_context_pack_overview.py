@@ -395,6 +395,160 @@ def test_extract_accepts_legacy_overview_without_data_quality() -> None:
     assert extracted["counts"]["fetch_failed"] == 0
 
 
+def test_extract_reconciles_stale_tw_overview_from_final_quote_and_news_evidence() -> None:
+    snapshot = {
+        "quote_availability": {
+            "status": "degraded",
+            "usable": True,
+            "source_label": "備援資料",
+            "fallback_used": True,
+            "user_message": "即時行情部分降級，但已取得可用替代資料",
+        },
+        "news_result_count": 4,
+        "analysis_context_pack_overview": {
+            "pack_version": "1.0",
+            "subject": {"code": "2379", "stock_name": "瑞昱", "market": "tw"},
+            "blocks": [
+                {
+                    "key": "quote",
+                    "label": "行情",
+                    "status": "missing",
+                    "source": None,
+                    "warnings": [],
+                    "missing_reasons": ["realtime_quote_missing"],
+                },
+                {
+                    "key": "news",
+                    "label": "新聞",
+                    "status": "missing",
+                    "source": None,
+                    "warnings": [],
+                    "missing_reasons": ["news_context_missing"],
+                },
+                {
+                    "key": "chip",
+                    "label": "籌碼",
+                    "status": "missing",
+                    "source": None,
+                    "warnings": [],
+                    "missing_reasons": ["chip_distribution_missing"],
+                },
+            ],
+            "metadata": {"trigger_source": "api", "news_result_count": 0},
+            "data_quality": {
+                "overall_score": 50,
+                "level": "poor",
+                "block_scores": {"quote": 35, "news": 35, "chip": 35},
+                "limitations": ["quote: missing", "news: missing", "chip: missing"],
+            },
+        },
+    }
+
+    extracted = extract_analysis_context_pack_overview(snapshot)
+
+    assert extracted is not None
+    blocks = {block["key"]: block for block in extracted["blocks"]}
+    assert blocks["quote"]["status"] == "fallback"
+    assert blocks["quote"]["missing_reasons"] == []
+    assert blocks["news"]["status"] == "available"
+    assert blocks["news"]["missing_reasons"] == []
+    assert "chip" not in blocks
+    assert extracted["counts"]["fallback"] == 1
+    assert extracted["counts"]["available"] == 1
+    assert extracted["counts"]["missing"] == 0
+    assert extracted["metadata"]["news_result_count"] == 4
+    assert extracted["data_quality"]["block_scores"] == {"quote": 65, "news": 100}
+    assert extracted["data_quality"]["limitations"] == []
+
+
+def test_extract_hides_chip_for_route_b_when_market_is_missing() -> None:
+    snapshot = {
+        "quote_availability": {
+            "status": "degraded",
+            "usable": True,
+            "source_label": "備援資料",
+            "fallback_used": True,
+        },
+        "analysis_context_pack_overview": {
+            "pack_version": "1.0",
+            "subject": {"code": "2330", "stock_name": "台積電", "market": None},
+            "blocks": [
+                {
+                    "key": "quote",
+                    "label": "行情",
+                    "status": "missing",
+                    "source": None,
+                    "warnings": [],
+                    "missing_reasons": ["realtime_quote_missing"],
+                },
+                {
+                    "key": "daily_bars",
+                    "label": "日線",
+                    "status": "available",
+                    "source": "storage.get_analysis_context",
+                    "warnings": [],
+                    "missing_reasons": [],
+                },
+                {
+                    "key": "chip",
+                    "label": "籌碼",
+                    "status": "missing",
+                    "source": None,
+                    "warnings": [],
+                    "missing_reasons": ["chip_distribution_missing"],
+                },
+            ],
+            "metadata": {"trigger_source": "api", "news_result_count": 0},
+            "data_quality": {
+                "overall_score": 70,
+                "level": "fair",
+                "block_scores": {"quote": 35, "daily_bars": 100, "chip": 35},
+                "limitations": ["quote: missing", "chip: missing"],
+            },
+        },
+    }
+
+    extracted = extract_analysis_context_pack_overview(snapshot)
+
+    assert extracted is not None
+    blocks = {block["key"]: block for block in extracted["blocks"]}
+    assert "chip" not in blocks
+    assert blocks["quote"]["status"] == "fallback"
+    assert blocks["quote"]["warnings"] == []
+    assert extracted["counts"]["missing"] == 0
+    assert extracted["data_quality"]["block_scores"] == {"quote": 65, "daily_bars": 100}
+    assert extracted["data_quality"]["limitations"] == []
+
+
+def test_extract_keeps_empty_realtime_quote_missing_when_no_fallback_exists() -> None:
+    snapshot = {
+        "realtime_quote_raw": {"code": "INTC", "source": "yfinance"},
+        "analysis_context_pack_overview": {
+            "pack_version": "1.0",
+            "subject": {"code": "INTC", "stock_name": "Intel", "market": "us"},
+            "blocks": [
+                {
+                    "key": "quote",
+                    "label": "行情",
+                    "status": "available",
+                    "source": "YfinanceFetcher",
+                    "warnings": [],
+                    "missing_reasons": [],
+                }
+            ],
+            "metadata": {},
+        },
+    }
+
+    extracted = extract_analysis_context_pack_overview(snapshot)
+
+    assert extracted is not None
+    quote = extracted["blocks"][0]
+    assert quote["status"] == "missing"
+    assert quote["source"] is None
+    assert quote["missing_reasons"] == ["realtime_quote_missing"]
+
+
 def test_extract_returns_none_for_malformed_persisted_overview() -> None:
     assert extract_analysis_context_pack_overview(
         {

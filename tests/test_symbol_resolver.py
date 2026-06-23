@@ -41,6 +41,19 @@ US_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("PLTR", ("PLTR", "Palantir", "Palantir Technologies")),
 )
 
+PHASE_15_9I_TW_ALIAS_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("2379", ("Realtek",)),
+    ("2357", ("ASUS", "Asus")),
+    ("2327", ("Yageo",)),
+    ("2395", ("Advantech",)),
+    ("3711", ("ASE", "ASE Technology")),
+)
+
+PHASE_15_9I_US_ALIAS_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("CSCO", ("Cisco", "Cisco Systems")),
+    ("COST", ("Costco", "Costco Wholesale")),
+)
+
 
 def _resolver() -> SymbolResolver:
     return SymbolResolver(SymbolUniverseCache.from_json_snapshot(DEFAULT_SYMBOL_UNIVERSE_SNAPSHOT_PATH))
@@ -72,6 +85,34 @@ def test_expanded_us_matrix_resolves_from_local_universe() -> None:
             assert result.selected.market == "US"
             assert result.selected.raw_symbol == expected_symbol
             assert all(candidate.record.market == "TW" or candidate.record.market == "US" for candidate in result.candidates)
+
+
+def test_phase15_9i_live_blocker_aliases_resolve_to_intended_tw_targets() -> None:
+    resolver = _resolver()
+
+    for expected_symbol, queries in PHASE_15_9I_TW_ALIAS_TARGETS:
+        for query in queries:
+            result = resolver.resolve(query)
+
+            assert result.status == "resolved", query
+            assert result.selected is not None
+            assert result.selected.market == "TW"
+            assert result.selected.raw_symbol == expected_symbol
+            assert all(candidate.record.market in {"TW", "US"} for candidate in result.candidates)
+
+
+def test_phase15_9i_live_blocker_aliases_resolve_to_intended_us_targets() -> None:
+    resolver = _resolver()
+
+    for expected_symbol, queries in PHASE_15_9I_US_ALIAS_TARGETS:
+        for query in queries:
+            result = resolver.resolve(query)
+
+            assert result.status == "resolved", query
+            assert result.selected is not None
+            assert result.selected.market == "US"
+            assert result.selected.raw_symbol == expected_symbol
+            assert all(candidate.record.market in {"TW", "US"} for candidate in result.candidates)
 
 
 def test_route_b_resolver_returns_not_found_for_unknown_query() -> None:

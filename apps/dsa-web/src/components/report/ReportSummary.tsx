@@ -63,6 +63,8 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
       {/* 輸入資料塊低敏摘要 */}
       <AnalysisContextSummary
         overview={details?.analysisContextPackOverview}
+        diagnosticSummary={diagnosticSummary}
+        recordId={recordId}
         language={reportLanguage}
       />
 

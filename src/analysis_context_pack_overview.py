@@ -16,11 +16,30 @@ from src.analysis_context_pack_prompt import (
 )
 from src.market_phase_summary import MARKET_PHASE_SUMMARY_KEY
 from src.schemas.analysis_context_pack import ContextFieldStatus
+from src.services.run_diagnostics import build_run_diagnostic_summary
 
 
 ANALYSIS_CONTEXT_PACK_OVERVIEW_KEY = "analysis_context_pack_overview"
 _ALL_STATUSES = tuple(status.value for status in ContextFieldStatus)
 _DATA_QUALITY_BLOCK_KEYS = {"quote", "daily_bars", "technical", "news", "fundamentals", "chip"}
+_QUALITY_BLOCK_WEIGHTS = {
+    "quote": 25,
+    "daily_bars": 25,
+    "technical": 25,
+    "news": 10,
+    "fundamentals": 10,
+    "chip": 5,
+}
+_STATUS_SCORES = {
+    "available": 100,
+    "partial": 75,
+    "estimated": 75,
+    "not_supported": 70,
+    "fallback": 65,
+    "stale": 50,
+    "missing": 35,
+    "fetch_failed": 25,
+}
 logger = logging.getLogger(__name__)
 
 
@@ -98,7 +117,7 @@ def extract_analysis_context_pack_overview(context_snapshot: Any) -> Optional[Di
     overview = snapshot.get(ANALYSIS_CONTEXT_PACK_OVERVIEW_KEY)
     if not isinstance(overview, Mapping):
         return None
-    return _sanitize_persisted_overview(overview)
+    return _sanitize_persisted_overview(overview, snapshot)
 
 
 def sanitize_context_snapshot_for_api(context_snapshot: Any) -> Any:
@@ -124,7 +143,10 @@ def _as_mapping(value: Any) -> Optional[Mapping[str, Any]]:
     return None
 
 
-def _sanitize_persisted_overview(overview: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+def _sanitize_persisted_overview(
+    overview: Mapping[str, Any],
+    snapshot: Optional[Mapping[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
     subject = overview.get("subject")
     blocks = overview.get("blocks")
     if not isinstance(subject, Mapping) or not isinstance(blocks, list):
@@ -179,7 +201,180 @@ def _sanitize_persisted_overview(overview: Mapping[str, Any]) -> Optional[Dict[s
     }
     if "data_quality" in overview:
         sanitized["data_quality"] = _sanitize_data_quality(overview.get("data_quality"))
-    return sanitized
+    return _reconcile_persisted_overview(sanitized, snapshot or {})
+
+
+def _reconcile_persisted_overview(
+    overview: Dict[str, Any],
+    snapshot: Mapping[str, Any],
+) -> Dict[str, Any]:
+    if not snapshot:
+        return overview
+
+    summary = build_run_diagnostic_summary(context_snapshot=snapshot, raw_result=None)
+    components = summary.get("components") if isinstance(summary, Mapping) else {}
+    changed = False
+    quote_component = components.get("realtime_quote") if isinstance(components, Mapping) else None
+    if isinstance(quote_component, Mapping):
+        changed = _apply_quote_component(overview, quote_component) or changed
+
+    news_count = _final_news_count(snapshot, components)
+    if news_count and news_count > 0:
+        block = _overview_block(overview, "news")
+        if block is not None:
+            block["status"] = "available"
+            block["missing_reasons"] = []
+            block["warnings"] = []
+            metadata = overview.setdefault("metadata", {})
+            metadata["news_result_count"] = news_count
+            changed = True
+
+    if _is_tw_us_overview(overview):
+        before = len(overview.get("blocks", []))
+        overview["blocks"] = [
+            block for block in overview.get("blocks", [])
+            if not (isinstance(block, Mapping) and block.get("key") == "chip")
+        ]
+        changed = changed or len(overview.get("blocks", [])) != before
+
+    if changed:
+        _refresh_quality(overview)
+        _refresh_counts(overview)
+    return overview
+
+
+def _apply_quote_component(
+    overview: Dict[str, Any],
+    component: Mapping[str, Any],
+) -> bool:
+    block = _overview_block(overview, "quote")
+    if block is None:
+        return False
+    status = _safe_text(component.get("status"))
+    details = component.get("details") if isinstance(component.get("details"), Mapping) else {}
+    source = _safe_text(details.get("source_label") or details.get("sourceLabel") or details.get("provider"))
+    if status == "ok":
+        block["status"] = "available"
+        block["source"] = source or block.get("source")
+        block["warnings"] = []
+        block["missing_reasons"] = []
+        return True
+    elif status == "degraded":
+        block["status"] = "fallback"
+        block["source"] = source or "備援資料"
+        block["warnings"] = []
+        block["missing_reasons"] = []
+        return True
+    elif status == "failed":
+        block["status"] = "missing"
+        block["source"] = None
+        block["warnings"] = []
+        block["missing_reasons"] = ["realtime_quote_missing"]
+        return True
+    return False
+
+
+def _final_news_count(
+    snapshot: Mapping[str, Any],
+    components: Any,
+) -> Optional[int]:
+    direct = _safe_int(snapshot.get("news_result_count"))
+    if direct and direct > 0:
+        return direct
+    news_search = snapshot.get("news_search") if isinstance(snapshot.get("news_search"), Mapping) else {}
+    search_count = _safe_int(news_search.get("result_count"))
+    if search_count and search_count > 0:
+        return search_count
+    news_component = components.get("news") if isinstance(components, Mapping) else None
+    details = news_component.get("details") if isinstance(news_component, Mapping) and isinstance(news_component.get("details"), Mapping) else {}
+    component_count = _safe_int(details.get("result_count") or details.get("resultCount"))
+    return component_count if component_count and component_count > 0 else None
+
+
+def _overview_block(overview: Mapping[str, Any], key: str) -> Optional[Dict[str, Any]]:
+    blocks = overview.get("blocks")
+    if not isinstance(blocks, list):
+        return None
+    for block in blocks:
+        if isinstance(block, dict) and block.get("key") == key:
+            return block
+    return None
+
+
+def _is_tw_us_overview(overview: Mapping[str, Any]) -> bool:
+    subject = overview.get("subject")
+    if not isinstance(subject, Mapping):
+        return False
+    market = _safe_text(subject.get("market")).lower()
+    if market in {"tw", "us"}:
+        return True
+
+    code = _safe_text(subject.get("code")).upper()
+    if code.isdigit() and len(code) == 4:
+        return True
+    return code.isalpha() and 1 <= len(code) <= 6
+
+
+def _refresh_counts(overview: Dict[str, Any]) -> None:
+    counts = {status: 0 for status in _ALL_STATUSES}
+    for block in overview.get("blocks", []):
+        if not isinstance(block, Mapping):
+            continue
+        status = _safe_status(block.get("status"))
+        if status:
+            counts[status] += 1
+    overview["counts"] = counts
+
+
+def _refresh_quality(overview: Dict[str, Any]) -> None:
+    data_quality = overview.get("data_quality")
+    if not isinstance(data_quality, dict):
+        return
+
+    visible_status = {
+        block.get("key"): block.get("status")
+        for block in overview.get("blocks", [])
+        if isinstance(block, Mapping)
+    }
+    block_scores = {
+        key: score
+        for key, score in _safe_block_scores(data_quality.get("block_scores")).items()
+        if key in visible_status
+    }
+    for key, status in visible_status.items():
+        if key in _DATA_QUALITY_BLOCK_KEYS:
+            block_scores[key] = _STATUS_SCORES.get(str(status), 35)
+
+    limitations = []
+    for item in _list_strings(data_quality.get("limitations"), limit=5):
+        raw_key, _, raw_status = item.partition(":")
+        key = raw_key.strip()
+        if key in visible_status and str(visible_status[key]) == raw_status.strip():
+            limitations.append(item)
+
+    total_weight = 0
+    weighted_sum = 0
+    for key, weight in _QUALITY_BLOCK_WEIGHTS.items():
+        if key not in visible_status:
+            continue
+        total_weight += weight
+        weighted_sum += block_scores.get(key, 35) * weight
+    if total_weight:
+        overall_score = int(round(weighted_sum / total_weight))
+        data_quality["overall_score"] = overall_score
+        data_quality["level"] = _quality_level(overall_score)
+    data_quality["block_scores"] = block_scores
+    data_quality["limitations"] = limitations
+
+
+def _quality_level(score: int) -> str:
+    if score >= 85:
+        return "good"
+    if score >= 70:
+        return "usable"
+    if score >= 55:
+        return "limited"
+    return "poor"
 
 
 def _sanitize_data_quality(value: Any) -> Optional[Dict[str, Any]]:

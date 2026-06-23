@@ -6,6 +6,7 @@ Agent API endpoints.
 import asyncio
 import json
 import logging
+import re
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -15,6 +16,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from src.config import get_config
 from src.services.agent_model_service import list_agent_model_deployments
+from src.services.symbol_universe import get_default_symbol_resolver
 
 # Tool name -> Chinese display name mapping
 TOOL_DISPLAY_NAMES: Dict[str, str] = {
@@ -61,6 +63,44 @@ class ChatResponse(BaseModel):
     content: str
     session_id: str
     error: Optional[str] = None
+
+
+def _route_b_context_from_message(message: str) -> Dict[str, Any]:
+    """Resolve TW/US chat targets locally before invoking the Agent LLM."""
+    text = (message or "").strip()
+    if not text:
+        return {}
+
+    resolver = get_default_symbol_resolver()
+    cache = resolver.cache
+    candidates: list[str] = []
+
+    for token in re.findall(r"[A-Za-z]{1,32}|\d{4,6}[A-Za-z]?", text):
+        candidates.append(token)
+
+    normalized_text = text.casefold()
+    for record in cache.records:
+        values = [record.name, *(record.aliases or [])]
+        if any(value and value.casefold() in normalized_text for value in values):
+            candidates.append(record.raw_symbol)
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = candidate.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        result = resolver.resolve(candidate)
+        if result.status == "resolved" and result.selected is not None:
+            selected = result.selected
+            return {
+                "stock_code": selected.raw_symbol,
+                "stock_name": selected.name,
+                "market": selected.market,
+                "selection_source": "local_symbol_universe",
+                "resolved_canonical_symbol": selected.canonical_symbol,
+            }
+    return {}
 
 class SkillInfo(BaseModel):
     id: str
@@ -165,6 +205,8 @@ async def agent_chat(request: ChatRequest):
         # Direct assignment so caller-provided skills always take precedence
         # over any stale value carried in the context dict.
         ctx = dict(request.context or {})
+        if "stock_code" not in ctx:
+            ctx.update(_route_b_context_from_message(request.message))
         if skills is not None:
             ctx["skills"] = skills
 
@@ -394,6 +436,8 @@ async def agent_chat_stream(request: ChatRequest):
     # Direct assignment so caller-provided skills always take precedence.
     skills = request.effective_skills
     stream_ctx = dict(request.context or {})
+    if "stock_code" not in stream_ctx:
+        stream_ctx.update(_route_b_context_from_message(request.message))
     if skills is not None:
         stream_ctx["skills"] = skills
 

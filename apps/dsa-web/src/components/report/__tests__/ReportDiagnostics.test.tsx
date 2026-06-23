@@ -73,6 +73,57 @@ const newsSearchDiagnosticSummary: RunDiagnosticSummary = {
   },
 };
 
+const missingQuoteDiagnosticSummary: RunDiagnosticSummary = {
+  ...diagnosticSummary,
+  status: 'degraded',
+  statusLabel: '部分降級',
+  reason: '即時行情未取得可用資料',
+  components: {
+    ...diagnosticSummary.components,
+    realtimeQuote: {
+      key: 'realtime_quote',
+      label: '實時行情',
+      status: 'failed',
+      message: '即時行情未取得可用資料',
+      details: {
+        finalQuoteStatus: 'missing',
+        quoteUsable: false,
+        reason: 'empty_or_incomplete_quote',
+      },
+    },
+  },
+};
+
+const quoteFallbackDiagnosticSummary: RunDiagnosticSummary = {
+  ...diagnosticSummary,
+  reason: '即時行情部分降級，但已取得可用替代資料',
+  components: {
+    ...diagnosticSummary.components,
+    realtimeQuote: {
+      key: 'realtime_quote',
+      label: '實時行情',
+      status: 'degraded',
+      message: '即時行情部分降級，但已取得可用替代資料',
+      details: {
+        finalQuoteStatus: 'degraded',
+        quoteUsable: true,
+        sourceLabel: '備援資料',
+        fallbackUsed: true,
+      },
+    },
+  },
+};
+
+const realtekDiagnosticSummary: RunDiagnosticSummary = {
+  ...newsSearchDiagnosticSummary,
+  stockCode: '2379',
+};
+
+const intelDiagnosticSummary: RunDiagnosticSummary = {
+  ...newsSearchDiagnosticSummary,
+  stockCode: 'INTC',
+};
+
 describe('ReportDiagnostics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -120,6 +171,27 @@ describe('ReportDiagnostics', () => {
     expect(screen.getByText('部分降級')).toBeInTheDocument();
   });
 
+  it('shows final quote missing without stale provider success wording', () => {
+    render(<ReportDiagnostics summary={missingQuoteDiagnosticSummary} />);
+
+    fireEvent.click(screen.getByText('執行狀態'));
+
+    expect(screen.getByText('失敗')).toBeInTheDocument();
+    expect(screen.getAllByText('即時行情未取得可用資料').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/YfinanceFetcher 成功/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/實時行情.*成功/)).not.toBeInTheDocument();
+  });
+
+  it('shows quote fallback success as available backup instead of warning status', () => {
+    render(<ReportDiagnostics summary={quoteFallbackDiagnosticSummary} />);
+
+    fireEvent.click(screen.getByText('執行狀態'));
+
+    expect(screen.getByText('備援可用')).toBeInTheDocument();
+    expect(screen.getAllByText('即時行情部分降級，但已取得可用替代資料').length).toBeGreaterThan(0);
+    expect(screen.queryByText('近期失敗後已降級')).not.toBeInTheDocument();
+  });
+
   it('displays and copies sanitized news search diagnostics', async () => {
     render(<ReportDiagnostics summary={newsSearchDiagnosticSummary} />);
 
@@ -156,6 +228,123 @@ describe('ReportDiagnostics', () => {
     expect(screen.getByLabelText('新聞來源測試標的')).toBeInTheDocument();
     expect(screen.getByLabelText('新聞來源測試模式')).toBeInTheDocument();
     expect(diagnosticsApi.probeNewsProvider).not.toHaveBeenCalled();
+  });
+
+  it('defaults the manual news provider probe to the current TW report symbol', () => {
+    render(<ReportDiagnostics summary={realtekDiagnosticSummary} />);
+
+    fireEvent.click(screen.getByText('執行狀態'));
+
+    expect(screen.getByLabelText('新聞來源測試市場')).toHaveValue('tw');
+    expect(screen.getByLabelText('新聞來源測試標的')).toHaveValue('2379');
+    expect(diagnosticsApi.probeNewsProvider).not.toHaveBeenCalled();
+  });
+
+  it('defaults the manual news provider probe to the current US report symbol', () => {
+    render(<ReportDiagnostics summary={intelDiagnosticSummary} />);
+
+    fireEvent.click(screen.getByText('執行狀態'));
+
+    expect(screen.getByLabelText('新聞來源測試市場')).toHaveValue('us');
+    expect(screen.getByLabelText('新聞來源測試標的')).toHaveValue('INTC');
+    expect(diagnosticsApi.probeNewsProvider).not.toHaveBeenCalled();
+  });
+
+  it('resets the manual probe target when switching to another report symbol', () => {
+    const { rerender } = render(<ReportDiagnostics summary={realtekDiagnosticSummary} />);
+
+    fireEvent.click(screen.getByText('執行狀態'));
+    fireEvent.change(screen.getByLabelText('新聞來源測試標的'), {
+      target: { value: '2379' },
+    });
+
+    rerender(<ReportDiagnostics summary={intelDiagnosticSummary} />);
+
+    expect(screen.getByLabelText('新聞來源測試市場')).toHaveValue('us');
+    expect(screen.getByLabelText('新聞來源測試標的')).toHaveValue('INTC');
+    expect(diagnosticsApi.probeNewsProvider).not.toHaveBeenCalled();
+  });
+
+  it('runs the manual news provider probe for typed fresh TW and US symbols', async () => {
+    vi.mocked(diagnosticsApi.probeNewsProvider)
+      .mockResolvedValueOnce({
+        symbol: '2379',
+        market: 'tw',
+        providerMode: 'runtime',
+        status: 'available',
+        providersAttempted: ['SearXNG'],
+        queryVariants: ['2379 瑞昱 新聞', 'Realtek 最新消息'],
+        attemptCount: 2,
+        resultCount: 2,
+        fallbackUsed: false,
+        latencyMs: 111,
+        items: [
+          {
+            title: '瑞昱 2379 Realtek 新聞',
+            source: 'Example TW',
+            url: 'https://example.com/tw/2379',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        symbol: 'INTC',
+        market: 'us',
+        providerMode: 'runtime',
+        status: 'available',
+        providersAttempted: ['Tavily'],
+        queryVariants: ['INTC Intel stock news', 'Intel earnings AI PC stock news'],
+        attemptCount: 2,
+        resultCount: 3,
+        fallbackUsed: true,
+        latencyMs: 222,
+        items: [
+          {
+            title: 'Intel INTC AI PC earnings news',
+            source: 'Example US',
+            url: 'https://example.com/us/intc',
+          },
+        ],
+      });
+
+    render(<ReportDiagnostics summary={realtekDiagnosticSummary} />);
+
+    fireEvent.click(screen.getByText('執行狀態'));
+    fireEvent.change(screen.getByLabelText('新聞來源測試市場'), {
+      target: { value: 'tw' },
+    });
+    fireEvent.change(screen.getByLabelText('新聞來源測試標的'), {
+      target: { value: '2379' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '測試新聞來源' }));
+
+    await waitFor(() => {
+      expect(diagnosticsApi.probeNewsProvider).toHaveBeenCalledWith({
+        symbol: '2379',
+        market: 'tw',
+        providerMode: 'runtime',
+        limit: 4,
+      });
+    });
+    expect(await screen.findByText('瑞昱 2379 Realtek 新聞')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('新聞來源測試市場'), {
+      target: { value: 'us' },
+    });
+    fireEvent.change(screen.getByLabelText('新聞來源測試標的'), {
+      target: { value: 'INTC' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '測試新聞來源' }));
+
+    await waitFor(() => {
+      expect(diagnosticsApi.probeNewsProvider).toHaveBeenCalledTimes(2);
+      expect(diagnosticsApi.probeNewsProvider).toHaveBeenLastCalledWith({
+        symbol: 'INTC',
+        market: 'us',
+        providerMode: 'runtime',
+        limit: 4,
+      });
+    });
+    expect(await screen.findByText('Intel INTC AI PC earnings news')).toBeInTheDocument();
   });
 
   it('runs the manual news provider probe after click and displays sanitized results', async () => {

@@ -558,7 +558,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             created_at.isoformat(),
         )
 
-    def test_run_market_review_background_raises_when_report_is_empty(self) -> None:
+    def test_run_market_review_background_returns_skip_payload_when_report_is_empty(self) -> None:
         if analysis_endpoint_module is None:
             self.skipTest("analysis endpoint helpers unavailable in this environment")
 
@@ -570,13 +570,17 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             "_build_market_review_runtime",
             return_value=(runtime_notifier, runtime_analyzer, runtime_search),
         ), patch("src.core.market_review.run_market_review", return_value=None):
-            with self.assertRaisesRegex(RuntimeError, "市場概覽未返回可持久化報告"):
-                analysis_endpoint_module._run_market_review_background(
-                    send_notification=False,
-                    override_region="tw",
-                    lock_token=None,
-                    config=SimpleNamespace(),
-                )
+            result = analysis_endpoint_module._run_market_review_background(
+                send_notification=False,
+                override_region="tw",
+                lock_token=None,
+                config=SimpleNamespace(),
+            )
+
+        self.assertEqual(result["status"], "skipped")
+        self.assertIsNone(result["result"])
+        self.assertIn("市場概覽", result["message"])
+        self.assertNotIn("未返回可持久化報告", result["message"])
 
     def test_run_market_review_background_releases_lock_on_runtime_build_failure(self) -> None:
         if analysis_endpoint_module is None:

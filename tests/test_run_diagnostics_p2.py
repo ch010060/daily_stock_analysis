@@ -282,6 +282,110 @@ class RunDiagnosticsP2TestCase(unittest.TestCase):
         self.assertIn("trace_id: trace-p2", summary["copy_text"])
         self.assertNotIn("secret", summary["copy_text"])
 
+    def test_empty_realtime_quote_overrides_transport_success_as_missing(self) -> None:
+        diagnostics = _diagnostic_snapshot()
+        diagnostics["provider_runs"] = [
+            {
+                "trace_id": "trace-p2",
+                "data_type": "realtime_quote",
+                "provider": "YfinanceFetcher",
+                "operation": "get_realtime_quote",
+                "success": True,
+            },
+        ]
+
+        summary = build_run_diagnostic_summary(
+            context_snapshot={
+                "diagnostics": diagnostics,
+                "quote_availability": {
+                    "status": "missing",
+                    "usable": False,
+                    "primary_source": "YfinanceFetcher",
+                    "reason": "empty_or_incomplete_quote",
+                    "user_message": "即時行情未取得可用資料",
+                },
+            },
+            raw_result={"success": True, "model_used": "deepseek-chat"},
+            report_saved=True,
+        )
+
+        quote = summary["components"]["realtime_quote"]
+        self.assertEqual(quote["status"], "failed")
+        self.assertIn("即時行情未取得可用資料", quote["message"])
+        self.assertEqual(quote["details"]["final_quote_status"], "missing")
+        self.assertFalse(quote["details"]["quote_usable"])
+        self.assertNotIn("YfinanceFetcher 成功", quote["message"])
+
+    def test_usable_quote_fallback_overrides_missing_provider_chain_as_degraded(self) -> None:
+        diagnostics = _diagnostic_snapshot()
+        diagnostics["provider_runs"] = [
+            {
+                "trace_id": "trace-p2",
+                "data_type": "realtime_quote",
+                "provider": "YfinanceFetcher",
+                "operation": "get_realtime_quote",
+                "success": False,
+                "error_type": "DataFetchError",
+                "error_message_sanitized": "empty or incomplete quote",
+            },
+        ]
+
+        summary = build_run_diagnostic_summary(
+            context_snapshot={
+                "diagnostics": diagnostics,
+                "quote_availability": {
+                    "status": "degraded",
+                    "usable": True,
+                    "source_label": "備援資料",
+                    "primary_source": "YfinanceFetcher",
+                    "fallback_used": True,
+                    "reason": "primary_quote_failed_fallback_used",
+                    "user_message": "即時行情部分降級，但已取得可用替代資料",
+                },
+            },
+            raw_result={"success": True, "model_used": "deepseek-chat"},
+            report_saved=True,
+        )
+
+        quote = summary["components"]["realtime_quote"]
+        self.assertEqual(quote["status"], "degraded")
+        self.assertIn("即時行情部分降級", quote["message"])
+        self.assertEqual(quote["details"]["final_quote_status"], "degraded")
+        self.assertTrue(quote["details"]["quote_usable"])
+
+    def test_valid_realtime_quote_overrides_provider_chain_as_available(self) -> None:
+        diagnostics = _diagnostic_snapshot()
+        diagnostics["provider_runs"] = [
+            {
+                "trace_id": "trace-p2",
+                "data_type": "realtime_quote",
+                "provider": "YfinanceFetcher",
+                "operation": "get_realtime_quote",
+                "success": True,
+            },
+        ]
+
+        summary = build_run_diagnostic_summary(
+            context_snapshot={
+                "diagnostics": diagnostics,
+                "quote_availability": {
+                    "status": "available",
+                    "usable": True,
+                    "source_label": "Yahoo Finance / yfinance",
+                    "primary_source": "YfinanceFetcher",
+                    "fallback_used": False,
+                },
+            },
+            raw_result={"success": True, "model_used": "deepseek-chat"},
+            report_saved=True,
+        )
+
+        quote = summary["components"]["realtime_quote"]
+        self.assertEqual(quote["status"], "ok")
+        self.assertIn("即時行情可用", quote["message"])
+        self.assertEqual(quote["details"]["final_quote_status"], "available")
+        self.assertTrue(quote["details"]["quote_usable"])
+
     def test_summary_marks_llm_failure_as_failed(self) -> None:
         diagnostics = _diagnostic_snapshot()
         diagnostics["llm_runs"] = [

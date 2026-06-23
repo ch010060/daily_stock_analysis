@@ -49,7 +49,6 @@ _STUB_MODS = (
     "src.schemas.report_schema",
     "src.schemas.market_light",
     "src.schemas.analysis_context_pack",
-    "src.market_context",
     "src.market_phase_prompt",
     "src.data",
     "src.data.stock_mapping",
@@ -94,8 +93,6 @@ sys.modules["src.llm.errors"].call_litellm_with_param_recovery = MagicMock(
 )
 sys.modules["src.report_language"].get_report_language = MagicMock(return_value="zh_TW")
 sys.modules["src.report_language"].localize_trend_prediction = MagicMock(side_effect=lambda x, lang=None, **k: x)
-sys.modules["src.market_context"].get_market_role = MagicMock(return_value="TW")
-sys.modules["src.market_context"].get_market_guidelines = MagicMock(return_value="")
 
 import pytest
 from unittest.mock import call

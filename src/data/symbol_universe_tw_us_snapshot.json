@@ -2,11 +2,9 @@
   "metadata": {
     "schema_version": 1,
     "source": "symbol_universe_builder",
-    "generated_at": "2026-06-22T09:14:31.537362+00:00",
+    "generated_at": "2026-06-22T14:37:10.459397+00:00",
     "provider_sources": [
-      "taiwan_isin_directory",
-      "finmind_taiwan_stock_info",
-      "nasdaq_screener_stock_directory",
+      "existing_snapshot",
       "curated_seed"
     ],
     "market_count": {
@@ -3321,11 +3319,14 @@
       "market": "TW",
       "exchange": "TWSE",
       "instrument_type": "stock",
-      "name": "國巨*",
-      "aliases": [],
-      "provider_source": "taiwan_isin_directory",
+      "name": "國巨",
+      "aliases": [
+        "Yageo",
+        "Yageo Corporation"
+      ],
+      "provider_source": "curated_seed",
       "is_active": true,
-      "last_updated": "2026-06-22T09:14:28.534240+00:00"
+      "last_updated": "2026-06-22"
     },
     {
       "canonical_symbol": "TW:2328",
@@ -3582,10 +3583,15 @@
       "exchange": "TWSE",
       "instrument_type": "stock",
       "name": "華碩",
-      "aliases": [],
-      "provider_source": "taiwan_isin_directory",
+      "aliases": [
+        "ASUS",
+        "Asus",
+        "ASUSTeK",
+        "ASUSTeK Computer"
+      ],
+      "provider_source": "curated_seed",
       "is_active": true,
-      "last_updated": "2026-06-22T09:14:28.534322+00:00"
+      "last_updated": "2026-06-22"
     },
     {
       "canonical_symbol": "TW:2359",
@@ -3778,10 +3784,13 @@
       "exchange": "TWSE",
       "instrument_type": "stock",
       "name": "瑞昱",
-      "aliases": [],
-      "provider_source": "taiwan_isin_directory",
+      "aliases": [
+        "Realtek",
+        "Realtek Semiconductor"
+      ],
+      "provider_source": "curated_seed",
       "is_active": true,
-      "last_updated": "2026-06-22T09:14:28.534368+00:00"
+      "last_updated": "2026-06-22"
     },
     {
       "canonical_symbol": "TW:2380",
@@ -3902,10 +3911,13 @@
       "exchange": "TWSE",
       "instrument_type": "stock",
       "name": "研華",
-      "aliases": [],
-      "provider_source": "taiwan_isin_directory",
+      "aliases": [
+        "Advantech",
+        "Advantech Co"
+      ],
+      "provider_source": "curated_seed",
       "is_active": true,
-      "last_updated": "2026-06-22T09:14:28.534395+00:00"
+      "last_updated": "2026-06-22"
     },
     {
       "canonical_symbol": "TW:2397",
@@ -7751,10 +7763,14 @@
       "exchange": "TWSE",
       "instrument_type": "stock",
       "name": "日月光投控",
-      "aliases": [],
-      "provider_source": "taiwan_isin_directory",
+      "aliases": [
+        "ASE",
+        "ASE Technology",
+        "ASE Technology Holding"
+      ],
+      "provider_source": "curated_seed",
       "is_active": true,
-      "last_updated": "2026-06-22T09:14:28.535343+00:00"
+      "last_updated": "2026-06-22"
     },
     {
       "canonical_symbol": "TW:3712",
@@ -49893,15 +49909,17 @@
       "canonical_symbol": "US:COST",
       "raw_symbol": "COST",
       "market": "US",
-      "exchange": null,
+      "exchange": "NASDAQ",
       "instrument_type": "stock",
       "name": "Costco Wholesale",
       "aliases": [
-        "Costco Wholesale Corporation"
+        "Costco Wholesale Corporation",
+        "Costco",
+        "Costco Wholesale"
       ],
-      "provider_source": "nasdaq_screener_stock_directory",
+      "provider_source": "curated_seed",
       "is_active": true,
-      "last_updated": "2026-06-22T09:14:31.425658+00:00"
+      "last_updated": "2026-06-22"
     },
     {
       "canonical_symbol": "US:COTY",
@@ -50669,13 +50687,17 @@
       "canonical_symbol": "US:CSCO",
       "raw_symbol": "CSCO",
       "market": "US",
-      "exchange": null,
+      "exchange": "NASDAQ",
       "instrument_type": "stock",
-      "name": "Cisco Systems Inc. (DE)",
-      "aliases": [],
-      "provider_source": "nasdaq_screener_stock_directory",
+      "name": "Cisco Systems",
+      "aliases": [
+        "Cisco",
+        "Cisco Systems Inc",
+        "Cisco Systems"
+      ],
+      "provider_source": "curated_seed",
       "is_active": true,
-      "last_updated": "2026-06-22T09:14:31.426194+00:00"
+      "last_updated": "2026-06-22"
     },
     {
       "canonical_symbol": "US:CSGP",

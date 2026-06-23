@@ -513,7 +513,7 @@ class PipelineMarketPhaseContextTestCase(unittest.TestCase):
                 stock_name="台積電",
                 realtime_quote=None,
                 chip_data=None,
-                fundamental_context={"market": "cn"},
+                fundamental_context={"market": "tw"},
                 trend_result=None,
                 market_phase_context=_phase_payload(),
                 market_phase_summary=_phase_payload(),
@@ -535,6 +535,11 @@ class PipelineMarketPhaseContextTestCase(unittest.TestCase):
         self.assertEqual(daily_block["status"], "available")
         self.assertEqual(daily_block["source"], "storage.get_analysis_context")
         self.assertEqual(daily_block["missing_reasons"], [])
+        snapshot = save_kwargs["context_snapshot"]
+        self.assertEqual(snapshot["enhanced_context"]["today"]["close"], 6.67)
+        self.assertEqual(snapshot["quote_availability"]["status"], "degraded")
+        self.assertTrue(snapshot["quote_availability"]["usable"])
+        self.assertEqual(result.current_price, 6.67)
         self.assertEqual(save_kwargs["context_snapshot"]["market_phase_summary"]["phase"], "intraday")
 
     def test_agent_pipeline_fail_open_when_pack_summary_generation_fails(self):

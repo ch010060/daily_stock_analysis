@@ -113,8 +113,14 @@ def test_quote_block_maps_available_missing_fallback_and_explicit_stale() -> Non
     assert available.source == "akshare_em"
     assert available.items["price"].value == 1880.0
 
-    missing = AnalysisContextBuilder.build(
+    fallback_from_context = AnalysisContextBuilder.build(
         _artifacts(realtime_quote=None)
+    ).blocks["quote"]
+    assert fallback_from_context.status == ContextFieldStatus.FALLBACK
+    assert fallback_from_context.items["price"].value == 1880.0
+
+    missing = AnalysisContextBuilder.build(
+        _artifacts(realtime_quote=None, base_context={}, enhanced_context={})
     ).blocks["quote"]
     assert missing.status == ContextFieldStatus.MISSING
     assert missing.items["quote"].missing_reason == "realtime_quote_missing"

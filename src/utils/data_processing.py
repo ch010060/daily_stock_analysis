@@ -34,6 +34,16 @@ def parse_json_field(value: Any) -> Any:
     return value
 
 
+def _usable_number(value: Any) -> Optional[float]:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
+
+
 def _non_empty_dict(value: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(value, dict):
         return None
@@ -199,6 +209,22 @@ def extract_realtime_detail_fields(context_snapshot: Any) -> Dict[str, Any]:
             change_pct = realtime_payload.get("change_pct")
         if change_pct is None:
             change_pct = realtime_payload.get("pct_chg")
+
+    quote_availability = snapshot_obj.get("quote_availability")
+    if isinstance(quote_availability, dict):
+        status = str(quote_availability.get("status") or "").lower()
+        usable = quote_availability.get("usable") is True
+        if usable and status in {"available", "degraded"}:
+            enhanced = snapshot_obj.get("enhanced_context")
+            if isinstance(enhanced, dict):
+                today = enhanced.get("today")
+                yesterday = enhanced.get("yesterday")
+                if current_price is None and isinstance(today, dict):
+                    current_price = _usable_number(today.get("close"))
+                if current_price is None and isinstance(yesterday, dict):
+                    current_price = _usable_number(yesterday.get("close"))
+                if change_pct is None and isinstance(today, dict):
+                    change_pct = today.get("pct_chg")
 
     return {
         "current_price": current_price,

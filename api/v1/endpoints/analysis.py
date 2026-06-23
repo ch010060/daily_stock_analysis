@@ -163,7 +163,11 @@ def _run_market_review_background(
             review_kwargs["query_id"] = query_id
         report = run_market_review(**review_kwargs)
         if not report:
-            raise RuntimeError("市場概覽未返回可持久化報告")
+            return {
+                "status": "skipped",
+                "result": None,
+                "message": "市場概覽已跳過：沒有可持久化的盤勢回顧內容",
+            }
         return {"result": report}
     finally:
         _release_market_review_lock(lock_token)
