@@ -7053,11 +7053,12 @@
       "instrument_type": "stock",
       "name": "統一超",
       "aliases": [
-        "PCSC"
+        "PCSC",
+        "President Chain Store"
       ],
-      "provider_source": "taiwan_isin_directory",
+      "provider_source": "curated_seed",
       "is_active": true,
-      "last_updated": "2026-06-22T09:14:28.534908+00:00"
+      "last_updated": "2026-06-23"
     },
     {
       "canonical_symbol": "TW:2913",
@@ -8379,11 +8380,12 @@
       "instrument_type": "stock",
       "name": "創意",
       "aliases": [
-        "GUC"
+        "GUC",
+        "Global Unichip"
       ],
-      "provider_source": "taiwan_isin_directory",
+      "provider_source": "curated_seed",
       "is_active": true,
-      "last_updated": "2026-06-22T09:14:28.535184+00:00"
+      "last_updated": "2026-06-23"
     },
     {
       "canonical_symbol": "TW:3447",

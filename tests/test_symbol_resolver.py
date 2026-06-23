@@ -201,6 +201,64 @@ def test_phase15_9o_wrong_substitution_guards() -> None:
     assert first_financial_us.selected.raw_symbol == "THFF"
 
 
+PHASE_15_9R_PRIMARY_TARGETS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("TW", "4938", ("和碩", "4938", "Pegatron")),
+    ("US", "NOW", ("NOW", "ServiceNow")),
+)
+
+PHASE_15_9R_TW_ALIAS_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("3443", ("Global Unichip",)),
+    ("2912", ("President Chain Store",)),
+)
+
+
+def test_phase15_9r_primary_targets_resolve() -> None:
+    resolver = _resolver()
+
+    for expected_market, expected_symbol, queries in PHASE_15_9R_PRIMARY_TARGETS:
+        for query in queries:
+            result = resolver.resolve(query)
+
+            assert result.status == "resolved", query
+            assert result.selected is not None
+            assert result.selected.market == expected_market
+            assert result.selected.raw_symbol == expected_symbol
+
+
+def test_phase15_9r_tw_full_english_name_aliases_resolve() -> None:
+    resolver = _resolver()
+
+    for expected_symbol, queries in PHASE_15_9R_TW_ALIAS_TARGETS:
+        for query in queries:
+            result = resolver.resolve(query)
+
+            assert result.status == "resolved", query
+            assert result.selected is not None
+            assert result.selected.market == "TW"
+            assert result.selected.raw_symbol == expected_symbol
+
+
+def test_phase15_9r_team_no_market_query_does_not_auto_resolve_to_tw_4967() -> None:
+    """Backend already disambiguates TW:4967's `TEAM` alias against US:TISI's `Team`
+    name; this guards that behavior. The live-validation bug was in the frontend's
+    local search ranking (searchStocks.ts), not in this resolver."""
+    resolver = _resolver()
+
+    result = resolver.resolve("TEAM")
+
+    assert result.status == "ambiguous"
+    assert result.selected is None
+    candidate_symbols = {candidate.record.raw_symbol for candidate in result.candidates}
+    assert "4967" in candidate_symbols
+    assert "TISI" in candidate_symbols
+
+    tw_scoped = resolver.resolve("TEAM", market="TW")
+    assert tw_scoped.status == "resolved"
+    assert tw_scoped.selected is not None
+    assert tw_scoped.selected.market == "TW"
+    assert tw_scoped.selected.raw_symbol == "4967"
+
+
 def test_route_b_resolver_returns_not_found_for_unknown_query() -> None:
     resolver = _resolver()
 

@@ -378,6 +378,22 @@ describe('searchStocks', () => {
     expect(usResults.every((result) => result.market === 'US')).toBe(true);
   });
 
+  test('does not silently auto-pick a TW alias over a same-named US ticker for a strict-ticker-shaped query', () => {
+    const teamIndex: StockIndexItem[] = [
+      ...mockIndex,
+      stock('4967', '十銓', 'TW', ['TEAM'], 90),
+      stock('TISI', 'Team', 'US', [], 90),
+    ];
+
+    const results = searchStocks('TEAM', teamIndex);
+    const codes = results.map((result) => result.canonicalCode);
+
+    expect(codes).toContain('4967');
+    expect(codes).toContain('TISI');
+    expect(results[0].canonicalCode).not.toBe('4967');
+    expect(results.filter((result) => result.matchType === 'exact').length).toBeGreaterThanOrEqual(2);
+  });
+
   test('does not return unsupported candidates even with all scope', () => {
     const results = searchStocks('非支援市場測試標的', mockIndex, { marketScope: 'all' });
 

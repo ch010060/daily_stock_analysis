@@ -107,9 +107,9 @@ function calculateMatchScore(query: string, item: StockIndexItem, strictTickerQu
   // 1. Exact match (96-100 points)
   if (q === normalizedCanonicalCode) return 100;
   if (q === normalizedDisplayCode) return 99;
+  if (q === normalizedName) return 98;
   if (normalizedAliases.some(a => a === q)) return 97;
   if (strictTickerQuery) return 0;
-  if (q === normalizedName) return 98;
   if (q === normalizedPinyinAbbr) return 96;
 
   // 2. Prefix match (77-80 points)
