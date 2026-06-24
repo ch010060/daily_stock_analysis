@@ -928,6 +928,9 @@ class Config:
     # 熔斷器冷卻時間（秒）
     circuit_breaker_cooldown: int = 300
 
+    # === Phase 18A 價值網路圖 Mermaid 附錄（PoC，預設關閉）===
+    enable_value_network_mermaid: bool = False
+
     # === 基本面聚合開關與降級保護 ===
     # 全域性總開關；關閉時返回 not_supported 並保持主流程無變化
     enable_fundamental_pipeline: bool = True
@@ -1752,6 +1755,7 @@ class Config:
                 'ENABLE_REALTIME_TECHNICAL_INDICATORS', 'true'
             ).lower() == 'true',
             enable_chip_distribution=os.getenv('ENABLE_CHIP_DISTRIBUTION', 'true').lower() == 'true',
+            enable_value_network_mermaid=os.getenv('ENABLE_VALUE_NETWORK_MERMAID', 'false').lower() == 'true',
             # 東財介面補丁開關
             enable_eastmoney_patch=os.getenv('ENABLE_EASTMONEY_PATCH', 'false').lower() == 'true',
             # 實時行情資料來源優先順序：

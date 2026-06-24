@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for analyzer news prompt hard constraints (Issue #697)."""
 
+import dataclasses
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -19,6 +20,7 @@ from src.analyzer import (
     _infer_trend_direction,
     _sanitize_trend_analysis_for_prompt,
 )
+from src.config import Config
 
 
 class AnalyzerNewsPromptTestCase(unittest.TestCase):
@@ -286,6 +288,58 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
 
         self.assertNotIn("市場階段上下文", prompt)
         self.assertNotIn("分析上下文包摘要", prompt)
+
+    def test_format_prompt_omits_value_network_mermaid_section_by_default(self) -> None:
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer()
+
+        context = {
+            "code": "2330",
+            "stock_name": "台積電",
+            "date": "2026-03-27",
+            "today": {},
+        }
+
+        prompt = analyzer._format_prompt(context, "台積電", news_context=None)
+
+        self.assertNotIn("value_network_mermaid", prompt)
+
+    def test_format_prompt_includes_value_network_mermaid_section_when_enabled(self) -> None:
+        enabled_config = dataclasses.replace(Config(), enable_value_network_mermaid=True)
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer(config=enabled_config)
+
+        context = {
+            "code": "2330",
+            "stock_name": "台積電",
+            "date": "2026-03-27",
+            "today": {},
+        }
+
+        prompt = analyzer._format_prompt(context, "台積電", news_context=None)
+
+        self.assertIn("value_network_mermaid", prompt)
+        self.assertIn("flowchart", prompt)
+        self.assertIn("供應商/客戶/競爭者/互補者/護城河", prompt)
+
+    def test_format_prompt_uses_index_etf_category_hint_when_enabled(self) -> None:
+        enabled_config = dataclasses.replace(Config(), enable_value_network_mermaid=True)
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer(config=enabled_config)
+
+        context = {
+            "code": "0050",
+            "stock_name": "元大台灣50",
+            "date": "2026-03-27",
+            "today": {},
+            "is_index_etf": True,
+        }
+
+        prompt = analyzer._format_prompt(context, "元大台灣50", news_context=None)
+
+        self.assertIn("value_network_mermaid", prompt)
+        self.assertIn("持股組成/需求驅動/替代方案/客戶", prompt)
+        self.assertNotIn("供應商/客戶/競爭者/互補者/護城河", prompt)
 
     def test_format_prompt_labels_intraday_partial_quote_as_estimated(self) -> None:
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):

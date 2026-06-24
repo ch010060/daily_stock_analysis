@@ -15,6 +15,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 # Keep this test runnable when optional LLM runtime deps are not installed.
@@ -1475,6 +1476,88 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         with self.db.get_session() as session:
             self.assertIsNone(session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id_1).first())
             self.assertIsNotNone(session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id_2).first())
+
+    def test_generate_single_stock_markdown_includes_appendix_for_valid_mermaid(self) -> None:
+        """Phase 18A: a valid value_network_mermaid renders as a fenced appendix near the footer."""
+        from datetime import datetime as _datetime
+
+        result = self._build_result()
+        result.value_network_mermaid = "flowchart TB\n  A[供應商] --> B[公司]"
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+
+        service = HistoryService(self.db)
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn("## 附錄：價值網路圖", markdown)
+        self.assertIn("```mermaid", markdown)
+        self.assertIn("flowchart TB\n  A[供應商] --> B[公司]", markdown)
+
+        appendix_index = markdown.index("## 附錄：價值網路圖")
+        footer_index = markdown.index("*報告生成時間")
+        self.assertLess(appendix_index, footer_index)
+
+    def test_generate_single_stock_markdown_omits_appendix_when_none(self) -> None:
+        """When value_network_mermaid is None, no appendix section is added and generation does not raise."""
+        from datetime import datetime as _datetime
+
+        result = self._build_result()
+        result.value_network_mermaid = None
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+
+        service = HistoryService(self.db)
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertNotIn("附錄：價值網路圖", markdown)
+
+    def test_generate_single_stock_markdown_omits_appendix_when_invalid(self) -> None:
+        """An invalid (forbidden diagram type) value_network_mermaid is silently dropped."""
+        from datetime import datetime as _datetime
+
+        result = self._build_result()
+        result.value_network_mermaid = "sequenceDiagram\n  Alice->>Bob: Hello"
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+
+        service = HistoryService(self.db)
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertNotIn("附錄：價值網路圖", markdown)
+
+    def test_rebuild_analysis_result_carries_value_network_mermaid(self) -> None:
+        """Phase 18A: _rebuild_analysis_result carries value_network_mermaid from raw_result."""
+        record_id = self._save_history("query_value_network_001")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            raw_result = {
+                "code": "2330",
+                "name": "台積電",
+                "value_network_mermaid": "flowchart TB\n  A[供應商] --> B[公司]",
+            }
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertEqual(rebuilt.value_network_mermaid, "flowchart TB\n  A[供應商] --> B[公司]")
+
+    def test_rebuild_analysis_result_defaults_value_network_mermaid_to_none(self) -> None:
+        """When raw_result lacks the field, the rebuilt AnalysisResult defaults to None."""
+        record_id = self._save_history("query_value_network_002")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            raw_result = {
+                "code": "2330",
+                "name": "台積電",
+            }
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertIsNone(rebuilt.value_network_mermaid)
 
 
 class HistoryItemSchemaNegativeSentimentTest(unittest.TestCase):

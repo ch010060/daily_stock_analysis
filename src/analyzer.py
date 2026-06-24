@@ -1562,6 +1562,7 @@ class AnalysisResult:
     raw_response: Optional[str] = None  # 原始響應（除錯用）
     search_performed: bool = False  # 是否執行了聯網搜尋
     data_sources: str = ""  # 資料來源說明
+    value_network_mermaid: Optional[str] = None  # Phase 18A：可選的價值網路圖 Mermaid 原始文字（已驗證或 None）
     success: bool = True
     error_message: Optional[str] = None
 
@@ -1614,6 +1615,7 @@ class AnalysisResult:
             'current_price': self.current_price,
             'change_pct': self.change_pct,
             'model_used': self.model_used,
+            'value_network_mermaid': self.value_network_mermaid,
         }
 
     def get_core_conclusion(self) -> str:
@@ -3391,6 +3393,22 @@ class GeminiAnalyzer:
 > - `risk_alerts` 中不得出現基金管理人相關的公司經營風險
 
 """
+        if getattr(self._get_runtime_config(), 'enable_value_network_mermaid', False):
+            categories_hint = (
+                "持股組成/需求驅動/替代方案/客戶"
+                if context.get('is_index_etf')
+                else "供應商/客戶/競爭者/互補者/護城河"
+            )
+            prompt += f"""
+### 附錄：價值網路圖（可選，僅在證據充分時提供）
+若現有資料足以支撐，請在最上層 JSON 額外新增一個 `value_network_mermaid` 欄位（字串或 null），內容為**純 Mermaid flowchart 原始文字**，用於呈現價值網路（建議分類：{categories_hint}）。規則：
+- 只能使用 `flowchart TB` 或 `flowchart LR`。
+- 不要包含 ``` 圍欄、HTML 或任何其他文字說明，只放 Mermaid 原始語法本身。
+- 最多 5 個 `subgraph` 分類，總節點數不超過 20 個，每個分類最多 4 個項目。
+- 節點標籤使用繁體中文（專有名詞可保留英文），單個標籤盡量在 20 字以內。
+- 用語不得超出本報告主結論的強度（禁止「必買」「保證上漲」「穩賺」等用語）。
+- 若證據不足，請將 `value_network_mermaid` 設為 null，不要編造供應商或客戶。
+"""
         prompt += f"""
 ### ⚠️ 重要：輸出正確的股票名稱格式
 正確的股票名稱格式為“股票名稱（股票程式碼）”，例如“貴州茅臺（600519）”。
@@ -3737,6 +3755,7 @@ class GeminiAnalyzer:
                     # 後設資料
                     search_performed=data.get('search_performed', False),
                     data_sources=data.get('data_sources', 'Technical data' if report_language == "en" else '技術面資料'),
+                    value_network_mermaid=data.get('value_network_mermaid'),
                     success=True,
                 )
             else:

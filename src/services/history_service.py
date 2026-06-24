@@ -32,6 +32,7 @@ from src.report_language import (
 )
 from src.storage import DatabaseManager
 from src.services.run_diagnostics import build_run_diagnostic_summary
+from src.services.value_network_mermaid import validate_value_network_mermaid
 from src.utils.data_processing import (
     extract_realtime_detail_fields,
     normalize_model_used,
@@ -843,6 +844,7 @@ class HistoryService:
                 current_price=raw_result.get("current_price"),
                 change_pct=raw_result.get("change_pct"),
                 model_used=raw_result.get("model_used"),
+                value_network_mermaid=raw_result.get("value_network_mermaid"),
             )
         except Exception as e:
             logger.error(f"Failed to rebuild AnalysisResult: {e}", exc_info=True)
@@ -1112,6 +1114,19 @@ class HistoryService:
                     f"{result.news_summary}",
                     "",
                 ])
+
+        # ========== 附錄：價值網路圖（Phase 18A PoC）==========
+        validated_mermaid = validate_value_network_mermaid(getattr(result, 'value_network_mermaid', None))
+        if validated_mermaid:
+            appendix_heading = "Appendix: Value Network" if report_language == "en" else "附錄：價值網路圖"
+            report_lines.extend([
+                f"## {appendix_heading}",
+                "",
+                "```mermaid",
+                validated_mermaid,
+                "```",
+                "",
+            ])
 
         # ========== 底部 ==========
         report_lines.extend([
