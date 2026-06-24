@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修復] 市場概覽任務完成後會即時更新 MARKET 個股欄卡片與市場概覽歷史資料，完成後不需重新整理整頁即可看到最新市場概覽入口。
+- [修復] Route B 相關資訊/新聞納入規則改為台股/美股正向相關性策略：非台美來源詞不再作為台美新聞正向訊號，無台美公司/財務/產業/市場關聯的內容會在進入 context/cache/tool output 前被丟棄，並保留具財務意義的 App/下載/活躍使用者等商業指標新聞。
+- [修復] 大盤覆盤的美股區塊在 `report_language=zh_TW`（預設值）時不再強制輸出英文標題與段落（如 `US Market Recap`、`Market Summary`、`Index Commentary`），改為遵循設定語言輸出繁體中文內容；報告內層標題統一為「台股大盤回顧」「美股大盤回顧」，不再出現舊版「大盤覆盤」字樣。
+- [修復] 市場概覽歷史記錄/個股欄卡片標題不再顯示「大盤覆盤」（含「大盤覆盤 MARKET」混合標籤），改為「市場概覽」；前端針對 `MARKET` 偽代號的卡片標題額外做防禦性正規化，涵蓋既有舊資料。
+- [修復] 問股自由文本輸入中的常見金融縮寫（如 TTM、EBITDA、DCF、PE）與常見英文填充詞不再被誤判為股票代號候選（同步前後端的常見詞排除清單）。
+- [修復] GitHub Actions 每日分析工作流讀取 `SEARXNG_BASE_URLS` 時改為 Variables 優先、Secrets 回退，修復僅配置 Variables 時 URL 不生效的問題。
+- [改進] 首頁重複任務警示新增關閉按鈕與 5 秒自動消失，避免警示長期佔用版面。
+- [修復] Docker 映像預置 efinance 快取目錄（`efinance/data`）屬主給非 root 執行使用者 `dsa`，修復 efinance 資料來源因寫入 `search-cache.json` 觸發 `PermissionError` 而每次抓取失敗降級的問題。
 - [修復] 股票代號/名稱查詢中，純大寫英文代號（如 TEAM）不再因前端搜尋僅抑制名稱比對而靜默只顯示台股別名候選；現在會同時列出對應的美股精確比對候選並排序在前。
 - [修復] 新增「Global Unichip」「President Chain Store」作為台股創意（3443）、統一超（2912）的英文全名別名。
 - [修復] 大盤覆盤交易日檢查改為正確識別台股獨立交易日曆（Asia/Taipei / XTAI），`MARKET_REVIEW_REGION=all` 不再被舊版邏輯誤判轉換成 cn 並因而中止，可正常產生並持久化台股/美股大盤覆盤報告；cn/hk/both 等舊版區域語意維持不變。

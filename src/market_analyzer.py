@@ -143,12 +143,7 @@ class MarketAnalyzer:
         self.strategy = get_market_strategy_blueprint(self.region)
 
     def _get_review_language(self) -> str:
-        configured = normalize_report_language(
-            getattr(getattr(self, "config", None), "report_language", "zh")
-        )
-        if self.region == "us":
-            return "en"
-        return configured
+        return self._get_template_review_language()
 
     def _get_template_review_language(self) -> str:
         return normalize_report_language(
@@ -206,7 +201,9 @@ class MarketAnalyzer:
             return f"## {date} {market_name}"
         if self.region == "tw":
             return f"## {date} 台股大盤回顧"
-        return f"## {date} 大盤覆盤"
+        if self.region == "us":
+            return f"## {date} 美股大盤回顧"
+        return f"## {date} 大盤回顧"
 
     def _get_index_hint(self) -> str:
         if self._get_review_language() == "en":
@@ -1103,9 +1100,7 @@ Output the report content directly, no extra commentary.
 
 ---
 
-# 輸出格式模板（請嚴格按此格式輸出）
-
-## {overview.date} 大盤覆盤
+{self._get_review_title(overview.date)}
 
 > 一句話給出今日市場狀態、核心矛盾和明日優先觀察方向。
 
@@ -1218,7 +1213,7 @@ Market conditions can change quickly. The data above is for reference only and d
         dashboard_block = self._build_stats_block(overview)
         indices_block = self._build_indices_block(overview)
         sector_block = self._build_sector_block(overview)
-        return f"""## {overview.date} 大盤覆盤
+        return f"""{self._get_review_title(overview.date)}
 
 > 今日{market_label}市場整體呈現**{market_mood}**態勢，優先觀察指數承接、成交額變化和板塊持續性。
 

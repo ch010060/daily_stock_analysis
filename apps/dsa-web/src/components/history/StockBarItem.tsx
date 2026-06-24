@@ -6,6 +6,8 @@ import { formatDateTime } from '../../utils/format';
 import { getMarketPhaseSummaryLabel } from '../../utils/marketPhase';
 import { truncateStockName } from '../../utils/stockName';
 
+const MARKET_REVIEW_DISPLAY_NAME = '市場概覽';
+
 interface StockBarItemProps {
   item: StockBarItemType;
   isViewing: boolean;
@@ -34,7 +36,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
   isMarketReview = false,
 }) => {
   const sentimentColor = item.sentimentScore !== undefined ? getSentimentColor(item.sentimentScore) : null;
-  const stockName = item.stockName || item.stockCode;
+  const stockName = isMarketReview ? MARKET_REVIEW_DISPLAY_NAME : (item.stockName || item.stockCode);
   const operationLabel = getOperationBadgeLabel(item.operationAdvice);
   const phaseLabel = getMarketPhaseSummaryLabel(item.marketPhaseSummary, undefined)?.replace('市場階段: ', '').replace('市場階段：', '').replace('市場階段: ', '').replace('市場階段：', '');
 

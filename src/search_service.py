@@ -2184,24 +2184,57 @@ class SearchService:
         "dividend", "lawsuit", "merger", "acquisition",
     )
     _COMPANY_EVENT_TERMS = (
-        "公告", "披露", "釋出", "收購", "回購", "減持", "增持", "訴訟", "處罰",
-        "業績", "財報", "營收", "淨利潤", "分紅", "董事會", "股東大會", "訂單",
-        "合作", "中標", "earnings", "revenue", "profit", "guidance", "filing",
-        "sec", "shares", "stock", "buyback", "dividend", "lawsuit", "merger",
-        "acquisition", "results", "quarterly", "annual", "announces", "launches",
+        "公告", "發布", "收購", "買回庫藏股", "訴訟", "財報", "營收",
+        "月營收", "獲利", "毛利率", "法說會", "股利", "除權息", "董事會",
+        "股東會", "訂單", "出貨", "庫存", "產能", "資本支出", "合作",
+        "earnings", "revenue", "profit", "eps", "margin",
+        "guidance", "forecast", "outlook", "valuation", "analyst rating",
+        "target price", "upgrade", "downgrade", "filing", "sec filing", "10-k",
+        "10-q", "8-k", "sec", "shares", "stock", "buyback", "dividend", "lawsuit",
+        "litigation", "antitrust", "investigation", "shareholder", "board",
+        "merger", "acquisition", "partnership", "order", "shipment", "inventory",
+        "capacity", "capex", "product launch", "results", "quarterly", "annual",
+        "announces", "launches",
     )
     _SECTOR_NEWS_TERMS = (
-        "行業", "板塊", "產業鏈", "龍頭", "概念股", "賽道", "sector", "industry",
-        "peers", "competitors", "supply chain", "market share",
+        "產業", "族群", "供應鏈", "同業", "sector", "industry",
+        "peers", "competitors", "supply chain", "market share", "半導體",
+        "先進製程", "ai伺服器", "ic設計", "ai", "cloud", "gpu", "cpu", "memory",
+        "dram", "nand", "foundry", "wafer", "smartphone", "pc", "server",
+        "data center", "automotive electronics", "ev",
     )
     _MACRO_NEWS_TERMS = (
-        "大盤", "市場", "指數", "宏觀", "央行", "利率", "通脹", "a股", "港股",
-        "美股", "納指", "標普", "market", "index", "fed", "inflation",
-        "interest rate", "nasdaq", "s&p 500", "dow jones",
+        "大盤", "市場", "指數", "總體經濟", "央行", "利率", "通膨", "台股",
+        "台灣股市", "加權指數", "櫃買", "外資", "投信", "自營商", "融資",
+        "融券", "美股", "那斯達克", "標普500", "wall street", "u.s. stocks",
+        "us market", "market", "index", "fed", "inflation", "cpi", "pce",
+        "treasury yields", "dollar", "oil", "geopolitical risk", "interest rate",
+        "nasdaq", "nyse", "s&p 500", "dow jones", "vix", "premarket",
+        "after-hours", "options", "etf",
     )
     _OFFICIAL_SOURCE_TERMS = (
-        "cninfo", "sse.com", "szse.cn", "hkexnews", "sec.gov", "nasdaq.com",
-        "nyse.com", "上交所", "深交所", "港交所", "證券交易所",
+        "sec.gov", "nasdaq.com", "nyse.com", "twse.com.tw", "tpex.org.tw",
+        "mops.twse.com.tw", "twse", "tpex", "公開資訊觀測站", "台灣證券交易所",
+        "證券櫃檯買賣中心",
+    )
+    _TWUS_POSITIVE_NEWS_TERMS = (
+        "營收", "月營收", "財報", "法說會", "eps", "半導體", "先進製程",
+        "ai伺服器", "ic設計", "台股", "台灣股市", "加權指數", "櫃買", "twse",
+        "tpex", "外資", "投信", "自營商", "融資", "融券", "除權息",
+        "earnings", "earnings call", "revenue", "profit", "margin", "guidance",
+        "forecast", "outlook", "valuation", "analyst rating", "target price",
+        "upgrade", "downgrade", "dividend", "buyback", "merger", "acquisition",
+        "partnership", "order", "shipment", "inventory", "capacity", "capex",
+        "product launch", "sec filing", "10-k", "10-q", "8-k", "litigation",
+        "antitrust", "investigation", "shareholder", "board", "semiconductor",
+        "ai chips", "ai chip", "cloud", "gpu", "cpu", "memory", "dram", "nand",
+        "foundry", "wafer", "smartphone", "pc", "server", "data center",
+        "automotive electronics", "ev", "etf", "s&p 500", "nasdaq", "nyse",
+        "wall street", "u.s. stocks", "us market", "fed", "inflation", "cpi",
+        "pce", "treasury yields", "dollar", "oil", "geopolitical risk",
+        "premarket", "after-hours", "options", "app revenue", "ad revenue",
+        "downloads grew", "download growth", "installs grew", "install growth",
+        "active users",
     )
     _TW_NEWS_ENGLISH_ALIASES_BY_CODE = {
         "2330": ["TSMC Taiwan Semiconductor"],
@@ -2855,6 +2888,14 @@ class SearchService:
         if not text or not term:
             return False
 
+        if term.isdigit():
+            pattern = r"(?<![A-Za-z0-9])" + re.escape(term) + r"(?![A-Za-z0-9])"
+            for match in re.finditer(pattern, text):
+                next_char = text[match.end():match.end() + 1]
+                if next_char != "點":
+                    return True
+            return False
+
         if cls._US_STOCK_RE.match(term) and term.upper() == term and not term.startswith("$"):
             ticker_pattern = f"(?:{re.escape(term)}|{re.escape(term.lower())})"
             pattern = (
@@ -2870,6 +2911,130 @@ class SearchService:
     def _contains_any_news_term(cls, text: str, terms: Tuple[str, ...]) -> bool:
         lower = (text or "").lower()
         return any(term.lower() in lower for term in terms)
+
+    @classmethod
+    def _contains_any_route_b_policy_term(cls, text: str, terms: Tuple[str, ...]) -> bool:
+        lower = (text or "").lower()
+        if not lower:
+            return False
+        for term in terms:
+            normalized = term.lower()
+            if not normalized:
+                continue
+            if normalized.isascii() and re.search(r"[a-z0-9]", normalized):
+                pattern = r"(?<![A-Za-z0-9])" + re.escape(normalized) + r"(?![A-Za-z0-9])"
+                if re.search(pattern, lower):
+                    return True
+                continue
+            if normalized in lower:
+                return True
+        return False
+
+    @classmethod
+    def _has_direct_twus_company_evidence(
+        cls,
+        item: SearchResult,
+        *,
+        stock_code: str,
+        stock_name: str,
+    ) -> bool:
+        text = " ".join(filter(None, [item.title, item.snippet, item.url]))
+        for term in cls._stock_code_identity_terms(stock_code):
+            if cls._contains_stock_code_identity_term(text, term):
+                return True
+        for term in cls._company_identity_terms(stock_name):
+            if cls._contains_identity_term(text, term):
+                return True
+        for term in cls._news_alias_identity_terms(stock_code):
+            if cls._contains_identity_term(text, term):
+                return True
+        return False
+
+    @classmethod
+    def has_positive_twus_news_relevance(
+        cls,
+        item: SearchResult,
+        *,
+        stock_code: str = "",
+        stock_name: str = "",
+    ) -> bool:
+        """Admission-first TW/US relevance signal."""
+        if cls._has_direct_twus_company_evidence(
+            item,
+            stock_code=stock_code,
+            stock_name=stock_name,
+        ):
+            return True
+        text = " ".join(filter(None, [item.title, item.snippet, item.url, item.source]))
+        return cls._contains_any_route_b_policy_term(text, cls._TWUS_POSITIVE_NEWS_TERMS)
+
+    @classmethod
+    def should_admit_route_b_news_item(
+        cls,
+        item: SearchResult,
+        *,
+        stock_code: str,
+        stock_name: str,
+        has_better_candidate: bool,
+    ) -> bool:
+        direct_evidence = cls._has_direct_twus_company_evidence(
+            item,
+            stock_code=stock_code,
+            stock_name=stock_name,
+        )
+        if direct_evidence or cls.has_positive_twus_news_relevance(
+            item,
+            stock_code=stock_code,
+            stock_name=stock_name,
+        ):
+            return True
+        if has_better_candidate and (item.relevance_score or 0) <= 0:
+            return False
+        return False
+
+    @classmethod
+    def filter_route_b_news_items(
+        cls,
+        results: List[SearchResult],
+        *,
+        stock_code: str,
+        stock_name: str,
+        log_scope: str,
+    ) -> List[SearchResult]:
+        if not results:
+            return results
+
+        has_better_candidate = any(
+            item.relevance_category == cls._DIRECT_NEWS_CATEGORY
+            or (item.relevance_score or 0) > 0
+            or cls.has_positive_twus_news_relevance(
+                item,
+                stock_code=stock_code,
+                stock_name=stock_name,
+            )
+            for item in results
+        )
+        admitted = [
+            item
+            for item in results
+            if cls.should_admit_route_b_news_item(
+                item,
+                stock_code=stock_code,
+                stock_name=stock_name,
+                has_better_candidate=has_better_candidate,
+            )
+        ]
+
+        dropped = len(results) - len(admitted)
+        if dropped:
+            logger.info(
+                "[新聞納入規則] %s: total=%s, kept=%s, dropped=%s",
+                log_scope,
+                len(results),
+                len(admitted),
+                dropped,
+            )
+        return admitted
 
     @classmethod
     def _score_news_relevance(
@@ -2983,18 +3148,27 @@ class SearchService:
 
         has_sector_signal = cls._contains_any_news_term(full_text, cls._SECTOR_NEWS_TERMS)
         has_macro_signal = cls._contains_any_news_term(full_text, cls._MACRO_NEWS_TERMS)
+        has_positive_twus_signal = cls.has_positive_twus_news_relevance(
+            item,
+            stock_code=stock_code,
+            stock_name=stock_name,
+        )
 
         if direct_signal >= 38:
             category = cls._DIRECT_NEWS_CATEGORY
         elif has_macro_signal and not direct_signal:
             category = cls._MACRO_NEWS_CATEGORY
-            score = max(0, score - 12)
-            add_reason("未命中目標公司身份，歸為宏觀/市場新聞")
+            if has_positive_twus_signal:
+                score += 10
+                add_reason("命中台美市場/產業/財務關聯詞")
+            else:
+                score = max(0, score - 12)
+                add_reason("未命中目標公司身份，歸為宏觀/市場新聞")
         else:
             category = cls._SECTOR_NEWS_CATEGORY
-            if has_sector_signal:
-                score += 6
-                add_reason("僅命中行業或板塊背景")
+            if has_sector_signal or has_positive_twus_signal:
+                score += 10 if has_positive_twus_signal else 6
+                add_reason("命中台美產業/財務背景")
             else:
                 add_reason("未命中股票代號或公司全稱，降級為背景新聞")
 
@@ -3043,7 +3217,13 @@ class SearchService:
             return (category_rank, language_rank, -score, index)
 
         ranked_results = [result for _, result in sorted(indexed_results, key=sort_key)]
-        limited_results = ranked_results[:max_results]
+        admitted_results = cls.filter_route_b_news_items(
+            ranked_results,
+            stock_code=stock_code,
+            stock_name=stock_name,
+            log_scope=log_scope,
+        )
+        limited_results = admitted_results[:max_results]
         category_counts = {
             cls._DIRECT_NEWS_CATEGORY: 0,
             cls._SECTOR_NEWS_CATEGORY: 0,
@@ -3574,6 +3754,15 @@ class SearchService:
                             ranked_response,
                             max_results=max_results,
                         )
+                        if not limited_response.results:
+                            fallback_used = True
+                            logger.info(
+                                "%s query[%s/%s] 搜尋成功但新聞納入規則後無有效 TW/US 相關資訊，繼續嘗試下一路徑",
+                                provider_name,
+                                query_index,
+                                len(candidate_queries),
+                            )
+                            continue
                         stats = self._news_relevance_stats(
                             limited_response,
                             prefer_chinese=prefer_chinese,
@@ -3667,6 +3856,8 @@ class SearchService:
                                     ranked_unknown,
                                     max_results=max_results,
                                 )
+                                if not limited_unknown.results:
+                                    continue
                                 unknown_stats = self._news_relevance_stats(
                                     limited_unknown,
                                     prefer_chinese=prefer_chinese,
@@ -3923,7 +4114,7 @@ class SearchService:
                     'name': 'announcements',
                     'query': (
                         f"{stock_name} {stock_code} 公告 指數調整 成分變化"
-                        if is_index_etf else f"{stock_name} {stock_code} 公司公告 重要公告 上交所 深交所 cninfo"
+                        if is_index_etf else f"{stock_name} {stock_code} 公司公告 法說會 月營收 財報"
                     ),
                     'desc': '公司公告',
                     'tavily_topic': 'news',

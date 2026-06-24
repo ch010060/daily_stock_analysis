@@ -33,6 +33,13 @@ def test_dockerfile_bundles_default_alphasift_adapter() -> None:
     assert "import alphasift.dsa_adapter" in dockerfile
 
 
+def test_dockerfile_grants_efinance_cache_dir_to_non_root_user() -> None:
+    dockerfile = (REPO_ROOT / "docker" / "Dockerfile").read_text(encoding="utf-8")
+
+    assert "import efinance, pathlib" in dockerfile
+    assert 'chown -R dsa:dsa "$EF_DATA_DIR"' in dockerfile
+
+
 def test_docker_entrypoint_repairs_ownership_and_user_permissions() -> None:
     entrypoint = (REPO_ROOT / "docker" / "entrypoint.sh").read_text(encoding="utf-8")
 
