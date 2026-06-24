@@ -15,6 +15,9 @@ interface HistoryListItemProps {
   onClick: (recordId: number) => void;
 }
 
+const MARKET_REVIEW_HISTORY_CODE = 'MARKET';
+const MARKET_REVIEW_DISPLAY_NAME = '市場概覽';
+
 const getOperationBadgeLabel = (advice?: string) => {
   const normalized = advice?.trim();
   if (!normalized) {
@@ -44,7 +47,9 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
   onClick,
 }) => {
   const sentimentColor = item.sentimentScore !== undefined ? getSentimentColor(item.sentimentScore) : null;
-  const stockName = item.stockName || item.stockCode;
+  const stockName = item.stockCode === MARKET_REVIEW_HISTORY_CODE
+    ? MARKET_REVIEW_DISPLAY_NAME
+    : (item.stockName || item.stockCode);
   const phaseLabel = getMarketPhaseSummaryLabel(item.marketPhaseSummary, undefined)?.replace('市場階段: ', '').replace('市場階段：', '').replace('市場階段: ', '').replace('市場階段：', '');
 
   return (

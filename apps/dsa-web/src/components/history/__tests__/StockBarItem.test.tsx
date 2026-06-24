@@ -18,7 +18,35 @@ const issue1600Item: StockBarItem = {
   },
 };
 
+const legacyMarketReviewItem: StockBarItem = {
+  id: 2,
+  stockCode: 'MARKET',
+  stockName: '大盤覆盤',
+  sentimentScore: 50,
+  operationAdvice: '檢視覆盤',
+  analysisCount: 1,
+  lastAnalysisTime: '2026-06-23T08:00:00Z',
+};
+
 describe('StockBarItemComponent', () => {
+  it('shows the 市場概覽 title for the MARKET pseudo-record even when the persisted name is the legacy 大盤覆盤 wording', () => {
+    render(
+      <StockBarItemComponent
+        item={legacyMarketReviewItem}
+        isViewing={false}
+        onClick={vi.fn()}
+        onDelete={vi.fn()}
+        isMarketReview
+      />,
+    );
+
+    expect(screen.getByText('市場概覽')).toBeInTheDocument();
+    expect(screen.queryByText('大盤覆盤')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^市場概覽 MARKET 歷史記錄$/ }),
+    ).toBeInTheDocument();
+  });
+
   it('keeps market phase in the meta row instead of the action row', () => {
     render(
       <StockBarItemComponent
