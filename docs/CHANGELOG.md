@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修復] Route B 相關資訊/新聞納入規則改為台股/美股正向相關性策略：非台美來源詞不再作為台美新聞正向訊號，無台美公司/財務/產業/市場關聯的內容會在進入 context/cache/tool output 前被丟棄，並保留具財務意義的 App/下載/活躍使用者等商業指標新聞。
 - [修復] 大盤覆盤的美股區塊在 `report_language=zh_TW`（預設值）時不再強制輸出英文標題與段落（如 `US Market Recap`、`Market Summary`、`Index Commentary`），改為遵循設定語言輸出繁體中文內容；報告內層標題統一為「台股大盤回顧」「美股大盤回顧」，不再出現舊版「大盤覆盤」字樣。
 - [修復] 市場概覽歷史記錄/個股欄卡片標題不再顯示「大盤覆盤」（含「大盤覆盤 MARKET」混合標籤），改為「市場概覽」；前端針對 `MARKET` 偽代號的卡片標題額外做防禦性正規化，涵蓋既有舊資料。
 - [修復] 問股自由文本輸入中的常見金融縮寫（如 TTM、EBITDA、DCF、PE）與常見英文填充詞不再被誤判為股票代號候選（同步前後端的常見詞排除清單）。
