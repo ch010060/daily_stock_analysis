@@ -1,12 +1,29 @@
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import Markdown from 'react-markdown';
+import type { ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { historyApi } from '../../api/history';
 import type { ReportLanguage } from '../../types/analysis';
 import { markdownToPlainText } from '../../utils/markdown';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Tooltip } from '../common/Tooltip';
+import { MermaidDiagram } from './MermaidDiagram';
+
+type CodeProps = React.ComponentProps<'code'> & ExtraProps;
+
+const MARKDOWN_COMPONENTS = {
+  code: ({ className, children, ...props }: CodeProps) => {
+    if (className === 'language-mermaid') {
+      return <MermaidDiagram code={String(children).trim()} />;
+    }
+    return (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    );
+  },
+};
 
 export interface ReportMarkdownPanelProps {
   recordId: number;
@@ -184,7 +201,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
             whitespace-pre-line break-words
           "
         >
-          <Markdown remarkPlugins={[remarkGfm]}>
+          <Markdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
             {content}
           </Markdown>
         </div>
