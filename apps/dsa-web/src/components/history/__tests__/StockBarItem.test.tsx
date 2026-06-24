@@ -65,7 +65,7 @@ describe('StockBarItemComponent', () => {
     expect(within(actions).queryByText('CN · 非交易日')).not.toBeInTheDocument();
     expect(within(meta).getByText('CN · 非交易日')).toBeVisible();
 
-    expect(screen.getByText('台積電股票股份.')).toBeVisible();
+    expect(screen.getByText('台積電股份有限公.')).toBeVisible();
     expect(
       screen.getByRole('button', {
         name: /^台積電股份有限公司 2330 歷史記錄$/,
