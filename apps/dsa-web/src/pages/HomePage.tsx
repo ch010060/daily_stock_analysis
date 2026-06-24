@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, Check, SlidersHorizontal } from 'lucide-react';
+import { BarChart3, Check, SlidersHorizontal, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
@@ -20,6 +20,8 @@ import type { SetupStatusResponse } from '../types/systemConfig';
 import { getReportText, normalizeReportLanguage } from '../utils/reportLanguage';
 import type { StockBarItem } from '../types/analysis';
 
+const DUPLICATE_BANNER_AUTO_DISMISS_MS = 5000;
+
 type MarketReviewNotice = {
   variant: 'success' | 'warning' | 'danger';
   title: string;
@@ -37,6 +39,8 @@ const HomePage: React.FC = () => {
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
   const [strategyMenuOpen, setStrategyMenuOpen] = useState(false);
+  const [duplicateBannerVisible, setDuplicateBannerVisible] = useState(false);
+  const duplicateBannerTimer = useRef<number | null>(null);
   const marketReviewPollTimer = useRef<number | null>(null);
   const dashboardScrollRef = useRef<HTMLElement | null>(null);
   const strategyMenuRef = useRef<HTMLDivElement | null>(null);
@@ -112,6 +116,35 @@ const HomePage: React.FC = () => {
     loadStockBar,
     refreshStockBar,
   } = useHomeDashboardState();
+
+  const clearDuplicateBannerTimer = useCallback(() => {
+    if (duplicateBannerTimer.current !== null) {
+      window.clearTimeout(duplicateBannerTimer.current);
+      duplicateBannerTimer.current = null;
+    }
+  }, []);
+
+  const dismissDuplicateBanner = useCallback(() => {
+    clearDuplicateBannerTimer();
+    setDuplicateBannerVisible(false);
+  }, [clearDuplicateBannerTimer]);
+
+  useEffect(() => {
+    if (!duplicateError) {
+      clearDuplicateBannerTimer();
+      setDuplicateBannerVisible(false);
+      return undefined;
+    }
+
+    setDuplicateBannerVisible(true);
+    clearDuplicateBannerTimer();
+    duplicateBannerTimer.current = window.setTimeout(() => {
+      duplicateBannerTimer.current = null;
+      setDuplicateBannerVisible(false);
+    }, DUPLICATE_BANNER_AUTO_DISMISS_MS);
+
+    return clearDuplicateBannerTimer;
+  }, [clearDuplicateBannerTimer, duplicateError]);
 
   useEffect(() => {
     document.title = '每日選股分析 - DSA';
@@ -735,7 +768,7 @@ const HomePage: React.FC = () => {
           </div>
         </header>
 
-        {inputError || duplicateError ? (
+        {inputError || (duplicateError && duplicateBannerVisible) ? (
           <div className="px-3 pb-2 md:px-4">
             {inputError ? (
               <InlineAlert
@@ -745,12 +778,22 @@ const HomePage: React.FC = () => {
                 className="rounded-xl px-3 py-2 text-xs shadow-none"
               />
             ) : null}
-            {!inputError && duplicateError ? (
+            {!inputError && duplicateError && duplicateBannerVisible ? (
               <InlineAlert
                 variant="warning"
                 title="任務已存在"
                 message={duplicateError}
                 className="rounded-xl px-3 py-2 text-xs shadow-none"
+                action={(
+                  <button
+                    type="button"
+                    onClick={dismissDuplicateBanner}
+                    aria-label="關閉"
+                    className="-my-1 -mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg opacity-70 transition-colors hover:bg-warning/15 hover:opacity-100"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               />
             ) : null}
           </div>

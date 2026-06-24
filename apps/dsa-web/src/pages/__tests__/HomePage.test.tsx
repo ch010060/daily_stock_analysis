@@ -351,6 +351,36 @@ describe('HomePage', () => {
     expect(screen.getByText(/股票 2330 正在分析中/).closest('[role="alert"]')).toBeInTheDocument();
   });
 
+  it('dismisses the duplicate task banner via its close button', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(
+      new DuplicateTaskError('2330', 'task-1', '股票 2330 正在分析中'),
+    );
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByPlaceholderText('輸入股票代號或名稱，如 2330、AAPL');
+    fireEvent.change(input, { target: { value: '2330' } });
+    fireEvent.click(screen.getByRole('button', { name: '分析' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/股票 2330 正在分析中/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '關閉' }));
+
+    expect(screen.queryByText(/股票 2330 正在分析中/)).not.toBeInTheDocument();
+  });
+
   it('submits market review from the home toolbar', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 0,
