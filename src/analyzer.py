@@ -1815,7 +1815,7 @@ class GeminiAnalyzer:
     "hot_topics": "相關熱點",
 
     "search_performed": true/false,
-    "data_sources": "資料來源說明"
+    "data_sources": "資料來源說明"{value_network_schema_field}
 }
 ```
 
@@ -1985,7 +1985,7 @@ class GeminiAnalyzer:
     "hot_topics": "相關熱點",
 
     "search_performed": true/false,
-    "data_sources": "資料來源說明"
+    "data_sources": "資料來源說明"{value_network_schema_field}
 }
 ```
 
@@ -2113,11 +2113,19 @@ class GeminiAnalyzer:
         market_role = get_market_role(stock_code, lang)
         market_guidelines = get_market_guidelines(stock_code, lang)
         skill_instructions, default_skill_policy, use_legacy_default_prompt = self._get_skill_prompt_sections()
+        value_network_schema_field = ""
+        if getattr(self._get_runtime_config(), 'enable_value_network_mermaid', False):
+            value_network_schema_field = (
+                ',\n    "value_network_mermaid": "純 Mermaid flowchart 文字或 null；'
+                "啟用時必須出現此鍵，產生規則見後方「附錄：價值網路圖」\""
+            )
         if use_legacy_default_prompt:
             base_prompt = self.LEGACY_DEFAULT_SYSTEM_PROMPT.replace(
                 "{market_placeholder}", market_role
             ).replace(
                 "{guidelines_placeholder}", market_guidelines
+            ).replace(
+                "{value_network_schema_field}", value_network_schema_field
             )
         else:
             skills_section = ""
@@ -2131,6 +2139,7 @@ class GeminiAnalyzer:
                 .replace("{guidelines_placeholder}", market_guidelines)
                 .replace("{default_skill_policy_section}", default_skill_policy_section)
                 .replace("{skills_section}", skills_section)
+                .replace("{value_network_schema_field}", value_network_schema_field)
             )
         if lang == "en":
             return base_prompt + """
@@ -3400,14 +3409,16 @@ class GeminiAnalyzer:
                 else "供應商/客戶/競爭者/互補者/護城河"
             )
             prompt += f"""
-### 附錄：價值網路圖（可選，僅在證據充分時提供）
-若現有資料足以支撐，請在最上層 JSON 額外新增一個 `value_network_mermaid` 欄位（字串或 null），內容為**純 Mermaid flowchart 原始文字**，用於呈現價值網路（建議分類：{categories_hint}）。規則：
-- 只能使用 `flowchart TB` 或 `flowchart LR`。
+### 附錄：價值網路圖（啟用時必須輸出此欄位）
+請在最上層 JSON 額外輸出 `value_network_mermaid` 欄位（字串或 null）。此功能已啟用，**該鍵必須出現在 JSON 中**，即使值為 null。
+- 對於有公開商業身份的已知標的（如知名上市公司、ETF），通常應能產出至少類別層級的精簡價值網路圖（建議分類：{categories_hint}），即使沒有精確供應商/客戶證據，也不要因此直接省略圖表。
+- 若無法取得精確的具名供應商/客戶/競爭者，請改用產業類別層級節點（例如：「晶圓代工」「IP供應」「手機品牌客戶」「IoT裝置」），不要編造具體公司名稱。
+- 只有在該標的業務身份本身嚴重不明確（例如資料嚴重缺失、無法判斷所屬產業）時，才將 `value_network_mermaid` 設為 null。
+- 內容為**純 Mermaid flowchart 原始文字**，只能使用 `flowchart TB` 或 `flowchart LR`。
 - 不要包含 ``` 圍欄、HTML 或任何其他文字說明，只放 Mermaid 原始語法本身。
 - 最多 5 個 `subgraph` 分類，總節點數不超過 20 個，每個分類最多 4 個項目。
 - 節點標籤使用繁體中文（專有名詞可保留英文），單個標籤盡量在 20 字以內。
 - 用語不得超出本報告主結論的強度（禁止「必買」「保證上漲」「穩賺」等用語）。
-- 若證據不足，請將 `value_network_mermaid` 設為 null，不要編造供應商或客戶。
 """
         prompt += f"""
 ### ⚠️ 重要：輸出正確的股票名稱格式

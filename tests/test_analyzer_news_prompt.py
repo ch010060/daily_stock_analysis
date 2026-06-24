@@ -341,6 +341,91 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
         self.assertIn("持股組成/需求驅動/替代方案/客戶", prompt)
         self.assertNotIn("供應商/客戶/競爭者/互補者/護城河", prompt)
 
+    def test_format_prompt_value_network_section_requires_key_presence_when_enabled(self) -> None:
+        """Phase 18C: the key must always appear in JSON when the flag is enabled, not a purely optional aside."""
+        enabled_config = dataclasses.replace(Config(), enable_value_network_mermaid=True)
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer(config=enabled_config)
+
+        context = {
+            "code": "2330",
+            "stock_name": "台積電",
+            "date": "2026-03-27",
+            "today": {},
+        }
+
+        prompt = analyzer._format_prompt(context, "台積電", news_context=None)
+
+        self.assertIn("該鍵必須出現在 JSON 中", prompt)
+
+    def test_format_prompt_value_network_section_allows_category_level_nodes(self) -> None:
+        """Phase 18C: weak exact-evidence should fall back to category-level nodes, not omission."""
+        enabled_config = dataclasses.replace(Config(), enable_value_network_mermaid=True)
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer(config=enabled_config)
+
+        context = {
+            "code": "2454",
+            "stock_name": "聯發科",
+            "date": "2026-03-27",
+            "today": {},
+        }
+
+        prompt = analyzer._format_prompt(context, "聯發科", news_context=None)
+
+        self.assertIn("通常應能產出至少類別層級的精簡價值網路圖", prompt)
+        self.assertIn("產業類別層級節點", prompt)
+        self.assertIn("不要因此直接省略圖表", prompt)
+
+    def test_format_prompt_value_network_section_reserves_null_for_unknown_identity(self) -> None:
+        """Phase 18C: null is reserved for genuinely unclear business identity, not generic insufficient evidence."""
+        enabled_config = dataclasses.replace(Config(), enable_value_network_mermaid=True)
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer(config=enabled_config)
+
+        context = {
+            "code": "2330",
+            "stock_name": "台積電",
+            "date": "2026-03-27",
+            "today": {},
+        }
+
+        prompt = analyzer._format_prompt(context, "台積電", news_context=None)
+
+        self.assertIn("業務身份本身嚴重不明確", prompt)
+        self.assertNotIn("若證據不足，請將 `value_network_mermaid` 設為 null，不要編造供應商或客戶。", prompt)
+
+    def test_analysis_system_prompt_omits_value_network_schema_field_by_default(self) -> None:
+        """Phase 18C: the canonical JSON schema list must not mention the field when the flag is disabled."""
+        for legacy in (False, True):
+            with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+                analyzer = GeminiAnalyzer(
+                    skill_instructions="",
+                    default_skill_policy="",
+                    use_legacy_default_prompt=legacy,
+                )
+
+            prompt = analyzer._get_analysis_system_prompt("zh", stock_code="2330")
+
+            self.assertNotIn("value_network_mermaid", prompt)
+
+    def test_analysis_system_prompt_includes_value_network_schema_field_when_enabled(self) -> None:
+        """Phase 18C (Option A): value_network_mermaid must be part of the canonical JSON schema list, not only an appended aside."""
+        enabled_config = dataclasses.replace(Config(), enable_value_network_mermaid=True)
+        for legacy in (False, True):
+            with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+                analyzer = GeminiAnalyzer(
+                    config=enabled_config,
+                    skill_instructions="",
+                    default_skill_policy="",
+                    use_legacy_default_prompt=legacy,
+                )
+
+            prompt = analyzer._get_analysis_system_prompt("zh", stock_code="2330")
+
+            self.assertIn('"value_network_mermaid"', prompt)
+            self.assertIn('"data_sources": "資料來源說明",', prompt)
+
     def test_format_prompt_labels_intraday_partial_quote_as_estimated(self) -> None:
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
             analyzer = GeminiAnalyzer()
