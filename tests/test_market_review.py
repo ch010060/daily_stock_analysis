@@ -307,12 +307,48 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                     ).first()
                     self.assertIsNotNone(row)
                     self.assertEqual(row.code, market_review_module.MARKET_REVIEW_HISTORY_CODE)
-                    self.assertEqual(row.name, "大盤覆盤")
+                    self.assertEqual(row.name, "市場概覽")
                     self.assertEqual(row.report_type, market_review_module.MARKET_REVIEW_REPORT_TYPE)
                     self.assertEqual(row.news_content, "## 今日大盤\n\n覆盤正文")
                     self.assertIn("# 🎯 大盤覆盤", row.raw_result)
                     self.assertIn('"market_light_snapshots"', row.context_snapshot)
                     self.assertIn('"trade_date": "2026-03-06"', row.context_snapshot)
+            finally:
+                DatabaseManager.reset_instance()
+                Config._instance = None
+                if old_db_path is None:
+                    os.environ.pop("DATABASE_PATH", None)
+                else:
+                    os.environ["DATABASE_PATH"] = old_db_path
+
+    def test_persist_market_review_history_uses_market_overview_wording_not_legacy_recap_term(self) -> None:
+        """History/stock-bar card title must not surface the legacy 大盤覆盤/大盤復盤 wording."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            old_db_path = os.environ.get("DATABASE_PATH")
+            os.environ["DATABASE_PATH"] = os.path.join(temp_dir, "market_review_history.db")
+            Config._instance = None
+            DatabaseManager.reset_instance()
+            try:
+                saved = market_review_module._persist_market_review_history(
+                    review_report="## 美股大盤回顧\n\n正文",
+                    markdown_report="# 🎯 大盤回顧\n\n## 美股大盤回顧\n\n正文",
+                    region="us",
+                    config=SimpleNamespace(report_language="zh_TW"),
+                    query_id="market-task-002",
+                )
+
+                self.assertEqual(saved, 1)
+                db = DatabaseManager.get_instance()
+                with db.get_session() as session:
+                    row = session.query(AnalysisHistory).filter(
+                        AnalysisHistory.query_id == "market-task-002"
+                    ).first()
+                    self.assertIsNotNone(row)
+                    self.assertEqual(row.name, "市場概覽")
+                    self.assertNotIn("大盤覆盤", row.name)
+                    self.assertNotIn("大盤復盤", row.name)
+                    self.assertNotIn("大盤覆盤", row.operation_advice or "")
+                    self.assertNotIn("大盤覆盤", row.trend_prediction or "")
             finally:
                 DatabaseManager.reset_instance()
                 Config._instance = None

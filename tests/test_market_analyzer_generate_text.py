@@ -1018,7 +1018,7 @@ class TestMarketAnalyzerBypassFix:
 
         result = ma.generate_market_review(overview, [])
 
-        assert "## 2026-03-05 大盤覆盤" in result
+        assert "## 2026-03-05 美股大盤回顧" in result
         assert "### 一、盤面總覽" in result
         assert "今日美股市場整體呈現**小幅下跌**態勢" in result
         assert "### 1. Market Summary" not in result

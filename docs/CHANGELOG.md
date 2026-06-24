@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修復] 大盤覆盤的美股區塊在 `report_language=zh_TW`（預設值）時不再強制輸出英文標題與段落（如 `US Market Recap`、`Market Summary`、`Index Commentary`），改為遵循設定語言輸出繁體中文內容；報告內層標題統一為「台股大盤回顧」「美股大盤回顧」，不再出現舊版「大盤覆盤」字樣。
 - [修復] 股票代號/名稱查詢中，純大寫英文代號（如 TEAM）不再因前端搜尋僅抑制名稱比對而靜默只顯示台股別名候選；現在會同時列出對應的美股精確比對候選並排序在前。
 - [修復] 新增「Global Unichip」「President Chain Store」作為台股創意（3443）、統一超（2912）的英文全名別名。
 - [修復] 大盤覆盤交易日檢查改為正確識別台股獨立交易日曆（Asia/Taipei / XTAI），`MARKET_REVIEW_REGION=all` 不再被舊版邏輯誤判轉換成 cn 並因而中止，可正常產生並持久化台股/美股大盤覆盤報告；cn/hk/both 等舊版區域語意維持不變。

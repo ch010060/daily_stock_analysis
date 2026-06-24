@@ -293,9 +293,9 @@ def _persist_market_review_history(
             operation_advice = "View review"
             trend_prediction = "Market review"
         else:
-            stock_name = "大盤覆盤"
-            operation_advice = "檢視覆盤"
-            trend_prediction = "大盤覆盤"
+            stock_name = "市場概覽"
+            operation_advice = "查看市場概覽"
+            trend_prediction = "市場概覽"
 
         result = AnalysisResult(
             code=MARKET_REVIEW_HISTORY_CODE,
@@ -344,6 +344,4 @@ def _summarize_market_review(review_report: str, report_language: str) -> str:
             return text[:200]
     if report_language == "en":
         return "Market review report generated."
-    if report_language == "zh_TW":
-        return "大盤回顧報告已生成。"
-    return "大盤覆盤報告已生成。"
+    return "大盤回顧報告已生成。"
