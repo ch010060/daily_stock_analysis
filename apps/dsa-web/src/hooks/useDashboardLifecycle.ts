@@ -2,12 +2,15 @@ import { useEffect, useRef } from 'react';
 import type { TaskInfo } from '../types/analysis';
 import { useTaskStream } from './useTaskStream';
 
+const MARKET_REVIEW_HISTORY_CODE = 'MARKET';
+
 type UseDashboardLifecycleOptions = {
   loadInitialHistory: () => Promise<void>;
   refreshHistory: (silent?: boolean) => Promise<void>;
   refreshActiveTasks: () => Promise<void>;
   loadStockBar: () => Promise<void>;
   refreshStockBar: () => Promise<void>;
+  refreshMarketReviewHistory: (silent?: boolean) => Promise<void>;
   syncTaskCreated: (task: TaskInfo) => void;
   syncTaskUpdated: (task: TaskInfo) => void;
   syncTaskFailed: (task: TaskInfo) => void;
@@ -21,6 +24,7 @@ export function useDashboardLifecycle({
   refreshActiveTasks,
   loadStockBar,
   refreshStockBar,
+  refreshMarketReviewHistory,
   syncTaskCreated,
   syncTaskUpdated,
   syncTaskFailed,
@@ -97,6 +101,9 @@ export function useDashboardLifecycle({
       syncTaskUpdated(task);
       void refreshHistory(true);
       void refreshStockBar();
+      if (task.stockCode === MARKET_REVIEW_HISTORY_CODE || task.reportType === 'market_review') {
+        void refreshMarketReviewHistory(true).catch(() => undefined);
+      }
       scheduleTaskRemoval(task.taskId, 2_000);
     },
     onTaskFailed: (task) => {

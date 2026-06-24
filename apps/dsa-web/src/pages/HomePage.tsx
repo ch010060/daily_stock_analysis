@@ -342,6 +342,7 @@ const HomePage: React.FC = () => {
     refreshHistory,
     loadStockBar,
     refreshStockBar,
+    refreshMarketReviewHistory,
     syncTaskCreated,
     syncTaskUpdated,
     syncTaskFailed,

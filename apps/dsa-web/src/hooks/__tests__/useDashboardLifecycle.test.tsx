@@ -17,9 +17,18 @@ const createTask = () => ({
   createdAt: '2026-03-18T08:00:00Z',
 });
 
+const createMarketReviewTask = () => ({
+  ...createTask(),
+  taskId: 'task-market-review',
+  stockCode: 'MARKET',
+  stockName: '市場概覽',
+  reportType: 'market_review',
+});
+
 const defaultMocks = {
   loadStockBar: vi.fn().mockResolvedValue(undefined),
   refreshStockBar: vi.fn().mockResolvedValue(undefined),
+  refreshMarketReviewHistory: vi.fn().mockResolvedValue(undefined),
 };
 
 describe('useDashboardLifecycle', () => {
@@ -105,6 +114,8 @@ describe('useDashboardLifecycle', () => {
 
   it('refreshes history and removes completed tasks after the grace window', () => {
     const refreshHistory = vi.fn().mockResolvedValue(undefined);
+    const refreshStockBar = vi.fn().mockResolvedValue(undefined);
+    const refreshMarketReviewHistory = vi.fn().mockResolvedValue(undefined);
     const syncTaskUpdated = vi.fn();
     const removeTask = vi.fn();
 
@@ -118,6 +129,8 @@ describe('useDashboardLifecycle', () => {
         syncTaskFailed: vi.fn(),
         removeTask,
         ...defaultMocks,
+        refreshStockBar,
+        refreshMarketReviewHistory,
       }),
     );
 
@@ -130,12 +143,120 @@ describe('useDashboardLifecycle', () => {
 
     expect(syncTaskUpdated).toHaveBeenCalledWith(completedTask);
     expect(refreshHistory).toHaveBeenCalledWith(true);
+    expect(refreshStockBar).toHaveBeenCalledTimes(1);
+    expect(refreshMarketReviewHistory).not.toHaveBeenCalled();
 
     act(() => {
       vi.advanceTimersByTime(2_000);
     });
 
     expect(removeTask).toHaveBeenCalledWith(completedTask.taskId);
+    expect(refreshMarketReviewHistory).not.toHaveBeenCalled();
+  });
+
+  it('refreshes market-review history once when a market-review task completes', () => {
+    const refreshHistory = vi.fn().mockResolvedValue(undefined);
+    const refreshStockBar = vi.fn().mockResolvedValue(undefined);
+    const refreshMarketReviewHistory = vi.fn().mockResolvedValue(undefined);
+    const syncTaskUpdated = vi.fn();
+
+    renderHook(() =>
+      useDashboardLifecycle({
+        loadInitialHistory: vi.fn().mockResolvedValue(undefined),
+        refreshHistory,
+        refreshActiveTasks: vi.fn().mockResolvedValue(undefined),
+        syncTaskCreated: vi.fn(),
+        syncTaskUpdated,
+        syncTaskFailed: vi.fn(),
+        removeTask: vi.fn(),
+        loadStockBar: vi.fn().mockResolvedValue(undefined),
+        refreshStockBar,
+        refreshMarketReviewHistory,
+      }),
+    );
+
+    const taskStreamOptions = vi.mocked(useTaskStream).mock.calls[0]?.[0];
+    const completedTask = createMarketReviewTask();
+
+    act(() => {
+      taskStreamOptions?.onTaskCompleted?.(completedTask);
+    });
+
+    expect(syncTaskUpdated).toHaveBeenCalledWith(completedTask);
+    expect(refreshHistory).toHaveBeenCalledWith(true);
+    expect(refreshStockBar).toHaveBeenCalledTimes(1);
+    expect(refreshMarketReviewHistory).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(2_000);
+    });
+
+    expect(refreshMarketReviewHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes market-review history when the completed task uses market_review report type', () => {
+    const refreshMarketReviewHistory = vi.fn().mockResolvedValue(undefined);
+
+    renderHook(() =>
+      useDashboardLifecycle({
+        loadInitialHistory: vi.fn().mockResolvedValue(undefined),
+        refreshHistory: vi.fn().mockResolvedValue(undefined),
+        refreshActiveTasks: vi.fn().mockResolvedValue(undefined),
+        syncTaskCreated: vi.fn(),
+        syncTaskUpdated: vi.fn(),
+        syncTaskFailed: vi.fn(),
+        removeTask: vi.fn(),
+        ...defaultMocks,
+        refreshMarketReviewHistory,
+      }),
+    );
+
+    const taskStreamOptions = vi.mocked(useTaskStream).mock.calls[0]?.[0];
+
+    act(() => {
+      taskStreamOptions?.onTaskCompleted?.({
+        ...createTask(),
+        stockCode: '',
+        reportType: 'market_review',
+      });
+    });
+
+    expect(refreshMarketReviewHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps market-review refresh errors non-fatal', async () => {
+    const refreshMarketReviewHistory = vi.fn().mockRejectedValue(new Error('network'));
+    const refreshHistory = vi.fn().mockResolvedValue(undefined);
+    const refreshStockBar = vi.fn().mockResolvedValue(undefined);
+
+    renderHook(() =>
+      useDashboardLifecycle({
+        loadInitialHistory: vi.fn().mockResolvedValue(undefined),
+        refreshHistory,
+        refreshActiveTasks: vi.fn().mockResolvedValue(undefined),
+        syncTaskCreated: vi.fn(),
+        syncTaskUpdated: vi.fn(),
+        syncTaskFailed: vi.fn(),
+        removeTask: vi.fn(),
+        loadStockBar: vi.fn().mockResolvedValue(undefined),
+        refreshStockBar,
+        refreshMarketReviewHistory,
+      }),
+    );
+
+    const taskStreamOptions = vi.mocked(useTaskStream).mock.calls[0]?.[0];
+
+    act(() => {
+      taskStreamOptions?.onTaskCompleted?.(createMarketReviewTask());
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(refreshHistory).toHaveBeenCalledWith(true);
+    expect(refreshStockBar).toHaveBeenCalledTimes(1);
+    expect(refreshMarketReviewHistory).toHaveBeenCalledTimes(1);
   });
 
   it('forwards task progress updates to the task sync handler', () => {
