@@ -25,7 +25,7 @@ def _result(
     title: str,
     published_date: str | None,
     *,
-    snippet: str = "snippet",
+    snippet: str = "earnings revenue guidance",
     url: str | None = None,
     source: str = "example.com",
 ) -> SearchResult:
@@ -338,7 +338,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         self.assertEqual(resp.results[0].relevance_category, "direct_company_news")
         provider.search.assert_called_once()
 
-    def test_a_share_chinese_sector_provider_beats_higher_scored_english_sector(self) -> None:
+    def test_tw_chinese_sector_provider_beats_higher_scored_english_sector(self) -> None:
         """When no direct hit exists, Chinese-preferred flows should compare language before score."""
         fresh = datetime.now().date().isoformat()
         service = SearchService(
@@ -355,9 +355,9 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
                 return_value=_response(
                     [
                         _result(
-                            "Baijiu industry quarterly results improve",
+                            "Semiconductor AI data center earnings improve",
                             fresh,
-                            snippet="Sector peers report better market share.",
+                            snippet="Sector peers report better market share and guidance.",
                             source="sec.gov",
                         )
                     ]
@@ -371,9 +371,9 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
                 return_value=_response(
                     [
                         _result(
-                            "白酒板塊資金回暖",
+                            "半導體產業買盤回暖",
                             fresh,
-                            snippet="消費行業反彈。",
+                            snippet="AI伺服器與先進製程需求帶動產業信心。",
                         )
                     ]
                 )
@@ -383,7 +383,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
 
         resp = service.search_stock_news("2330", "台積電", max_results=1)
 
-        self.assertEqual([r.title for r in resp.results], ["白酒板塊資金回暖"])
+        self.assertEqual([r.title for r in resp.results], ["半導體產業買盤回暖"])
         self.assertEqual(resp.results[0].relevance_category, "sector_related_news")
         self.assertEqual(p1.search.call_count, 4)
         self.assertEqual(p2.search.call_count, 4)
@@ -516,8 +516,8 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         p1.search.assert_called_once()
         p2.search.assert_called_once()
 
-    def test_hk_stock_relevance_avoids_similar_name_noise(self) -> None:
-        """HK stock matching should prefer exact company/code over similar-name news."""
+    def test_tw_stock_relevance_drops_similar_name_noise(self) -> None:
+        """TW stock matching should keep exact company/code news and drop similar-name noise."""
         fresh = datetime.now().date().isoformat()
         service = SearchService(
             bocha_keys=["dummy_key"],
@@ -527,20 +527,20 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         provider = SimpleNamespace(
             is_available=True,
-            name="HKProvider",
+            name="TWProvider",
             search=MagicMock(
                 return_value=_response(
                     [
                         _result(
-                            "騰訊音樂釋出新專輯合作計劃",
+                            "台積電鎮地方活動公告",
                             fresh,
-                            snippet="騰訊音樂娛樂集團宣佈內容合作。",
+                            snippet="地方活動與餐飲市集資訊。",
                         ),
                         _result(
-                            "騰訊控股 AAPL 公告：回購股份",
+                            "台積電 2330 公告：回購股份",
                             fresh,
-                            snippet="騰訊控股在港交所披露股份回購公告。",
-                            source="hkexnews",
+                            snippet="台積電公告買回庫藏股與財報資訊。",
+                            source="finance.example.invalid",
                         ),
                     ]
                 )
@@ -548,26 +548,25 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         service._providers = [provider]
 
-        resp = service.search_stock_news("hkAAPL", "騰訊控股", max_results=2)
+        resp = service.search_stock_news("2330", "台積電", max_results=2)
 
-        self.assertEqual(resp.results[0].title, "騰訊控股 AAPL 公告：回購股份")
+        self.assertEqual([item.title for item in resp.results], ["台積電 2330 公告：回購股份"])
         self.assertEqual(resp.results[0].relevance_category, "direct_company_news")
-        self.assertEqual(resp.results[1].relevance_category, "sector_related_news")
 
-    def test_hk_stock_bare_short_code_does_not_match_index_points(self) -> None:
-        """Bare HK short codes should not make index-point headlines direct hits."""
+    def test_tw_stock_code_does_not_match_unrelated_index_points(self) -> None:
+        """Bare TW stock codes should not make index-point headlines direct hits."""
         result = SearchService._score_news_relevance(
             _result(
-                "恒生指數大漲700點 科技股普遍反彈",
+                "加權指數大漲2330點 科技股普遍反彈",
                 datetime.now().date().isoformat(),
-                snippet="美股市場情緒回暖，指數走強。",
+                snippet="台股大盤情緒回暖，指數走強。",
             ),
-            stock_code="hkAAPL",
-            stock_name="騰訊控股",
+            stock_code="2330",
+            stock_name="台積電",
         )
 
         self.assertNotEqual(result.relevance_category, "direct_company_news")
-        self.assertNotIn("股票代號 700", "；".join(result.relevance_reasons or []))
+        self.assertNotIn("股票代號 2330", "；".join(result.relevance_reasons or []))
 
     def test_us_stock_ticker_relevance_beats_ambiguous_company_word(self) -> None:
         """US ticker hits should outrank ambiguous common-word company-name noise."""
@@ -870,7 +869,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
                     "web": {
                         "results": [
                             {
-                                "title": title,
+                                "title": f"{stock_name} {title}",
                                 "description": description,
                                 "url": "https://example.com/news",
                                 "age": fresh_iso,

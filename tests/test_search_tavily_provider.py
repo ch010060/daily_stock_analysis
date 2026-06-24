@@ -74,15 +74,15 @@ class TestTavilySearchProvider(unittest.TestCase):
             {
                 "results": [
                     {
-                        "title": "Alibaba earnings beat",
-                        "url": "https://example.com/alibaba-earnings",
+                        "title": "Apple earnings beat",
+                        "url": "https://example.com/apple-earnings",
                         "content": "Fresh coverage",
                         "published_date": published_text,
                     },
                 ]
             }
         ):
-            resp = provider.search("BABA latest news", max_results=5, days=3, topic="news")
+            resp = provider.search("AAPL latest news", max_results=5, days=3, topic="news")
 
         self.assertTrue(resp.success)
         self.assertEqual(_FakeTavilyClient.init_api_keys, ["dummy_key"])
@@ -93,7 +93,7 @@ class TestTavilySearchProvider(unittest.TestCase):
         self.assertEqual(_FakeTavilyClient.search_calls[0]["search_depth"], "advanced")
         self.assertEqual(len(resp.results), 1)
         self.assertEqual(resp.results[0].published_date, published_text)
-        self.assertEqual(resp.results[0].url, "https://example.com/alibaba-earnings")
+        self.assertEqual(resp.results[0].url, "https://example.com/apple-earnings")
 
     def test_provider_supports_publishedDate_variant(self) -> None:
         provider = TavilySearchProvider(["dummy_key"])
@@ -102,15 +102,15 @@ class TestTavilySearchProvider(unittest.TestCase):
             {
                 "results": [
                     {
-                        "title": "Alibaba guidance update",
-                        "url": "https://example.com/alibaba-guidance",
+                        "title": "Apple guidance update",
+                        "url": "https://example.com/apple-guidance",
                         "content": "Fresh coverage",
                         "publishedDate": "2026-03-20T11:00:00Z",
                     }
                 ]
             }
         ):
-            resp = provider.search("BABA latest news", max_results=5, days=7, topic="news")
+            resp = provider.search("AAPL latest news", max_results=5, days=7, topic="news")
 
         self.assertTrue(resp.success)
         self.assertEqual(len(resp.results), 1)
@@ -123,14 +123,14 @@ class TestTavilySearchProvider(unittest.TestCase):
             {
                 "results": [
                     {
-                        "title": "Alibaba price action",
-                        "url": "https://example.com/alibaba-price",
+                        "title": "Apple price action",
+                        "url": "https://example.com/apple-price",
                         "content": "General search result",
                     }
                 ]
             }
         ):
-            resp = provider.search("BABA stock price", max_results=3)
+            resp = provider.search("AAPL stock price", max_results=3)
 
         self.assertTrue(resp.success)
         self.assertEqual(len(_FakeTavilyClient.search_calls), 1)
@@ -147,9 +147,9 @@ class TestTavilySearchProvider(unittest.TestCase):
                     {
                         "results": [
                             {
-                                "title": f"Fresh article via {field_name}",
+                                "title": f"聯發科 2454 月營收公告 via {field_name}",
                                 "url": "https://example.com/fresh-article",
-                                "content": "Fresh coverage",
+                                "content": "聯發科財報與法說會 coverage",
                                 field_name: published_text,
                             }
                         ]
@@ -161,7 +161,7 @@ class TestTavilySearchProvider(unittest.TestCase):
                         news_max_age_days=3,
                         news_strategy_profile="short",
                     )
-                    resp = service.search_stock_news("BABA", "阿里巴巴", max_results=3)
+                    resp = service.search_stock_news("2454", "聯發科", max_results=3)
 
                 self.assertTrue(resp.success)
                 self.assertEqual(len(resp.results), 1)
@@ -173,8 +173,8 @@ class TestTavilySearchProvider(unittest.TestCase):
             {
                 "results": [
                     {
-                        "title": "Alibaba quarterly results",
-                        "url": "https://example.com/alibaba-event",
+                        "title": "Apple quarterly results",
+                        "url": "https://example.com/apple-event",
                         "content": "Event coverage",
                     }
                 ]
@@ -184,7 +184,7 @@ class TestTavilySearchProvider(unittest.TestCase):
                 tavily_keys=["dummy_key"],
                 searxng_public_instances_enabled=False,
             )
-            resp = service.search_stock_events("BABA", "阿里巴巴")
+            resp = service.search_stock_events("AAPL", "Apple")
 
         self.assertTrue(resp.success)
         self.assertEqual(len(resp.results), 1)
@@ -198,9 +198,9 @@ class TestTavilySearchProvider(unittest.TestCase):
             {
                 "results": [
                     {
-                        "title": "Alibaba intel article",
-                        "url": "https://example.com/alibaba-intel",
-                        "content": "Recent intel",
+                        "title": "Apple AAPL earnings intel article",
+                        "url": "https://example.com/apple-intel",
+                        "content": "Recent revenue guidance intel",
                         "published_date": published_text,
                     }
                 ]
@@ -212,7 +212,7 @@ class TestTavilySearchProvider(unittest.TestCase):
                 news_max_age_days=3,
                 news_strategy_profile="short",
             )
-            intel = service.search_comprehensive_intel("BABA", "阿里巴巴", max_searches=2)
+            intel = service.search_comprehensive_intel("AAPL", "Apple", max_searches=2)
 
         self.assertIn("latest_news", intel)
         self.assertIn("market_analysis", intel)
@@ -228,9 +228,9 @@ class TestTavilySearchProvider(unittest.TestCase):
             {
                 "results": [
                     {
-                        "title": "ETF intel article",
+                        "title": "SPY S&P 500 ETF intel article",
                         "url": "https://example.com/etf-intel",
-                        "content": "Recent ETF coverage",
+                        "content": "Recent S&P 500 ETF coverage",
                         "published_date": published_text,
                     }
                 ]
@@ -242,7 +242,7 @@ class TestTavilySearchProvider(unittest.TestCase):
                 news_max_age_days=3,
                 news_strategy_profile="short",
             )
-            intel = service.search_comprehensive_intel("510300", "滬深300ETF", max_searches=3)
+            intel = service.search_comprehensive_intel("SPY", "SPDR S&P 500 ETF", max_searches=3)
 
         self.assertIn("latest_news", intel)
         self.assertIn("market_analysis", intel)
