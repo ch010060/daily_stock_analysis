@@ -66,4 +66,20 @@ describe('MermaidDiagram', () => {
     });
     expect(mermaid.render).not.toHaveBeenCalled();
   });
+
+  it('allows horizontal overflow scroll instead of clipping wide A4 card layouts', async () => {
+    vi.mocked(mermaid.render).mockResolvedValue({
+      svg: '<svg data-testid="fake-svg"></svg>',
+      diagramType: 'flowchart',
+    });
+
+    render(<MermaidDiagram code={'flowchart TB\n  A["Start"] --> B["End"]'} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mermaid-diagram')).toBeInTheDocument();
+    });
+    const container = screen.getByTestId('mermaid-diagram');
+    expect(container.style.overflowX).toBe('auto');
+    expect(container.style.maxWidth).toBe('100%');
+  });
 });

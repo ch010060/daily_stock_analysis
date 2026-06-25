@@ -291,10 +291,10 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertIn("value_network_mermaid", prompt)
         self.assertIn("flowchart", prompt)
         self.assertIn("啟用時必須輸出此欄位", prompt)
-        self.assertIn("`供應商`、`客戶`、`競爭者`、`互補者`，可選加上 `護城河`", prompt)
+        self.assertIn("`供應商 Suppliers`(S)、`客戶 Customers`(K)、`競爭者 Competitors`(R)、`互補者 Complementors`(P)", prompt)
 
     def test_run_value_network_section_is_compact(self):
-        """Phase 18E: Agent-mode prompt requires the same fixed compact center+category layout."""
+        """Phase 18E v3: Agent-mode prompt requires the same dagre-constrained 4-section A4 card layout."""
         registry = _make_registry_with_echo()
         adapter = _make_mock_adapter()
         adapter.call_with_tools.return_value = LLMResponse(
@@ -311,16 +311,28 @@ class TestAgentExecutor(unittest.TestCase):
 
         self.assertTrue(result.success)
         prompt = adapter.call_with_tools.call_args.args[0][0]["content"]
-        self.assertIn("一個中心節點 + 最多 5 個分類方框", prompt)
-        self.assertIn("不要額外建立「公司核心業務」之類的獨立 subgraph", prompt)
-        self.assertIn("16-18 個以內", prompt)
-        self.assertIn("10-12 條以內", prompt)
-        self.assertIn("不可使用中文作為節點 ID", prompt)
+        self.assertIn("一個中心節點 + 剛好 4 個分類方框", prompt)
+        self.assertIn("不要額外建立「公司核心業務」或「護城河」之類的獨立 subgraph", prompt)
+        self.assertIn("每個分類方框固定 3 張卡片", prompt)
+        self.assertIn("總可視節點數（含中心節點）固定為 13 個", prompt)
+        self.assertIn("~~~", prompt)
+        self.assertIn("S3 --> C", prompt)
+        self.assertIn("K3 --> C", prompt)
+        self.assertIn("C --> R1", prompt)
+        self.assertIn("C --> P1", prompt)
+        self.assertIn("一律使用雙引號包住", prompt)
+        self.assertIn("不加雙引號會讓 Mermaid 解析直接失敗", prompt)
+        self.assertIn("不要輸出 `%%{init...}%%`", prompt)
+        self.assertIn("不要使用 `flowchart LR`", prompt)
+        self.assertIn(".US", prompt)
+        self.assertIn(".TW", prompt)
+        self.assertIn("005930", prompt)
+        self.assertIn("不可使用中文作為", prompt)
         self.assertIn("不可使用以數字開頭的 ID", prompt)
         self.assertIn("5G_SoC", prompt)
         # the compact reminder is part of the same appended instruction block
         appendix_index = prompt.index("## 附錄：價值網路圖")
-        compact_index = prompt.index("一個中心節點 + 最多 5 個分類方框")
+        compact_index = prompt.index("一個中心節點 + 剛好 4 個分類方框")
         language_index = prompt.index("## 輸出語言")
         self.assertLess(appendix_index, compact_index)
         self.assertLess(compact_index, language_index)
@@ -345,8 +357,11 @@ class TestAgentExecutor(unittest.TestCase):
 
         self.assertTrue(result.success)
         prompt = adapter.call_with_tools.call_args.args[0][0]["content"]
-        self.assertIn("`持股組成`、`需求驅動`、`替代方案`、`互補主題`，可選加上 `風險因子`", prompt)
-        self.assertNotIn("`供應商`、`客戶`、`競爭者`、`互補者`，可選加上 `護城河`", prompt)
+        # Phase 18E v3: ETF and stock now share the same 4 section names;
+        # only the semantic hint text differs.
+        self.assertIn("`供應商 Suppliers`(S)、`客戶 Customers`(K)、`競爭者 Competitors`(R)、`互補者 Complementors`(P)", prompt)
+        self.assertIn("ETF 語意對應", prompt)
+        self.assertIn("主要成分股/持股權重", prompt)
 
     def test_simple_text_response(self):
         """Agent returns text immediately (no tool calls) with JSON dashboard."""

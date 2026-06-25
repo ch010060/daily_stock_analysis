@@ -338,10 +338,10 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
 
         self.assertIn("value_network_mermaid", prompt)
         self.assertIn("flowchart", prompt)
-        self.assertIn("`供應商`、`客戶`、`競爭者`、`互補者`，可選加上 `護城河`", prompt)
+        self.assertIn("`供應商 Suppliers`(S)、`客戶 Customers`(K)、`競爭者 Competitors`(R)、`互補者 Complementors`(P)", prompt)
 
     def test_format_prompt_value_network_section_is_compact(self) -> None:
-        """Phase 18E: the appendix instruction must require a fixed compact center+category layout."""
+        """Phase 18E v3: the appendix instruction must require the dagre-constrained 4-section A4 card layout."""
         enabled_config = dataclasses.replace(Config(), enable_value_network_mermaid=True)
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
             analyzer = GeminiAnalyzer(config=enabled_config)
@@ -355,11 +355,23 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
 
         prompt = analyzer._format_prompt(context, "台積電", news_context=None)
 
-        self.assertIn("一個中心節點 + 最多 5 個分類方框", prompt)
-        self.assertIn("不要額外建立「公司核心業務」之類的獨立 subgraph", prompt)
-        self.assertIn("16-18 個以內", prompt)
-        self.assertIn("10-12 條以內", prompt)
-        self.assertIn("不可使用中文作為節點 ID", prompt)
+        self.assertIn("一個中心節點 + 剛好 4 個分類方框", prompt)
+        self.assertIn("不要額外建立「公司核心業務」或「護城河」之類的獨立 subgraph", prompt)
+        self.assertIn("每個分類方框固定 3 張卡片", prompt)
+        self.assertIn("總可視節點數（含中心節點）固定為 13 個", prompt)
+        self.assertIn("~~~", prompt)
+        self.assertIn("S3 --> C", prompt)
+        self.assertIn("K3 --> C", prompt)
+        self.assertIn("C --> R1", prompt)
+        self.assertIn("C --> P1", prompt)
+        self.assertIn("一律使用雙引號包住", prompt)
+        self.assertIn("不加雙引號會讓 Mermaid 解析直接失敗", prompt)
+        self.assertIn("不要輸出 `%%{init...}%%`", prompt)
+        self.assertIn("不要使用 `flowchart LR`", prompt)
+        self.assertIn(".US", prompt)
+        self.assertIn(".TW", prompt)
+        self.assertIn("005930", prompt)
+        self.assertIn("不可使用中文作為", prompt)
         self.assertIn("不可使用以數字開頭的 ID", prompt)
         self.assertIn("5G_SoC", prompt)
 
@@ -379,8 +391,11 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
         prompt = analyzer._format_prompt(context, "元大台灣50", news_context=None)
 
         self.assertIn("value_network_mermaid", prompt)
-        self.assertIn("`持股組成`、`需求驅動`、`替代方案`、`互補主題`，可選加上 `風險因子`", prompt)
-        self.assertNotIn("`供應商`、`客戶`、`競爭者`、`互補者`，可選加上 `護城河`", prompt)
+        # Phase 18E v3: ETF and stock now share the same 4 section names;
+        # only the semantic hint text differs.
+        self.assertIn("`供應商 Suppliers`(S)、`客戶 Customers`(K)、`競爭者 Competitors`(R)、`互補者 Complementors`(P)", prompt)
+        self.assertIn("ETF 語意對應", prompt)
+        self.assertIn("主要成分股/持股權重", prompt)
 
     def test_format_prompt_value_network_section_requires_key_presence_when_enabled(self) -> None:
         """Phase 18C: the key must always appear in JSON when the flag is enabled, not a purely optional aside."""

@@ -1496,6 +1496,27 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         footer_index = markdown.index("*報告生成時間")
         self.assertLess(appendix_index, footer_index)
 
+    def test_generate_single_stock_markdown_prepends_mermaid_init_line_exactly_once(self) -> None:
+        """Phase 18E v3: the LLM never outputs %%{init...}%% — history_service prepends it
+        deterministically inside the fenced mermaid block, exactly once, after the validated body."""
+        from datetime import datetime as _datetime
+        from src.services.history_service import MERMAID_INIT_LINE
+
+        result = self._build_result()
+        result.value_network_mermaid = "flowchart TB\n  A[供應商] --> B[公司]"
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+
+        service = HistoryService(self.db)
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertEqual(markdown.count(MERMAID_INIT_LINE), 1)
+
+        fence_index = markdown.index("```mermaid")
+        init_index = markdown.index(MERMAID_INIT_LINE)
+        flowchart_index = markdown.index("flowchart TB\n  A[供應商] --> B[公司]")
+        self.assertLess(fence_index, init_index)
+        self.assertLess(init_index, flowchart_index)
+
     def test_generate_single_stock_markdown_omits_appendix_when_none(self) -> None:
         """When value_network_mermaid is None, no appendix section is added and generation does not raise."""
         from datetime import datetime as _datetime

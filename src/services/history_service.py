@@ -44,6 +44,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Phase 18E v3: the LLM never produces this directive (the validator rejects
+# it if it tries to) — it is a fixed styling constant appended deterministically
+# after validation passes, so the appendix renders with a readable font size
+# without trusting the LLM to reproduce a styling directive verbatim each time.
+MERMAID_INIT_LINE = '%%{init: {"theme": "base", "themeVariables": {"fontSize": "20px"}}}%%'
+
 
 class MarkdownReportGenerationError(Exception):
     """Exception raised when Markdown report generation fails due to internal errors."""
@@ -1123,6 +1129,7 @@ class HistoryService:
                 f"## {appendix_heading}",
                 "",
                 "```mermaid",
+                MERMAID_INIT_LINE,
                 validated_mermaid,
                 "```",
                 "",

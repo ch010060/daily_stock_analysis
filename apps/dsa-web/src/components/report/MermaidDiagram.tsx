@@ -81,5 +81,11 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code }) => {
     );
   }
 
-  return <div data-testid="mermaid-diagram" ref={containerRef} />;
+  return (
+    <div
+      data-testid="mermaid-diagram"
+      ref={containerRef}
+      style={{ overflowX: 'auto', maxWidth: '100%' }}
+    />
+  );
 };
