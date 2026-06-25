@@ -338,7 +338,30 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
 
         self.assertIn("value_network_mermaid", prompt)
         self.assertIn("flowchart", prompt)
-        self.assertIn("供應商/客戶/競爭者/互補者/護城河", prompt)
+        self.assertIn("`供應商`、`客戶`、`競爭者`、`互補者`，可選加上 `護城河`", prompt)
+
+    def test_format_prompt_value_network_section_is_compact(self) -> None:
+        """Phase 18E: the appendix instruction must require a fixed compact center+category layout."""
+        enabled_config = dataclasses.replace(Config(), enable_value_network_mermaid=True)
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer(config=enabled_config)
+
+        context = {
+            "code": "2330",
+            "stock_name": "台積電",
+            "date": "2026-03-27",
+            "today": {},
+        }
+
+        prompt = analyzer._format_prompt(context, "台積電", news_context=None)
+
+        self.assertIn("一個中心節點 + 最多 5 個分類方框", prompt)
+        self.assertIn("不要額外建立「公司核心業務」之類的獨立 subgraph", prompt)
+        self.assertIn("16-18 個以內", prompt)
+        self.assertIn("10-12 條以內", prompt)
+        self.assertIn("不可使用中文作為節點 ID", prompt)
+        self.assertIn("不可使用以數字開頭的 ID", prompt)
+        self.assertIn("5G_SoC", prompt)
 
     def test_format_prompt_uses_index_etf_category_hint_when_enabled(self) -> None:
         enabled_config = dataclasses.replace(Config(), enable_value_network_mermaid=True)
@@ -356,8 +379,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
         prompt = analyzer._format_prompt(context, "元大台灣50", news_context=None)
 
         self.assertIn("value_network_mermaid", prompt)
-        self.assertIn("持股組成/需求驅動/替代方案/客戶", prompt)
-        self.assertNotIn("供應商/客戶/競爭者/互補者/護城河", prompt)
+        self.assertIn("`持股組成`、`需求驅動`、`替代方案`、`互補主題`，可選加上 `風險因子`", prompt)
+        self.assertNotIn("`供應商`、`客戶`、`競爭者`、`互補者`，可選加上 `護城河`", prompt)
 
     def test_format_prompt_value_network_section_requires_key_presence_when_enabled(self) -> None:
         """Phase 18C: the key must always appear in JSON when the flag is enabled, not a purely optional aside."""

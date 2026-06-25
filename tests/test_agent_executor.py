@@ -291,7 +291,39 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertIn("value_network_mermaid", prompt)
         self.assertIn("flowchart", prompt)
         self.assertIn("啟用時必須輸出此欄位", prompt)
-        self.assertIn("供應商/客戶/競爭者/互補者/護城河", prompt)
+        self.assertIn("`供應商`、`客戶`、`競爭者`、`互補者`，可選加上 `護城河`", prompt)
+
+    def test_run_value_network_section_is_compact(self):
+        """Phase 18E: Agent-mode prompt requires the same fixed compact center+category layout."""
+        registry = _make_registry_with_echo()
+        adapter = _make_mock_adapter()
+        adapter.call_with_tools.return_value = LLMResponse(
+            content=json.dumps(SAMPLE_DASHBOARD, ensure_ascii=False),
+            tool_calls=[],
+            usage={"total_tokens": 50},
+            provider="openai",
+        )
+
+        executor = AgentExecutor(registry, adapter, max_steps=2)
+        enabled_config = SimpleNamespace(enable_value_network_mermaid=True)
+        with patch("src.agent.executor.get_config", return_value=enabled_config):
+            result = executor.run("Analyze MSFT", context={"stock_code": "MSFT"})
+
+        self.assertTrue(result.success)
+        prompt = adapter.call_with_tools.call_args.args[0][0]["content"]
+        self.assertIn("一個中心節點 + 最多 5 個分類方框", prompt)
+        self.assertIn("不要額外建立「公司核心業務」之類的獨立 subgraph", prompt)
+        self.assertIn("16-18 個以內", prompt)
+        self.assertIn("10-12 條以內", prompt)
+        self.assertIn("不可使用中文作為節點 ID", prompt)
+        self.assertIn("不可使用以數字開頭的 ID", prompt)
+        self.assertIn("5G_SoC", prompt)
+        # the compact reminder is part of the same appended instruction block
+        appendix_index = prompt.index("## 附錄：價值網路圖")
+        compact_index = prompt.index("一個中心節點 + 最多 5 個分類方框")
+        language_index = prompt.index("## 輸出語言")
+        self.assertLess(appendix_index, compact_index)
+        self.assertLess(compact_index, language_index)
 
     def test_run_uses_index_etf_category_hint_when_enabled(self):
         """Phase 18D: ETF targets get the ETF-specific category hint, same as the non-agent path."""
@@ -313,8 +345,8 @@ class TestAgentExecutor(unittest.TestCase):
 
         self.assertTrue(result.success)
         prompt = adapter.call_with_tools.call_args.args[0][0]["content"]
-        self.assertIn("持股組成/需求驅動/替代方案/客戶", prompt)
-        self.assertNotIn("供應商/客戶/競爭者/互補者/護城河", prompt)
+        self.assertIn("`持股組成`、`需求驅動`、`替代方案`、`互補主題`，可選加上 `風險因子`", prompt)
+        self.assertNotIn("`供應商`、`客戶`、`競爭者`、`互補者`，可選加上 `護城河`", prompt)
 
     def test_simple_text_response(self):
         """Agent returns text immediately (no tool calls) with JSON dashboard."""

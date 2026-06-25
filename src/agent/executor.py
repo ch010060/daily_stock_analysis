@@ -617,23 +617,29 @@ def _build_value_network_sections(context: Optional[Dict[str, Any]]) -> tuple:
     if not getattr(get_config(), "enable_value_network_mermaid", False):
         return "", ""
 
-    categories_hint = (
-        "持股組成/需求驅動/替代方案/客戶"
+    category_list = (
+        "`持股組成`、`需求驅動`、`替代方案`、`互補主題`，可選加上 `風險因子`"
         if (context or {}).get("is_index_etf")
-        else "供應商/客戶/競爭者/互補者/護城河"
+        else "`供應商`、`客戶`、`競爭者`、`互補者`，可選加上 `護城河`"
     )
     schema_field = (
         ',\n    "value_network_mermaid": "純 Mermaid flowchart 文字或 null；'
         "啟用時必須出現此鍵，產生規則見後方「附錄：價值網路圖」\""
     )
     instruction_section = f"""
-## 附錄：價值網路圖（啟用時必須輸出此欄位）
+## 附錄：價值網路圖（啟用時必須輸出此欄位，需精簡）
 最終 JSON 必須額外包含 `value_network_mermaid` 欄位（字串或 null），即使值為 null。
-- 對於有公開商業身份的已知標的，通常應能產出至少類別層級的精簡價值網路圖（建議分類：{categories_hint}），不要因證據不夠精確就直接省略圖表。
+- 對於有公開商業身份的已知標的，通常應能產出至少類別層級的精簡價值網路圖，不要因證據不夠精確就直接省略圖表。
 - 若無法取得精確的具名供應商/客戶/競爭者，請改用產業類別層級節點，不要編造具體公司名稱。
 - 只有在該標的業務身份本身嚴重不明確時，才將 `value_network_mermaid` 設為 null。
-- 內容為純 Mermaid flowchart 原始文字，只能使用 `flowchart TB` 或 `flowchart LR`，不要包含 ``` 圍欄或 HTML。
-- 最多 5 個 subgraph 分類，總節點數不超過 20 個，每個分類最多 4 個項目，節點標籤使用繁體中文，用語不得超出本報告主結論的強度。
+- **結構固定為「一個中心節點 + 最多 5 個分類方框」**：標的本身只能是一個中心節點，不要額外建立「公司核心業務」之類的獨立 subgraph。
+- 分類方框限定使用：{category_list}。
+- 總可視節點數（含中心節點）建議在 16-18 個以內，每個分類方框 2-3 個節點即可；同類項請合併成一個節點（例如「AWS / Google Cloud」合併成一個節點），不要每家公司都拆成獨立節點。
+- 連線數量建議在 10-12 條以內，每個分類用 1 條代表性連線連到中心節點即可，不要每個節點互相連線，避免變成密集的星狀關係圖。
+- 節點 ID 必須是安全的 ASCII 識別碼（例如 `C`、`S1`、`K1`、`R1`、`P1`、`M1`），不可使用中文作為節點 ID，也不可使用以數字開頭的 ID（例如不可用 `5G_SoC`）；中文或專有名稱只能放在節點標籤（`[...]` 內）。
+- 節點標籤盡量精簡，可用 `<br/>` 換行，避免整段文字或長串證據塞進節點。
+- 內容為純 Mermaid flowchart 原始文字，只能使用 `flowchart TB` 或 `flowchart LR`，不要包含 ``` 圍欄、HTML（`<br/>` 除外）或裸網址。
+- 節點標籤使用繁體中文，用語不得超出本報告主結論的強度。
 """
     return schema_field, instruction_section
 
