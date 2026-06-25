@@ -289,9 +289,27 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
         self.assertNotIn("市場階段上下文", prompt)
         self.assertNotIn("分析上下文包摘要", prompt)
 
-    def test_format_prompt_omits_value_network_mermaid_section_by_default(self) -> None:
+    def test_format_prompt_includes_value_network_mermaid_section_by_default(self) -> None:
+        """Phase 18D: the value-network appendix instruction is on by default, no opt-in env var needed."""
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
             analyzer = GeminiAnalyzer()
+
+        context = {
+            "code": "2330",
+            "stock_name": "台積電",
+            "date": "2026-03-27",
+            "today": {},
+        }
+
+        prompt = analyzer._format_prompt(context, "台積電", news_context=None)
+
+        self.assertIn("value_network_mermaid", prompt)
+
+    def test_format_prompt_omits_value_network_mermaid_section_when_explicitly_disabled(self) -> None:
+        """Phase 18D: ENABLE_VALUE_NETWORK_MERMAID=false must still be able to disable the default-on feature."""
+        disabled_config = dataclasses.replace(Config(), enable_value_network_mermaid=False)
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer(config=disabled_config)
 
         context = {
             "code": "2330",
@@ -395,11 +413,27 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
         self.assertIn("業務身份本身嚴重不明確", prompt)
         self.assertNotIn("若證據不足，請將 `value_network_mermaid` 設為 null，不要編造供應商或客戶。", prompt)
 
-    def test_analysis_system_prompt_omits_value_network_schema_field_by_default(self) -> None:
-        """Phase 18C: the canonical JSON schema list must not mention the field when the flag is disabled."""
+    def test_analysis_system_prompt_includes_value_network_schema_field_by_default(self) -> None:
+        """Phase 18D: the canonical JSON schema list includes the field by default, no opt-in env var needed."""
         for legacy in (False, True):
             with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
                 analyzer = GeminiAnalyzer(
+                    skill_instructions="",
+                    default_skill_policy="",
+                    use_legacy_default_prompt=legacy,
+                )
+
+            prompt = analyzer._get_analysis_system_prompt("zh", stock_code="2330")
+
+            self.assertIn('"value_network_mermaid"', prompt)
+
+    def test_analysis_system_prompt_omits_value_network_schema_field_when_explicitly_disabled(self) -> None:
+        """Phase 18D: ENABLE_VALUE_NETWORK_MERMAID=false must still be able to disable the default-on schema field."""
+        disabled_config = dataclasses.replace(Config(), enable_value_network_mermaid=False)
+        for legacy in (False, True):
+            with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+                analyzer = GeminiAnalyzer(
+                    config=disabled_config,
                     skill_instructions="",
                     default_skill_policy="",
                     use_legacy_default_prompt=legacy,

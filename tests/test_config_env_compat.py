@@ -80,13 +80,14 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
 
     @patch("src.config.setup_env")
     @patch.object(Config, "_parse_litellm_yaml", return_value=[])
-    def test_value_network_mermaid_defaults_to_disabled(
+    def test_value_network_mermaid_defaults_to_enabled(
         self, _mock_parse_litellm_yaml, _mock_setup_env
     ):
+        """Phase 18D: the value-network Mermaid appendix is on by default."""
         with patch.dict(os.environ, {"STOCK_LIST": "2330"}, clear=True):
             config = Config._load_from_env()
 
-        self.assertFalse(config.enable_value_network_mermaid)
+        self.assertTrue(config.enable_value_network_mermaid)
 
     @patch("src.config.setup_env")
     @patch.object(Config, "_parse_litellm_yaml", return_value=[])
@@ -104,6 +105,24 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
             config = Config._load_from_env()
 
         self.assertTrue(config.enable_value_network_mermaid)
+
+    @patch("src.config.setup_env")
+    @patch.object(Config, "_parse_litellm_yaml", return_value=[])
+    def test_value_network_mermaid_disabled_via_env(
+        self, _mock_parse_litellm_yaml, _mock_setup_env
+    ):
+        """Phase 18D: an explicit env override can still disable the default-on feature."""
+        with patch.dict(
+            os.environ,
+            {
+                "STOCK_LIST": "2330",
+                "ENABLE_VALUE_NETWORK_MERMAID": "false",
+            },
+            clear=True,
+        ):
+            config = Config._load_from_env()
+
+        self.assertFalse(config.enable_value_network_mermaid)
 
     @patch("src.config.setup_env")
     @patch.object(Config, "_parse_litellm_yaml", return_value=[])
