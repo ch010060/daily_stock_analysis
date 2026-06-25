@@ -624,6 +624,29 @@ def get_report_labels(language: Optional[str]) -> Dict[str, str]:
     return _REPORT_LABELS[normalized]
 
 
+# Phase 19B.1: report title contract. Only "etf" and "index" get a dedicated
+# title; "stock" and "unknown" (and anything unrecognized) keep the existing
+# labels["report_title"] text untouched, preserving current behavior and
+# backward compatibility with old history records.
+_INSTRUMENT_REPORT_TITLE_OVERRIDES: Dict[str, Dict[str, str]] = {
+    "etf": {"zh": "ETF分析報告", "zh_TW": "ETF分析報告", "en": "ETF Analysis Report"},
+    "index": {"zh": "指數分析報告", "zh_TW": "指數分析報告", "en": "Index Analysis Report"},
+}
+
+
+def get_instrument_report_title(language: Optional[str], instrument_type: Optional[str]) -> str:
+    """Return the report title text for the given instrument_type.
+
+    Falls back to the existing generic report_title label for "stock",
+    "unknown", missing, or any unrecognized instrument_type value.
+    """
+    normalized_language = normalize_report_language(language)
+    override = _INSTRUMENT_REPORT_TITLE_OVERRIDES.get(instrument_type or "unknown")
+    if override:
+        return override[normalized_language]
+    return _REPORT_LABELS[normalized_language]["report_title"]
+
+
 def get_placeholder_text(language: Optional[str]) -> str:
     """Return placeholder text for missing localized content."""
     return _PLACEHOLDER_BY_LANGUAGE[normalize_report_language(language)]

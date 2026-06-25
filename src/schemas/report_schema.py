@@ -9,7 +9,7 @@ Aligns with SYSTEM_PROMPT in src/analyzer.py.
 Uses Optional for lenient parsing; business-layer integrity checks are separate.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -174,3 +174,9 @@ class AnalysisReportSchema(BaseModel):
     search_performed: Optional[bool] = None
     data_sources: Optional[str] = None
     value_network_mermaid: Optional[str] = None
+
+    # Phase 19B.1: deterministic report contract field. Sourced only from
+    # SymbolRecord.instrument_type (src/services/symbol_universe.py) — never
+    # LLM-inferred. The LLM never populates this; it defaults to "unknown"
+    # during LLM-JSON schema validation and is set by the pipeline afterward.
+    instrument_type: Optional[Literal["stock", "etf", "index", "unknown"]] = "unknown"

@@ -1241,3 +1241,33 @@ def get_default_symbol_universe_cache() -> SymbolUniverseCache:
 @lru_cache(maxsize=1)
 def get_default_symbol_resolver() -> SymbolResolver:
     return SymbolResolver(get_default_symbol_universe_cache())
+
+
+# Report-contract instrument types (Phase 19B.1). Kept intentionally narrower
+# than SymbolRecord.instrument_type (which also has "etn",
+# "beneficiary_security", "depositary_receipt", "preferred_stock", etc.) —
+# anything outside this set must fall back to "unknown" rather than inventing
+# a new report category.
+REPORT_INSTRUMENT_TYPES = frozenset({"stock", "etf", "index"})
+
+
+def resolve_report_instrument_type(code: str) -> str:
+    """Resolve the report-contract instrument_type for a canonical stock code.
+
+    Looks up the already-loaded local symbol universe snapshot only
+    (no network calls, no universe rebuild). Returns "unknown" when the
+    code isn't found or its classification isn't one of
+    REPORT_INSTRUMENT_TYPES — never raises.
+    """
+    if not code:
+        return "unknown"
+    try:
+        record = get_default_symbol_universe_cache().get_by_raw_symbol(code)
+    except Exception:
+        # ponytail: lookup must never break report generation; unknown is safe.
+        return "unknown"
+    if record is None:
+        return "unknown"
+    if record.instrument_type in REPORT_INSTRUMENT_TYPES:
+        return record.instrument_type
+    return "unknown"

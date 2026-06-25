@@ -52,6 +52,7 @@ from src.analysis_context_pack_overview import render_analysis_context_pack_over
 from src.market_phase_summary import MARKET_PHASE_SUMMARY_KEY, render_market_phase_summary
 from src.phase_decision_guardrail import apply_phase_decision_guardrails
 from src.services.social_sentiment_service import SocialSentimentService
+from src.services.symbol_universe import resolve_report_instrument_type
 from src.services.analysis_context_builder import (
     AnalysisContextBuilder,
     PipelineAnalysisArtifacts,
@@ -662,6 +663,7 @@ class StockAnalysisPipeline:
             if result:
                 self._emit_progress(94, f"{stock_name}：正在校驗並整理分析結果")
                 result.query_id = query_id
+                result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
                 realtime_data = enhanced_context.get('realtime', {})
                 result.current_price = realtime_data.get('price')
                 result.change_pct = realtime_data.get('change_pct')
@@ -1159,6 +1161,7 @@ class StockAnalysisPipeline:
             )
             if result:
                 result.query_id = query_id
+                result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
             # Agent weak integrity: placeholder fill only, no LLM retry
             if result and getattr(self.config, "report_integrity_enabled", False):
                 from src.analyzer import check_content_integrity, apply_placeholder_fill

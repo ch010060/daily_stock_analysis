@@ -2905,5 +2905,149 @@ class TestSkillActivation(unittest.TestCase):
             self.assertEqual(result.sentiment_score, 80)
 
 
+# ============================================================
+# Phase 19B.1: instrument_type Agent-mode parity
+# ============================================================
+# Both the legacy path (analyze_stock) and the Agent-mode path
+# (_analyze_with_agent) must set AnalysisResult.instrument_type via the same
+# resolve_report_instrument_type(code) call — parity by construction, not by
+# independent LLM inference in either path.
+
+class TestInstrumentTypeAgentParity(unittest.TestCase):
+    """instrument_type must be set identically regardless of agent_mode."""
+
+    def _mock_cfg(self, agent_mode: bool) -> MagicMock:
+        mock_cfg = MagicMock()
+        mock_cfg.max_workers = 2
+        mock_cfg.agent_mode = agent_mode
+        mock_cfg.is_agent_available.return_value = agent_mode
+        mock_cfg.agent_max_steps = 10
+        mock_cfg.agent_skills = []
+        mock_cfg.bocha_api_keys = []
+        mock_cfg.tavily_api_keys = []
+        mock_cfg.brave_api_keys = []
+        mock_cfg.serpapi_keys = []
+        mock_cfg.searxng_base_urls = []
+        mock_cfg.searxng_public_instances_enabled = False
+        mock_cfg.news_max_age_days = 7
+        mock_cfg.enable_realtime_quote = True
+        mock_cfg.enable_chip_distribution = True
+        mock_cfg.realtime_source_priority = []
+        mock_cfg.save_context_snapshot = False
+        return mock_cfg
+
+    def test_agent_mode_sets_instrument_type_from_resolver(self):
+        """_analyze_with_agent must set instrument_type via resolve_report_instrument_type."""
+        with patch('src.core.pipeline.get_config') as mock_config, \
+             patch('src.core.pipeline.get_db'), \
+             patch('src.core.pipeline.DataFetcherManager'), \
+             patch('src.core.pipeline.GeminiAnalyzer'), \
+             patch('src.core.pipeline.NotificationService'), \
+             patch('src.core.pipeline.SearchService'), \
+             patch('src.agent.factory.build_agent_executor') as mock_build_executor, \
+             patch('src.core.pipeline.resolve_report_instrument_type') as mock_resolve:
+
+            mock_resolve.return_value = "etf"
+            mock_cfg = self._mock_cfg(agent_mode=True)
+            mock_config.return_value = mock_cfg
+
+            from src.core.pipeline import StockAnalysisPipeline
+            from src.agent.executor import AgentResult
+            from src.enums import ReportType
+            pipeline = StockAnalysisPipeline(config=mock_cfg)
+
+            agent_result = AgentResult(
+                success=True,
+                content="{}",
+                dashboard={
+                    "stock_name": "元大台灣50",
+                    "sentiment_score": 60,
+                    "trend_prediction": "震盪",
+                    "operation_advice": "持有",
+                    "decision_type": "hold",
+                },
+                provider="gemini",
+            )
+            mock_executor = MagicMock()
+            mock_executor.run.return_value = agent_result
+            mock_build_executor.return_value = mock_executor
+            pipeline.search_service.is_available = False
+
+            result = pipeline._analyze_with_agent(
+                code="0050",
+                report_type=ReportType.SIMPLE,
+                query_id="q-parity-agent",
+                stock_name="元大台灣50",
+                realtime_quote=None,
+                chip_data=None,
+            )
+
+            self.assertIsNotNone(result)
+            self.assertEqual(result.instrument_type, "etf")
+            mock_resolve.assert_called_once_with("0050")
+
+    def test_legacy_and_agent_paths_resolve_same_instrument_type_for_same_code(self):
+        """Same code must yield the same instrument_type whether agent_mode is on or off."""
+        for agent_mode in (False, True):
+            with patch('src.core.pipeline.get_config') as mock_config, \
+                 patch('src.core.pipeline.get_db'), \
+                 patch('src.core.pipeline.DataFetcherManager'), \
+                 patch('src.core.pipeline.GeminiAnalyzer'), \
+                 patch('src.core.pipeline.NotificationService'), \
+                 patch('src.core.pipeline.SearchService'), \
+                 patch('src.agent.factory.build_agent_executor') as mock_build_executor, \
+                 patch('src.core.pipeline.resolve_report_instrument_type') as mock_resolve:
+
+                mock_resolve.return_value = "stock"
+                mock_cfg = self._mock_cfg(agent_mode=agent_mode)
+                mock_config.return_value = mock_cfg
+
+                from src.core.pipeline import StockAnalysisPipeline
+                from src.agent.executor import AgentResult
+                from src.enums import ReportType
+                pipeline = StockAnalysisPipeline(config=mock_cfg)
+
+                if agent_mode:
+                    agent_result = AgentResult(
+                        success=True,
+                        content="{}",
+                        dashboard={
+                            "stock_name": "台積電",
+                            "sentiment_score": 70,
+                            "trend_prediction": "看多",
+                            "operation_advice": "持有",
+                            "decision_type": "hold",
+                        },
+                        provider="gemini",
+                    )
+                    mock_executor = MagicMock()
+                    mock_executor.run.return_value = agent_result
+                    mock_build_executor.return_value = mock_executor
+                    pipeline.search_service.is_available = False
+
+                    result = pipeline._analyze_with_agent(
+                        code="2330",
+                        report_type=ReportType.SIMPLE,
+                        query_id="q-parity-2",
+                        stock_name="台積電",
+                        realtime_quote=None,
+                        chip_data=None,
+                    )
+                else:
+                    pipeline.fetcher_manager.get_realtime_quote.return_value = None
+                    pipeline.fetcher_manager.get_chip_distribution.return_value = None
+                    pipeline.search_service.is_available = False
+                    pipeline.db.get_analysis_context.return_value = None
+                    pipeline.analyzer.analyze.return_value = MagicMock(
+                        code="2330", name="台積電", success=True,
+                    )
+
+                    result = pipeline.analyze_stock("2330", ReportType.SIMPLE, "q-parity-2")
+
+                self.assertIsNotNone(result)
+                self.assertEqual(result.instrument_type, "stock")
+                mock_resolve.assert_called_once_with("2330")
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -23,6 +23,7 @@ from src.report_language import (
     get_report_labels,
     get_signal_level,
     get_chip_unavailable_reason,
+    get_instrument_report_title,
     is_chip_structure_unavailable,
     localize_bias_status,
     localize_chip_health,
@@ -851,6 +852,7 @@ class HistoryService:
                 change_pct=raw_result.get("change_pct"),
                 model_used=raw_result.get("model_used"),
                 value_network_mermaid=raw_result.get("value_network_mermaid"),
+                instrument_type=raw_result.get("instrument_type", "unknown"),
             )
         except Exception as e:
             logger.error(f"Failed to rebuild AnalysisResult: {e}", exc_info=True)
@@ -896,8 +898,11 @@ class HistoryService:
         signal_text, signal_emoji, signal_tag = self._get_signal_level(result)
         dashboard = result.dashboard if hasattr(result, 'dashboard') and result.dashboard else {}
 
+        report_title = get_instrument_report_title(
+            report_language, getattr(result, "instrument_type", "unknown")
+        )
         report_lines = [
-            f"# 📊 {name_escaped} ({result.code}) {labels['report_title']}",
+            f"# 📊 {name_escaped} ({result.code}) {report_title}",
             "",
             f"> {analysis_date_label}: **{report_date}** | {report_time_label}: {report_time}",
             "",

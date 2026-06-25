@@ -1563,6 +1563,7 @@ class AnalysisResult:
     search_performed: bool = False  # 是否執行了聯網搜尋
     data_sources: str = ""  # 資料來源說明
     value_network_mermaid: Optional[str] = None  # Phase 18A：可選的價值網路圖 Mermaid 原始文字（已驗證或 None）
+    instrument_type: str = "unknown"  # Phase 19B.1：報告契約欄位，僅來自 SymbolRecord，非 LLM 推論
     success: bool = True
     error_message: Optional[str] = None
 
@@ -1616,6 +1617,7 @@ class AnalysisResult:
             'change_pct': self.change_pct,
             'model_used': self.model_used,
             'value_network_mermaid': self.value_network_mermaid,
+            'instrument_type': self.instrument_type,
         }
 
     def get_core_conclusion(self) -> str:

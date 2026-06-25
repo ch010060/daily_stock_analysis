@@ -1580,6 +1580,78 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertIsNotNone(rebuilt)
         self.assertIsNone(rebuilt.value_network_mermaid)
 
+    def test_rebuild_analysis_result_carries_instrument_type(self) -> None:
+        """Phase 19B.1: _rebuild_analysis_result carries instrument_type from raw_result."""
+        record_id = self._save_history("query_instrument_type_001")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            raw_result = {
+                "code": "0050",
+                "name": "元大台灣50",
+                "instrument_type": "etf",
+            }
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertEqual(rebuilt.instrument_type, "etf")
+
+    def test_rebuild_analysis_result_defaults_instrument_type_to_unknown(self) -> None:
+        """Phase 19B.1: old history records (no instrument_type key) rebuild as 'unknown',
+        not a crash and not a missing attribute — backward compatibility contract."""
+        record_id = self._save_history("query_instrument_type_002")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            raw_result = {
+                "code": "2330",
+                "name": "台積電",
+            }
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertEqual(rebuilt.instrument_type, "unknown")
+
+    def test_generate_single_stock_markdown_title_switches_by_instrument_type(self) -> None:
+        """Phase 19B.1: title contract — etf/index get dedicated titles, stock/unknown
+        keep the existing generic title (backward compatible with old reports)."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        cases = {
+            "etf": "ETF分析報告",
+            "index": "指數分析報告",
+            "stock": "股票分析報告",
+            "unknown": "股票分析報告",
+        }
+        for instrument_type, expected_title in cases.items():
+            result = self._build_result()
+            result.instrument_type = instrument_type
+            markdown = service._generate_single_stock_markdown(result, record)
+            self.assertIn(expected_title, markdown)
+
+    def test_generate_single_stock_markdown_defaults_title_when_instrument_type_missing(self) -> None:
+        """Old AnalysisResult objects without the instrument_type attribute must not crash
+        markdown generation and must keep the existing title."""
+        from datetime import datetime as _datetime
+
+        result = self._build_result()
+        del result.__dict__["instrument_type"]  # simulate a pre-19B.1 in-memory object
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+
+        service = HistoryService(self.db)
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn("股票分析報告", markdown)
+
 
 class HistoryItemSchemaNegativeSentimentTest(unittest.TestCase):
     """Regression: HistoryItem / ReportSummary must accept out-of-range sentiment_score from DB rows."""

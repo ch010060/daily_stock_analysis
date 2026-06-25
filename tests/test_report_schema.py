@@ -137,6 +137,34 @@ class TestAnalysisReportSchema(unittest.TestCase):
         schema = AnalysisReportSchema.model_validate(data)
         self.assertEqual(schema.value_network_mermaid, "flowchart TB\n  A --> B")
 
+    def test_schema_instrument_type_defaults_to_unknown(self) -> None:
+        """Phase 19B.1: instrument_type is declared and defaults to 'unknown'."""
+        self.assertIn("instrument_type", AnalysisReportSchema.model_fields)
+
+        data = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        schema = AnalysisReportSchema.model_validate(data)
+        self.assertEqual(schema.instrument_type, "unknown")
+
+    def test_schema_instrument_type_accepts_contract_values(self) -> None:
+        """Phase 19B.1: only stock/etf/index/unknown are valid; others reject."""
+        base = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        for value in ("stock", "etf", "index", "unknown"):
+            schema = AnalysisReportSchema.model_validate({**base, "instrument_type": value})
+            self.assertEqual(schema.instrument_type, value)
+
+        with self.assertRaises(Exception):
+            AnalysisReportSchema.model_validate({**base, "instrument_type": "warrant"})
+
 
 class TestAnalyzerSchemaFallback(unittest.TestCase):
     """Analyzer fallback when schema validation fails."""
@@ -239,3 +267,21 @@ class TestAnalyzerSchemaFallback(unittest.TestCase):
         self.assertEqual(result.trend_prediction, "Bullish")
         self.assertEqual(result.operation_advice, "Buy")
         self.assertEqual(result.confidence_level, "Low")
+
+    def test_parse_response_ignores_llm_supplied_instrument_type(self) -> None:
+        """Phase 19B.1: instrument_type must never be LLM-inferred; it stays
+        at the dataclass default regardless of what the LLM JSON contains.
+        The pipeline (not the analyzer) is responsible for setting it from
+        SymbolRecord."""
+        analyzer = GeminiAnalyzer()
+        response = json.dumps({
+            "stock_name": "台積電",
+            "sentiment_score": 72,
+            "trend_prediction": "看多",
+            "operation_advice": "持有",
+            "decision_type": "hold",
+            "analysis_summary": "技術面向好",
+            "instrument_type": "etf",
+        })
+        result = analyzer._parse_response(response, "2330", "股票2330")
+        self.assertEqual(result.instrument_type, "unknown")
