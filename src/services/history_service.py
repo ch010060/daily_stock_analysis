@@ -853,6 +853,8 @@ class HistoryService:
                 model_used=raw_result.get("model_used"),
                 value_network_mermaid=raw_result.get("value_network_mermaid"),
                 instrument_type=raw_result.get("instrument_type", "unknown"),
+                valuation_snapshot=raw_result.get("valuation_snapshot"),
+                fundamental_snapshot=raw_result.get("fundamental_snapshot"),
             )
         except Exception as e:
             logger.error(f"Failed to rebuild AnalysisResult: {e}", exc_info=True)
@@ -1049,6 +1051,68 @@ class HistoryService:
                 if chip_unavailable_reason:
                     report_lines.extend([
                         f"**{labels['chip_label']}**: {chip_unavailable_reason}",
+                        "",
+                    ])
+
+        # ========== 估值與基本面快照（Phase 19B.2，僅 stock，後端決定性組裝）==========
+        if getattr(result, "instrument_type", "unknown") == "stock":
+            valuation_snapshot = getattr(result, "valuation_snapshot", None)
+            fundamental_snapshot = getattr(result, "fundamental_snapshot", None)
+            if isinstance(valuation_snapshot, dict) or isinstance(fundamental_snapshot, dict):
+                report_lines.extend([
+                    f"### 🧾 {labels['valuation_fundamental_heading']}",
+                    "",
+                ])
+                gap_label = labels['snapshot_data_gap_label']
+
+                def _snapshot_value(snapshot: Optional[Dict[str, Any]], field: str, is_pct: bool) -> str:
+                    if not isinstance(snapshot, dict):
+                        return gap_label
+                    value = snapshot.get(field)
+                    if value is None:
+                        return gap_label
+                    return f"{value}%" if is_pct else str(value)
+
+                if isinstance(valuation_snapshot, dict):
+                    report_lines.extend([
+                        f"**{labels['valuation_metrics_label']}**",
+                        "",
+                        f"| {labels['pe_ttm_label']} | {labels['pe_forward_label']} | {labels['pb_label']} | "
+                        f"{labels['dividend_yield_label']} | {labels['market_cap_label']} |",
+                        "|---|---|---|---|---|",
+                        f"| {_snapshot_value(valuation_snapshot, 'pe_ttm', False)} | "
+                        f"{_snapshot_value(valuation_snapshot, 'pe_forward', False)} | "
+                        f"{_snapshot_value(valuation_snapshot, 'pb', False)} | "
+                        f"{_snapshot_value(valuation_snapshot, 'dividend_yield', True)} | "
+                        f"{_snapshot_value(valuation_snapshot, 'market_cap', False)} |",
+                        "",
+                    ])
+                if isinstance(fundamental_snapshot, dict):
+                    report_lines.extend([
+                        f"**{labels['fundamental_metrics_label']}**",
+                        "",
+                        f"| {labels['revenue_yoy_label']} | {labels['earnings_yoy_label']} | "
+                        f"{labels['net_profit_yoy_label']} | {labels['roe_label']} | {labels['gross_margin_label']} |",
+                        "|---|---|---|---|---|",
+                        f"| {_snapshot_value(fundamental_snapshot, 'revenue_yoy', True)} | "
+                        f"{_snapshot_value(fundamental_snapshot, 'earnings_yoy', True)} | "
+                        f"{_snapshot_value(fundamental_snapshot, 'net_profit_yoy', True)} | "
+                        f"{_snapshot_value(fundamental_snapshot, 'roe', True)} | "
+                        f"{_snapshot_value(fundamental_snapshot, 'gross_margin', True)} |",
+                        "",
+                    ])
+                snapshot_source = (
+                    (valuation_snapshot or {}).get("source")
+                    or (fundamental_snapshot or {}).get("source")
+                )
+                snapshot_as_of = (
+                    (valuation_snapshot or {}).get("as_of")
+                    or (fundamental_snapshot or {}).get("as_of")
+                )
+                if snapshot_source or snapshot_as_of:
+                    report_lines.extend([
+                        f"*{labels['snapshot_source_label']}: {snapshot_source or 'N/A'} | "
+                        f"{labels['snapshot_as_of_label']}: {snapshot_as_of or 'N/A'}*",
                         "",
                     ])
 

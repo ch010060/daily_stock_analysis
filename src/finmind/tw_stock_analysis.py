@@ -31,6 +31,7 @@ Snapshot sections:
 import logging
 import re
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.finmind.fetcher import FinMindDatasetFetcher
@@ -244,6 +245,68 @@ def _extract_monthly_revenue(result: Dict[str, Any]) -> Dict[str, Any]:
         "row_count": len(rows),
         "rows": rows,
     }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 19B.2 — narrow valuation/fundamental snapshot fetch
+# ──────────────────────────────────────────────────────────────────────────────
+
+def build_tw_valuation_fundamental_snapshot(
+    stock_id: str,
+    *,
+    end_date: str,
+    fetcher: Optional[FinMindDatasetFetcher] = None,
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Targeted (valuation, fundamental) raw-field fetch for a TW stock_id.
+
+    Only pulls TaiwanStockPER + TaiwanStockMonthRevenue — not the full
+    TWStockAnalysisCollector snapshot — to avoid unrelated fetches (OHLCV,
+    balance sheet, cash flow, dividend, institutional flow, margin) and the
+    extra latency/quota they would add. Never raises; missing/failed fields
+    are simply absent from the returned dicts so callers can degrade to a
+    "data not available" snapshot.
+    """
+    fetcher = fetcher or FinMindDatasetFetcher()
+    end_dt = date.fromisoformat(end_date)
+    valuation_raw: Dict[str, Any] = {}
+    fundamental_raw: Dict[str, Any] = {}
+
+    try:
+        per_result = fetcher.fetch(
+            "TaiwanStockPER",
+            data_id=stock_id,
+            start_date=(end_dt - timedelta(days=30)).isoformat(),
+            end_date=end_date,
+        )
+        per_section = _extract_valuation(per_result)
+        if per_section.get("available"):
+            valuation_raw = {
+                "pe_ttm": per_section.get("PER"),
+                "pb": per_section.get("PBR"),
+                "dividend_yield": per_section.get("dividend_yield"),
+                "as_of": per_section.get("latest_date"),
+            }
+    except Exception as exc:
+        logger.warning("TW valuation snapshot fetch failed for %s: %s", stock_id, exc)
+
+    try:
+        # 13+ months of history needed for YoY in _compute_revenue_yoy.
+        revenue_result = fetcher.fetch(
+            "TaiwanStockMonthRevenue",
+            data_id=stock_id,
+            start_date=(end_dt - timedelta(days=400)).isoformat(),
+            end_date=end_date,
+        )
+        revenue_section = _extract_monthly_revenue(revenue_result)
+        if revenue_section.get("available"):
+            fundamental_raw = {
+                "revenue_yoy": revenue_section.get("yoy_pct"),
+                "as_of": revenue_section.get("latest_date"),
+            }
+    except Exception as exc:
+        logger.warning("TW fundamental snapshot fetch failed for %s: %s", stock_id, exc)
+
+    return valuation_raw, fundamental_raw
 
 
 def _extract_kv_statements(result: Dict[str, Any], section_name: str) -> Dict[str, Any]:

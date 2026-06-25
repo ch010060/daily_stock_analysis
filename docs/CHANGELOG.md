@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 個股（`instrument_type=stock`）完整報告新增「🧾 估值與基本面快照」區塊，位於資料透視之後、作戰計劃之前；數值由後端決定性組裝（台股使用 FinMind `TaiwanStockPER`/`TaiwanStockMonthRevenue`，美股重用既有 yfinance 基本面資料），LLM 不參與該區塊數值生成；缺失欄位顯示為資料缺口而非省略；ETF/指數/未知類型不顯示此區塊。
 - [新功能] 個股完整報告新增可選的「附錄：價值網路圖」Mermaid 流程圖區塊，由新環境變數 `ENABLE_VALUE_NETWORK_MERMAID`（預設 `false`）控制是否在 Prompt 中請求 LLM 產出；後端會驗證圖表型別、長度、節點/分類數量並過濾危險內容，驗證失敗則靜默省略，不影響報告其餘內容；WebUI 以 `mermaid`（`securityLevel: strict`）安全渲染，渲染失敗時顯示提示並保留原始 Mermaid 原始碼。
 - [修復] 市場概覽任務完成後會即時更新 MARKET 個股欄卡片與市場概覽歷史資料，完成後不需重新整理整頁即可看到最新市場概覽入口。
 - [修復] Route B 相關資訊/新聞納入規則改為台股/美股正向相關性策略：非台美來源詞不再作為台美新聞正向訊號，無台美公司/財務/產業/市場關聯的內容會在進入 context/cache/tool output 前被丟棄，並保留具財務意義的 App/下載/活躍使用者等商業指標新聞。

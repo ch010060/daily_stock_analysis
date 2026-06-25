@@ -180,3 +180,10 @@ class AnalysisReportSchema(BaseModel):
     # LLM-inferred. The LLM never populates this; it defaults to "unknown"
     # during LLM-JSON schema validation and is set by the pipeline afterward.
     instrument_type: Optional[Literal["stock", "etf", "index", "unknown"]] = "unknown"
+
+    # Phase 19B.2: deterministic valuation/fundamental snapshots for stock-only
+    # instruments. Backend-built (FinMind for TW, yfinance for US) after LLM-JSON
+    # validation — never LLM-populated, so any value supplied by the LLM here is
+    # discarded and overwritten by the pipeline, same pattern as instrument_type.
+    valuation_snapshot: Optional[Dict[str, Any]] = None
+    fundamental_snapshot: Optional[Dict[str, Any]] = None

@@ -1564,6 +1564,9 @@ class AnalysisResult:
     data_sources: str = ""  # 資料來源說明
     value_network_mermaid: Optional[str] = None  # Phase 18A：可選的價值網路圖 Mermaid 原始文字（已驗證或 None）
     instrument_type: str = "unknown"  # Phase 19B.1：報告契約欄位，僅來自 SymbolRecord，非 LLM 推論
+    # Phase 19B.2：股票專屬估值/基本面快照，由後端決定性組裝（FinMind/yfinance），非 LLM 推論
+    valuation_snapshot: Optional[Dict[str, Any]] = None
+    fundamental_snapshot: Optional[Dict[str, Any]] = None
     success: bool = True
     error_message: Optional[str] = None
 
@@ -1618,6 +1621,8 @@ class AnalysisResult:
             'model_used': self.model_used,
             'value_network_mermaid': self.value_network_mermaid,
             'instrument_type': self.instrument_type,
+            'valuation_snapshot': self.valuation_snapshot,
+            'fundamental_snapshot': self.fundamental_snapshot,
         }
 
     def get_core_conclusion(self) -> str:

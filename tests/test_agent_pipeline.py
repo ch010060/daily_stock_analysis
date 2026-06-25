@@ -15,6 +15,7 @@ import types
 import unittest
 import sys
 import os
+from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch, PropertyMock
@@ -3047,6 +3048,89 @@ class TestInstrumentTypeAgentParity(unittest.TestCase):
                 self.assertIsNotNone(result)
                 self.assertEqual(result.instrument_type, "stock")
                 mock_resolve.assert_called_once_with("2330")
+
+
+class TestAttachValuationFundamentalSnapshot(unittest.TestCase):
+    """Phase 19B.2: unit tests for pipeline._attach_valuation_fundamental_snapshot.
+
+    Directly invokes the wired method on a minimally-constructed pipeline
+    instance rather than driving the full analyze_stock/_analyze_with_agent
+    flow — the method is already proven reachable from both paths by
+    TestInstrumentTypeAgentParity's "set instrument_type then call" pattern.
+    """
+
+    def _make_pipeline(self) -> "StockAnalysisPipeline":  # noqa: F821
+        with patch('src.core.pipeline.get_config') as mock_config, \
+             patch('src.core.pipeline.get_db'), \
+             patch('src.core.pipeline.DataFetcherManager'), \
+             patch('src.core.pipeline.GeminiAnalyzer'), \
+             patch('src.core.pipeline.NotificationService'), \
+             patch('src.core.pipeline.SearchService'):
+            mock_cfg = MagicMock()
+            mock_cfg.max_workers = 2
+            mock_cfg.agent_mode = False
+            mock_config.return_value = mock_cfg
+
+            from src.core.pipeline import StockAnalysisPipeline
+            return StockAnalysisPipeline(config=mock_cfg)
+
+    def test_non_stock_instrument_type_is_noop(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="etf", valuation_snapshot=None, fundamental_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock') as mock_market:
+            pipeline._attach_valuation_fundamental_snapshot(result, "0050", None)
+            mock_market.assert_not_called()
+
+        self.assertIsNone(result.valuation_snapshot)
+        self.assertIsNone(result.fundamental_snapshot)
+
+    def test_tw_stock_builds_finmind_snapshots(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_snapshot=None, fundamental_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
+             patch('src.finmind.tw_stock_analysis.normalize_tw_symbol', return_value=("2330", None)), \
+             patch('src.services.history_loader.get_frozen_target_date', return_value=date(2026, 6, 25)), \
+             patch(
+                 'src.finmind.tw_stock_analysis.build_tw_valuation_fundamental_snapshot',
+                 return_value=(
+                     {"pe_ttm": 23.1, "pb": 6.3, "as_of": "2026-06-13"},
+                     {"revenue_yoy": 45.0, "as_of": "2026-06-10"},
+                 ),
+             ):
+            pipeline._attach_valuation_fundamental_snapshot(result, "2330", None)
+
+        self.assertEqual(result.valuation_snapshot["pe_ttm"], 23.1)
+        self.assertEqual(result.valuation_snapshot["source"], "finmind")
+        self.assertEqual(result.fundamental_snapshot["revenue_yoy"], 45.0)
+        self.assertEqual(result.fundamental_snapshot["source"], "finmind")
+
+    def test_us_stock_builds_yfinance_snapshots_from_fundamental_context(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_snapshot=None, fundamental_snapshot=None)
+        fundamental_context = {
+            "valuation": {"pe_ttm": 32.5, "pe_forward": 28.1, "pb": 48.2, "market_cap": 3.2e12, "dividend_yield": 0.5},
+            "growth": {"revenue_yoy": 16.6, "net_profit_yoy": 19.3, "roe": 141.5, "gross_margin": 47.9},
+        }
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="us"):
+            pipeline._attach_valuation_fundamental_snapshot(result, "AAPL", fundamental_context)
+
+        self.assertEqual(result.valuation_snapshot["pe_ttm"], 32.5)
+        self.assertEqual(result.valuation_snapshot["source"], "yfinance")
+        self.assertEqual(result.fundamental_snapshot["earnings_yoy"], 19.3)  # mapped from net_profit_yoy
+        self.assertEqual(result.fundamental_snapshot["source"], "yfinance")
+
+    def test_exception_degrades_to_no_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_snapshot=None, fundamental_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', side_effect=RuntimeError("boom")):
+            pipeline._attach_valuation_fundamental_snapshot(result, "2330", None)
+
+        self.assertIsNone(result.valuation_snapshot)
+        self.assertIsNone(result.fundamental_snapshot)
 
 
 if __name__ == '__main__':

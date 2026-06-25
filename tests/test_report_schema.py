@@ -165,6 +165,37 @@ class TestAnalysisReportSchema(unittest.TestCase):
         with self.assertRaises(Exception):
             AnalysisReportSchema.model_validate({**base, "instrument_type": "warrant"})
 
+    def test_schema_valuation_fundamental_snapshot_fields_default_to_none(self) -> None:
+        """Phase 19B.2: declared, Optional[Dict], default None, extra="allow"
+        means any LLM-supplied value is accepted by the schema but is later
+        discarded/overwritten by the pipeline (same pattern as instrument_type)."""
+        self.assertIn("valuation_snapshot", AnalysisReportSchema.model_fields)
+        self.assertIn("fundamental_snapshot", AnalysisReportSchema.model_fields)
+
+        data = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        schema = AnalysisReportSchema.model_validate(data)
+        self.assertIsNone(schema.valuation_snapshot)
+        self.assertIsNone(schema.fundamental_snapshot)
+
+    def test_schema_valuation_fundamental_snapshot_accepts_dict(self) -> None:
+        base = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        snapshot = {"pe_ttm": 23.1, "source": "finmind", "data_gap_fields": []}
+        schema = AnalysisReportSchema.model_validate(
+            {**base, "valuation_snapshot": snapshot, "fundamental_snapshot": snapshot}
+        )
+        self.assertEqual(schema.valuation_snapshot, snapshot)
+        self.assertEqual(schema.fundamental_snapshot, snapshot)
+
 
 class TestAnalyzerSchemaFallback(unittest.TestCase):
     """Analyzer fallback when schema validation fails."""
@@ -285,3 +316,21 @@ class TestAnalyzerSchemaFallback(unittest.TestCase):
         })
         result = analyzer._parse_response(response, "2330", "股票2330")
         self.assertEqual(result.instrument_type, "unknown")
+
+    def test_parse_response_ignores_llm_supplied_valuation_fundamental_snapshot(self) -> None:
+        """Phase 19B.2: same non-LLM-inferred contract as instrument_type —
+        the pipeline (not the analyzer) builds these from FinMind/yfinance."""
+        analyzer = GeminiAnalyzer()
+        response = json.dumps({
+            "stock_name": "台積電",
+            "sentiment_score": 72,
+            "trend_prediction": "看多",
+            "operation_advice": "持有",
+            "decision_type": "hold",
+            "analysis_summary": "技術面向好",
+            "valuation_snapshot": {"pe_ttm": 999.0},
+            "fundamental_snapshot": {"revenue_yoy": 999.0},
+        })
+        result = analyzer._parse_response(response, "2330", "股票2330")
+        self.assertIsNone(result.valuation_snapshot)
+        self.assertIsNone(result.fundamental_snapshot)

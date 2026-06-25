@@ -664,6 +664,7 @@ class StockAnalysisPipeline:
                 self._emit_progress(94, f"{stock_name}：正在校驗並整理分析結果")
                 result.query_id = query_id
                 result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
+                self._attach_valuation_fundamental_snapshot(result, code, fundamental_context)
                 realtime_data = enhanced_context.get('realtime', {})
                 result.current_price = realtime_data.get('price')
                 result.change_pct = realtime_data.get('change_pct')
@@ -1004,6 +1005,78 @@ class StockAnalysisPipeline:
         enriched_context["belong_boards"] = boards
         return enriched_context
 
+    def _attach_valuation_fundamental_snapshot(
+        self,
+        result: Any,
+        code: str,
+        fundamental_context: Optional[Dict[str, Any]],
+    ) -> None:
+        """
+        Phase 19B.2: attach deterministic `valuation_snapshot` / `fundamental_snapshot`.
+
+        Stock-only (etf/index/unknown render nothing — Phase 19B.3 scope).
+        TW market triggers one additional, narrowly-scoped FinMind fetch
+        (TaiwanStockPER + TaiwanStockMonthRevenue only). US market reuses the
+        yfinance `info` dict already fetched into `fundamental_context` by
+        `get_fundamental_context()` — no extra network call. Never raises;
+        any failure degrades to "no snapshot" rather than aborting the report.
+        """
+        if getattr(result, "instrument_type", "unknown") != "stock":
+            return
+        try:
+            market = get_market_for_stock(normalize_stock_code(code))
+            valuation_raw: Dict[str, Any] = {}
+            fundamental_raw: Dict[str, Any] = {}
+            source: Optional[str] = None
+
+            if market == "tw":
+                from src.finmind.tw_stock_analysis import (
+                    build_tw_valuation_fundamental_snapshot,
+                    normalize_tw_symbol,
+                )
+
+                stock_id, err = normalize_tw_symbol(code)
+                if err or not stock_id:
+                    return
+                from src.services.history_loader import get_frozen_target_date
+
+                frozen = get_frozen_target_date()
+                end_date = (frozen if frozen else get_market_now(market).date()).isoformat()
+                valuation_raw, fundamental_raw = build_tw_valuation_fundamental_snapshot(
+                    stock_id, end_date=end_date,
+                )
+                source = "finmind"
+            elif market == "us":
+                ctx = fundamental_context if isinstance(fundamental_context, dict) else {}
+                valuation_block = ctx.get("valuation") or {}
+                growth_block = ctx.get("growth") or {}
+                valuation_raw = {
+                    "pe_ttm": valuation_block.get("pe_ttm"),
+                    "pe_forward": valuation_block.get("pe_forward"),
+                    "pb": valuation_block.get("pb"),
+                    "dividend_yield": valuation_block.get("dividend_yield"),
+                    "market_cap": valuation_block.get("market_cap"),
+                }
+                fundamental_raw = {
+                    "revenue_yoy": growth_block.get("revenue_yoy"),
+                    "earnings_yoy": growth_block.get("net_profit_yoy"),
+                    "roe": growth_block.get("roe"),
+                    "gross_margin": growth_block.get("gross_margin"),
+                }
+                source = "yfinance"
+            else:
+                return
+
+            from src.services.valuation_fundamental_snapshot import (
+                build_fundamental_snapshot,
+                build_valuation_snapshot,
+            )
+
+            result.valuation_snapshot = build_valuation_snapshot(valuation_raw, source=source)
+            result.fundamental_snapshot = build_fundamental_snapshot(fundamental_raw, source=source)
+        except Exception as exc:
+            logger.warning("[valuation_fundamental_snapshot] skipped for %s: %s", code, exc)
+
     def _ensure_agent_history(self, code: str, min_days: int = 240) -> None:
         """Ensure at least *min_days* of K-line history is in DB for agent tools."""
         from src.services.history_loader import get_frozen_target_date
@@ -1162,6 +1235,7 @@ class StockAnalysisPipeline:
             if result:
                 result.query_id = query_id
                 result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
+                self._attach_valuation_fundamental_snapshot(result, code, fundamental_context)
             # Agent weak integrity: placeholder fill only, no LLM retry
             if result and getattr(self.config, "report_integrity_enabled", False):
                 from src.analyzer import check_content_integrity, apply_placeholder_fill
