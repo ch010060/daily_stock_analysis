@@ -113,7 +113,12 @@ npm run build
 gh pr view <pr_number>
 gh pr checks <pr_number>
 gh run view <run_id> --log-failed
+scripts/gitleaks_scan.sh --log-opts="<base>..HEAD"
 ```
+
+`scripts/gitleaks_scan.sh` 包裝 `gitleaks detect`，固定 `--source` 與
+`--gitleaks-ignore-path` 為 repo 根目錄，避免在子目錄（如 `apps/dsa-web/`）
+執行時漏讀根目錄的 `.gitleaksignore`、誤報已確認過的歷史誤判。
 
 ## 5. 預設工作流
 
