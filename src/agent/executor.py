@@ -280,7 +280,7 @@ LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT = """你是一位專注於趨勢交易的{mar
     "company_highlights": "公司亮點/風險",
     "news_summary": "新聞摘要",
     "market_sentiment": "市場情緒",
-    "hot_topics": "相關熱點"
+    "hot_topics": "相關熱點"{value_network_schema_field}
 }}
 ```
 
@@ -327,7 +327,7 @@ LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT = """你是一位專注於趨勢交易的{mar
 - 只有在跌破關鍵支撐、主力資金持續流出或風險顯著放大時，才能給出賣出/減倉。
 - 必須輸出 `dashboard.phase_decision` 七欄位；盤中/午休/臨近收盤要給出當前動作、觀察條件和下一次檢查點。
 - 盤前、非交易日或未知階段不得偽造今日盤中走勢；quote/daily_bars/technical 存在 stale、fallback、missing、fetch_failed、partial 或 estimated 時，`confidence_level` 不得為高。
-
+{value_network_instruction_section}
 {language_section}
 """
 
@@ -430,7 +430,7 @@ AGENT_SYSTEM_PROMPT = """你是一位{market_role}投資分析 Agent，擁有資
     "company_highlights": "公司亮點/風險",
     "news_summary": "新聞摘要",
     "market_sentiment": "市場情緒",
-    "hot_topics": "相關熱點"
+    "hot_topics": "相關熱點"{value_network_schema_field}
 }}
 ```
 
@@ -474,7 +474,7 @@ AGENT_SYSTEM_PROMPT = """你是一位{market_role}投資分析 Agent，擁有資
 - 只有在跌破關鍵支撐、主力資金持續流出或風險顯著放大時，才能給出賣出/減倉。
 - 必須輸出 `dashboard.phase_decision` 七欄位；盤中/午休/臨近收盤要給出當前動作、觀察條件和下一次檢查點。
 - 盤前、非交易日或未知階段不得偽造今日盤中走勢；quote/daily_bars/technical 存在 stale、fallback、missing、fetch_failed、partial 或 estimated 時，`confidence_level` 不得為高。
-
+{value_network_instruction_section}
 {language_section}
 """
 
@@ -607,6 +607,37 @@ def _build_language_section(report_language: str, *, chat_mode: bool = False) ->
 """
 
 
+def _build_value_network_sections(context: Optional[Dict[str, Any]]) -> tuple:
+    """Build the (schema_field, instruction_section) pair for the value-network appendix.
+
+    Mirrors the GeminiAnalyzer._format_prompt / SYSTEM_PROMPT treatment in
+    src/analyzer.py so the Agent-mode path offers the same opt-out-by-default,
+    always-present-when-enabled JSON contract.
+    """
+    if not getattr(get_config(), "enable_value_network_mermaid", False):
+        return "", ""
+
+    categories_hint = (
+        "持股組成/需求驅動/替代方案/客戶"
+        if (context or {}).get("is_index_etf")
+        else "供應商/客戶/競爭者/互補者/護城河"
+    )
+    schema_field = (
+        ',\n    "value_network_mermaid": "純 Mermaid flowchart 文字或 null；'
+        "啟用時必須出現此鍵，產生規則見後方「附錄：價值網路圖」\""
+    )
+    instruction_section = f"""
+## 附錄：價值網路圖（啟用時必須輸出此欄位）
+最終 JSON 必須額外包含 `value_network_mermaid` 欄位（字串或 null），即使值為 null。
+- 對於有公開商業身份的已知標的，通常應能產出至少類別層級的精簡價值網路圖（建議分類：{categories_hint}），不要因證據不夠精確就直接省略圖表。
+- 若無法取得精確的具名供應商/客戶/競爭者，請改用產業類別層級節點，不要編造具體公司名稱。
+- 只有在該標的業務身份本身嚴重不明確時，才將 `value_network_mermaid` 設為 null。
+- 內容為純 Mermaid flowchart 原始文字，只能使用 `flowchart TB` 或 `flowchart LR`，不要包含 ``` 圍欄或 HTML。
+- 最多 5 個 subgraph 分類，總節點數不超過 20 個，每個分類最多 4 個項目，節點標籤使用繁體中文，用語不得超出本報告主結論的強度。
+"""
+    return schema_field, instruction_section
+
+
 # ============================================================
 # Agent Executor
 # ============================================================
@@ -666,11 +697,16 @@ class AgentExecutor:
             if self.use_legacy_default_prompt
             else AGENT_SYSTEM_PROMPT
         )
+        value_network_schema_field, value_network_instruction_section = _build_value_network_sections(
+            context
+        )
         system_prompt = prompt_template.format(
             market_role=market_role,
             market_guidelines=market_guidelines,
             default_skill_policy_section=default_skill_policy_section,
             skills_section=skills_section,
+            value_network_schema_field=value_network_schema_field,
+            value_network_instruction_section=value_network_instruction_section,
             language_section=_build_language_section(report_language),
         )
 
