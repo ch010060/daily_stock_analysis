@@ -1475,6 +1475,8 @@ class StockAnalysisPipeline:
             # methods (get_sniper_points, get_core_conclusion, etc.) expect that inner
             # structure, so we unwrap it here.
             result.dashboard = nested_dashboard or dash
+            if isinstance(dash, dict):
+                result.value_network_mermaid = dash.get("value_network_mermaid")
             self._backfill_agent_dashboard_fields(result, trend_result, report_language)
         else:
             self._apply_trend_fallback(result, trend_result, report_language)

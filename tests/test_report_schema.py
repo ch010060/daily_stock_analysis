@@ -123,6 +123,20 @@ class TestAnalysisReportSchema(unittest.TestCase):
         with self.assertRaises(Exception):
             AnalysisReportSchema.model_validate(data)
 
+    def test_schema_declares_optional_value_network_mermaid_field(self) -> None:
+        """Phase 18A: value_network_mermaid is a declared optional field."""
+        self.assertIn("value_network_mermaid", AnalysisReportSchema.model_fields)
+
+        data = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+            "value_network_mermaid": "flowchart TB\n  A --> B",
+        }
+        schema = AnalysisReportSchema.model_validate(data)
+        self.assertEqual(schema.value_network_mermaid, "flowchart TB\n  A --> B")
+
 
 class TestAnalyzerSchemaFallback(unittest.TestCase):
     """Analyzer fallback when schema validation fails."""
@@ -184,6 +198,35 @@ class TestAnalyzerSchemaFallback(unittest.TestCase):
         result = analyzer._parse_response(response, "2330", "股票2330")
         self.assertEqual(result.dashboard["decision_stability"]["applied"], True)
         self.assertEqual(result.dashboard["decision_stability"]["reason"], "回測驗證")
+
+    def test_parse_response_carries_value_network_mermaid_field(self) -> None:
+        """Phase 18A: value_network_mermaid from the LLM JSON reaches AnalysisResult."""
+        analyzer = GeminiAnalyzer()
+        response = json.dumps({
+            "stock_name": "台積電",
+            "sentiment_score": 72,
+            "trend_prediction": "看多",
+            "operation_advice": "持有",
+            "decision_type": "hold",
+            "analysis_summary": "技術面向好",
+            "value_network_mermaid": "flowchart TB\n  A[供應商] --> B[公司]",
+        })
+        result = analyzer._parse_response(response, "2330", "股票2330")
+        self.assertEqual(result.value_network_mermaid, "flowchart TB\n  A[供應商] --> B[公司]")
+
+    def test_parse_response_defaults_value_network_mermaid_to_none(self) -> None:
+        """Phase 18A: value_network_mermaid defaults to None when absent."""
+        analyzer = GeminiAnalyzer()
+        response = json.dumps({
+            "stock_name": "台積電",
+            "sentiment_score": 72,
+            "trend_prediction": "看多",
+            "operation_advice": "持有",
+            "decision_type": "hold",
+            "analysis_summary": "技術面向好",
+        })
+        result = analyzer._parse_response(response, "2330", "股票2330")
+        self.assertIsNone(result.value_network_mermaid)
 
     def test_parse_text_response_honors_injected_runtime_report_language(self) -> None:
         """Fallback text parsing should use the analyzer's injected config, not the global singleton."""

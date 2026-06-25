@@ -280,7 +280,7 @@ LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT = """你是一位專注於趨勢交易的{mar
     "company_highlights": "公司亮點/風險",
     "news_summary": "新聞摘要",
     "market_sentiment": "市場情緒",
-    "hot_topics": "相關熱點"
+    "hot_topics": "相關熱點"{value_network_schema_field}
 }}
 ```
 
@@ -327,7 +327,7 @@ LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT = """你是一位專注於趨勢交易的{mar
 - 只有在跌破關鍵支撐、主力資金持續流出或風險顯著放大時，才能給出賣出/減倉。
 - 必須輸出 `dashboard.phase_decision` 七欄位；盤中/午休/臨近收盤要給出當前動作、觀察條件和下一次檢查點。
 - 盤前、非交易日或未知階段不得偽造今日盤中走勢；quote/daily_bars/technical 存在 stale、fallback、missing、fetch_failed、partial 或 estimated 時，`confidence_level` 不得為高。
-
+{value_network_instruction_section}
 {language_section}
 """
 
@@ -430,7 +430,7 @@ AGENT_SYSTEM_PROMPT = """你是一位{market_role}投資分析 Agent，擁有資
     "company_highlights": "公司亮點/風險",
     "news_summary": "新聞摘要",
     "market_sentiment": "市場情緒",
-    "hot_topics": "相關熱點"
+    "hot_topics": "相關熱點"{value_network_schema_field}
 }}
 ```
 
@@ -474,7 +474,7 @@ AGENT_SYSTEM_PROMPT = """你是一位{market_role}投資分析 Agent，擁有資
 - 只有在跌破關鍵支撐、主力資金持續流出或風險顯著放大時，才能給出賣出/減倉。
 - 必須輸出 `dashboard.phase_decision` 七欄位；盤中/午休/臨近收盤要給出當前動作、觀察條件和下一次檢查點。
 - 盤前、非交易日或未知階段不得偽造今日盤中走勢；quote/daily_bars/technical 存在 stale、fallback、missing、fetch_failed、partial 或 estimated 時，`confidence_level` 不得為高。
-
+{value_network_instruction_section}
 {language_section}
 """
 
@@ -607,6 +607,54 @@ def _build_language_section(report_language: str, *, chat_mode: bool = False) ->
 """
 
 
+def _build_value_network_sections(context: Optional[Dict[str, Any]]) -> tuple:
+    """Build the (schema_field, instruction_section) pair for the value-network appendix.
+
+    Mirrors the GeminiAnalyzer._format_prompt / SYSTEM_PROMPT treatment in
+    src/analyzer.py so the Agent-mode path offers the same opt-out-by-default,
+    always-present-when-enabled JSON contract.
+    """
+    if not getattr(get_config(), "enable_value_network_mermaid", False):
+        return "", ""
+
+    etf_semantic_hint = (
+        "- ETF 語意對應：`供應商`=主要成分股/持股權重，`客戶`=申購資金來源（機構/散戶/政策驅動），"
+        "`競爭者`=同類型 ETF 或可替代的個股直接投資，`互補者`=產業趨勢/政策/上游需求題材。\n"
+        if (context or {}).get("is_index_etf")
+        else ""
+    )
+    schema_field = (
+        ',\n    "value_network_mermaid": "純 Mermaid flowchart 文字或 null；'
+        "啟用時必須出現此鍵，產生規則見後方「附錄：價值網路圖」\""
+    )
+    instruction_section = f"""
+## 附錄：價值網路圖（啟用時必須輸出此欄位，dagre 排版受限的 4 分類 A4 卡片版型）
+最終 JSON 必須額外包含 `value_network_mermaid` 欄位（字串或 null），即使值為 null。
+- 對於有公開商業身份的已知標的，通常應能產出至少類別層級的精簡價值網路圖，不要因證據不夠精確就直接省略圖表。
+- 若無法取得精確的具名供應商/客戶/競爭者，請改用產業類別層級節點，不要編造具體公司名稱。
+- 只有在該標的業務身份本身嚴重不明確時，才將 `value_network_mermaid` 設為 null。
+{etf_semantic_hint}- **結構固定為「一個中心節點 + 剛好 4 個分類方框」**：標的本身只能是一個中心節點，不要額外建立「公司核心業務」或「護城河」之類的獨立 subgraph；護城河/收購/風險等戰略資訊請併入最接近語意的既有分類卡片內（例如寫進該卡片的第二行）。
+- 分類方框固定使用這四個（subgraph id 固定用 `S`/`K`/`R`/`P`）：`供應商 Suppliers`(S)、`客戶 Customers`(K)、`競爭者 Competitors`(R)、`互補者 Complementors`(P)。
+- 每個分類方框固定 3 張卡片（id 例如 `S1`/`S2`/`S3`），總可視節點數（含中心節點）固定為 13 個；若戰略卡必須併入導致某分類需要第 4 張卡，上限放寬到每分類最多 4 張、總數最多 17 個，不要超過。
+- 同類項請合併成一個節點（例如「AWS / Google Cloud」合併成一個節點），不要每家公司都拆成獨立節點。
+- **第一行必須是 `flowchart TB`，不要輸出 `%%{{init...}}%%` 這類樣式指令**（樣式由系統固定附加，不需要也不可以由你輸出）。
+- **每個分類方框內，三張卡片之間必須用隱形連結 `~~~` 串成一條鏈**（例如 `S1 ~~~ S2`、`S2 ~~~ S3`），這是讓圖表呈直向堆疊、不被排成寬扁長條的必要寫法，務必每個分類都要寫。
+- **代表性連線的接法固定**：`供應商`、`客戶` 在中心節點上方，代表邊**從各分類最後一張卡接到中心**（例如 3 張卡時是 `S3 --> C`、`K3 --> C`）；`競爭者`、`互補者` 在中心節點下方，代表邊**從中心接到各分類第一張卡**（例如 `C --> R1`、`C --> P1`）。不可接到第一張卡了事，也不可每張卡都接中心。
+- 可視連線數量建議在 4-8 條以內（4 個分類各 1 條代表邊接中心即可）；分類內的 `~~~` 隱形鏈不算入可見連線數量，但仍必須輸出。
+- 卡片標籤固定格式為「公司名 (代碼)<br/>角色關係」，最多 2 行，必要時 3 行：
+  - 美股代碼一律加 `.US` 後綴（例如 `NVIDIA (NVDA.US)`、`Amazon (AMZN.US)`），對齊台股慣例。
+  - 台股代碼一律加 `.TW` 後綴（例如 `TSMC (2330.TW)`、`MediaTek (2454.TW)`）。
+  - 韓股使用純數字代碼，不加後綴（例如 `Samsung (005930)`）。
+  - 不確定代碼是否正確時整個代碼省略（連括號都不寫），不可瞎猜代碼或猜錯市場後綴；非上市/抽象節點（產業類別、政策題材、資金來源）本來就不需要代碼。
+- **節點與 subgraph 標籤一律使用雙引號包住**（例如 `C["Microsoft (MSFT.US)<br/>雲端/AI"]`、`subgraph S["供應商 Suppliers"]`），不可省略雙引號：標籤內只要含有括號（例如代碼的 `(NVDA.US)`），不加雙引號會讓 Mermaid 解析直接失敗、整張圖無法渲染。
+- 節點 ID 與 subgraph ID 都必須是安全的 ASCII 識別碼（例如 `C`、`S1`、`K1`、`R1`、`P1`），不可使用中文作為 ID，也不可使用以數字開頭的 ID（例如不可用 `5G_SoC`）；中文或專有名稱只能放在節點標籤（`[...]` 內）。
+- 內容為純 Mermaid flowchart 原始文字，只能使用 `flowchart TB`（不要使用 `flowchart LR`），不要包含 ``` 圍欄、HTML（`<br/>` 除外）或裸網址。
+- 仍要輸出 `classDef`/`class` 樣式指派行（例如 `classDef card ...`、`classDef center ...`、`class S1,S2,S3 card`、`class C center`）。
+- 節點標籤使用繁體中文，用語不得超出本報告主結論的強度。
+"""
+    return schema_field, instruction_section
+
+
 # ============================================================
 # Agent Executor
 # ============================================================
@@ -666,11 +714,16 @@ class AgentExecutor:
             if self.use_legacy_default_prompt
             else AGENT_SYSTEM_PROMPT
         )
+        value_network_schema_field, value_network_instruction_section = _build_value_network_sections(
+            context
+        )
         system_prompt = prompt_template.format(
             market_role=market_role,
             market_guidelines=market_guidelines,
             default_skill_policy_section=default_skill_policy_section,
             skills_section=skills_section,
+            value_network_schema_field=value_network_schema_field,
+            value_network_instruction_section=value_network_instruction_section,
             language_section=_build_language_section(report_language),
         )
 

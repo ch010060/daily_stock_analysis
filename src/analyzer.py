@@ -1562,6 +1562,7 @@ class AnalysisResult:
     raw_response: Optional[str] = None  # 原始響應（除錯用）
     search_performed: bool = False  # 是否執行了聯網搜尋
     data_sources: str = ""  # 資料來源說明
+    value_network_mermaid: Optional[str] = None  # Phase 18A：可選的價值網路圖 Mermaid 原始文字（已驗證或 None）
     success: bool = True
     error_message: Optional[str] = None
 
@@ -1614,6 +1615,7 @@ class AnalysisResult:
             'current_price': self.current_price,
             'change_pct': self.change_pct,
             'model_used': self.model_used,
+            'value_network_mermaid': self.value_network_mermaid,
         }
 
     def get_core_conclusion(self) -> str:
@@ -1813,7 +1815,7 @@ class GeminiAnalyzer:
     "hot_topics": "相關熱點",
 
     "search_performed": true/false,
-    "data_sources": "資料來源說明"
+    "data_sources": "資料來源說明"{value_network_schema_field}
 }
 ```
 
@@ -1983,7 +1985,7 @@ class GeminiAnalyzer:
     "hot_topics": "相關熱點",
 
     "search_performed": true/false,
-    "data_sources": "資料來源說明"
+    "data_sources": "資料來源說明"{value_network_schema_field}
 }
 ```
 
@@ -2111,11 +2113,19 @@ class GeminiAnalyzer:
         market_role = get_market_role(stock_code, lang)
         market_guidelines = get_market_guidelines(stock_code, lang)
         skill_instructions, default_skill_policy, use_legacy_default_prompt = self._get_skill_prompt_sections()
+        value_network_schema_field = ""
+        if getattr(self._get_runtime_config(), 'enable_value_network_mermaid', False):
+            value_network_schema_field = (
+                ',\n    "value_network_mermaid": "純 Mermaid flowchart 文字或 null；'
+                "啟用時必須出現此鍵，產生規則見後方「附錄：價值網路圖」\""
+            )
         if use_legacy_default_prompt:
             base_prompt = self.LEGACY_DEFAULT_SYSTEM_PROMPT.replace(
                 "{market_placeholder}", market_role
             ).replace(
                 "{guidelines_placeholder}", market_guidelines
+            ).replace(
+                "{value_network_schema_field}", value_network_schema_field
             )
         else:
             skills_section = ""
@@ -2129,6 +2139,7 @@ class GeminiAnalyzer:
                 .replace("{guidelines_placeholder}", market_guidelines)
                 .replace("{default_skill_policy_section}", default_skill_policy_section)
                 .replace("{skills_section}", skills_section)
+                .replace("{value_network_schema_field}", value_network_schema_field)
             )
         if lang == "en":
             return base_prompt + """
@@ -3391,6 +3402,39 @@ class GeminiAnalyzer:
 > - `risk_alerts` 中不得出現基金管理人相關的公司經營風險
 
 """
+        if getattr(self._get_runtime_config(), 'enable_value_network_mermaid', False):
+            etf_semantic_hint = (
+                "- ETF 語意對應：`供應商`=主要成分股/持股權重，`客戶`=申購資金來源（機構/散戶/政策驅動），"
+                "`競爭者`=同類型 ETF 或可替代的個股直接投資，`互補者`=產業趨勢/政策/上游需求題材。\n"
+                if context.get('is_index_etf')
+                else ""
+            )
+            prompt += f"""
+### 附錄：價值網路圖（啟用時必須輸出此欄位，dagre 排版受限的 4 分類 A4 卡片版型）
+請在最上層 JSON 額外輸出 `value_network_mermaid` 欄位（字串或 null）。此功能已啟用，**該鍵必須出現在 JSON 中**，即使值為 null。
+- 對於有公開商業身份的已知標的（如知名上市公司、ETF），通常應能產出至少類別層級的精簡價值網路圖，即使沒有精確供應商/客戶證據，也不要因此直接省略圖表。
+- 若無法取得精確的具名供應商/客戶/競爭者，請改用產業類別層級節點，不要編造具體公司名稱。
+- 只有在該標的業務身份本身嚴重不明確（例如資料嚴重缺失、無法判斷所屬產業）時，才將 `value_network_mermaid` 設為 null。
+{etf_semantic_hint}- **結構固定為「一個中心節點 + 剛好 4 個分類方框」**：標的本身只能是一個中心節點，不要額外建立「公司核心業務」或「護城河」之類的獨立 subgraph；護城河/收購/風險等戰略資訊請併入最接近語意的既有分類卡片內（例如寫進該卡片的第二行）。
+- 分類方框固定使用這四個（subgraph id 固定用 `S`/`K`/`R`/`P`）：`供應商 Suppliers`(S)、`客戶 Customers`(K)、`競爭者 Competitors`(R)、`互補者 Complementors`(P)。
+- 每個分類方框固定 3 張卡片（id 例如 `S1`/`S2`/`S3`），總可視節點數（含中心節點）固定為 13 個；若戰略卡必須併入導致某分類需要第 4 張卡，上限放寬到每分類最多 4 張、總數最多 17 個，不要超過。
+- 同類項請合併成一個節點（例如「AWS / Google Cloud」合併成一個節點），不要每家公司都拆成獨立節點。
+- **第一行必須是 `flowchart TB`，不要輸出 `%%{{init...}}%%` 這類樣式指令**（樣式由系統固定附加，不需要也不可以由你輸出）。
+- **每個分類方框內，三張卡片之間必須用隱形連結 `~~~` 串成一條鏈**（例如 `S1 ~~~ S2`、`S2 ~~~ S3`），這是讓圖表呈直向堆疊、不被排成寬扁長條的必要寫法，務必每個分類都要寫。
+- **代表性連線的接法固定**：`供應商`、`客戶` 在中心節點上方，代表邊**從各分類最後一張卡接到中心**（例如 3 張卡時是 `S3 --> C`、`K3 --> C`）；`競爭者`、`互補者` 在中心節點下方，代表邊**從中心接到各分類第一張卡**（例如 `C --> R1`、`C --> P1`）。不可接到第一張卡了事，也不可每張卡都接中心。
+- 可視連線數量建議在 4-8 條以內（4 個分類各 1 條代表邊接中心即可）；分類內的 `~~~` 隱形鏈不算入可見連線數量，但仍必須輸出。
+- 卡片標籤固定格式為「公司名 (代碼)<br/>角色關係」，最多 2 行，必要時 3 行：
+  - 美股代碼一律加 `.US` 後綴（例如 `NVIDIA (NVDA.US)`、`Amazon (AMZN.US)`），對齊台股慣例。
+  - 台股代碼一律加 `.TW` 後綴（例如 `TSMC (2330.TW)`、`MediaTek (2454.TW)`）。
+  - 韓股使用純數字代碼，不加後綴（例如 `Samsung (005930)`）。
+  - 不確定代碼是否正確時整個代碼省略（連括號都不寫），不可瞎猜代碼或猜錯市場後綴；非上市/抽象節點（產業類別、政策題材、資金來源）本來就不需要代碼。
+- **節點與 subgraph 標籤一律使用雙引號包住**（例如 `C["Microsoft (MSFT.US)<br/>雲端/AI"]`、`subgraph S["供應商 Suppliers"]`），不可省略雙引號：標籤內只要含有括號（例如代碼的 `(NVDA.US)`），不加雙引號會讓 Mermaid 解析直接失敗、整張圖無法渲染。
+- 節點 ID 與 subgraph ID 都必須是安全的 ASCII 識別碼（例如 `C`、`S1`、`K1`、`R1`、`P1`），不可使用中文作為 ID，也不可使用以數字開頭的 ID（例如不可用 `5G_SoC`）；中文或專有名稱只能放在節點標籤（`[...]` 內）。
+- 內容為**純 Mermaid flowchart 原始文字**，只能使用 `flowchart TB`（不要使用 `flowchart LR`）。
+- 仍要輸出 `classDef`/`class` 樣式指派行（例如 `classDef card ...`、`classDef center ...`、`class S1,S2,S3 card`、`class C center`）。
+- 不要包含 ``` 圍欄、HTML（`<br/>` 除外）或任何其他文字說明，只放 Mermaid 原始語法本身，也不可包含裸網址。
+- 用語不得超出本報告主結論的強度（禁止「必買」「保證上漲」「穩賺」等用語）。
+"""
         prompt += f"""
 ### ⚠️ 重要：輸出正確的股票名稱格式
 正確的股票名稱格式為“股票名稱（股票程式碼）”，例如“貴州茅臺（600519）”。
@@ -3737,6 +3781,7 @@ class GeminiAnalyzer:
                     # 後設資料
                     search_performed=data.get('search_performed', False),
                     data_sources=data.get('data_sources', 'Technical data' if report_language == "en" else '技術面資料'),
+                    value_network_mermaid=data.get('value_network_mermaid'),
                     success=True,
                 )
             else:

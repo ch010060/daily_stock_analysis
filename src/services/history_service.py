@@ -32,6 +32,7 @@ from src.report_language import (
 )
 from src.storage import DatabaseManager
 from src.services.run_diagnostics import build_run_diagnostic_summary
+from src.services.value_network_mermaid import validate_value_network_mermaid
 from src.utils.data_processing import (
     extract_realtime_detail_fields,
     normalize_model_used,
@@ -42,6 +43,12 @@ if TYPE_CHECKING:
     from src.analyzer import AnalysisResult
 
 logger = logging.getLogger(__name__)
+
+# Phase 18E v3: the LLM never produces this directive (the validator rejects
+# it if it tries to) — it is a fixed styling constant appended deterministically
+# after validation passes, so the appendix renders with a readable font size
+# without trusting the LLM to reproduce a styling directive verbatim each time.
+MERMAID_INIT_LINE = '%%{init: {"theme": "base", "themeVariables": {"fontSize": "20px"}}}%%'
 
 
 class MarkdownReportGenerationError(Exception):
@@ -843,6 +850,7 @@ class HistoryService:
                 current_price=raw_result.get("current_price"),
                 change_pct=raw_result.get("change_pct"),
                 model_used=raw_result.get("model_used"),
+                value_network_mermaid=raw_result.get("value_network_mermaid"),
             )
         except Exception as e:
             logger.error(f"Failed to rebuild AnalysisResult: {e}", exc_info=True)
@@ -1112,6 +1120,20 @@ class HistoryService:
                     f"{result.news_summary}",
                     "",
                 ])
+
+        # ========== 附錄：價值網路圖（Phase 18A PoC）==========
+        validated_mermaid = validate_value_network_mermaid(getattr(result, 'value_network_mermaid', None))
+        if validated_mermaid:
+            appendix_heading = "Appendix: Value Network" if report_language == "en" else "附錄：價值網路圖"
+            report_lines.extend([
+                f"## {appendix_heading}",
+                "",
+                "```mermaid",
+                MERMAID_INIT_LINE,
+                validated_mermaid,
+                "```",
+                "",
+            ])
 
         # ========== 底部 ==========
         report_lines.extend([

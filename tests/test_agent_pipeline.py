@@ -647,6 +647,65 @@ class TestAgentResultConversion(unittest.TestCase):
         self.assertIn("agent:gemini", result.data_sources)
         self.assertIsNotNone(result.dashboard)
 
+    def test_convert_carries_value_network_mermaid_from_dashboard(self):
+        """Phase 18D: the agent-mode conversion must extract value_network_mermaid, not drop it."""
+        pipeline = self._make_pipeline()
+
+        from src.agent.executor import AgentResult
+        from src.enums import ReportType
+
+        dashboard = {
+            "stock_name": "Microsoft",
+            "sentiment_score": 50,
+            "trend_prediction": "看空",
+            "operation_advice": "觀望",
+            "decision_type": "hold",
+            "confidence_level": "中",
+            "dashboard": {"core_conclusion": {"one_sentence": "弱勢"}},
+            "value_network_mermaid": "flowchart TB\n  A[供應商] --> B[公司]",
+        }
+        agent_result = AgentResult(
+            success=True,
+            content=json.dumps(dashboard),
+            dashboard=dashboard,
+            provider="deepseek",
+        )
+
+        result = pipeline._agent_result_to_analysis_result(
+            agent_result, "MSFT", "Microsoft", ReportType.FULL, "q456"
+        )
+
+        self.assertEqual(result.value_network_mermaid, "flowchart TB\n  A[供應商] --> B[公司]")
+
+    def test_convert_defaults_value_network_mermaid_to_none_when_absent(self):
+        """Phase 18D: absence of the field must not raise and must default to None."""
+        pipeline = self._make_pipeline()
+
+        from src.agent.executor import AgentResult
+        from src.enums import ReportType
+
+        dashboard = {
+            "stock_name": "Microsoft",
+            "sentiment_score": 50,
+            "trend_prediction": "看空",
+            "operation_advice": "觀望",
+            "decision_type": "hold",
+            "confidence_level": "中",
+            "dashboard": {"core_conclusion": {"one_sentence": "弱勢"}},
+        }
+        agent_result = AgentResult(
+            success=True,
+            content=json.dumps(dashboard),
+            dashboard=dashboard,
+            provider="deepseek",
+        )
+
+        result = pipeline._agent_result_to_analysis_result(
+            agent_result, "MSFT", "Microsoft", ReportType.FULL, "q789"
+        )
+
+        self.assertIsNone(result.value_network_mermaid)
+
     def test_convert_preserves_top_level_phase_decision_with_nested_dashboard(self):
         """Agent top-level phase_decision should survive nested dashboard unwrapping."""
         pipeline = self._make_pipeline()

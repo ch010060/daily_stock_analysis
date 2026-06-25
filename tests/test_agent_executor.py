@@ -140,6 +140,14 @@ def test_agent_system_prompts_require_phase_decision_contract() -> None:
         assert "`confidence_level` 不得為高" in prompt
 
 
+def test_agent_system_prompts_carry_value_network_placeholders() -> None:
+    """Phase 18D: both Agent-mode prompt templates must wire the value-network
+    appendix placeholders so AgentExecutor.run() can fill them in."""
+    for prompt in (LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT, AGENT_SYSTEM_PROMPT):
+        assert "{value_network_schema_field}" in prompt
+        assert "{value_network_instruction_section}" in prompt
+
+
 # ============================================================
 # AgentExecutor Tests
 # ============================================================
@@ -241,6 +249,119 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertIn("專注於趨勢交易", prompt)
         self.assertIn("多頭排列必須條件", prompt)
         self.assertIn("多頭排列：MA5 > MA10 > MA20", prompt)
+
+    def test_run_omits_value_network_section_when_disabled(self):
+        """Phase 18D: Agent-mode prompt excludes the value-network field when the flag is off."""
+        registry = _make_registry_with_echo()
+        adapter = _make_mock_adapter()
+        adapter.call_with_tools.return_value = LLMResponse(
+            content=json.dumps(SAMPLE_DASHBOARD, ensure_ascii=False),
+            tool_calls=[],
+            usage={"total_tokens": 50},
+            provider="openai",
+        )
+
+        executor = AgentExecutor(registry, adapter, max_steps=2)
+        disabled_config = SimpleNamespace(enable_value_network_mermaid=False)
+        with patch("src.agent.executor.get_config", return_value=disabled_config):
+            result = executor.run("Analyze MSFT", context={"stock_code": "MSFT"})
+
+        self.assertTrue(result.success)
+        prompt = adapter.call_with_tools.call_args.args[0][0]["content"]
+        self.assertNotIn("value_network_mermaid", prompt)
+
+    def test_run_includes_value_network_section_when_enabled(self):
+        """Phase 18D: Agent-mode prompt requires the value-network key when the flag is on."""
+        registry = _make_registry_with_echo()
+        adapter = _make_mock_adapter()
+        adapter.call_with_tools.return_value = LLMResponse(
+            content=json.dumps(SAMPLE_DASHBOARD, ensure_ascii=False),
+            tool_calls=[],
+            usage={"total_tokens": 50},
+            provider="openai",
+        )
+
+        executor = AgentExecutor(registry, adapter, max_steps=2)
+        enabled_config = SimpleNamespace(enable_value_network_mermaid=True)
+        with patch("src.agent.executor.get_config", return_value=enabled_config):
+            result = executor.run("Analyze MSFT", context={"stock_code": "MSFT"})
+
+        self.assertTrue(result.success)
+        prompt = adapter.call_with_tools.call_args.args[0][0]["content"]
+        self.assertIn("value_network_mermaid", prompt)
+        self.assertIn("flowchart", prompt)
+        self.assertIn("啟用時必須輸出此欄位", prompt)
+        self.assertIn("`供應商 Suppliers`(S)、`客戶 Customers`(K)、`競爭者 Competitors`(R)、`互補者 Complementors`(P)", prompt)
+
+    def test_run_value_network_section_is_compact(self):
+        """Phase 18E v3: Agent-mode prompt requires the same dagre-constrained 4-section A4 card layout."""
+        registry = _make_registry_with_echo()
+        adapter = _make_mock_adapter()
+        adapter.call_with_tools.return_value = LLMResponse(
+            content=json.dumps(SAMPLE_DASHBOARD, ensure_ascii=False),
+            tool_calls=[],
+            usage={"total_tokens": 50},
+            provider="openai",
+        )
+
+        executor = AgentExecutor(registry, adapter, max_steps=2)
+        enabled_config = SimpleNamespace(enable_value_network_mermaid=True)
+        with patch("src.agent.executor.get_config", return_value=enabled_config):
+            result = executor.run("Analyze MSFT", context={"stock_code": "MSFT"})
+
+        self.assertTrue(result.success)
+        prompt = adapter.call_with_tools.call_args.args[0][0]["content"]
+        self.assertIn("一個中心節點 + 剛好 4 個分類方框", prompt)
+        self.assertIn("不要額外建立「公司核心業務」或「護城河」之類的獨立 subgraph", prompt)
+        self.assertIn("每個分類方框固定 3 張卡片", prompt)
+        self.assertIn("總可視節點數（含中心節點）固定為 13 個", prompt)
+        self.assertIn("~~~", prompt)
+        self.assertIn("S3 --> C", prompt)
+        self.assertIn("K3 --> C", prompt)
+        self.assertIn("C --> R1", prompt)
+        self.assertIn("C --> P1", prompt)
+        self.assertIn("一律使用雙引號包住", prompt)
+        self.assertIn("不加雙引號會讓 Mermaid 解析直接失敗", prompt)
+        self.assertIn("不要輸出 `%%{init...}%%`", prompt)
+        self.assertIn("不要使用 `flowchart LR`", prompt)
+        self.assertIn(".US", prompt)
+        self.assertIn(".TW", prompt)
+        self.assertIn("005930", prompt)
+        self.assertIn("不可使用中文作為", prompt)
+        self.assertIn("不可使用以數字開頭的 ID", prompt)
+        self.assertIn("5G_SoC", prompt)
+        # the compact reminder is part of the same appended instruction block
+        appendix_index = prompt.index("## 附錄：價值網路圖")
+        compact_index = prompt.index("一個中心節點 + 剛好 4 個分類方框")
+        language_index = prompt.index("## 輸出語言")
+        self.assertLess(appendix_index, compact_index)
+        self.assertLess(compact_index, language_index)
+
+    def test_run_uses_index_etf_category_hint_when_enabled(self):
+        """Phase 18D: ETF targets get the ETF-specific category hint, same as the non-agent path."""
+        registry = _make_registry_with_echo()
+        adapter = _make_mock_adapter()
+        adapter.call_with_tools.return_value = LLMResponse(
+            content=json.dumps(SAMPLE_DASHBOARD, ensure_ascii=False),
+            tool_calls=[],
+            usage={"total_tokens": 50},
+            provider="openai",
+        )
+
+        executor = AgentExecutor(registry, adapter, max_steps=2)
+        enabled_config = SimpleNamespace(enable_value_network_mermaid=True)
+        with patch("src.agent.executor.get_config", return_value=enabled_config):
+            result = executor.run(
+                "Analyze 0050", context={"stock_code": "0050", "is_index_etf": True}
+            )
+
+        self.assertTrue(result.success)
+        prompt = adapter.call_with_tools.call_args.args[0][0]["content"]
+        # Phase 18E v3: ETF and stock now share the same 4 section names;
+        # only the semantic hint text differs.
+        self.assertIn("`供應商 Suppliers`(S)、`客戶 Customers`(K)、`競爭者 Competitors`(R)、`互補者 Complementors`(P)", prompt)
+        self.assertIn("ETF 語意對應", prompt)
+        self.assertIn("主要成分股/持股權重", prompt)
 
     def test_simple_text_response(self):
         """Agent returns text immediately (no tool calls) with JSON dashboard."""

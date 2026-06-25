@@ -173,3 +173,4 @@ class AnalysisReportSchema(BaseModel):
 
     search_performed: Optional[bool] = None
     data_sources: Optional[str] = None
+    value_network_mermaid: Optional[str] = None
