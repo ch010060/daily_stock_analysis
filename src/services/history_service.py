@@ -12,6 +12,7 @@ Responsibilities:
 from __future__ import annotations
 import json
 import logging
+import math
 import re
 from datetime import date, datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple, TYPE_CHECKING
@@ -1139,6 +1140,18 @@ class HistoryService:
                 value = snapshot.get(field)
                 return gap_label if value is None else str(value)
 
+            def _format_decimal(snapshot: Optional[Dict[str, Any]], field: str, digits: int = 2) -> str:
+                if not isinstance(snapshot, dict):
+                    return gap_label
+                value = snapshot.get(field)
+                if value is None:
+                    return gap_label
+                try:
+                    f = float(value)
+                    return gap_label if not math.isfinite(f) else f"{f:.{digits}f}"
+                except (TypeError, ValueError):
+                    return gap_label
+
             if show_exposure and isinstance(exposure_snapshot, dict):
                 report_lines.extend([
                     f"### 🧭 {labels['exposure_heading']}",
@@ -1160,7 +1173,7 @@ class HistoryService:
                     f"| {labels['vix_level_label']} | {labels['vix_status_label']} | "
                     f"{labels['spx_change_pct_label']} |",
                     "|---|---|---|",
-                    f"| {_exposure_value(market_risk_snapshot, 'vix_level')} | "
+                    f"| {_format_decimal(market_risk_snapshot, 'vix_level')} | "
                     f"{_exposure_value(market_risk_snapshot, 'vix_status')} | "
                     f"{_exposure_value(market_risk_snapshot, 'spx_change_pct')} |",
                     "",

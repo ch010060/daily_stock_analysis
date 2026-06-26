@@ -1735,6 +1735,52 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertNotIn("ETF／指數曝險摘要", markdown)
         self.assertNotIn("市場風險溫度計", markdown)
 
+    def test_market_risk_markdown_formats_vix_level_to_two_decimals(self) -> None:
+        """Phase 19D-F1: raw binary-float VIX values must be rounded to 2dp in
+        the rendered Markdown — regression guard for 18.889999389648438."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "stock"
+        result.exposure_snapshot = None
+        result.market_risk_snapshot = {
+            "vix_level": 18.889999389648438,
+            "vix_status": "平穩",
+            "spx_change_pct": -0.01,
+            "source": "yfinance",
+            "data_gap_fields": [],
+        }
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn("18.89", markdown)
+        self.assertNotIn("18.889999389648438", markdown)
+        self.assertIn("市場風險溫度計", markdown)
+
+    def test_market_risk_markdown_formats_vix_level_none_as_gap(self) -> None:
+        """Phase 19D-F1: vix_level=None renders 資料不足, not 'None'."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "stock"
+        result.exposure_snapshot = None
+        result.market_risk_snapshot = {
+            "vix_level": None,
+            "vix_status": None,
+            "spx_change_pct": None,
+            "gap_reason": "資料來源不可用",
+            "data_gap_fields": ["vix_level", "vix_status", "spx_change_pct"],
+        }
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertNotIn("None", markdown)
+        self.assertIn("市場風險溫度計", markdown)
+
     def test_generate_single_stock_markdown_shows_tw_gap_reason(self) -> None:
         """TW market_risk_snapshot this phase always carries a gap_reason
         instead of source/as_of — markdown must surface that reason verbatim."""
