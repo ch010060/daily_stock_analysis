@@ -665,6 +665,7 @@ class StockAnalysisPipeline:
                 result.query_id = query_id
                 result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
                 self._attach_valuation_fundamental_snapshot(result, code, fundamental_context)
+                self._attach_exposure_and_market_risk_snapshot(result, code, fundamental_context)
                 realtime_data = enhanced_context.get('realtime', {})
                 result.current_price = realtime_data.get('price')
                 result.change_pct = realtime_data.get('change_pct')
@@ -1077,6 +1078,73 @@ class StockAnalysisPipeline:
         except Exception as exc:
             logger.warning("[valuation_fundamental_snapshot] skipped for %s: %s", code, exc)
 
+    def _attach_exposure_and_market_risk_snapshot(
+        self,
+        result: Any,
+        code: str,
+        fundamental_context: Optional[Dict[str, Any]],
+    ) -> None:
+        """
+        Phase 19B.3 / 19B.3A: attach deterministic `exposure_snapshot` /
+        `market_risk_snapshot`.
+
+        `exposure_snapshot` is ETF/index-only. `market_risk_snapshot` is
+        stock/ETF/index (broadened in 19B.3A — a stock report still benefits
+        from a market-risk thermometer even without an exposure summary).
+        `unknown` remains a no-op for both fields.
+
+        US market reuses the existing `fetcher_manager.get_realtime_quote()`
+        dispatcher (already circuit-breaker protected) to read VIX/SPX —
+        no new provider, no new cache. TW market makes no fetch attempt at
+        all this phase (security constraint following the 19B.2A FinMind
+        token-leak incident) and always renders a deterministic data-gap
+        snapshot. Never raises; any failure degrades to "no snapshot"
+        rather than aborting the report.
+        """
+        instrument_type = getattr(result, "instrument_type", "unknown")
+        should_build_exposure = instrument_type in ("etf", "index")
+        should_build_market_risk = instrument_type in ("stock", "etf", "index")
+        if not should_build_exposure and not should_build_market_risk:
+            return
+        try:
+            from src.services.exposure_market_risk_snapshot import (
+                TW_MARKET_RISK_GAP_REASON,
+                build_exposure_snapshot,
+                build_market_risk_snapshot,
+                classify_vix_status,
+            )
+
+            market = get_market_for_stock(normalize_stock_code(code))
+            exposure_raw: Dict[str, Any] = {}
+
+            if market == "us":
+                market_risk_raw: Dict[str, Any] = {}
+                vix_quote = self.fetcher_manager.get_realtime_quote("VIX", log_final_failure=False)
+                if vix_quote:
+                    vix_level = getattr(vix_quote, "price", None)
+                    market_risk_raw["vix_level"] = vix_level
+                    market_risk_raw["vix_status"] = classify_vix_status(vix_level)
+                spx_quote = self.fetcher_manager.get_realtime_quote("SPX", log_final_failure=False)
+                if spx_quote:
+                    market_risk_raw["spx_change_pct"] = getattr(spx_quote, "change_pct", None)
+                if should_build_exposure:
+                    result.exposure_snapshot = build_exposure_snapshot(exposure_raw, source=None)
+                if should_build_market_risk:
+                    result.market_risk_snapshot = build_market_risk_snapshot(
+                        market_risk_raw, source="yfinance" if (vix_quote or spx_quote) else None,
+                    )
+            elif market == "tw":
+                if should_build_exposure:
+                    result.exposure_snapshot = build_exposure_snapshot(exposure_raw, source=None)
+                if should_build_market_risk:
+                    result.market_risk_snapshot = build_market_risk_snapshot(
+                        {}, source=None, gap_reason=TW_MARKET_RISK_GAP_REASON,
+                    )
+            else:
+                return
+        except Exception as exc:
+            logger.warning("[exposure_market_risk_snapshot] skipped for %s: %s", code, exc)
+
     def _ensure_agent_history(self, code: str, min_days: int = 240) -> None:
         """Ensure at least *min_days* of K-line history is in DB for agent tools."""
         from src.services.history_loader import get_frozen_target_date
@@ -1236,6 +1304,7 @@ class StockAnalysisPipeline:
                 result.query_id = query_id
                 result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
                 self._attach_valuation_fundamental_snapshot(result, code, fundamental_context)
+                self._attach_exposure_and_market_risk_snapshot(result, code, fundamental_context)
             # Agent weak integrity: placeholder fill only, no LLM retry
             if result and getattr(self.config, "report_integrity_enabled", False):
                 from src.analyzer import check_content_integrity, apply_placeholder_fill

@@ -1618,6 +1618,143 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertIsNotNone(rebuilt)
         self.assertEqual(rebuilt.instrument_type, "unknown")
 
+    def test_rebuild_analysis_result_carries_exposure_and_market_risk_snapshot(self) -> None:
+        """Phase 19B.3: _rebuild_analysis_result carries exposure_snapshot/
+        market_risk_snapshot from raw_result, mirroring 19B.2's snapshot fields."""
+        record_id = self._save_history("query_exposure_market_risk_001")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            raw_result = {
+                "code": "0050",
+                "name": "元大台灣50",
+                "instrument_type": "etf",
+                "exposure_snapshot": {"leverage_factor": 1, "data_gap_fields": []},
+                "market_risk_snapshot": {"vix_level": 18.2, "source": "yfinance"},
+            }
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertEqual(rebuilt.exposure_snapshot, {"leverage_factor": 1, "data_gap_fields": []})
+        self.assertEqual(rebuilt.market_risk_snapshot, {"vix_level": 18.2, "source": "yfinance"})
+
+    def test_rebuild_analysis_result_defaults_exposure_market_risk_to_none(self) -> None:
+        """Old history records (no exposure/market_risk keys) rebuild as None,
+        not a crash — same backward compatibility contract as 19B.1/19B.2."""
+        record_id = self._save_history("query_exposure_market_risk_002")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            raw_result = {"code": "2330", "name": "台積電"}
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertIsNone(rebuilt.exposure_snapshot)
+        self.assertIsNone(rebuilt.market_risk_snapshot)
+
+    def test_generate_single_stock_markdown_renders_exposure_and_market_risk_for_etf(self) -> None:
+        """Phase 19B.3: markdown renders the new sections for etf/index only,
+        positioned after the 19B.2 valuation/fundamental section."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "etf"
+        result.exposure_snapshot = {"underlying_index": "S&P 500", "leverage_factor": 2, "data_gap_fields": []}
+        result.market_risk_snapshot = {
+            "vix_level": 18.2, "vix_status": "平穩", "spx_change_pct": 0.4,
+            "source": "yfinance", "data_gap_fields": [],
+        }
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn("ETF／指數曝險摘要", markdown)
+        self.assertIn("市場風險溫度計", markdown)
+        self.assertIn("S&P 500", markdown)
+        self.assertIn("18.2", markdown)
+
+    def test_generate_single_stock_markdown_omits_exposure_section_for_stock(self) -> None:
+        """19B.3A: stock-type results must never show the etf/index-only
+        exposure section, even if the field is somehow populated
+        (defensive — should not happen given the pipeline gate)."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "stock"
+        result.exposure_snapshot = {"underlying_index": "should not render"}
+        result.market_risk_snapshot = {"vix_level": 18.2}
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertNotIn("ETF／指數曝險摘要", markdown)
+
+    def test_generate_single_stock_markdown_renders_market_risk_for_stock(self) -> None:
+        """19B.3A: stock-type results DO render the market risk thermometer
+        section (the broadened gate), as long as market_risk_snapshot is set."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "stock"
+        result.exposure_snapshot = None
+        result.market_risk_snapshot = {
+            "vix_level": 18.2, "vix_status": "平穩", "spx_change_pct": 0.4,
+            "source": "yfinance", "data_gap_fields": [],
+        }
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn("市場風險溫度計", markdown)
+        self.assertIn("18.2", markdown)
+        self.assertNotIn("ETF／指數曝險摘要", markdown)
+
+    def test_generate_single_stock_markdown_omits_both_sections_for_unknown(self) -> None:
+        """19B.3A: unknown instrument_type remains a no-op for both sections,
+        even if fields are somehow populated (defensive)."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "unknown"
+        result.exposure_snapshot = {"underlying_index": "should not render"}
+        result.market_risk_snapshot = {"vix_level": 18.2}
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertNotIn("ETF／指數曝險摘要", markdown)
+        self.assertNotIn("市場風險溫度計", markdown)
+
+    def test_generate_single_stock_markdown_shows_tw_gap_reason(self) -> None:
+        """TW market_risk_snapshot this phase always carries a gap_reason
+        instead of source/as_of — markdown must surface that reason verbatim."""
+        from datetime import datetime as _datetime
+        from src.services.exposure_market_risk_snapshot import TW_MARKET_RISK_GAP_REASON
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "index"
+        result.exposure_snapshot = {"data_gap_fields": ["underlying_index", "leverage_factor", "is_leveraged", "is_inverse"]}
+        result.market_risk_snapshot = {
+            "vix_level": None, "vix_status": None, "spx_change_pct": None,
+            "source": None, "gap_reason": TW_MARKET_RISK_GAP_REASON, "data_gap_fields": [],
+        }
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn(TW_MARKET_RISK_GAP_REASON, markdown)
+
     def test_generate_single_stock_markdown_title_switches_by_instrument_type(self) -> None:
         """Phase 19B.1: title contract — etf/index get dedicated titles, stock/unknown
         keep the existing generic title (backward compatible with old reports)."""

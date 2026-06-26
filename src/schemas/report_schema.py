@@ -187,3 +187,9 @@ class AnalysisReportSchema(BaseModel):
     # discarded and overwritten by the pipeline, same pattern as instrument_type.
     valuation_snapshot: Optional[Dict[str, Any]] = None
     fundamental_snapshot: Optional[Dict[str, Any]] = None
+
+    # Phase 19B.3: deterministic exposure / market-risk snapshots for
+    # etf/index-only instruments. Same contract as 19B.2 above — backend
+    # built after LLM-JSON validation, never LLM-populated.
+    exposure_snapshot: Optional[Dict[str, Any]] = None
+    market_risk_snapshot: Optional[Dict[str, Any]] = None

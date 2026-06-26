@@ -855,6 +855,8 @@ class HistoryService:
                 instrument_type=raw_result.get("instrument_type", "unknown"),
                 valuation_snapshot=raw_result.get("valuation_snapshot"),
                 fundamental_snapshot=raw_result.get("fundamental_snapshot"),
+                exposure_snapshot=raw_result.get("exposure_snapshot"),
+                market_risk_snapshot=raw_result.get("market_risk_snapshot"),
             )
         except Exception as e:
             logger.error(f"Failed to rebuild AnalysisResult: {e}", exc_info=True)
@@ -1113,6 +1115,64 @@ class HistoryService:
                     report_lines.extend([
                         f"*{labels['snapshot_source_label']}: {snapshot_source or 'N/A'} | "
                         f"{labels['snapshot_as_of_label']}: {snapshot_as_of or 'N/A'}*",
+                        "",
+                    ])
+
+        # ========== ETF/指數曝險摘要 + 市場風險溫度計 ==========
+        # Phase 19B.3: exposure_snapshot stays etf/index-only.
+        # Phase 19B.3A: market_risk_snapshot gating broadened to stock/etf/index
+        # (a market-risk thermometer is useful for stock reports too; the
+        # exposure/leverage summary is not). Each field is gated independently
+        # by instrument_type as defense-in-depth on top of the pipeline gate.
+        instrument_type = getattr(result, "instrument_type", "unknown")
+        show_exposure = instrument_type in ("etf", "index")
+        show_market_risk = instrument_type in ("stock", "etf", "index")
+        if show_exposure or show_market_risk:
+            exposure_snapshot = getattr(result, "exposure_snapshot", None)
+            market_risk_snapshot = getattr(result, "market_risk_snapshot", None)
+            gap_label = labels['snapshot_data_gap_label']
+
+            def _exposure_value(snapshot: Optional[Dict[str, Any]], field: str) -> str:
+                if not isinstance(snapshot, dict):
+                    return gap_label
+                value = snapshot.get(field)
+                return gap_label if value is None else str(value)
+
+            if show_exposure and isinstance(exposure_snapshot, dict):
+                report_lines.extend([
+                    f"### 🧭 {labels['exposure_heading']}",
+                    "",
+                    f"| {labels['underlying_index_label']} | {labels['leverage_factor_label']} | "
+                    f"{labels['is_leveraged_label']} | {labels['is_inverse_label']} |",
+                    "|---|---|---|---|",
+                    f"| {_exposure_value(exposure_snapshot, 'underlying_index')} | "
+                    f"{_exposure_value(exposure_snapshot, 'leverage_factor')} | "
+                    f"{_exposure_value(exposure_snapshot, 'is_leveraged')} | "
+                    f"{_exposure_value(exposure_snapshot, 'is_inverse')} |",
+                    "",
+                ])
+
+            if show_market_risk and isinstance(market_risk_snapshot, dict):
+                report_lines.extend([
+                    f"### 🌡️ {labels['market_risk_heading']}",
+                    "",
+                    f"| {labels['vix_level_label']} | {labels['vix_status_label']} | "
+                    f"{labels['spx_change_pct_label']} |",
+                    "|---|---|---|",
+                    f"| {_exposure_value(market_risk_snapshot, 'vix_level')} | "
+                    f"{_exposure_value(market_risk_snapshot, 'vix_status')} | "
+                    f"{_exposure_value(market_risk_snapshot, 'spx_change_pct')} |",
+                    "",
+                ])
+                gap_reason = market_risk_snapshot.get("gap_reason")
+                mrs_source = market_risk_snapshot.get("source")
+                mrs_as_of = market_risk_snapshot.get("as_of")
+                if gap_reason:
+                    report_lines.extend([f"*{gap_reason}*", ""])
+                elif mrs_source or mrs_as_of:
+                    report_lines.extend([
+                        f"*{labels['snapshot_source_label']}: {mrs_source or 'N/A'} | "
+                        f"{labels['snapshot_as_of_label']}: {mrs_as_of or 'N/A'}*",
                         "",
                     ])
 

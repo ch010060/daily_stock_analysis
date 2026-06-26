@@ -1567,6 +1567,9 @@ class AnalysisResult:
     # Phase 19B.2：股票專屬估值/基本面快照，由後端決定性組裝（FinMind/yfinance），非 LLM 推論
     valuation_snapshot: Optional[Dict[str, Any]] = None
     fundamental_snapshot: Optional[Dict[str, Any]] = None
+    # Phase 19B.3：ETF/指數專屬曝險/市場風險快照，由後端決定性組裝，非 LLM 推論
+    exposure_snapshot: Optional[Dict[str, Any]] = None
+    market_risk_snapshot: Optional[Dict[str, Any]] = None
     success: bool = True
     error_message: Optional[str] = None
 
@@ -1623,6 +1626,8 @@ class AnalysisResult:
             'instrument_type': self.instrument_type,
             'valuation_snapshot': self.valuation_snapshot,
             'fundamental_snapshot': self.fundamental_snapshot,
+            'exposure_snapshot': self.exposure_snapshot,
+            'market_risk_snapshot': self.market_risk_snapshot,
         }
 
     def get_core_conclusion(self) -> str:

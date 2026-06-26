@@ -3133,5 +3133,132 @@ class TestAttachValuationFundamentalSnapshot(unittest.TestCase):
         self.assertIsNone(result.fundamental_snapshot)
 
 
+class TestAttachExposureAndMarketRiskSnapshot(unittest.TestCase):
+    """Phase 19B.3 / 19B.3A: unit tests for
+    pipeline._attach_exposure_and_market_risk_snapshot.
+
+    19B.3A gating contract: exposure_snapshot stays etf/index-only;
+    market_risk_snapshot is broadened to stock/etf/index; unknown remains
+    a no-op for both. Mirrors TestAttachValuationFundamentalSnapshot's
+    direct-invocation pattern. No live network/provider calls —
+    fetcher_manager.get_realtime_quote is always mocked.
+    """
+
+    def _make_pipeline(self) -> "StockAnalysisPipeline":  # noqa: F821
+        with patch('src.core.pipeline.get_config') as mock_config, \
+             patch('src.core.pipeline.get_db'), \
+             patch('src.core.pipeline.DataFetcherManager'), \
+             patch('src.core.pipeline.GeminiAnalyzer'), \
+             patch('src.core.pipeline.NotificationService'), \
+             patch('src.core.pipeline.SearchService'):
+            mock_cfg = MagicMock()
+            mock_cfg.max_workers = 2
+            mock_cfg.agent_mode = False
+            mock_config.return_value = mock_cfg
+
+            from src.core.pipeline import StockAnalysisPipeline
+            return StockAnalysisPipeline(config=mock_cfg)
+
+    def test_stock_us_builds_market_risk_but_not_exposure(self) -> None:
+        """19B.3A: a US stock gets market_risk_snapshot from the mocked
+        VIX/SPX quote path, but exposure_snapshot stays None."""
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", exposure_snapshot=None, market_risk_snapshot=None)
+        vix_quote = SimpleNamespace(price=18.1, change_pct=None)
+        spx_quote = SimpleNamespace(price=None, change_pct=0.4)
+
+        def _fake_quote(code, log_final_failure=False):
+            return vix_quote if code == "VIX" else spx_quote
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="us"), \
+             patch.object(pipeline.fetcher_manager, 'get_realtime_quote', side_effect=_fake_quote):
+            pipeline._attach_exposure_and_market_risk_snapshot(result, "AAPL", None)
+
+        self.assertIsNone(result.exposure_snapshot)
+        self.assertIsNotNone(result.market_risk_snapshot)
+        self.assertEqual(result.market_risk_snapshot["vix_level"], 18.1)
+        self.assertEqual(result.market_risk_snapshot["source"], "yfinance")
+
+    def test_stock_tw_market_risk_data_gap_no_fetch(self) -> None:
+        """19B.3A: a TW stock gets a data-gap market_risk_snapshot with zero
+        quote-provider calls, and no exposure_snapshot."""
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", exposure_snapshot=None, market_risk_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
+             patch.object(pipeline.fetcher_manager, 'get_realtime_quote') as mock_quote:
+            pipeline._attach_exposure_and_market_risk_snapshot(result, "2330", None)
+            mock_quote.assert_not_called()
+
+        self.assertIsNone(result.exposure_snapshot)
+        self.assertIsNotNone(result.market_risk_snapshot)
+        self.assertIsNone(result.market_risk_snapshot["source"])
+        self.assertIn("gap_reason", result.market_risk_snapshot)
+
+    def test_etf_and_index_still_build_both_snapshots(self) -> None:
+        """19B.3A: etf/index instrument types are unaffected — both fields
+        still get built, exactly as in 19B.3."""
+        pipeline = self._make_pipeline()
+        for instrument_type in ("etf", "index"):
+            result = SimpleNamespace(instrument_type=instrument_type, exposure_snapshot=None, market_risk_snapshot=None)
+            with patch('src.core.pipeline.get_market_for_stock', return_value="tw"):
+                pipeline._attach_exposure_and_market_risk_snapshot(result, "0050", None)
+            self.assertIsNotNone(result.exposure_snapshot, instrument_type)
+            self.assertIsNotNone(result.market_risk_snapshot, instrument_type)
+
+    def test_unknown_instrument_type_is_noop(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="unknown", exposure_snapshot=None, market_risk_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock') as mock_market:
+            pipeline._attach_exposure_and_market_risk_snapshot(result, "AAPL", None)
+            mock_market.assert_not_called()
+
+        self.assertIsNone(result.exposure_snapshot)
+        self.assertIsNone(result.market_risk_snapshot)
+
+    def test_us_etf_builds_market_risk_from_realtime_quote(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="etf", exposure_snapshot=None, market_risk_snapshot=None)
+        vix_quote = SimpleNamespace(price=28.4, change_pct=None)
+        spx_quote = SimpleNamespace(price=None, change_pct=-1.2)
+
+        def _fake_quote(code, log_final_failure=False):
+            return vix_quote if code == "VIX" else spx_quote
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="us"), \
+             patch.object(pipeline.fetcher_manager, 'get_realtime_quote', side_effect=_fake_quote):
+            pipeline._attach_exposure_and_market_risk_snapshot(result, "SPY", None)
+
+        self.assertEqual(result.market_risk_snapshot["vix_level"], 28.4)
+        self.assertEqual(result.market_risk_snapshot["vix_status"], "緊張")
+        self.assertEqual(result.market_risk_snapshot["spx_change_pct"], -1.2)
+        self.assertEqual(result.market_risk_snapshot["source"], "yfinance")
+        self.assertIsNotNone(result.exposure_snapshot)
+
+    def test_tw_index_always_renders_data_gap_no_fetch(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="index", exposure_snapshot=None, market_risk_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
+             patch.object(pipeline.fetcher_manager, 'get_realtime_quote') as mock_quote:
+            pipeline._attach_exposure_and_market_risk_snapshot(result, "0050", None)
+            mock_quote.assert_not_called()
+
+        self.assertIsNone(result.market_risk_snapshot["source"])
+        self.assertIn("gap_reason", result.market_risk_snapshot)
+        self.assertEqual(result.market_risk_snapshot["data_gap_fields"], list(["vix_level", "vix_status", "spx_change_pct", "risk_level"]))
+
+    def test_exception_degrades_to_no_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="etf", exposure_snapshot=None, market_risk_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', side_effect=RuntimeError("boom")):
+            pipeline._attach_exposure_and_market_risk_snapshot(result, "0050", None)
+
+        self.assertIsNone(result.exposure_snapshot)
+        self.assertIsNone(result.market_risk_snapshot)
+
+
 if __name__ == '__main__':
     unittest.main()

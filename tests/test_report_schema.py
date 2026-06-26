@@ -196,6 +196,35 @@ class TestAnalysisReportSchema(unittest.TestCase):
         self.assertEqual(schema.valuation_snapshot, snapshot)
         self.assertEqual(schema.fundamental_snapshot, snapshot)
 
+    def test_schema_exposure_market_risk_snapshot_fields_default_to_none(self) -> None:
+        """Phase 19B.3: same declared-Optional-Dict-default-None pattern as 19B.2."""
+        self.assertIn("exposure_snapshot", AnalysisReportSchema.model_fields)
+        self.assertIn("market_risk_snapshot", AnalysisReportSchema.model_fields)
+
+        data = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        schema = AnalysisReportSchema.model_validate(data)
+        self.assertIsNone(schema.exposure_snapshot)
+        self.assertIsNone(schema.market_risk_snapshot)
+
+    def test_schema_exposure_market_risk_snapshot_accepts_dict(self) -> None:
+        base = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        snapshot = {"vix_level": 18.2, "source": "yfinance", "data_gap_fields": []}
+        schema = AnalysisReportSchema.model_validate(
+            {**base, "exposure_snapshot": snapshot, "market_risk_snapshot": snapshot}
+        )
+        self.assertEqual(schema.exposure_snapshot, snapshot)
+        self.assertEqual(schema.market_risk_snapshot, snapshot)
+
 
 class TestAnalyzerSchemaFallback(unittest.TestCase):
     """Analyzer fallback when schema validation fails."""
@@ -334,3 +363,21 @@ class TestAnalyzerSchemaFallback(unittest.TestCase):
         result = analyzer._parse_response(response, "2330", "股票2330")
         self.assertIsNone(result.valuation_snapshot)
         self.assertIsNone(result.fundamental_snapshot)
+
+    def test_parse_response_ignores_llm_supplied_exposure_market_risk_snapshot(self) -> None:
+        """Phase 19B.3: same non-LLM-inferred contract — the pipeline (not
+        the analyzer) builds these from realtime-quote data / data-gap."""
+        analyzer = GeminiAnalyzer()
+        response = json.dumps({
+            "stock_name": "0050",
+            "sentiment_score": 72,
+            "trend_prediction": "看多",
+            "operation_advice": "持有",
+            "decision_type": "hold",
+            "analysis_summary": "技術面向好",
+            "exposure_snapshot": {"leverage_factor": 999},
+            "market_risk_snapshot": {"vix_level": 999.0},
+        })
+        result = analyzer._parse_response(response, "0050", "元大台灣50")
+        self.assertIsNone(result.exposure_snapshot)
+        self.assertIsNone(result.market_risk_snapshot)
