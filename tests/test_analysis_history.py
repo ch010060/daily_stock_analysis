@@ -1755,6 +1755,106 @@ class AnalysisHistoryTestCase(unittest.TestCase):
 
         self.assertIn(TW_MARKET_RISK_GAP_REASON, markdown)
 
+    def test_rebuild_analysis_result_carries_multi_period_trend_snapshot(self) -> None:
+        """Phase 19B.4: _rebuild_analysis_result carries multi_period_trend_snapshot
+        from raw_result, mirroring 19B.3's snapshot fields."""
+        record_id = self._save_history("query_multi_period_trend_001")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            snapshot = {
+                "source": "db_cache",
+                "periods": [{"period": "5D", "label": "1週", "change_pct": 1.2, "data_gap_fields": []}],
+                "data_gap_fields": [],
+            }
+            raw_result = {
+                "code": "2330",
+                "name": "台積電",
+                "instrument_type": "stock",
+                "multi_period_trend_snapshot": snapshot,
+            }
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertEqual(rebuilt.multi_period_trend_snapshot, snapshot)
+
+    def test_rebuild_analysis_result_defaults_multi_period_trend_snapshot_to_none(self) -> None:
+        """Old history records (no multi_period_trend_snapshot key) rebuild as
+        None, not a crash — same backward compatibility contract as 19B.1-19B.3."""
+        record_id = self._save_history("query_multi_period_trend_002")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            raw_result = {"code": "2330", "name": "台積電"}
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertIsNone(rebuilt.multi_period_trend_snapshot)
+
+    def test_generate_single_stock_markdown_renders_multi_period_trend_for_stock_etf_index(self) -> None:
+        """Phase 19B.4: markdown renders the new section for stock/etf/index,
+        positioned after the market-risk thermometer section."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        for instrument_type in ("stock", "etf", "index"):
+            result = self._build_result()
+            result.instrument_type = instrument_type
+            result.multi_period_trend_snapshot = {
+                "source": "db_cache",
+                "as_of": "2026-04-09",
+                "periods": [
+                    {
+                        "period": "5D", "label": "1週", "change_pct": 3.5,
+                        "drawdown_from_high_pct": -1.2, "price_vs_ma_pct": 0.8,
+                        "trend_status": "neutral", "data_gap_fields": [],
+                    },
+                    {
+                        "period": "252D", "label": "52週", "change_pct": None,
+                        "drawdown_from_high_pct": None, "price_vs_ma_pct": None,
+                        "trend_status": "insufficient_data",
+                        "data_gap_fields": ["change_pct", "drawdown_from_high_pct", "price_vs_ma_pct"],
+                    },
+                ],
+                "data_gap_fields": ["252D"],
+            }
+            markdown = service._generate_single_stock_markdown(result, record)
+
+            self.assertIn("多週期趨勢快照", markdown)
+            self.assertIn("1週", markdown)
+            self.assertIn("資料不足", markdown)
+            # Mermaid appendix (if present) must still come after this section.
+            market_risk_idx = markdown.find("多週期趨勢快照")
+            battle_idx = markdown.find("作戰計")
+            if battle_idx != -1:
+                self.assertLess(market_risk_idx, battle_idx)
+
+    def test_generate_single_stock_markdown_omits_multi_period_trend_for_unknown(self) -> None:
+        """Unknown instrument_type remains a no-op, even if the field is
+        somehow populated (defensive — should not happen given the pipeline gate)."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "unknown"
+        result.multi_period_trend_snapshot = {
+            "periods": [{"period": "5D", "label": "1週", "change_pct": 1.0, "data_gap_fields": []}],
+            "data_gap_fields": [],
+        }
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertNotIn("多週期趨勢快照", markdown)
+
     def test_generate_single_stock_markdown_title_switches_by_instrument_type(self) -> None:
         """Phase 19B.1: title contract — etf/index get dedicated titles, stock/unknown
         keep the existing generic title (backward compatible with old reports)."""

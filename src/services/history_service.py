@@ -857,6 +857,7 @@ class HistoryService:
                 fundamental_snapshot=raw_result.get("fundamental_snapshot"),
                 exposure_snapshot=raw_result.get("exposure_snapshot"),
                 market_risk_snapshot=raw_result.get("market_risk_snapshot"),
+                multi_period_trend_snapshot=raw_result.get("multi_period_trend_snapshot"),
             )
         except Exception as e:
             logger.error(f"Failed to rebuild AnalysisResult: {e}", exc_info=True)
@@ -1175,6 +1176,58 @@ class HistoryService:
                         f"{labels['snapshot_as_of_label']}: {mrs_as_of or 'N/A'}*",
                         "",
                     ])
+
+        # ========== 多週期趨勢快照 ==========
+        # Phase 19B.4: deterministic, backend-computed — stock/etf/index only.
+        show_trend_snapshot = instrument_type in ("stock", "etf", "index")
+        if show_trend_snapshot:
+            trend_snapshot = getattr(result, "multi_period_trend_snapshot", None)
+            if isinstance(trend_snapshot, dict):
+                gap_label = labels['snapshot_data_gap_label']
+                periods = trend_snapshot.get("periods") or []
+                status_label_map = {
+                    "uptrend": labels['trend_status_uptrend_label'],
+                    "downtrend": labels['trend_status_downtrend_label'],
+                    "neutral": labels['trend_status_neutral_label'],
+                    "insufficient_data": labels['trend_status_insufficient_data_label'],
+                }
+
+                def _trend_value(period: Dict[str, Any], field: str, *, is_pct: bool = False) -> str:
+                    if period.get("data_gap_fields") and field in period["data_gap_fields"]:
+                        return gap_label
+                    value = period.get(field)
+                    if value is None:
+                        return gap_label
+                    return f"{value:.2f}%" if is_pct else str(value)
+
+                if periods:
+                    report_lines.extend([
+                        f"### 📈 {labels['multi_period_trend_heading']}",
+                        "",
+                        f"| {labels['period_label']} | {labels['change_pct_label']} | "
+                        f"{labels['drawdown_from_high_pct_label']} | {labels['price_vs_ma_pct_label']} | "
+                        f"{labels['trend_status_label']} |",
+                        "|---|---|---|---|---|",
+                    ])
+                    for period in periods:
+                        status_key = period.get("trend_status") or "insufficient_data"
+                        status_text = status_label_map.get(status_key, gap_label)
+                        report_lines.append(
+                            f"| {period.get('label', period.get('period', 'N/A'))} | "
+                            f"{_trend_value(period, 'change_pct', is_pct=True)} | "
+                            f"{_trend_value(period, 'drawdown_from_high_pct', is_pct=True)} | "
+                            f"{_trend_value(period, 'price_vs_ma_pct', is_pct=True)} | "
+                            f"{status_text} |"
+                        )
+                    report_lines.append("")
+                    ts_source = trend_snapshot.get("source")
+                    ts_as_of = trend_snapshot.get("as_of")
+                    if ts_source or ts_as_of:
+                        report_lines.extend([
+                            f"*{labels['snapshot_source_label']}: {ts_source or 'N/A'} | "
+                            f"{labels['snapshot_as_of_label']}: {ts_as_of or 'N/A'}*",
+                            "",
+                        ])
 
         # ========== 作戰計劃 ==========
         battle = dashboard.get('battle_plan', {}) if dashboard else {}

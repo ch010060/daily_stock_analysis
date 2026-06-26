@@ -193,3 +193,9 @@ class AnalysisReportSchema(BaseModel):
     # built after LLM-JSON validation, never LLM-populated.
     exposure_snapshot: Optional[Dict[str, Any]] = None
     market_risk_snapshot: Optional[Dict[str, Any]] = None
+
+    # Phase 19B.4: deterministic multi-period trend snapshot for
+    # stock/etf/index instruments. Same contract as 19B.2/19B.3 above —
+    # backend-computed from already-fetched OHLC rows after LLM-JSON
+    # validation, never LLM-populated.
+    multi_period_trend_snapshot: Optional[Dict[str, Any]] = None

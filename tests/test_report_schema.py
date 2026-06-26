@@ -225,6 +225,44 @@ class TestAnalysisReportSchema(unittest.TestCase):
         self.assertEqual(schema.exposure_snapshot, snapshot)
         self.assertEqual(schema.market_risk_snapshot, snapshot)
 
+    def test_schema_multi_period_trend_snapshot_defaults_to_none(self) -> None:
+        """Phase 19B.4: same declared-Optional-Dict-default-None pattern as 19B.2/19B.3."""
+        self.assertIn("multi_period_trend_snapshot", AnalysisReportSchema.model_fields)
+
+        data = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        schema = AnalysisReportSchema.model_validate(data)
+        self.assertIsNone(schema.multi_period_trend_snapshot)
+
+    def test_schema_multi_period_trend_snapshot_accepts_dict(self) -> None:
+        base = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        snapshot = {"periods": [], "source": "db_cache", "data_gap_fields": []}
+        schema = AnalysisReportSchema.model_validate(
+            {**base, "multi_period_trend_snapshot": snapshot}
+        )
+        self.assertEqual(schema.multi_period_trend_snapshot, snapshot)
+
+    def test_schema_old_payload_without_multi_period_trend_snapshot_still_parses(self) -> None:
+        """Old payloads recorded before Phase 19B.4 must still validate."""
+        data = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+            "exposure_snapshot": {"leverage_factor": 1},
+        }
+        schema = AnalysisReportSchema.model_validate(data)
+        self.assertIsNone(schema.multi_period_trend_snapshot)
+
 
 class TestAnalyzerSchemaFallback(unittest.TestCase):
     """Analyzer fallback when schema validation fails."""
@@ -381,3 +419,19 @@ class TestAnalyzerSchemaFallback(unittest.TestCase):
         result = analyzer._parse_response(response, "0050", "元大台灣50")
         self.assertIsNone(result.exposure_snapshot)
         self.assertIsNone(result.market_risk_snapshot)
+
+    def test_parse_response_ignores_llm_supplied_multi_period_trend_snapshot(self) -> None:
+        """Phase 19B.4: same non-LLM-inferred contract — the pipeline (not
+        the analyzer) builds this from OHLC rows via load_history_df."""
+        analyzer = GeminiAnalyzer()
+        response = json.dumps({
+            "stock_name": "0050",
+            "sentiment_score": 72,
+            "trend_prediction": "看多",
+            "operation_advice": "持有",
+            "decision_type": "hold",
+            "analysis_summary": "技術面向好",
+            "multi_period_trend_snapshot": {"periods": [{"period": "5D", "change_pct": 999.0}]},
+        })
+        result = analyzer._parse_response(response, "0050", "元大台灣50")
+        self.assertIsNone(result.multi_period_trend_snapshot)

@@ -1570,6 +1570,8 @@ class AnalysisResult:
     # Phase 19B.3：ETF/指數專屬曝險/市場風險快照，由後端決定性組裝，非 LLM 推論
     exposure_snapshot: Optional[Dict[str, Any]] = None
     market_risk_snapshot: Optional[Dict[str, Any]] = None
+    # Phase 19B.4：股票/ETF/指數多週期趨勢快照，由後端從已抓取的 OHLC 資料決定性計算，非 LLM 推論
+    multi_period_trend_snapshot: Optional[Dict[str, Any]] = None
     success: bool = True
     error_message: Optional[str] = None
 
@@ -1628,6 +1630,7 @@ class AnalysisResult:
             'fundamental_snapshot': self.fundamental_snapshot,
             'exposure_snapshot': self.exposure_snapshot,
             'market_risk_snapshot': self.market_risk_snapshot,
+            'multi_period_trend_snapshot': self.multi_period_trend_snapshot,
         }
 
     def get_core_conclusion(self) -> str:

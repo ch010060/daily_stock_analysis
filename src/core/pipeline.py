@@ -666,6 +666,7 @@ class StockAnalysisPipeline:
                 result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
                 self._attach_valuation_fundamental_snapshot(result, code, fundamental_context)
                 self._attach_exposure_and_market_risk_snapshot(result, code, fundamental_context)
+                self._attach_multi_period_trend_snapshot(result, code)
                 realtime_data = enhanced_context.get('realtime', {})
                 result.current_price = realtime_data.get('price')
                 result.change_pct = realtime_data.get('change_pct')
@@ -1145,6 +1146,48 @@ class StockAnalysisPipeline:
         except Exception as exc:
             logger.warning("[exposure_market_risk_snapshot] skipped for %s: %s", code, exc)
 
+    def _attach_multi_period_trend_snapshot(
+        self,
+        result: Any,
+        code: str,
+    ) -> None:
+        """
+        Phase 19B.4: attach deterministic `multi_period_trend_snapshot`.
+
+        stock/etf/index only (unknown is a no-op). Computes 5D/20D/60D/120D/
+        252D return, drawdown-from-high, and MA-position rows from OHLC rows
+        loaded via `src.services.history_loader.load_history_df` — a DB-first
+        helper already reused elsewhere (Issue #1066), so this adds at most
+        one additional network fetch (only on a DB-cache miss) and never
+        widens or otherwise touches the existing ~89-day window that feeds
+        MA60/trend_result (this class's main fetch, see the `timedelta(days=89)`
+        window above). Periods without enough rows degrade to
+        `insufficient_data` with `data_gap_fields` populated — never a
+        hallucinated 52W number. Never raises; any failure degrades to
+        "no snapshot" rather than aborting the report.
+        """
+        if getattr(result, "instrument_type", "unknown") not in ("stock", "etf", "index"):
+            return
+        try:
+            from src.services.history_loader import load_history_df
+            from src.services.multi_period_trend_snapshot import (
+                build_multi_period_trend_snapshot,
+            )
+
+            # `days=252` is a trading-day-count request, not a calendar-day
+            # window: load_history_df() internally converts it to a
+            # ~1.8x + 10 calendar-day DB lookback buffer (~463 calendar days
+            # for 252), the same convention already used by
+            # `_ensure_agent_history()`'s `min_days * 1.8` above and by
+            # `data_tools._handle_get_daily_history()`. Pinned by
+            # tests/test_history_loader.py::test_252_trading_days_uses_wide_calendar_buffer.
+            df, source = load_history_df(code, days=252)
+            result.multi_period_trend_snapshot = build_multi_period_trend_snapshot(
+                df, source=(source if df is not None else None),
+            )
+        except Exception as exc:
+            logger.warning("[multi_period_trend_snapshot] skipped for %s: %s", code, exc)
+
     def _ensure_agent_history(self, code: str, min_days: int = 240) -> None:
         """Ensure at least *min_days* of K-line history is in DB for agent tools."""
         from src.services.history_loader import get_frozen_target_date
@@ -1305,6 +1348,7 @@ class StockAnalysisPipeline:
                 result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
                 self._attach_valuation_fundamental_snapshot(result, code, fundamental_context)
                 self._attach_exposure_and_market_risk_snapshot(result, code, fundamental_context)
+                self._attach_multi_period_trend_snapshot(result, code)
             # Agent weak integrity: placeholder fill only, no LLM retry
             if result and getattr(self.config, "report_integrity_enabled", False):
                 from src.analyzer import check_content_integrity, apply_placeholder_fill

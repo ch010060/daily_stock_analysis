@@ -134,6 +134,34 @@ class HistoryLoaderTestCase(unittest.TestCase):
         self.assertEqual(mock_db.get_data_range.call_count, 2)
 
     # ------------------------------------------------------------------
+    # `days` is trading-day-count semantics, not calendar-day semantics
+    # (Phase 19B.4 lookback-window confirmation: 252 trading days must map
+    # to a calendar window comfortably >= 365 days, otherwise a 252D/52W
+    # request would systematically underfetch).
+    # ------------------------------------------------------------------
+    @patch("src.storage.get_db")
+    def test_252_trading_days_uses_wide_calendar_buffer(self, mock_get_db):
+        from src.services.history_loader import load_history_df
+
+        mock_db = MagicMock()
+        mock_db.get_data_range.return_value = []  # force a deterministic miss
+        mock_get_db.return_value = mock_db
+
+        with patch("src.services.history_loader._get_fetcher_manager") as mock_get_fm:
+            mock_fm = MagicMock()
+            mock_fm.get_daily_data.return_value = (None, "none")
+            mock_get_fm.return_value = mock_fm
+
+            load_history_df("2330", days=252, target_date=date(2026, 4, 18))
+
+        call_args = mock_db.get_data_range.call_args
+        _code, start, end = call_args[0]
+        calendar_span_days = (end - start).days
+        # int(252 * 1.8) + 10 == 463 calendar days, comfortably >= 365.
+        self.assertEqual(calendar_span_days, 463)
+        self.assertGreaterEqual(calendar_span_days, 365)
+
+    # ------------------------------------------------------------------
     # Both paths fail gracefully
     # ------------------------------------------------------------------
     @patch("src.services.history_loader._get_fetcher_manager")

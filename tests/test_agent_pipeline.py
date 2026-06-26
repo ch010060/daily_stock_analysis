@@ -3260,5 +3260,128 @@ class TestAttachExposureAndMarketRiskSnapshot(unittest.TestCase):
         self.assertIsNone(result.market_risk_snapshot)
 
 
+class TestAttachMultiPeriodTrendSnapshot(unittest.TestCase):
+    """Phase 19B.4: unit tests for
+    pipeline._attach_multi_period_trend_snapshot.
+
+    Approach A: this method calls
+    `src.services.history_loader.load_history_df(code, days=252)`
+    independently — it never touches the existing ~89-day window used for
+    MA60/trend_result. Mirrors TestAttachExposureAndMarketRiskSnapshot's
+    direct-invocation pattern. No live network/provider calls —
+    load_history_df is always mocked.
+    """
+
+    def _make_pipeline(self) -> "StockAnalysisPipeline":  # noqa: F821
+        with patch('src.core.pipeline.get_config') as mock_config, \
+             patch('src.core.pipeline.get_db'), \
+             patch('src.core.pipeline.DataFetcherManager'), \
+             patch('src.core.pipeline.GeminiAnalyzer'), \
+             patch('src.core.pipeline.NotificationService'), \
+             patch('src.core.pipeline.SearchService'):
+            mock_cfg = MagicMock()
+            mock_cfg.max_workers = 2
+            mock_cfg.agent_mode = False
+            mock_config.return_value = mock_cfg
+
+            from src.core.pipeline import StockAnalysisPipeline
+            return StockAnalysisPipeline(config=mock_cfg)
+
+    @staticmethod
+    def _rows(n: int, start: float = 100.0, step: float = 5.0) -> list:
+        from datetime import date, timedelta
+        base = date(2025, 1, 1)
+        return [
+            {
+                "date": (base + timedelta(days=i)).isoformat(),
+                "high": start + i * step + 1,
+                "low": start + i * step - 1,
+                "close": start + i * step,
+            }
+            for i in range(n)
+        ]
+
+    def test_stock_etf_index_attach_from_sufficient_rows(self) -> None:
+        pipeline = self._make_pipeline()
+        rows = self._rows(260)
+        for instrument_type in ("stock", "etf", "index"):
+            result = SimpleNamespace(instrument_type=instrument_type, multi_period_trend_snapshot=None)
+            with patch('src.services.history_loader.load_history_df', return_value=(rows, "db_cache")):
+                pipeline._attach_multi_period_trend_snapshot(result, "2330")
+            self.assertIsNotNone(result.multi_period_trend_snapshot, instrument_type)
+            self.assertEqual(result.multi_period_trend_snapshot["source"], "db_cache")
+            self.assertEqual(result.multi_period_trend_snapshot["data_gap_fields"], [])
+
+    def test_unknown_instrument_type_is_noop(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="unknown", multi_period_trend_snapshot=None)
+
+        with patch('src.services.history_loader.load_history_df') as mock_load:
+            pipeline._attach_multi_period_trend_snapshot(result, "AAPL")
+            mock_load.assert_not_called()
+
+        self.assertIsNone(result.multi_period_trend_snapshot)
+
+    def test_insufficient_rows_produce_data_gap_not_exception(self) -> None:
+        pipeline = self._make_pipeline()
+        rows = self._rows(10)
+        result = SimpleNamespace(instrument_type="stock", multi_period_trend_snapshot=None)
+
+        with patch('src.services.history_loader.load_history_df', return_value=(rows, "yfinance")):
+            pipeline._attach_multi_period_trend_snapshot(result, "AAPL")
+
+        self.assertIsNotNone(result.multi_period_trend_snapshot)
+        self.assertIn("60D", result.multi_period_trend_snapshot["data_gap_fields"])
+        self.assertIn("252D", result.multi_period_trend_snapshot["data_gap_fields"])
+
+    def test_load_history_df_returns_none_degrades_to_no_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", multi_period_trend_snapshot=None)
+
+        with patch('src.services.history_loader.load_history_df', return_value=(None, "none")):
+            pipeline._attach_multi_period_trend_snapshot(result, "AAPL")
+
+        self.assertIsNone(result.multi_period_trend_snapshot)
+
+    def test_exception_degrades_to_no_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="etf", multi_period_trend_snapshot=None)
+
+        with patch('src.services.history_loader.load_history_df', side_effect=RuntimeError("boom")):
+            pipeline._attach_multi_period_trend_snapshot(result, "0050")
+
+        self.assertIsNone(result.multi_period_trend_snapshot)
+
+    def test_does_not_widen_or_touch_existing_89_day_window(self) -> None:
+        """Approach A guard: calling the new method must not invoke
+        db.get_data_range (the existing MA60/trend_result fetch path) —
+        it only goes through load_history_df."""
+        pipeline = self._make_pipeline()
+        rows = self._rows(260)
+        result = SimpleNamespace(instrument_type="index", multi_period_trend_snapshot=None)
+
+        with patch('src.services.history_loader.load_history_df', return_value=(rows, "db_cache")):
+            pipeline._attach_multi_period_trend_snapshot(result, "0050")
+
+        pipeline.db.get_data_range.assert_not_called()
+
+    def test_agent_and_non_agent_paths_call_same_method_with_same_args(self) -> None:
+        """Parity by construction: both analyze_stock and _analyze_with_agent
+        invoke `_attach_multi_period_trend_snapshot(result, code)` — verified
+        by calling it directly through two independently constructed
+        pipelines and confirming identical output for identical input,
+        mirroring TestInstrumentTypeAgentParity's approach for 19B.1."""
+        rows = self._rows(260)
+        outputs = []
+        for _ in range(2):
+            pipeline = self._make_pipeline()
+            result = SimpleNamespace(instrument_type="stock", multi_period_trend_snapshot=None)
+            with patch('src.services.history_loader.load_history_df', return_value=(rows, "db_cache")):
+                pipeline._attach_multi_period_trend_snapshot(result, "2330")
+            outputs.append(result.multi_period_trend_snapshot)
+
+        self.assertEqual(outputs[0], outputs[1])
+
+
 if __name__ == '__main__':
     unittest.main()
