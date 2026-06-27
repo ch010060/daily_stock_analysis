@@ -39,6 +39,32 @@ function formatDate(iso: string): string {
   }
 }
 
+function normalizeStrategyText(text: string | null): string {
+  return (text ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^(?:建議)?(?:觀望|看多|看空|中性)[，,、：:\s]+/, '');
+}
+
+function deriveKeyTrigger(...values: Array<string | null>): { value: string; caption: string } {
+  const text = values.map(normalizeStrategyText).find(Boolean) ?? '';
+  if (!text) return { value: '等待確認', caption: '訊號未齊' };
+
+  const ma = text.match(/MA\s*(\d+)/i)?.[1];
+  const maLabel = ma ? `MA${ma}` : null;
+
+  if (maLabel && /(站回|收復|突破)/.test(text)) return { value: `站回 ${maLabel}`, caption: '確認後再行動' };
+  if (maLabel && /回測/.test(text) && /支撐/.test(text)) {
+    return { value: `回測 ${maLabel} 支撐`, caption: '確認支撐有效' };
+  }
+  if (maLabel && /支撐/.test(text)) return { value: `守住 ${maLabel}`, caption: '失守則降風險' };
+  if (/放量/.test(text)) return { value: '放量確認', caption: '等待量價配合' };
+  if (/成交量/.test(text) && /(收縮|收斂)/.test(text)) return { value: '量能收斂', caption: '等待價格確認' };
+  if (/(停損|跌破)/.test(text)) return { value: '守住風控線', caption: '失守不追' };
+  if (/(壓力|目標)/.test(text)) return { value: '看壓力帶反應', caption: '不追高' };
+  return { value: '等待確認', caption: '訊號未齊' };
+}
+
 export const ReportVisualSummary: React.FC<ReportVisualSummaryProps> = ({ report }) => {
   let vm;
   try {
@@ -50,6 +76,7 @@ export const ReportVisualSummary: React.FC<ReportVisualSummaryProps> = ({ report
 
   const decisionColor = decisionColorClass(vm.sentimentScore);
   const priceColor = vm.changePct !== null && vm.changePct < 0 ? 'text-danger' : 'text-success';
+  const keyTrigger = deriveKeyTrigger(vm.idealBuy, vm.secondaryBuy, vm.stopLoss, vm.takeProfit);
 
   return (
     <div
@@ -103,10 +130,15 @@ export const ReportVisualSummary: React.FC<ReportVisualSummaryProps> = ({ report
             </div>
           </div>
         )}
-        <div className="px-3 py-2.5">
-          <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">操作建議</div>
-          <div className={`font-mono text-lg font-bold ${decisionColor}`}>{vm.decision}</div>
-          <div className="text-[9px] text-muted-foreground">詳見下方作戰計畫</div>
+        <div className="px-3 py-2.5" data-testid="visual-summary-trigger-kpi">
+          <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">關鍵觸發</div>
+          <div
+            className="whitespace-nowrap text-sm font-semibold leading-tight text-foreground"
+            data-testid="visual-summary-trigger-value"
+          >
+            {keyTrigger.value}
+          </div>
+          <div className="text-[9px] text-muted-foreground">{keyTrigger.caption}</div>
         </div>
         {vm.vixLevel !== null && (
           <div className="px-3 py-2.5">

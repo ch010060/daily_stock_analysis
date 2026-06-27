@@ -75,13 +75,32 @@ describe('ReportVisualSummary', () => {
     expect(el.className).toContain('report-light-surface');
   });
 
-  // F1.4: no hardcoded "0%" position value; shows operationAdvice and 操作建議 label
-  it('shows 操作建議 label with vm.decision text, not hardcoded 0%', () => {
+  // R3: hero remains the only primary decision anchor; KPI row must not repeat operationAdvice
+  it('shows a compact key-trigger KPI instead of repeating operation advice', () => {
     render(<ReportVisualSummary report={MSFT_REPORT} />);
     const el = screen.getByTestId('report-visual-summary');
-    expect(el.textContent).toContain('操作建議');
     expect(el.textContent).toContain('觀望');
+    expect(el.textContent).not.toContain('操作建議');
     expect(el.textContent).not.toContain('空倉觀望');
+
+    const trigger = screen.getByTestId('visual-summary-trigger-kpi');
+    const triggerValue = screen.getByTestId('visual-summary-trigger-value');
+    expect(trigger.textContent).toContain('關鍵觸發');
+    expect(trigger.textContent).toMatch(/MA|放量|量能|風控|壓力|確認|等待/);
+    expect(trigger.textContent).not.toContain('觀望');
+    expect(trigger.textContent).not.toContain('詳見');
+    expect(trigger.textContent).not.toContain('下方');
+    expect(triggerValue.className).toContain('whitespace-nowrap');
+  });
+
+  it('shows a safe key-trigger fallback when strategy details are unavailable', () => {
+    render(<ReportVisualSummary report={MINIMAL_REPORT} />);
+    const trigger = screen.getByTestId('visual-summary-trigger-kpi');
+    expect(trigger.textContent).toContain('關鍵觸發');
+    expect(trigger.textContent).toContain('等待確認');
+    expect(trigger.textContent).toContain('訊號未齊');
+    expect(trigger.textContent).not.toContain('詳見');
+    expect(trigger.textContent).not.toContain('下方');
   });
 
   // R1: CandlestickChartBlock stays disabled in production drawer pending chart-library/removal decision
