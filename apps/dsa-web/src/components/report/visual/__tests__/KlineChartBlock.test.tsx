@@ -223,6 +223,7 @@ describe('KlineChartBlock', () => {
   it('daily 1Y renders MA252', async () => {
     render(<KlineChartBlock historyId={65} instrumentType="stock" />);
     await screen.findByTestId('kline-chart-block');
+    await waitFor(() => expect(lineSeriesCalls()).toHaveLength(3));
     addSeries.mockClear();
     fireEvent.click(screen.getByRole('button', { name: '1Y' }));
     await waitFor(() => expect(historyApi.getKline).toHaveBeenLastCalledWith(65, '1y'));

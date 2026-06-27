@@ -1,3 +1,4 @@
+import { getSentimentLabel } from '../../../types/analysis';
 import type {
   AnalysisReport,
   FundamentalSnapshot,
@@ -60,6 +61,10 @@ export interface VisualReportViewModel {
   vixStatus: string | null;
   spxChangePct: number | null;
   vixDataGap: boolean;
+  marketRiskKind: 'vix' | 'sentiment';
+  marketRiskDataGap: boolean;
+  marketRiskSentimentScore: number | null;
+  marketRiskSentimentLabel: string | null;
   // Trend
   trendPeriods: TrendPeriodVM[];
   trendDataGap: boolean;
@@ -214,6 +219,28 @@ function snapshotAvailability(
   return { status: 'partial', reason: `缺少 ${gaps.length}/${fieldCount} 欄位` };
 }
 
+function normalizeMarket(v: unknown): 'tw' | 'us' | null {
+  const raw = toStr(v)?.toLowerCase();
+  if (!raw) return null;
+  if (raw === 'tw' || raw === 'taiwan') return 'tw';
+  if (raw === 'us' || raw === 'usa' || raw === 'united_states') return 'us';
+  return null;
+}
+
+function inferReportMarket(report: AnalysisReport, raw: VisualReportRawResult): 'tw' | 'us' | null {
+  const fromContext = normalizeMarket(report.details?.analysisContextPackOverview?.subject?.market);
+  if (fromContext) return fromContext;
+  const fromMeta = normalizeMarket(report.meta.marketPhaseSummary?.market);
+  if (fromMeta) return fromMeta;
+  const fromRaw = normalizeMarket(raw.market);
+  if (fromRaw) return fromRaw;
+
+  const code = report.meta.stockCode.toUpperCase();
+  if (/^(?:TW:)?\d{4,6}(?:\.TW)?$/.test(code)) return 'tw';
+  if (/^(?:US:)?[A-Z]{1,5}(?:[.-][A-Z]{1,2})?$/.test(code)) return 'us';
+  return null;
+}
+
 // ─── Public adapter ───────────────────────────────────────────
 
 export function adaptToVisualReport(report: AnalysisReport): VisualReportViewModel {
@@ -228,6 +255,14 @@ export function adaptToVisualReport(report: AnalysisReport): VisualReportViewMod
   const vixStatus = toStr(mrSnap?.vixStatus);
   const spxChangePct = toNum(mrSnap?.spxChangePct);
   const vixDataGap = !mrSnap || vixLevel === null;
+  const rawSentimentScore = toNum(summary.sentimentScore);
+  const market = inferReportMarket(report, raw);
+  const marketRiskKind = vixLevel !== null || market !== 'tw' ? 'vix' : 'sentiment';
+  const marketRiskDataGap = marketRiskKind === 'vix' ? vixDataGap : rawSentimentScore === null;
+  const marketRiskSentimentLabel =
+    rawSentimentScore !== null
+      ? (toStr(summary.sentimentLabel) ?? getSentimentLabel(rawSentimentScore, meta.reportLanguage ?? 'zh_TW'))
+      : null;
 
   const trendSnap = raw.multiPeriodTrendSnapshot ?? null;
   const rawPeriods: MultiPeriodTrendPeriod[] = Array.isArray(trendSnap?.periods)
@@ -277,7 +312,8 @@ export function adaptToVisualReport(report: AnalysisReport): VisualReportViewMod
     {
       key: 'market_risk',
       label: '市場風險',
-      status: vixDataGap ? 'gap' : 'ok',
+      status: marketRiskDataGap ? 'gap' : 'ok',
+      reason: marketRiskKind === 'sentiment' && marketRiskDataGap ? '情緒分數未產生' : undefined,
     },
     {
       key: 'trend',
@@ -307,7 +343,7 @@ export function adaptToVisualReport(report: AnalysisReport): VisualReportViewMod
     analysisDate: meta.createdAt,
     decision: summary.operationAdvice ?? '—',
     trend: summary.trendPrediction ?? '—',
-    sentimentScore: summary.sentimentScore ?? 50,
+    sentimentScore: rawSentimentScore ?? 50,
     oneLiner: summary.analysisSummary ?? '',
     currentPrice,
     changePct,
@@ -315,6 +351,10 @@ export function adaptToVisualReport(report: AnalysisReport): VisualReportViewMod
     vixStatus,
     spxChangePct,
     vixDataGap,
+    marketRiskKind,
+    marketRiskDataGap,
+    marketRiskSentimentScore: rawSentimentScore,
+    marketRiskSentimentLabel,
     trendPeriods,
     trendDataGap,
     ma5,

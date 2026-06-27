@@ -8,8 +8,126 @@ describe('adaptToVisualReport', () => {
     expect(vm.vixLevel).toBeCloseTo(18.89);
     expect(vm.vixStatus).toBe('calm');
     expect(vm.vixDataGap).toBe(false);
+    expect(vm.marketRiskKind).toBe('vix');
+    expect(vm.marketRiskDataGap).toBe(false);
     expect(vm.trendPeriods).toHaveLength(5);
     expect(vm.trendDataGap).toBe(false);
+  });
+
+  it('uses dashboard sentiment for TW stock when VIX is absent', () => {
+    const twReport = {
+      ...MSFT_REPORT,
+      meta: {
+        ...MSFT_REPORT.meta,
+        stockCode: '2454',
+        stockName: '聯發科',
+      },
+      summary: {
+        ...MSFT_REPORT.summary,
+        sentimentScore: 22,
+        sentimentLabel: '悲觀' as const,
+      },
+      details: {
+        analysisContextPackOverview: {
+          packVersion: 'test',
+          subject: { code: '2454', market: 'tw' },
+          blocks: [],
+          counts: { available: 0, missing: 0, notSupported: 0, fallback: 0, stale: 0, estimated: 0, partial: 0, fetchFailed: 0 },
+          warnings: [],
+          metadata: {},
+        },
+        rawResult: {
+          ...MSFT_REPORT.details?.rawResult,
+          instrumentType: 'stock',
+          marketRiskSnapshot: {
+            source: null,
+            vixLevel: null,
+            vixStatus: null,
+            spxChangePct: null,
+            dataGapFields: ['vix_level', 'vix_status', 'spx_change_pct'],
+          },
+        },
+      },
+    };
+
+    const vm = adaptToVisualReport(twReport);
+    expect(vm.vixDataGap).toBe(true);
+    expect(vm.marketRiskKind).toBe('sentiment');
+    expect(vm.marketRiskDataGap).toBe(false);
+    expect(vm.marketRiskSentimentScore).toBe(22);
+    expect(vm.marketRiskSentimentLabel).toBe('悲觀');
+    expect(vm.dataAvailability.find((d) => d.key === 'market_risk')?.status).toBe('ok');
+  });
+
+  it('uses dashboard sentiment for TW ETF when VIX is absent', () => {
+    const twEtfReport = {
+      ...MSFT_REPORT,
+      meta: {
+        ...MSFT_REPORT.meta,
+        stockCode: '006208',
+        stockName: '富邦台50',
+      },
+      summary: {
+        ...MSFT_REPORT.summary,
+        sentimentScore: 42,
+        sentimentLabel: '中性' as const,
+      },
+      details: {
+        rawResult: {
+          ...MSFT_REPORT.details?.rawResult,
+          instrumentType: 'etf',
+          marketRiskSnapshot: {
+            source: null,
+            vixLevel: null,
+            vixStatus: null,
+            spxChangePct: null,
+            dataGapFields: ['vix_level', 'vix_status', 'spx_change_pct'],
+          },
+          exposureSnapshot: { dataGapFields: [] },
+        },
+      },
+    };
+
+    const vm = adaptToVisualReport(twEtfReport);
+    expect(vm.marketRiskKind).toBe('sentiment');
+    expect(vm.marketRiskDataGap).toBe(false);
+    expect(vm.marketRiskSentimentScore).toBe(42);
+    expect(vm.marketRiskSentimentLabel).toBe('中性');
+  });
+
+  it('keeps an explicit TW sentiment gap when dashboard score is missing', () => {
+    const twMissingScoreReport = {
+      ...MSFT_REPORT,
+      meta: {
+        ...MSFT_REPORT.meta,
+        stockCode: '2454',
+      },
+      summary: {
+        ...MSFT_REPORT.summary,
+        sentimentScore: null,
+        sentimentLabel: undefined,
+      },
+      details: {
+        rawResult: {
+          ...MSFT_REPORT.details?.rawResult,
+          instrumentType: 'stock',
+          marketRiskSnapshot: {
+            source: null,
+            vixLevel: null,
+            vixStatus: null,
+            spxChangePct: null,
+            dataGapFields: ['vix_level', 'vix_status', 'spx_change_pct'],
+          },
+        },
+      },
+    } as unknown as typeof MSFT_REPORT;
+
+    const vm = adaptToVisualReport(twMissingScoreReport);
+    expect(vm.marketRiskKind).toBe('sentiment');
+    expect(vm.marketRiskDataGap).toBe(true);
+    expect(vm.marketRiskSentimentScore).toBeNull();
+    expect(vm.dataAvailability.find((d) => d.key === 'market_risk')?.status).toBe('gap');
+    expect(vm.dataAvailability.find((d) => d.key === 'market_risk')?.reason).toBe('情緒分數未產生');
   });
 
   it('extracts price and change from meta', () => {

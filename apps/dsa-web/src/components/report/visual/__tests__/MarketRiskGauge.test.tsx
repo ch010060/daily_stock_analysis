@@ -27,6 +27,40 @@ describe('MarketRiskGauge', () => {
     expect(gauge.querySelector('svg')).toBeFalsy();
   });
 
+  it('renders TW sentiment score without labeling it as VIX', () => {
+    render(
+      <MarketRiskGauge
+        vixLevel={null}
+        vixStatus={null}
+        spxChangePct={null}
+        marketRiskKind="sentiment"
+        sentimentScore={42}
+        sentimentLabel="中性"
+      />
+    );
+    const gauge = screen.getByTestId('market-risk-gauge');
+    expect(gauge.textContent).toContain('市場情緒 · 恐慌貪婪分數');
+    expect(gauge.textContent).toContain('42');
+    expect(gauge.textContent).toContain('中性');
+    expect(gauge.textContent).not.toContain('VIX');
+  });
+
+  it('renders TW sentiment data gap without a VIX unavailable label', () => {
+    render(
+      <MarketRiskGauge
+        vixLevel={null}
+        vixStatus={null}
+        spxChangePct={null}
+        marketRiskKind="sentiment"
+        sentimentScore={null}
+        dataGap
+      />
+    );
+    const gauge = screen.getByTestId('market-risk-gauge');
+    expect(gauge.textContent).toContain('情緒分數資料不足');
+    expect(gauge.textContent).not.toContain('VIX 資料不足');
+  });
+
   it('renders without crashing for extreme VIX values (clamped to max)', () => {
     // VIX=80 > 45 max; pointerX should clamp to 600 per Math.min guard
     expect(() =>

@@ -5,6 +5,10 @@ interface MarketRiskGaugeProps {
   vixStatus: string | null;
   spxChangePct: number | null;
   dataGap?: boolean;
+  marketRiskKind?: 'vix' | 'sentiment';
+  sentimentScore?: number | null;
+  sentimentLabel?: string | null;
+  sentimentSourceLabel?: string | null;
 }
 
 // VIX scale: 0-45. SVG viewBox 600 wide.
@@ -20,9 +24,61 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
   vixStatus,
   spxChangePct,
   dataGap = false,
+  marketRiskKind = 'vix',
+  sentimentScore = null,
+  sentimentLabel = null,
+  sentimentSourceLabel = '分析儀表板分數',
 }) => {
   const pct = (n: number | null, decimals = 2) =>
     n !== null ? `${n > 0 ? '+' : ''}${n.toFixed(decimals)}%` : '—';
+
+  if (marketRiskKind === 'sentiment') {
+    if (dataGap || sentimentScore === null) {
+      return (
+        <div data-testid="market-risk-gauge" className="rounded-lg border bg-muted/30 p-3">
+          <div className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            市場情緒 · 恐慌貪婪分數
+          </div>
+          <p className="text-xs text-muted-foreground">情緒分數資料不足 / 暫不可用</p>
+        </div>
+      );
+    }
+
+    const boundedScore = Math.max(0, Math.min(100, sentimentScore));
+    const toneClass =
+      boundedScore <= 40 ? 'bg-danger text-danger' : boundedScore <= 60 ? 'bg-warning text-warning' : 'bg-success text-success';
+
+    return (
+      <div data-testid="market-risk-gauge" className="rounded-lg border bg-card p-3">
+        <div className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          市場情緒 · 恐慌貪婪分數
+        </div>
+        <div className="mb-2 flex items-baseline gap-2">
+          <span className="font-mono text-2xl font-bold text-foreground">
+            {boundedScore.toFixed(0)}
+          </span>
+          {sentimentLabel && (
+            <span className={`rounded border border-current bg-transparent px-2 py-0.5 text-xs font-bold ${toneClass.replace('bg-', 'text-')}`}>
+              {sentimentLabel}
+            </span>
+          )}
+        </div>
+        <div className="h-2 rounded-full bg-muted">
+          <div
+            className={`h-2 rounded-full ${toneClass.split(' ')[0]}`}
+            style={{ width: `${boundedScore}%` }}
+            aria-label={`恐慌貪婪分數 ${boundedScore.toFixed(0)}`}
+          />
+        </div>
+        <div className="mt-1 flex justify-between text-[9px] text-muted-foreground">
+          <span>恐慌</span>
+          <span>中性</span>
+          <span>貪婪</span>
+        </div>
+        <p className="mt-2 text-[10px] text-muted-foreground">來源：{sentimentSourceLabel}</p>
+      </div>
+    );
+  }
 
   if (dataGap || vixLevel === null) {
     return (

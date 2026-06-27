@@ -161,7 +161,10 @@ export const ReportVisualSummary: React.FC<ReportVisualSummaryProps> = ({ report
           vixLevel={vm.vixLevel}
           vixStatus={vm.vixStatus}
           spxChangePct={vm.spxChangePct}
-          dataGap={vm.vixDataGap}
+          dataGap={vm.marketRiskDataGap}
+          marketRiskKind={vm.marketRiskKind}
+          sentimentScore={vm.marketRiskSentimentScore}
+          sentimentLabel={vm.marketRiskSentimentLabel}
         />
 
         {historyId && ['stock', 'etf', 'index'].includes(vm.instrumentType) && (

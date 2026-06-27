@@ -64,6 +64,44 @@ describe('ReportVisualSummary', () => {
     expect(el.textContent).toContain('18.89');
   });
 
+  it('renders TW market sentiment instead of a misleading VIX gap', () => {
+    const twEtfReport = {
+      ...MSFT_REPORT,
+      meta: {
+        ...MSFT_REPORT.meta,
+        stockCode: '006208',
+        stockName: '富邦台50',
+      },
+      summary: {
+        ...MSFT_REPORT.summary,
+        sentimentScore: 42,
+        sentimentLabel: '中性' as const,
+      },
+      details: {
+        rawResult: {
+          ...MSFT_REPORT.details?.rawResult,
+          instrumentType: 'etf',
+          marketRiskSnapshot: {
+            source: null,
+            vixLevel: null,
+            vixStatus: null,
+            spxChangePct: null,
+            dataGapFields: ['vix_level', 'vix_status', 'spx_change_pct'],
+          },
+          exposureSnapshot: { dataGapFields: [] },
+        },
+      },
+    };
+
+    render(<ReportVisualSummary report={twEtfReport} />);
+    const gauge = screen.getByTestId('market-risk-gauge');
+    expect(gauge.textContent).toContain('市場情緒 · 恐慌貪婪分數');
+    expect(gauge.textContent).toContain('42');
+    expect(gauge.textContent).toContain('中性');
+    expect(gauge.textContent).not.toContain('VIX 資料不足');
+    expect(gauge.textContent).not.toContain('VIX 恐慌指數');
+  });
+
   it('renders without crashing on malformed rawResult', () => {
     const badReport = {
       ...MSFT_REPORT,
