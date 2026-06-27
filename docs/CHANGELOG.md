@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 完整分析報告 K-line 圖表新增 1D/5D 盤中 snapshot 分頁，抽屜分頁調整為 1D/5D/1M/3M/1Y（隱藏 1W UI、保留後端相容），盤中分頁讀取報告保存的 `/kline` snapshot、不顯示日線 MA，並依 `MARKET_REVIEW_COLOR_SCHEME` 套用紅漲綠跌或綠漲紅跌至 K 線與成交量。
 - [新功能] 完整分析報告視覺摘要新增 market-aware K-line 圖表：透過新的 `/api/v1/history/{id}/kline` DB/cache 優先端點讀取日線 OHLCV，台股/台股 ETF 保持 FinMind-backed cache 路徑，美股/美股 ETF 保持 yfinance-backed cache 路徑，前端使用 TradingView Lightweight Charts 顯示 K 線、成交量、MA20/60/120/252 與固定 hover 數值列。
 - [修復] 修正 US 股票 fresh 分析時 FinancialResultCards 全部顯示「—」的問題：`_build_offshore_fundamental_context` 漏合併 yfinance bundle `valuation` block，`_attach_valuation_fundamental_snapshot` 從 `_build_fundamental_block` 包裝層的頂層而非 `"data"` subkey 讀取數值；同時移除 Visual Summary 中重複的 現價（TechnicalSnapshotCards）與重複的 VIX（KPI row）顯示（Phase 19G-R5B）。
 - [改進] WebUI 視覺摘要「估值快照」與「基本面」卡片改為直接顯示投資人關注數值（PE(TTM)/Forward PE/PB/股息率/市值；營收 YoY/淨利 YoY/ROE/毛利率），取代先前以「可用/資料缺口/部分可用/不適用」badge 為主的資料可用性面板；ETF/指數不渲染財務卡片；缺少欄位顯示「—」；資料來源（yfinance/finmind · as_of）以 footnote 形式呈現於各卡片底部（Phase 19G-R5）。

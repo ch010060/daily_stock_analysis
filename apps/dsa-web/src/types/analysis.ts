@@ -463,10 +463,13 @@ export interface StockBarResponse {
 
 // ============ K-line Types ============
 
-export type KlineRange = '1w' | '1m' | '3m' | '1y';
+export type KlineRange = '1d' | '5d' | '1w' | '1m' | '3m' | '1y';
+export type VisibleKlineRange = '1d' | '5d' | '1m' | '3m' | '1y';
+export type KlineGranularity = 'intraday' | 'daily' | string;
 
 export interface KlineBar {
-  date: string;
+  date?: string;
+  timestamp?: string;
   open: number;
   high: number;
   low: number;
@@ -484,10 +487,18 @@ export interface KlineResponse {
   market: 'tw' | 'us' | 'unknown' | string;
   instrumentType: InstrumentType | string;
   range: KlineRange;
+  granularity?: KlineGranularity;
+  interval?: string | null;
+  currency?: string | null;
+  timezone?: string | null;
   source: string;
   sourceType: 'db_cache' | 'provider' | 'data_gap' | string;
+  sourceChain?: string[];
   asOf?: string | null;
+  isCached?: boolean | null;
   rows: KlineBar[];
+  candles?: KlineBar[];
+  snapshotCreatedAt?: string | null;
   currentPrice?: number | null;
   supportLevel?: number | null;
   resistanceLevel?: number | null;

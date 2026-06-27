@@ -132,14 +132,22 @@ describe('ReportVisualSummary', () => {
     expect(screen.getByTestId('market-risk-gauge')).toBeInTheDocument();
     expect(screen.getByTestId('kline-chart-block')).toBeInTheDocument();
     expect(screen.getByTestId('multi-period-trend-bars')).toBeInTheDocument();
+    expect(screen.getByTestId('financial-result-cards')).toBeInTheDocument();
+    expect(screen.getByTestId('action-plan-cards')).toBeInTheDocument();
     const gaugeEl = screen.getByTestId('market-risk-gauge');
     const klineEl = screen.getByTestId('kline-chart-block');
     const trendEl = screen.getByTestId('multi-period-trend-bars');
+    const financialEl = screen.getByTestId('financial-result-cards');
+    const actionEl = screen.getByTestId('action-plan-cards');
     const gaugeToKline = gaugeEl.compareDocumentPosition(klineEl);
     const klineToTrend = klineEl.compareDocumentPosition(trendEl);
+    const trendToFinancial = trendEl.compareDocumentPosition(financialEl);
+    const financialToAction = financialEl.compareDocumentPosition(actionEl);
     // DOCUMENT_POSITION_FOLLOWING = 4
     expect(gaugeToKline & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(klineToTrend & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(trendToFinancial & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(financialToAction & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('does not render KlineChartBlock for unknown instrument type', () => {
