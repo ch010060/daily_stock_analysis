@@ -23,11 +23,8 @@ from src.report_language import (
     get_localized_stock_name,
     get_report_labels,
     get_signal_level,
-    get_chip_unavailable_reason,
     get_instrument_report_title,
-    is_chip_structure_unavailable,
     localize_bias_status,
-    localize_chip_health,
     localize_operation_advice,
     localize_trend_prediction,
     normalize_report_language,
@@ -984,7 +981,6 @@ class HistoryService:
             trend_data = data_persp.get('trend_status', {})
             price_data = data_persp.get('price_position', {})
             vol_data = data_persp.get('volume_analysis', {})
-            chip_data = data_persp.get('chip_structure', {})
 
             report_lines.extend([
                 f"### 📊 {labels['data_perspective_heading']}",
@@ -1028,35 +1024,6 @@ class HistoryService:
                     f"💡 *{vol_data.get('volume_meaning', '')}*",
                     "",
                 ])
-            # 籌碼結構
-            if chip_data:
-                if is_chip_structure_unavailable(chip_data):
-                    report_lines.extend([
-                        f"**{labels['chip_label']}**: {get_chip_unavailable_reason(chip_data, report_language)}",
-                        "",
-                    ])
-                else:
-                    raw_chip_health = chip_data.get('chip_health', 'N/A')
-                    chip_health = localize_chip_health(raw_chip_health, report_language)
-                    normalized_chip_health = str(raw_chip_health or "").strip().lower()
-                    if normalized_chip_health in {"健康", "healthy"}:
-                        chip_emoji = "✅"
-                    elif normalized_chip_health in {"一般", "average"}:
-                        chip_emoji = "⚠️"
-                    else:
-                        chip_emoji = "🚨"
-                    report_lines.extend([
-                        f"**{labels['chip_label']}**: {chip_data.get('profit_ratio', 'N/A')} | {chip_data.get('avg_cost', 'N/A')} | "
-                        f"{chip_data.get('concentration', 'N/A')} {chip_emoji}{chip_health}",
-                        "",
-                    ])
-            else:
-                chip_unavailable_reason = get_chip_unavailable_reason(data_persp, report_language)
-                if chip_unavailable_reason:
-                    report_lines.extend([
-                        f"**{labels['chip_label']}**: {chip_unavailable_reason}",
-                        "",
-                    ])
 
         # ========== 估值與基本面快照（Phase 19B.2，僅 stock，後端決定性組裝）==========
         if getattr(result, "instrument_type", "unknown") == "stock":

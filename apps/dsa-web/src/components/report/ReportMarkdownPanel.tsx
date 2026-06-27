@@ -1,29 +1,231 @@
 import type React from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { isValidElement, useCallback, useEffect, useState } from 'react';
 import Markdown from 'react-markdown';
 import type { ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { historyApi } from '../../api/history';
-import type { ReportLanguage } from '../../types/analysis';
+import type { AnalysisReport, ReportLanguage } from '../../types/analysis';
 import { markdownToPlainText } from '../../utils/markdown';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Tooltip } from '../common/Tooltip';
 import { MermaidDiagram } from './MermaidDiagram';
+import { ReportVisualSummary } from './visual/ReportVisualSummary';
 
 type CodeProps = React.ComponentProps<'code'> & ExtraProps;
 
+const cx = (...classes: Array<string | undefined>) => classes.filter(Boolean).join(' ');
+
+const getNodeText = (node: React.ReactNode): string => {
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node);
+  }
+  if (Array.isArray(node)) {
+    return node.map(getNodeText).join('');
+  }
+  if (isValidElement<{ children?: React.ReactNode }>(node)) {
+    return getNodeText(node.props.children);
+  }
+  return '';
+};
+
+const REPORT_LABEL_LINE_PATTERN =
+  /^(?:📊|⚠️|⚠|🎯|⏱️|⏱|📈|📉|🧭|🔬|🛡️|🛡|✅|❌|💡|🔥|📌|🧾|🔎|🪙|💰|🧩|🚨|✨|📍|🌡️|🌡|🧠|📝)/u;
+const DEPRECATED_REPORT_TERM_PATTERN = /籌碼(?:集中度|分布|分佈|判斷)?/u;
+const DUPLICATE_SECTION_HEADING_PATTERN = /^#{1,3}\s+.*(?:當日行情|市場風險溫度計|多週期趨勢快照)\s*$/u;
+const DUPLICATE_REPORT_TITLE_PATTERN = /^#\s+.*(?:股票分析報告|分析報告)\s*$/u;
+const DUPLICATE_SIGNAL_LINE_PATTERN =
+  /^\s*\*\*.*(?:買進|加倉|持有|減倉|賣出|觀望).*?\*\*\s*\|\s*(?:強烈看多|看多|震盪|震盪偏多|震盪偏空|看空|強烈看空)\s*$/u;
+const CHECKLIST_MARKER_PATTERN = /(?:檢查清單|檢查未透過項)/u;
+const CHECKLIST_LINE_PATTERN = /^\s*(?:[-*]\s*)?(✅|❌|⚠️|⚠)\s*(.+)$/u;
+
+const stripMarkdownEmphasis = (text: string): string => text.replace(/\*\*/g, '').trim();
+
+const shouldSuppressMarkdownLine = (line: string): boolean => {
+  const trimmed = line.trim();
+  return (
+    DEPRECATED_REPORT_TERM_PATTERN.test(trimmed) ||
+    DUPLICATE_REPORT_TITLE_PATTERN.test(trimmed) ||
+    DUPLICATE_SIGNAL_LINE_PATTERN.test(trimmed)
+  );
+};
+
+const shouldSuppressMarkdownSection = (section: string): boolean => {
+  const heading = section.split(/\r?\n/).find((line) => line.trim());
+  return Boolean(heading && (
+    DEPRECATED_REPORT_TERM_PATTERN.test(heading) ||
+    DUPLICATE_SECTION_HEADING_PATTERN.test(heading.trim())
+  ));
+};
+
+const checklistRowFromLine = (line: string): string | null => {
+  const match = CHECKLIST_LINE_PATTERN.exec(line);
+  if (!match) return null;
+  const status = match[1];
+  const body = stripMarkdownEmphasis(match[2]).replace(/^\uFE0F/u, '').trim();
+  const [item, ...rest] = body.split(/[:：]/u);
+  return `| ${status} | ${item.trim()} | ${(rest.join('：').trim() || '—')} |`;
+};
+
+const formatChecklistSection = (section: string): string => {
+  const lines = section.split(/\r?\n/);
+  if (!lines.some((line) => CHECKLIST_MARKER_PATTERN.test(stripMarkdownEmphasis(line)))) {
+    return section;
+  }
+
+  const rows = lines.map(checklistRowFromLine).filter((row): row is string => Boolean(row));
+  if (!rows.length) return section;
+
+  const output: string[] = [];
+  let insertedTable = false;
+  for (const line of lines) {
+    if (checklistRowFromLine(line)) {
+      if (!insertedTable) {
+        output.push('| 狀態 | 檢查項目 | 解讀 |');
+        output.push('|---|---|---|');
+        output.push(...rows);
+        insertedTable = true;
+      }
+      continue;
+    }
+    output.push(line);
+  }
+
+  return output.join('\n').trim();
+};
+
+function sanitizeReportMarkdown(markdown: string): string {
+  return splitMarkdownSections(markdown)
+    .map((section) => section
+      .split(/\r?\n/)
+      .filter((line) => !shouldSuppressMarkdownLine(line))
+      .join('\n')
+      .trim())
+    .filter((section) => section && !shouldSuppressMarkdownSection(section))
+    .map(formatChecklistSection)
+    .join('\n\n');
+}
+
 const MARKDOWN_COMPONENTS = {
+  h1: ({ className, ...props }: React.ComponentProps<'h1'>) => (
+    <h1 className={cx('report-body-title', className)} {...props} />
+  ),
+  h2: ({ className, ...props }: React.ComponentProps<'h2'>) => (
+    <h2 className={cx('report-body-heading', className)} {...props} />
+  ),
+  h3: ({ className, ...props }: React.ComponentProps<'h3'>) => (
+    <h3 className={cx('report-body-heading', 'report-body-heading-level3', className)} {...props} />
+  ),
+  p: ({ className, children, ...props }: React.ComponentProps<'p'>) => {
+    const isLabelLine = REPORT_LABEL_LINE_PATTERN.test(getNodeText(children).trim());
+    return (
+      <p
+        className={cx('report-body-paragraph', isLabelLine ? 'report-body-label-line' : undefined, className)}
+        {...props}
+      >
+        {children}
+      </p>
+    );
+  },
+  strong: ({ className, ...props }: React.ComponentProps<'strong'>) => (
+    <strong className={cx('report-body-strong', className)} {...props} />
+  ),
+  em: ({ className, ...props }: React.ComponentProps<'em'>) => (
+    <em className={cx('report-body-emphasis', className)} {...props} />
+  ),
+  table: ({ className, children, ...props }: React.ComponentProps<'table'>) => {
+    const text = getNodeText(children);
+    const isBattlePlan = /(?:理想買進|次優買進|停損|停利|目標|操作建議|操作點位)/u.test(text);
+    const isChecklist = /(?:檢查項目|解讀)/u.test(text);
+    const isGapTable = (text.match(/資料不足/g) ?? []).length >= 2;
+    return (
+      <table
+        className={cx(
+          'report-body-table',
+          isBattlePlan ? 'report-body-battle-table' : undefined,
+          isChecklist ? 'report-body-checklist-table' : undefined,
+          isGapTable ? 'report-body-gap-table' : undefined,
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </table>
+    );
+  },
+  blockquote: ({ className, children, ...props }: React.ComponentProps<'blockquote'>) => {
+    const isMeta = /(?:分析日期|報告生成時間)/u.test(getNodeText(children));
+    return (
+      <blockquote
+        className={cx('report-body-callout', isMeta ? 'report-body-meta-strip' : undefined, className)}
+        {...props}
+      >
+        {children}
+      </blockquote>
+    );
+  },
+  ul: ({ className, ...props }: React.ComponentProps<'ul'>) => (
+    <ul className={cx('report-body-list', className)} {...props} />
+  ),
+  ol: ({ className, ...props }: React.ComponentProps<'ol'>) => (
+    <ol className={cx('report-body-list', className)} {...props} />
+  ),
+  li: ({ className, ...props }: React.ComponentProps<'li'>) => (
+    <li className={cx('report-body-list-item', className)} {...props} />
+  ),
+  hr: ({ className, ...props }: React.ComponentProps<'hr'>) => (
+    <hr className={cx('report-body-rule', className)} {...props} />
+  ),
+  pre: ({ className, ...props }: React.ComponentProps<'pre'>) => (
+    <pre className={cx('report-body-pre', className)} {...props} />
+  ),
+  a: ({ className, ...props }: React.ComponentProps<'a'>) => (
+    <a className={cx('report-body-link', className)} {...props} />
+  ),
   code: ({ className, children, ...props }: CodeProps) => {
     if (className === 'language-mermaid') {
-      return <MermaidDiagram code={String(children).trim()} />;
+      return (
+        <figure className="report-body-mermaid-figure">
+          <figcaption className="report-body-figure-caption">
+            Fig. 1 · 供應商 / 客戶 / 競爭者 / 互補者結構
+          </figcaption>
+          <div className="report-body-mermaid">
+            <MermaidDiagram code={String(children).trim()} />
+          </div>
+        </figure>
+      );
     }
     return (
-      <code className={className} {...props}>
+      <code className={cx('report-body-code', className)} {...props}>
         {children}
       </code>
     );
   },
 };
+
+function splitMarkdownSections(markdown: string): string[] {
+  const sections: string[] = [];
+  const current: string[] = [];
+  let inFence = false;
+
+  for (const line of markdown.split(/\r?\n/)) {
+    const isFence = line.trim().startsWith('```');
+    const isSectionHeading = !inFence && /^#{1,3}\s+\S/.test(line);
+
+    if (isSectionHeading && current.some((item) => item.trim())) {
+      sections.push(current.join('\n').trim());
+      current.length = 0;
+    }
+
+    current.push(line);
+    if (isFence) inFence = !inFence;
+  }
+
+  if (current.some((item) => item.trim())) {
+    sections.push(current.join('\n').trim());
+  }
+
+  return sections;
+}
 
 export interface ReportMarkdownPanelProps {
   recordId: number;
@@ -46,6 +248,9 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedType, setCopiedType] = useState<'markdown' | 'text' | null>(null);
+  const [detail, setDetail] = useState<AnalysisReport | null>(null);
+  const sanitizedContent = sanitizeReportMarkdown(content);
+  const sections = splitMarkdownSections(sanitizedContent);
 
   const handleCopyMarkdown = useCallback(async () => {
     if (!content) return;
@@ -77,13 +282,20 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
       setIsLoading(true);
       setError(null);
       try {
-        const markdownContent = await historyApi.getMarkdown(recordId);
+        const [markdownContent, detailResult] = await Promise.allSettled([
+          historyApi.getMarkdown(recordId),
+          historyApi.getDetail(recordId),
+        ]);
         if (isMounted) {
-          setContent(markdownContent);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : loadReportFailedText);
+          if (markdownContent.status === 'fulfilled') {
+            setContent(markdownContent.value);
+          } else {
+            setError(markdownContent.reason instanceof Error ? markdownContent.reason.message : loadReportFailedText);
+          }
+          if (detailResult.status === 'fulfilled') {
+            setDetail(detailResult.value);
+          }
+          // ponytail: detail fetch failure is silent — visual summary just won't render
         }
       } finally {
         if (isMounted) {
@@ -183,28 +395,25 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
           </button>
         </div>
       ) : (
+        <>
+        {detail && <ReportVisualSummary report={detail} historyId={recordId} />}
         <div
-          className="home-markdown-prose prose prose-invert prose-sm max-w-none
-            prose-headings:text-foreground prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2
-            prose-h1:text-xl
-            prose-h2:text-lg
-            prose-h3:text-base
-            prose-p:leading-relaxed prose-p:mb-3 prose-p:last:mb-0
-            prose-strong:text-foreground prose-strong:font-semibold
-            prose-ul:my-2 prose-ol:my-2 prose-li:my-1
-            prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none
-            prose-pre:border
-            prose-table:border-collapse
-            prose-hr:my-4
-            prose-a:no-underline hover:prose-a:underline
-            prose-blockquote:text-secondary-text
-            whitespace-pre-line break-words
-          "
+          data-testid="report-markdown-body"
+          className="report-light-surface report-markdown-body report-body-paper break-words"
         >
-          <Markdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
-            {content}
-          </Markdown>
+          {sections.map((section, index) => (
+            <section
+              key={`${index}-${section.slice(0, 24)}`}
+              data-testid="report-body-section"
+              className="report-body-section"
+            >
+              <Markdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+                {section}
+              </Markdown>
+            </section>
+          ))}
         </div>
+        </>
       )}
 
       <div className="home-divider mt-6 flex justify-end border-t pt-4">

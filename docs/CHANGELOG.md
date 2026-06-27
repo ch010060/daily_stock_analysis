@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [改進] WebUI 報告抽屜新增視覺摘要面板（Phase 19G）：在 Markdown 全文之上插入決策卡、VIX gauge、多週期趨勢條、技術指標卡、資料可用性面板與作戰計畫卡；平行 fetch 不阻塞 Markdown 渲染，detail fetch 失敗時靜默降級。
 - [新功能] 個股／ETF／指數完整報告新增「📈 多週期趨勢快照」區塊（1週/1月/1季/半年/52週），位於「🌡️ 市場風險溫度計」之後、作戰計劃之前；數值由後端從既有 OHLC 資料決定性計算（漲跌幅、區間高低點、自高點回撤、均線位置、趨勢狀態），52 週區間獨立向資料庫優先的歷史資料載入器請求最多 252 個交易日（不調整既有 89 天技術指標視窗），資料不足的週期顯示「資料不足」而非省略或臆測；LLM 不參與該區塊數值生成；未知類型不顯示。
 - [新功能] 完整報告新增「🧭 ETF／指數曝險摘要」（限 ETF/指數）與「🌡️ 市場風險溫度計」（個股／ETF／指數皆顯示，未知類型不顯示）兩個區塊，位於估值與基本面快照之後、作戰計劃之前；美股市場風險溫度計重用既有 `fetcher_manager.get_realtime_quote()` 讀取 VIX/SPX（無新資料源、無新快取，沿用既有 CircuitBreaker），台股本期不發起任何外部資料請求，固定顯示資料不足與原因說明；LLM 不參與該區塊數值生成。
 - [新功能] 個股（`instrument_type=stock`）完整報告新增「🧾 估值與基本面快照」區塊，位於資料透視之後、作戰計劃之前；數值由後端決定性組裝（台股使用 FinMind `TaiwanStockPER`/`TaiwanStockMonthRevenue`，美股重用既有 yfinance 基本面資料），LLM 不參與該區塊數值生成；缺失欄位顯示為資料缺口而非省略；ETF/指數/未知類型不顯示此區塊。

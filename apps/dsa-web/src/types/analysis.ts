@@ -502,3 +502,75 @@ export const getSentimentColor = (score: number): string => {
   if (score <= 80) return '#22c55e'; // green-500
   return '#10b981'; // emerald-500
 };
+
+// ============ Visual Report Snapshot Types (Phase 19B raw_result overlay) ============
+// These types mirror the backend snapshot dicts after camelCase conversion.
+// Access via AnalysisReport.details.rawResult cast to VisualReportRawResult.
+
+export type InstrumentType = 'stock' | 'etf' | 'index' | 'unknown';
+
+export interface MarketRiskSnapshot {
+  source?: string;
+  asOf?: string;
+  vixLevel?: number | null;
+  vixStatus?: string | null;
+  spxChangePct?: number | null;
+  gapReason?: string | null;
+  dataGapFields?: string[];
+}
+
+export interface MultiPeriodTrendPeriod {
+  label?: string;
+  period?: string;
+  changePct?: number | null;
+  drawdownPct?: number | null;
+  // API returns drawdown_from_high_pct → toCamelCase → drawdownFromHighPct
+  drawdownFromHighPct?: number | null;
+  priceVsMaPct?: number | null;
+  // test fixtures use `status`; real API returns trend_status → toCamelCase → trendStatus
+  status?: string | null;
+  trendStatus?: string | null;
+}
+
+export interface MultiPeriodTrendSnapshot {
+  source?: string;
+  asOf?: string;
+  periods?: MultiPeriodTrendPeriod[];
+  dataGapFields?: string[];
+}
+
+export interface DataSnapshot {
+  source?: string;
+  asOf?: string;
+  dataGapFields?: string[];
+  gapReason?: string | null;
+  [key: string]: unknown;
+}
+
+/** Typed overlay for AnalysisReport.details.rawResult in history detail responses */
+export interface VisualReportRawResult {
+  instrumentType?: InstrumentType;
+  // Price/technical fields (also in meta, but raw_result may have richer data)
+  currentPrice?: number | null;
+  changePct?: number | null;
+  ma5?: number | null;
+  ma10?: number | null;
+  ma20?: number | null;
+  deviationRate?: number | null;
+  supportLevel?: number | null;
+  resistanceLevel?: number | null;
+  trendStrength?: number | null;
+  volumeRatio?: number | null;
+  turnoverRate?: number | null;
+  rsi?: number | null;
+  rsi6?: number | null;
+  rsi12?: number | null;
+  // Phase 19B snapshots
+  marketRiskSnapshot?: MarketRiskSnapshot | null;
+  multiPeriodTrendSnapshot?: MultiPeriodTrendSnapshot | null;
+  valuationSnapshot?: DataSnapshot | null;
+  fundamentalSnapshot?: DataSnapshot | null;
+  exposureSnapshot?: DataSnapshot | null;
+  valueNetworkMermaid?: string | null;
+  [key: string]: unknown;
+}

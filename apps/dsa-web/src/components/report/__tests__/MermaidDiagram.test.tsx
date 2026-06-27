@@ -26,7 +26,98 @@ describe('MermaidDiagram', () => {
     await waitFor(() => {
       expect(screen.getByTestId('mermaid-diagram')).toBeInTheDocument();
     });
+    expect(mermaid.initialize).toHaveBeenCalledWith(expect.objectContaining({
+      securityLevel: 'strict',
+      theme: 'base',
+      themeVariables: expect.objectContaining({
+        primaryTextColor: '#111827',
+        clusterBkg: '#f8fafc',
+      }),
+      flowchart: expect.objectContaining({
+        htmlLabels: false,
+      }),
+    }));
     expect(screen.queryByTestId('mermaid-fallback')).not.toBeInTheDocument();
+  });
+
+  it('applies inline report tuning to generated svg labels and center nodes', async () => {
+    vi.mocked(mermaid.render).mockResolvedValue({
+      svg: [
+        '<svg data-testid="fake-svg" viewBox="0 0 100 80">',
+        '<g class="node center"><rect /><text><tspan class="nodeLabel">富邦台50</tspan></text></g>',
+        '</svg>',
+      ].join(''),
+      diagramType: 'flowchart',
+    });
+
+    render(<MermaidDiagram code={'flowchart TB\n  A["富邦台50"]'} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mermaid-diagram')).toBeInTheDocument();
+    });
+    const container = screen.getByTestId('mermaid-diagram');
+    expect((container.querySelector('.nodeLabel') as HTMLElement).style.fontSize).toBe('13px');
+    expect((container.querySelector('.node.center rect') as SVGElement).style.fill).toBe('#fffdfa');
+    expect(container.querySelector('svg')?.getAttribute('viewBox')).toBe('-44 -44 188 168');
+    expect(container.querySelector('svg')?.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet');
+  });
+
+  it('replaces dark center/card class definitions with readable report classes', async () => {
+    vi.mocked(mermaid.render).mockResolvedValue({
+      svg: '<svg data-testid="fake-svg"></svg>',
+      diagramType: 'flowchart',
+    });
+
+    render(
+      <MermaidDiagram
+        code={[
+          'flowchart TB',
+          '  C["Microsoft (MSFT.US)<br/>雲端/AI"]',
+          '  classDef center fill:#111827,stroke:#111827,color:#ffffff;',
+          '  classDef card fill:#0f172a,color:#ffffff;',
+          '  class C center',
+        ].join('\n')}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mermaid-diagram')).toBeInTheDocument();
+    });
+    expect(mermaid.render).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.stringContaining('classDef center fill:#fffdfa,stroke:#1e3a5f,stroke-width:2px,color:#111827;')
+    );
+    expect(mermaid.render).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.not.stringContaining('fill:#111827')
+    );
+  });
+
+  it('strips source-level mermaid init directives so report theme controls sizing', async () => {
+    vi.mocked(mermaid.render).mockResolvedValue({
+      svg: '<svg data-testid="fake-svg"></svg>',
+      diagramType: 'flowchart',
+    });
+
+    render(
+      <MermaidDiagram
+        code={[
+          "%%{init: {'themeVariables': {'fontSize': '20px'}}}%%",
+          'flowchart TB',
+          '  C["富邦台50<br/>(006208.TW)<br/>市值型台股ETF"]',
+          '  classDef center fill:#0f172a,color:#ffffff;',
+          '  class C center',
+        ].join('\n')}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mermaid-diagram')).toBeInTheDocument();
+    });
+    expect(mermaid.render).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.not.stringContaining('fontSize')
+    );
   });
 
   it('renders the fallback container when mermaid.render rejects (invalid syntax)', async () => {

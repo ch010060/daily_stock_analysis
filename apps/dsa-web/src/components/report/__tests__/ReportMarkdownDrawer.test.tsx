@@ -104,11 +104,13 @@ describe('ReportMarkdownDrawer', () => {
     vi.doMock('../../../api/history', () => ({
       historyApi: {
         getMarkdown: vi.fn().mockResolvedValue('# Lazy loaded report'),
+        getDetail: vi.fn().mockResolvedValue(null),
       },
     }));
 
     await renderDrawer();
 
     expect(await screen.findByRole('heading', { name: 'Lazy loaded report' })).toBeInTheDocument();
+    expect(screen.getByTestId('report-markdown-body')).toBeInTheDocument();
   });
 });
