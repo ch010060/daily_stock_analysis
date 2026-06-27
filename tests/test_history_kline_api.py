@@ -70,9 +70,13 @@ class HistoryKlineApiTest(unittest.TestCase):
         self.assertEqual(result.symbol, "MSFT")
         self.assertEqual(result.market, "us")
         self.assertEqual(result.instrument_type, "stock")
+        self.assertEqual(result.granularity, "daily")
+        self.assertEqual(result.interval, "1d")
         self.assertEqual(result.source, "YfinanceFetcher")
         self.assertEqual(result.source_type, "db_cache")
+        self.assertTrue(result.is_cached)
         self.assertEqual(len(result.rows), 60)
+        self.assertEqual(len(result.candles), 60)
         self.assertIsNone(result.data_gap_reason)
 
     def test_valid_tw_history_returns_finmind_source(self):
@@ -114,6 +118,11 @@ class HistoryKlineApiTest(unittest.TestCase):
         with patch("data_provider.base.DataFetcherManager") as manager:
             self._call([], code="MSFT")
         manager.assert_not_called()
+
+    def test_daily_ranges_do_not_call_intraday_provider(self):
+        with patch("src.services.kline_snapshot._fetch_yfinance_intraday_frame") as fetcher:
+            self._call(_bars(80), code="MSFT", range_value="1m")
+        fetcher.assert_not_called()
 
     def test_tw_miss_does_not_call_yfinance(self):
         with patch("data_provider.yfinance_fetcher.YfinanceFetcher") as fetcher:

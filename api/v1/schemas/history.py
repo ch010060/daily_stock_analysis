@@ -100,6 +100,17 @@ class KlineBar(BaseModel):
     ma252: Optional[float] = Field(None, description="252 日均線")
 
 
+class KlineCandle(BaseModel):
+    """Timezone-aware intraday/daily OHLCV candle."""
+
+    timestamp: str = Field(..., description="交易時間；intraday 使用市場時區 timestamp，daily 可使用交易日期")
+    open: float = Field(..., description="開盤價")
+    high: float = Field(..., description="最高價")
+    low: float = Field(..., description="最低價")
+    close: float = Field(..., description="收盤價")
+    volume: Optional[float] = Field(None, description="成交量")
+
+
 class KlineResponse(BaseModel):
     """History-scoped K-line chart response."""
 
@@ -107,11 +118,18 @@ class KlineResponse(BaseModel):
     symbol: str = Field(..., description="標的代號")
     market: str = Field(..., description="市場：tw/us/unknown")
     instrument_type: str = Field(..., description="工具類型：stock/etf/index/unknown")
-    range: Literal["1w", "1m", "3m", "1y"] = Field(..., description="K-line 顯示範圍")
+    range: Literal["1d", "5d", "1w", "1m", "3m", "1y"] = Field(..., description="K-line 顯示範圍")
+    granularity: Literal["intraday", "daily"] = Field("daily", description="K-line 粒度")
+    interval: str = Field("1d", description="K-line bar 間隔，例如 5m/15m/1d")
+    currency: Optional[str] = Field(None, description="報價幣別")
+    timezone: Optional[str] = Field(None, description="市場時區")
     source: str = Field(..., description="OHLC 資料來源")
     source_type: Literal["db_cache", "provider", "data_gap"] = Field(..., description="來源類型")
+    source_chain: List[str] = Field(default_factory=list, description="來源鏈")
     as_of: Optional[str] = Field(None, description="最新資料日期")
+    is_cached: bool = Field(False, description="是否來自快取")
     rows: List[KlineBar] = Field(default_factory=list, description="K-line rows")
+    candles: List[KlineCandle] = Field(default_factory=list, description="通用 K-line candles")
     current_price: Optional[float] = Field(None, description="目前價格或最新收盤價")
     support_level: Optional[float] = Field(None, description="支撐價")
     resistance_level: Optional[float] = Field(None, description="壓力價")

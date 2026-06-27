@@ -61,7 +61,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-KlineRange = Literal["1w", "1m", "3m", "1y"]
+KlineRange = Literal["1d", "5d", "1w", "1m", "3m", "1y"]
 
 
 def _normalize_code_for_grouping(code: str) -> str:
@@ -489,7 +489,7 @@ def get_history_detail(
 )
 def get_history_kline(
     record_id: str,
-    range: KlineRange = Query("3m", description="顯示範圍：1w/1m/3m/1y"),
+    range: KlineRange = Query("3m", description="顯示範圍：1d/5d/1w/1m/3m/1y"),
     db_manager: DatabaseManager = Depends(get_database_manager),
 ) -> KlineResponse:
     try:

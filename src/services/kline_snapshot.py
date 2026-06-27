@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import math
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from data_provider.base import canonical_stock_code, normalize_stock_code
 from src.market_context import detect_market
@@ -18,6 +18,11 @@ KLINE_RANGE_ROWS: Dict[str, int] = {
     "1m": 20,
     "3m": 60,
     "1y": 252,
+}
+
+INTRADAY_RANGE_CONFIG: Dict[str, Tuple[str, str]] = {
+    "1d": ("1d", "5m"),
+    "5d": ("5d", "15m"),
 }
 
 
@@ -150,9 +155,194 @@ def _first_number(raw: Dict[str, Any], *keys: str) -> Optional[float]:
     return None
 
 
+def _timezone_for_market(market: str) -> Optional[str]:
+    if market == "tw":
+        return "Asia/Taipei"
+    if market == "us":
+        return "America/New_York"
+    return None
+
+
+def _currency_for_market(market: str) -> Optional[str]:
+    if market == "tw":
+        return "TWD"
+    if market == "us":
+        return "USD"
+    return None
+
+
+def _yfinance_intraday_symbol(symbol: str, market: str) -> str:
+    normalized = canonical_stock_code(normalize_stock_code(symbol))
+    if market == "tw" and not normalized.endswith(".TW"):
+        return f"{normalized}.TW"
+    return normalized.removesuffix(".US")
+
+
+def _classify_intraday_error(exc: Exception) -> str:
+    text = f"{type(exc).__name__} {str(exc)}".lower()
+    if "rate" in text or "too many" in text or "429" in text:
+        return "provider_rate_limited_or_blocked"
+    if "timeout" in text or "connection" in text or "network" in text or "ssl" in text:
+        return "provider_network_error"
+    if "timezone" in text or "tz" in text:
+        return "timezone_or_index_error"
+    if "not found" in text or "delisted" in text or "no data" in text:
+        return "unsupported_symbol_or_no_data"
+    return "unknown_error"
+
+
+def _normalize_intraday_columns(frame: Any) -> Any:
+    columns = getattr(frame, "columns", None)
+    if columns is None:
+        return frame
+    if hasattr(columns, "nlevels") and columns.nlevels > 1:
+        frame = frame.copy()
+        frame.columns = [str(column[0]).lower().replace(" ", "_") for column in frame.columns]
+        return frame
+    frame = frame.copy()
+    frame.columns = [str(column).lower().replace(" ", "_") for column in frame.columns]
+    return frame
+
+
+def _fetch_yfinance_intraday_frame(symbol: str, period: str, interval: str) -> Tuple[Any, Optional[str]]:
+    import yfinance as yf
+
+    ticker = yf.Ticker(symbol)
+    frame = ticker.history(
+        period=period,
+        interval=interval,
+        auto_adjust=False,
+        actions=False,
+        prepost=False,
+    )
+    currency = None
+    try:
+        fast_info = ticker.fast_info
+        currency = getattr(fast_info, "currency", None)
+        if currency is None and hasattr(fast_info, "get"):
+            currency = fast_info.get("currency")
+    except Exception:
+        currency = None
+    return frame, str(currency) if currency else None
+
+
+def _intraday_gap_payload(
+    record: Any,
+    symbol: str,
+    market: str,
+    instrument_type: str,
+    range_value: str,
+    interval: str,
+    reason: str,
+) -> Dict[str, Any]:
+    return {
+        "history_id": getattr(record, "id", None),
+        "symbol": symbol,
+        "market": market,
+        "instrument_type": instrument_type,
+        "range": range_value,
+        "granularity": "intraday",
+        "interval": interval,
+        "currency": _currency_for_market(market),
+        "timezone": _timezone_for_market(market),
+        "source": "yfinance",
+        "source_type": "data_gap",
+        "source_chain": ["yfinance"],
+        "as_of": None,
+        "is_cached": False,
+        "rows": [],
+        "candles": [],
+        "current_price": None,
+        "support_level": None,
+        "resistance_level": None,
+        "data_gap_reason": reason,
+    }
+
+
+def _build_intraday_kline(
+    record: Any,
+    raw: Dict[str, Any],
+    symbol: str,
+    market: str,
+    instrument_type: str,
+    range_value: str,
+) -> Dict[str, Any]:
+    period, interval = INTRADAY_RANGE_CONFIG[range_value]
+    yf_symbol = _yfinance_intraday_symbol(symbol, market)
+    try:
+        frame, currency = _fetch_yfinance_intraday_frame(yf_symbol, period, interval)
+    except Exception as exc:
+        return _intraday_gap_payload(
+            record, yf_symbol, market, instrument_type, range_value, interval,
+            _classify_intraday_error(exc),
+        )
+
+    if frame is None or getattr(frame, "empty", True):
+        return _intraday_gap_payload(
+            record, yf_symbol, market, instrument_type, range_value, interval,
+            "provider_empty_response",
+        )
+
+    frame = _normalize_intraday_columns(frame)
+    timezone_name = str(getattr(getattr(frame, "index", None), "tz", None) or _timezone_for_market(market) or "")
+    candles: List[Dict[str, Any]] = []
+    seen = set()
+    for timestamp, row in frame.iterrows():
+        open_ = _finite(row.get("open"))
+        high = _finite(row.get("high"))
+        low = _finite(row.get("low"))
+        close = _finite(row.get("close"))
+        volume = _finite(row.get("volume"))
+        if None in (open_, high, low, close, volume):
+            continue
+        ts = timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
+        # ponytail: keep the last duplicate timestamp; add exchange sequence handling only if yfinance returns real duplicates.
+        if ts in seen:
+            candles = [candle for candle in candles if candle["timestamp"] != ts]
+        seen.add(ts)
+        candles.append({
+            "timestamp": ts,
+            "open": open_,
+            "high": high,
+            "low": low,
+            "close": close,
+            "volume": volume,
+        })
+
+    if not candles:
+        return _intraday_gap_payload(
+            record, yf_symbol, market, instrument_type, range_value, interval,
+            "provider_partial_ohlcv",
+        )
+
+    candles.sort(key=lambda candle: candle["timestamp"])
+    return {
+        "history_id": getattr(record, "id", None),
+        "symbol": yf_symbol,
+        "market": market,
+        "instrument_type": instrument_type,
+        "range": range_value,
+        "granularity": "intraday",
+        "interval": interval,
+        "currency": currency or _currency_for_market(market),
+        "timezone": timezone_name or _timezone_for_market(market),
+        "source": "yfinance",
+        "source_type": "provider",
+        "source_chain": ["yfinance"],
+        "as_of": candles[-1]["timestamp"],
+        "is_cached": False,
+        "rows": [],
+        "candles": candles,
+        "current_price": _first_number(raw, "current_price", "currentPrice") or candles[-1]["close"],
+        "support_level": _first_number(raw, "support_level", "supportLevel"),
+        "resistance_level": _first_number(raw, "resistance_level", "resistanceLevel"),
+        "data_gap_reason": None,
+    }
+
+
 def build_history_kline(db_manager: Any, record_id: str, range_value: str = "3m") -> Dict[str, Any]:
     """Build an additive K-line API payload from local OHLC cache."""
-    if range_value not in KLINE_RANGE_ROWS:
+    if range_value not in KLINE_RANGE_ROWS and range_value not in INTRADAY_RANGE_CONFIG:
         range_value = "3m"
 
     record = _resolve_history(db_manager, record_id)
@@ -162,6 +352,9 @@ def build_history_kline(db_manager: Any, record_id: str, range_value: str = "3m"
     instrument_type = str(
         raw.get("instrument_type") or raw.get("instrumentType") or "unknown"
     ).lower()
+    if range_value in INTRADAY_RANGE_CONFIG:
+        return _build_intraday_kline(record, raw, symbol, market, instrument_type, range_value)
+
     end_date = _record_end_date(record)
     start_date = end_date - timedelta(days=540)
 
@@ -181,10 +374,17 @@ def build_history_kline(db_manager: Any, record_id: str, range_value: str = "3m"
             "market": market,
             "instrument_type": instrument_type,
             "range": range_value,
+            "granularity": "daily",
+            "interval": "1d",
+            "currency": _currency_for_market(market),
+            "timezone": _timezone_for_market(market),
             "source": _expected_source(market),
             "source_type": "data_gap",
+            "source_chain": [_expected_source(market)],
             "as_of": None,
+            "is_cached": True,
             "rows": [],
+            "candles": [],
             "current_price": _first_number(raw, "current_price", "currentPrice"),
             "support_level": _first_number(raw, "support_level", "supportLevel"),
             "resistance_level": _first_number(raw, "resistance_level", "resistanceLevel"),
@@ -205,10 +405,27 @@ def build_history_kline(db_manager: Any, record_id: str, range_value: str = "3m"
         "market": market,
         "instrument_type": instrument_type,
         "range": range_value,
+        "granularity": "daily",
+        "interval": "1d",
+        "currency": _currency_for_market(market),
+        "timezone": _timezone_for_market(market),
         "source": source or _expected_source(market),
         "source_type": "db_cache",
+        "source_chain": [source or _expected_source(market)],
         "as_of": display_rows[-1]["date"] if display_rows else None,
+        "is_cached": True,
         "rows": display_rows,
+        "candles": [
+            {
+                "timestamp": row["date"],
+                "open": row["open"],
+                "high": row["high"],
+                "low": row["low"],
+                "close": row["close"],
+                "volume": row.get("volume"),
+            }
+            for row in display_rows
+        ],
         "current_price": _first_number(raw, "current_price", "currentPrice") or (
             display_rows[-1]["close"] if display_rows else None
         ),
