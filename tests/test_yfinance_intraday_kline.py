@@ -47,9 +47,9 @@ def _frame() -> pd.DataFrame:
 
 class YfinanceIntradayKlineTest(unittest.TestCase):
     def _call(self, code="MSFT", range_value="1d", instrument_type="stock"):
-        from src.services.kline_snapshot import build_history_kline
+        from src.services.kline_snapshot import build_report_kline_snapshot_payload
 
-        return build_history_kline(_make_db(code, instrument_type), "65", range_value)
+        return build_report_kline_snapshot_payload(_make_db(code, instrument_type), "65", range_value)
 
     def test_1d_maps_to_intraday_5m_contract(self):
         with patch("src.services.kline_snapshot._fetch_yfinance_intraday_frame", return_value=(_frame(), "USD")) as fetcher:

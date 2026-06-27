@@ -130,6 +130,7 @@ class KlineResponse(BaseModel):
     is_cached: bool = Field(False, description="是否來自快取")
     rows: List[KlineBar] = Field(default_factory=list, description="K-line rows")
     candles: List[KlineCandle] = Field(default_factory=list, description="通用 K-line candles")
+    snapshot_created_at: Optional[str] = Field(None, description="報告 K-line 快照建立時間")
     current_price: Optional[float] = Field(None, description="目前價格或最新收盤價")
     support_level: Optional[float] = Field(None, description="支撐價")
     resistance_level: Optional[float] = Field(None, description="壓力價")

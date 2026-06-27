@@ -340,11 +340,28 @@ def _build_intraday_kline(
     }
 
 
-def build_history_kline(db_manager: Any, record_id: str, range_value: str = "3m") -> Dict[str, Any]:
-    """Build an additive K-line API payload from local OHLC cache."""
-    if range_value not in KLINE_RANGE_ROWS and range_value not in INTRADAY_RANGE_CONFIG:
-        range_value = "3m"
+def _snapshot_missing_intraday_payload(
+    record: Any,
+    symbol: str,
+    market: str,
+    instrument_type: str,
+    range_value: str,
+) -> Dict[str, Any]:
+    _period, interval = INTRADAY_RANGE_CONFIG[range_value]
+    payload = _intraday_gap_payload(
+        record,
+        _yfinance_intraday_symbol(symbol, market),
+        market,
+        instrument_type,
+        range_value,
+        interval,
+        "report_kline_snapshot_missing",
+    )
+    payload["source_chain"] = ["analysis_kline_snapshot"]
+    return payload
 
+
+def _history_parts(db_manager: Any, record_id: str) -> Tuple[Any, Dict[str, Any], str, str, str]:
     record = _resolve_history(db_manager, record_id)
     raw = _read_raw_result(record)
     symbol = canonical_stock_code(str(getattr(record, "code", "") or ""))
@@ -352,9 +369,20 @@ def build_history_kline(db_manager: Any, record_id: str, range_value: str = "3m"
     instrument_type = str(
         raw.get("instrument_type") or raw.get("instrumentType") or "unknown"
     ).lower()
-    if range_value in INTRADAY_RANGE_CONFIG:
-        return _build_intraday_kline(record, raw, symbol, market, instrument_type, range_value)
+    return record, raw, symbol, market, instrument_type
 
+
+def _build_daily_kline(
+    db_manager: Any,
+    record: Any,
+    raw: Dict[str, Any],
+    symbol: str,
+    market: str,
+    instrument_type: str,
+    range_value: str,
+    *,
+    legacy_fallback: bool = False,
+) -> Dict[str, Any]:
     end_date = _record_end_date(record)
     start_date = end_date - timedelta(days=540)
 
@@ -366,6 +394,11 @@ def build_history_kline(db_manager: Any, record_id: str, range_value: str = "3m"
             bars = candidate_bars
             resolved_symbol = candidate
             break
+
+    source_chain_prefix = (
+        ["report_snapshot_missing", "stock_daily_legacy_db_fallback"]
+        if legacy_fallback else []
+    )
 
     if not bars:
         return {
@@ -380,7 +413,7 @@ def build_history_kline(db_manager: Any, record_id: str, range_value: str = "3m"
             "timezone": _timezone_for_market(market),
             "source": _expected_source(market),
             "source_type": "data_gap",
-            "source_chain": [_expected_source(market)],
+            "source_chain": [*source_chain_prefix, _expected_source(market)],
             "as_of": None,
             "is_cached": True,
             "rows": [],
@@ -411,7 +444,7 @@ def build_history_kline(db_manager: Any, record_id: str, range_value: str = "3m"
         "timezone": _timezone_for_market(market),
         "source": source or _expected_source(market),
         "source_type": "db_cache",
-        "source_chain": [source or _expected_source(market)],
+        "source_chain": [*source_chain_prefix, source or _expected_source(market)],
         "as_of": display_rows[-1]["date"] if display_rows else None,
         "is_cached": True,
         "rows": display_rows,
@@ -433,3 +466,91 @@ def build_history_kline(db_manager: Any, record_id: str, range_value: str = "3m"
         "resistance_level": _first_number(raw, "resistance_level", "resistanceLevel"),
         "data_gap_reason": data_gap_reason,
     }
+
+
+def build_report_kline_snapshot_payload(
+    db_manager: Any,
+    record_id: str,
+    range_value: str,
+) -> Dict[str, Any]:
+    """Build a report-bound K-line snapshot, allowing analysis-time providers."""
+    if range_value not in KLINE_RANGE_ROWS and range_value not in INTRADAY_RANGE_CONFIG:
+        range_value = "3m"
+    record, raw, symbol, market, instrument_type = _history_parts(db_manager, record_id)
+    if range_value in INTRADAY_RANGE_CONFIG:
+        return _build_intraday_kline(record, raw, symbol, market, instrument_type, range_value)
+    return _build_daily_kline(db_manager, record, raw, symbol, market, instrument_type, range_value)
+
+
+def persist_report_kline_snapshots(
+    db_manager: Any,
+    history_id: int,
+    ranges: Optional[List[str]] = None,
+) -> int:
+    """Persist K-line snapshots for one history record after analysis save."""
+    saved = 0
+    for range_value in (ranges or ["1d", "5d", "1w", "1m", "3m", "1y"]):
+        try:
+            payload = build_report_kline_snapshot_payload(db_manager, str(history_id), range_value)
+        except Exception:
+            try:
+                record, _raw, symbol, market, instrument_type = _history_parts(db_manager, str(history_id))
+                if range_value in INTRADAY_RANGE_CONFIG:
+                    payload = _snapshot_missing_intraday_payload(
+                        record, symbol, market, instrument_type, range_value
+                    )
+                else:
+                    payload = {
+                        "history_id": history_id,
+                        "symbol": symbol,
+                        "market": market,
+                        "instrument_type": instrument_type,
+                        "range": range_value,
+                        "granularity": "daily",
+                        "interval": "1d",
+                        "currency": _currency_for_market(market),
+                        "timezone": _timezone_for_market(market),
+                        "source": _expected_source(market),
+                        "source_type": "data_gap",
+                        "source_chain": [_expected_source(market)],
+                        "as_of": None,
+                        "is_cached": True,
+                        "rows": [],
+                        "candles": [],
+                        "current_price": None,
+                        "support_level": None,
+                        "resistance_level": None,
+                        "data_gap_reason": "snapshot_build_exception",
+                    }
+                payload["data_gap_reason"] = payload.get("data_gap_reason") or "snapshot_build_exception"
+            except Exception:
+                continue
+        saved += int(db_manager.upsert_analysis_kline_snapshot(payload) or 0)
+    return saved
+
+
+def build_history_kline(db_manager: Any, record_id: str, range_value: str = "3m") -> Dict[str, Any]:
+    """Build a read-only K-line API payload from persisted report snapshots."""
+    if range_value not in KLINE_RANGE_ROWS and range_value not in INTRADAY_RANGE_CONFIG:
+        range_value = "3m"
+
+    record, raw, symbol, market, instrument_type = _history_parts(db_manager, record_id)
+    snapshot_loader = getattr(db_manager, "get_analysis_kline_snapshot", None)
+    if callable(snapshot_loader):
+        snapshot = snapshot_loader(getattr(record, "id", None), range_value)
+        if isinstance(snapshot, dict):
+            return snapshot
+
+    if range_value in INTRADAY_RANGE_CONFIG:
+        return _snapshot_missing_intraday_payload(record, symbol, market, instrument_type, range_value)
+
+    return _build_daily_kline(
+        db_manager,
+        record,
+        raw,
+        symbol,
+        market,
+        instrument_type,
+        range_value,
+        legacy_fallback=True,
+    )

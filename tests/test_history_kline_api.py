@@ -45,6 +45,7 @@ def _make_db(bars, record=None):
     db.get_analysis_history_by_id.return_value = record or _make_record()
     db.get_latest_analysis_by_query_id.return_value = None
     db.get_data_range.return_value = bars
+    db.get_analysis_kline_snapshot.return_value = None
     return db
 
 
@@ -123,6 +124,57 @@ class HistoryKlineApiTest(unittest.TestCase):
         with patch("src.services.kline_snapshot._fetch_yfinance_intraday_frame") as fetcher:
             self._call(_bars(80), code="MSFT", range_value="1m")
         fetcher.assert_not_called()
+
+    def test_intraday_read_missing_snapshot_returns_gap_without_provider_call(self):
+        with patch("src.services.kline_snapshot._fetch_yfinance_intraday_frame") as fetcher:
+            result = self._call([], code="MSFT", range_value="1d")
+        fetcher.assert_not_called()
+        self.assertEqual(result.granularity, "intraday")
+        self.assertEqual(result.interval, "5m")
+        self.assertEqual(result.candles, [])
+        self.assertEqual(result.data_gap_reason, "report_kline_snapshot_missing")
+
+    def test_intraday_read_returns_persisted_snapshot_without_provider_call(self):
+        snapshot = {
+            "history_id": 65,
+            "symbol": "MSFT",
+            "market": "us",
+            "instrument_type": "stock",
+            "range": "1d",
+            "granularity": "intraday",
+            "interval": "5m",
+            "currency": "USD",
+            "timezone": "America/New_York",
+            "source": "yfinance",
+            "source_type": "provider",
+            "source_chain": ["analysis_kline_snapshot", "yfinance"],
+            "as_of": "2026-06-26T09:30:00-04:00",
+            "is_cached": True,
+            "rows": [],
+            "candles": [{
+                "timestamp": "2026-06-26T09:30:00-04:00",
+                "open": 100,
+                "high": 101,
+                "low": 99,
+                "close": 100.5,
+                "volume": 1000,
+            }],
+            "current_price": 100.5,
+            "support_level": None,
+            "resistance_level": None,
+            "data_gap_reason": None,
+            "snapshot_created_at": "2026-06-26T10:00:00",
+        }
+        db = _make_db([], _make_record(code="MSFT"))
+        db.get_analysis_kline_snapshot.return_value = snapshot
+        from api.v1.endpoints.history import get_history_kline
+
+        with patch("src.services.kline_snapshot._fetch_yfinance_intraday_frame") as fetcher:
+            result = get_history_kline(record_id="65", range="1d", db_manager=db)
+        fetcher.assert_not_called()
+        self.assertEqual(result.data_gap_reason, None)
+        self.assertEqual(len(result.candles), 1)
+        self.assertEqual(result.snapshot_created_at, "2026-06-26T10:00:00")
 
     def test_tw_miss_does_not_call_yfinance(self):
         with patch("data_provider.yfinance_fetcher.YfinanceFetcher") as fetcher:

@@ -276,6 +276,43 @@ class AnalysisHistory(Base):
         }
 
 
+class AnalysisKlineSnapshot(Base):
+    """Report-bound K-line snapshot captured at analysis time."""
+
+    __tablename__ = 'analysis_kline_snapshots'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    history_id = Column(Integer, ForeignKey('analysis_history.id'), nullable=False, index=True)
+    stock_code = Column(String(16), nullable=False, index=True)
+    stock_name = Column(String(80))
+    market = Column(String(16))
+    instrument_type = Column(String(16))
+    range = Column(String(8), nullable=False, index=True)
+    granularity = Column(String(16), nullable=False)
+    interval = Column(String(16), nullable=False)
+    currency = Column(String(8))
+    timezone = Column(String(64))
+    source = Column(String(64))
+    source_type = Column(String(32))
+    source_chain_json = Column(Text)
+    as_of = Column(String(64))
+    is_cached = Column(Boolean, nullable=False, default=True)
+    data_gap_reason = Column(String(80))
+    rows_json = Column(Text)
+    candles_json = Column(Text)
+    current_price = Column(Float)
+    support_level = Column(Float)
+    resistance_level = Column(Float)
+    snapshot_created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    __table_args__ = (
+        UniqueConstraint('history_id', 'range', name='uix_analysis_kline_history_range'),
+        Index('ix_analysis_kline_history_range', 'history_id', 'range'),
+    )
+
+
 class BacktestResult(Base):
     """單條分析記錄的回測結果。"""
 
@@ -1360,34 +1397,152 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
         try:
             def _write(session: Session) -> int:
-                session.add(
-                    AnalysisHistory(
-                        query_id=query_id,
-                        code=result.code,
-                        name=result.name,
-                        report_type=report_type,
-                        sentiment_score=result.sentiment_score,
-                        operation_advice=result.operation_advice,
-                        trend_prediction=result.trend_prediction,
-                        analysis_summary=result.analysis_summary,
-                        raw_result=self._safe_json_dumps(raw_result),
-                        news_content=news_content,
-                        context_snapshot=context_text,
-                        ideal_buy=sniper_points.get("ideal_buy"),
-                        secondary_buy=sniper_points.get("secondary_buy"),
-                        stop_loss=sniper_points.get("stop_loss"),
-                        take_profit=sniper_points.get("take_profit"),
-                        created_at=datetime.now(),
-                    )
+                history = AnalysisHistory(
+                    query_id=query_id,
+                    code=result.code,
+                    name=result.name,
+                    report_type=report_type,
+                    sentiment_score=result.sentiment_score,
+                    operation_advice=result.operation_advice,
+                    trend_prediction=result.trend_prediction,
+                    analysis_summary=result.analysis_summary,
+                    raw_result=self._safe_json_dumps(raw_result),
+                    news_content=news_content,
+                    context_snapshot=context_text,
+                    ideal_buy=sniper_points.get("ideal_buy"),
+                    secondary_buy=sniper_points.get("secondary_buy"),
+                    stop_loss=sniper_points.get("stop_loss"),
+                    take_profit=sniper_points.get("take_profit"),
+                    created_at=datetime.now(),
                 )
-                return 1
-            return self._run_write_transaction(
+                session.add(history)
+                session.flush()
+                return int(history.id)
+
+            history_id = self._run_write_transaction(
                 f"save_analysis_history[{result.code}]",
                 _write,
             )
+            try:
+                from src.services.kline_snapshot import persist_report_kline_snapshots
+
+                persist_report_kline_snapshots(self, history_id)
+            except Exception as snapshot_exc:
+                logger.warning(
+                    "K-line snapshot persistence failed for history_id=%s: %s",
+                    history_id,
+                    snapshot_exc,
+                )
+            return 1
         except Exception as e:
             logger.error(f"儲存分析歷史失敗: {e}")
             return 0
+
+    def upsert_analysis_kline_snapshot(self, payload: Dict[str, Any]) -> int:
+        """Persist one report-bound K-line snapshot."""
+        history_id = int(payload.get("history_id") or 0)
+        range_value = str(payload.get("range") or "")
+        if history_id <= 0 or not range_value:
+            return 0
+
+        now = datetime.now()
+        values = {
+            "history_id": history_id,
+            "stock_code": str(payload.get("symbol") or ""),
+            "stock_name": payload.get("stock_name"),
+            "market": payload.get("market"),
+            "instrument_type": payload.get("instrument_type"),
+            "range": range_value,
+            "granularity": payload.get("granularity") or "daily",
+            "interval": payload.get("interval") or "1d",
+            "currency": payload.get("currency"),
+            "timezone": payload.get("timezone"),
+            "source": payload.get("source"),
+            "source_type": payload.get("source_type"),
+            "source_chain_json": self._safe_json_dumps(payload.get("source_chain") or []),
+            "as_of": payload.get("as_of"),
+            "is_cached": bool(payload.get("is_cached", True)),
+            "data_gap_reason": payload.get("data_gap_reason"),
+            "rows_json": self._safe_json_dumps(payload.get("rows") or []),
+            "candles_json": self._safe_json_dumps(payload.get("candles") or []),
+            "current_price": payload.get("current_price"),
+            "support_level": payload.get("support_level"),
+            "resistance_level": payload.get("resistance_level"),
+            "snapshot_created_at": now,
+            "created_at": now,
+            "updated_at": now,
+        }
+
+        def _write(session: Session) -> int:
+            existing = session.execute(
+                select(AnalysisKlineSnapshot).where(
+                    and_(
+                        AnalysisKlineSnapshot.history_id == history_id,
+                        AnalysisKlineSnapshot.range == range_value,
+                    )
+                )
+            ).scalars().first()
+            if existing is None:
+                session.add(AnalysisKlineSnapshot(**values))
+            else:
+                for key, value in values.items():
+                    if key != "created_at":
+                        setattr(existing, key, value)
+            return 1
+
+        return self._run_write_transaction(
+            f"upsert_analysis_kline_snapshot[{history_id}:{range_value}]",
+            _write,
+        )
+
+    def get_analysis_kline_snapshot(self, history_id: int, range_value: str) -> Optional[Dict[str, Any]]:
+        """Load one report-bound K-line snapshot payload."""
+        with self.get_session() as session:
+            snapshot = session.execute(
+                select(AnalysisKlineSnapshot).where(
+                    and_(
+                        AnalysisKlineSnapshot.history_id == int(history_id),
+                        AnalysisKlineSnapshot.range == range_value,
+                    )
+                )
+            ).scalars().first()
+            if snapshot is None:
+                return None
+
+            def _loads(text: Optional[str], default: Any) -> Any:
+                if not text:
+                    return default
+                try:
+                    return json.loads(text)
+                except json.JSONDecodeError:
+                    return default
+
+            return {
+                "history_id": snapshot.history_id,
+                "symbol": snapshot.stock_code,
+                "market": snapshot.market or "unknown",
+                "instrument_type": snapshot.instrument_type or "unknown",
+                "range": snapshot.range,
+                "granularity": snapshot.granularity,
+                "interval": snapshot.interval,
+                "currency": snapshot.currency,
+                "timezone": snapshot.timezone,
+                "source": snapshot.source or "analysis_kline_snapshot",
+                "source_type": snapshot.source_type or "db_cache",
+                "source_chain": ["analysis_kline_snapshot", *_loads(snapshot.source_chain_json, [])],
+                "as_of": snapshot.as_of,
+                "is_cached": snapshot.is_cached,
+                "rows": _loads(snapshot.rows_json, []),
+                "candles": _loads(snapshot.candles_json, []),
+                "current_price": snapshot.current_price,
+                "support_level": snapshot.support_level,
+                "resistance_level": snapshot.resistance_level,
+                "data_gap_reason": snapshot.data_gap_reason,
+                "snapshot_created_at": (
+                    snapshot.snapshot_created_at.isoformat()
+                    if snapshot.snapshot_created_at else None
+                ),
+            }
 
     def update_analysis_history_diagnostics(
         self,
