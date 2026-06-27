@@ -547,6 +547,22 @@ export interface DataSnapshot {
   [key: string]: unknown;
 }
 
+export interface ValuationSnapshot extends DataSnapshot {
+  peTtm?: number | null;
+  peForward?: number | null;
+  pb?: number | null;
+  dividendYield?: number | null;
+  marketCap?: number | null;
+}
+
+export interface FundamentalSnapshot extends DataSnapshot {
+  revenueYoy?: number | null;
+  earningsYoy?: number | null;
+  netProfitYoy?: number | null;
+  roe?: number | null;
+  grossMargin?: number | null;
+}
+
 /** Typed overlay for AnalysisReport.details.rawResult in history detail responses */
 export interface VisualReportRawResult {
   instrumentType?: InstrumentType;
@@ -568,8 +584,8 @@ export interface VisualReportRawResult {
   // Phase 19B snapshots
   marketRiskSnapshot?: MarketRiskSnapshot | null;
   multiPeriodTrendSnapshot?: MultiPeriodTrendSnapshot | null;
-  valuationSnapshot?: DataSnapshot | null;
-  fundamentalSnapshot?: DataSnapshot | null;
+  valuationSnapshot?: ValuationSnapshot | null;
+  fundamentalSnapshot?: FundamentalSnapshot | null;
   exposureSnapshot?: DataSnapshot | null;
   valueNetworkMermaid?: string | null;
   [key: string]: unknown;

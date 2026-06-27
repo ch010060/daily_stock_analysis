@@ -1,8 +1,6 @@
 import type React from 'react';
 
 interface TechnicalSnapshotCardsProps {
-  currentPrice: number | null;
-  changePct: number | null;
   ma5: number | null;
   ma10: number | null;
   ma20: number | null;
@@ -50,7 +48,6 @@ function StatRow({ label, value, accent = false }: { label: string; value: React
 
 export const TechnicalSnapshotCards: React.FC<TechnicalSnapshotCardsProps> = (props) => {
   const {
-    currentPrice, changePct,
     ma5, ma10, ma20,
     ma5DevPct, ma10DevPct, ma20DevPct,
     supportLevel, resistanceLevel,
@@ -59,7 +56,7 @@ export const TechnicalSnapshotCards: React.FC<TechnicalSnapshotCardsProps> = (pr
 
   const hasAnyTech = [ma5, ma10, ma20, supportLevel, resistanceLevel].some(v => v !== null);
 
-  if (!hasAnyTech && currentPrice === null) return null;
+  if (!hasAnyTech) return null;
 
   const rsiColor = rsi !== null ? (rsi < 30 ? 'text-danger' : rsi > 70 ? 'text-warning' : 'text-muted-foreground') : 'text-muted-foreground';
 
@@ -70,21 +67,8 @@ export const TechnicalSnapshotCards: React.FC<TechnicalSnapshotCardsProps> = (pr
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {/* Price & MA */}
+        {/* MA */}
         <div>
-          {currentPrice !== null && (
-            <div className="mb-2">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">現價</div>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-bold text-foreground">{fmt(currentPrice)}</span>
-                {changePct !== null && (
-                  <span className={`text-xs font-bold ${changePct < 0 ? 'text-danger' : 'text-success'}`}>
-                    {fmtPct(changePct)}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
           {ma5 !== null && (
             <StatRow label="MA5" value={<>{fmt(ma5)}<DevBadge pct={ma5DevPct} /></>} />
           )}

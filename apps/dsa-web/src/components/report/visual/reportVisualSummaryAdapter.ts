@@ -1,7 +1,9 @@
 import type {
   AnalysisReport,
+  FundamentalSnapshot,
   InstrumentType,
   MultiPeriodTrendPeriod,
+  ValuationSnapshot,
   VisualReportRawResult,
 } from '../../../types/analysis';
 
@@ -24,6 +26,20 @@ export interface DataAvailabilityVM {
   label: string;
   status: DataAvailStatus;
   reason?: string;
+}
+
+export interface FinancialKpiVM {
+  key: string;
+  label: string;
+  value: string;
+  signed: boolean;
+}
+
+export interface FinancialCardVM {
+  title: string;
+  kpis: FinancialKpiVM[];
+  source: string | null;
+  asOf: string | null;
 }
 
 export interface VisualReportViewModel {
@@ -60,8 +76,11 @@ export interface VisualReportViewModel {
   volumeRatio: number | null;
   turnoverRate: number | null;
   rsi: number | null;
-  // Data availability
+  // Data availability (secondary diagnostics — kept for backwards compat)
   dataAvailability: DataAvailabilityVM[];
+  // Financial result cards (primary investor-facing display)
+  valuationCard: FinancialCardVM | null;
+  fundamentalCard: FinancialCardVM | null;
   // Action plan
   idealBuy: string | null;
   secondaryBuy: string | null;
@@ -123,6 +142,59 @@ function buildTrendPeriods(periods: MultiPeriodTrendPeriod[]): TrendPeriodVM[] {
       barWidthPct: barW,
     };
   });
+}
+
+// ─── Financial KPI formatters ──────────────────────────────────
+
+function fmtMultiple(v: unknown): string {
+  const n = toNum(v);
+  return n !== null ? `${n.toFixed(1)}x` : '—';
+}
+
+function fmtPct(v: unknown): string {
+  const n = toNum(v);
+  if (n === null) return '—';
+  return `${n > 0 ? '+' : ''}${n.toFixed(1)}%`;
+}
+
+function fmtMarketCap(v: unknown): string {
+  const n = toNum(v);
+  if (n === null) return '—';
+  if (n >= 1e12) return `${(n / 1e12).toFixed(2)}T`;
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(0)}M`;
+  return `${n.toFixed(0)}`;
+}
+
+function buildValuationCard(snap: ValuationSnapshot | null | undefined, applicable: boolean): FinancialCardVM | null {
+  if (!applicable) return null;
+  return {
+    title: '估值快照',
+    kpis: [
+      { key: 'pe_ttm', label: 'PE(TTM)', value: fmtMultiple(snap?.peTtm), signed: false },
+      { key: 'pe_forward', label: 'Forward PE', value: fmtMultiple(snap?.peForward), signed: false },
+      { key: 'pb', label: 'PB', value: fmtMultiple(snap?.pb), signed: false },
+      { key: 'dividend_yield', label: '股息率', value: fmtPct(snap?.dividendYield), signed: false },
+      { key: 'market_cap', label: '市值', value: fmtMarketCap(snap?.marketCap), signed: false },
+    ],
+    source: toStr(snap?.source),
+    asOf: toStr(snap?.asOf),
+  };
+}
+
+function buildFundamentalCard(snap: FundamentalSnapshot | null | undefined, applicable: boolean): FinancialCardVM | null {
+  if (!applicable) return null;
+  return {
+    title: '基本面',
+    kpis: [
+      { key: 'revenue_yoy', label: '營收 YoY', value: fmtPct(snap?.revenueYoy), signed: true },
+      { key: 'net_profit_yoy', label: '淨利 YoY', value: fmtPct(snap?.netProfitYoy ?? snap?.earningsYoy), signed: true },
+      { key: 'roe', label: 'ROE', value: fmtPct(snap?.roe), signed: false },
+      { key: 'gross_margin', label: '毛利率', value: fmtPct(snap?.grossMargin), signed: false },
+    ],
+    source: toStr(snap?.source),
+    asOf: toStr(snap?.asOf),
+  };
 }
 
 const VALUATION_FIELD_COUNT = 5;
@@ -225,6 +297,9 @@ export function adaptToVisualReport(report: AnalysisReport): VisualReportViewMod
     });
   }
 
+  const valuationCard = buildValuationCard(raw.valuationSnapshot, stockOnlySnapshotsApply);
+  const fundamentalCard = buildFundamentalCard(raw.fundamentalSnapshot, stockOnlySnapshotsApply);
+
   return {
     stockCode: meta.stockCode,
     stockName: meta.stockName,
@@ -255,6 +330,8 @@ export function adaptToVisualReport(report: AnalysisReport): VisualReportViewMod
     turnoverRate: toNum(raw.turnoverRate),
     rsi,
     dataAvailability: avail,
+    valuationCard,
+    fundamentalCard,
     idealBuy: toStr(strategy?.idealBuy),
     secondaryBuy: toStr(strategy?.secondaryBuy),
     stopLoss: toStr(strategy?.stopLoss),

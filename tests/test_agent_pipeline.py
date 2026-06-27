@@ -3123,6 +3123,48 @@ class TestAttachValuationFundamentalSnapshot(unittest.TestCase):
         self.assertEqual(result.fundamental_snapshot["net_profit_yoy"], 19.3)
         self.assertEqual(result.fundamental_snapshot["source"], "yfinance")
 
+    def test_us_stock_reads_nested_data_key_from_build_fundamental_block(self) -> None:
+        # _build_fundamental_block wraps payload under "data"; pipeline must unwrap it.
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_snapshot=None, fundamental_snapshot=None)
+        fundamental_context = {
+            "valuation": {
+                "status": "ok",
+                "coverage": {"status": "ok"},
+                "source_chain": [],
+                "errors": [],
+                "data": {
+                    "pe_ttm": 28.5, "pe_forward": 25.1, "pb": 12.3,
+                    "dividend_yield": 0.72, "market_cap": 3.08e12,
+                },
+            },
+            "growth": {
+                "status": "ok",
+                "coverage": {"status": "ok"},
+                "source_chain": [],
+                "errors": [],
+                "data": {
+                    "revenue_yoy": 17.2, "net_profit_yoy": 21.4,
+                    "roe": 35.2, "gross_margin": 69.4,
+                },
+            },
+        }
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="us"):
+            pipeline._attach_valuation_fundamental_snapshot(result, "MSFT", fundamental_context)
+
+        self.assertIsNotNone(result.valuation_snapshot)
+        self.assertAlmostEqual(result.valuation_snapshot["pe_ttm"], 28.5)
+        self.assertAlmostEqual(result.valuation_snapshot["pb"], 12.3)
+        self.assertAlmostEqual(result.valuation_snapshot["market_cap"], 3.08e12)
+        self.assertEqual(result.valuation_snapshot["source"], "yfinance")
+        self.assertIsNotNone(result.fundamental_snapshot)
+        self.assertAlmostEqual(result.fundamental_snapshot["revenue_yoy"], 17.2)
+        self.assertAlmostEqual(result.fundamental_snapshot["net_profit_yoy"], 21.4)
+        self.assertAlmostEqual(result.fundamental_snapshot["earnings_yoy"], 21.4)
+        self.assertAlmostEqual(result.fundamental_snapshot["roe"], 35.2)
+        self.assertEqual(result.fundamental_snapshot["source"], "yfinance")
+
     def test_exception_degrades_to_no_snapshot(self) -> None:
         pipeline = self._make_pipeline()
         result = SimpleNamespace(instrument_type="stock", valuation_snapshot=None, fundamental_snapshot=None)

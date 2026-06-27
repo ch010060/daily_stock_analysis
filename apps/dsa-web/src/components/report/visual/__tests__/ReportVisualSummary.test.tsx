@@ -36,9 +36,9 @@ describe('ReportVisualSummary', () => {
     expect(screen.getByTestId('technical-snapshot-cards')).toBeInTheDocument();
   });
 
-  it('shows data availability cards', () => {
+  it('shows financial result cards for stock reports', () => {
     render(<ReportVisualSummary report={MSFT_REPORT} />);
-    expect(screen.getByTestId('data-availability-cards')).toBeInTheDocument();
+    expect(screen.getByTestId('financial-result-cards')).toBeInTheDocument();
   });
 
   it('shows action plan cards', () => {

@@ -106,6 +106,68 @@ describe('adaptToVisualReport', () => {
     expect(vm.dataAvailability.find((d) => d.key === 'exposure')).toBeDefined();
   });
 
+  it('extracts valuation card with actual field values', () => {
+    const vm = adaptToVisualReport(MSFT_REPORT);
+    expect(vm.valuationCard).not.toBeNull();
+    expect(vm.valuationCard?.title).toBe('估值快照');
+    const pe = vm.valuationCard?.kpis.find((k) => k.key === 'pe_ttm');
+    expect(pe?.value).toBe('28.5x');
+    const fpe = vm.valuationCard?.kpis.find((k) => k.key === 'pe_forward');
+    expect(fpe?.value).toBe('25.1x');
+    const cap = vm.valuationCard?.kpis.find((k) => k.key === 'market_cap');
+    expect(cap?.value).toBe('3.08T');
+    const div = vm.valuationCard?.kpis.find((k) => k.key === 'dividend_yield');
+    expect(div?.value).toBe('+0.7%');
+    expect(vm.valuationCard?.source).toBe('yfinance');
+    expect(vm.valuationCard?.asOf).toBe('2025-03-14');
+  });
+
+  it('extracts fundamental card with signed YoY values', () => {
+    const vm = adaptToVisualReport(MSFT_REPORT);
+    expect(vm.fundamentalCard).not.toBeNull();
+    const rev = vm.fundamentalCard?.kpis.find((k) => k.key === 'revenue_yoy');
+    expect(rev?.value).toBe('+17.2%');
+    expect(rev?.signed).toBe(true);
+    const np = vm.fundamentalCard?.kpis.find((k) => k.key === 'net_profit_yoy');
+    expect(np?.value).toBe('+21.4%');
+    const roe = vm.fundamentalCard?.kpis.find((k) => k.key === 'roe');
+    expect(roe?.value).toBe('+35.2%');
+    expect(roe?.signed).toBe(false);
+  });
+
+  it('returns null financial cards for ETF instrument type', () => {
+    const etfReport = {
+      ...MSFT_REPORT,
+      details: {
+        rawResult: {
+          ...MSFT_REPORT.details?.rawResult,
+          instrumentType: 'etf',
+          valuationSnapshot: null,
+          fundamentalSnapshot: null,
+        },
+      },
+    };
+    const vm = adaptToVisualReport(etfReport);
+    expect(vm.valuationCard).toBeNull();
+    expect(vm.fundamentalCard).toBeNull();
+  });
+
+  it('shows dash for missing snapshot fields', () => {
+    const report = {
+      ...MSFT_REPORT,
+      details: {
+        rawResult: {
+          ...MSFT_REPORT.details?.rawResult,
+          valuationSnapshot: { source: 'yfinance', dataGapFields: ['pe_forward', 'market_cap'] },
+          fundamentalSnapshot: { source: 'yfinance', dataGapFields: ['earnings_yoy'] },
+        },
+      },
+    };
+    const vm = adaptToVisualReport(report);
+    expect(vm.valuationCard?.kpis.find((k) => k.key === 'pe_forward')?.value).toBe('—');
+    expect(vm.valuationCard?.kpis.find((k) => k.key === 'market_cap')?.value).toBe('—');
+  });
+
   it('handles null/missing raw_result gracefully', () => {
     expect(() => adaptToVisualReport(MINIMAL_REPORT)).not.toThrow();
     const vm = adaptToVisualReport(MINIMAL_REPORT);

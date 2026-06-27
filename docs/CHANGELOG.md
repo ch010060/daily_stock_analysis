@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修復] 修正 US 股票 fresh 分析時 FinancialResultCards 全部顯示「—」的問題：`_build_offshore_fundamental_context` 漏合併 yfinance bundle `valuation` block，`_attach_valuation_fundamental_snapshot` 從 `_build_fundamental_block` 包裝層的頂層而非 `"data"` subkey 讀取數值；同時移除 Visual Summary 中重複的 現價（TechnicalSnapshotCards）與重複的 VIX（KPI row）顯示（Phase 19G-R5B）。
+- [改進] WebUI 視覺摘要「估值快照」與「基本面」卡片改為直接顯示投資人關注數值（PE(TTM)/Forward PE/PB/股息率/市值；營收 YoY/淨利 YoY/ROE/毛利率），取代先前以「可用/資料缺口/部分可用/不適用」badge 為主的資料可用性面板；ETF/指數不渲染財務卡片；缺少欄位顯示「—」；資料來源（yfinance/finmind · as_of）以 footnote 形式呈現於各卡片底部（Phase 19G-R5）。
 - [改進] WebUI 報告抽屜新增視覺摘要面板（Phase 19G）：在 Markdown 全文之上插入決策卡、VIX gauge、多週期趨勢條、技術指標卡、資料可用性面板與作戰計畫卡；平行 fetch 不阻塞 Markdown 渲染，detail fetch 失敗時靜默降級。
 - [新功能] 個股／ETF／指數完整報告新增「📈 多週期趨勢快照」區塊（1週/1月/1季/半年/52週），位於「🌡️ 市場風險溫度計」之後、作戰計劃之前；數值由後端從既有 OHLC 資料決定性計算（漲跌幅、區間高低點、自高點回撤、均線位置、趨勢狀態），52 週區間獨立向資料庫優先的歷史資料載入器請求最多 252 個交易日（不調整既有 89 天技術指標視窗），資料不足的週期顯示「資料不足」而非省略或臆測；LLM 不參與該區塊數值生成；未知類型不顯示。
 - [新功能] 完整報告新增「🧭 ETF／指數曝險摘要」（限 ETF/指數）與「🌡️ 市場風險溫度計」（個股／ETF／指數皆顯示，未知類型不顯示）兩個區塊，位於估值與基本面快照之後、作戰計劃之前；美股市場風險溫度計重用既有 `fetcher_manager.get_realtime_quote()` 讀取 VIX/SPX（無新資料源、無新快取，沿用既有 CircuitBreaker），台股本期不發起任何外部資料請求，固定顯示資料不足與原因說明；LLM 不參與該區塊數值生成。

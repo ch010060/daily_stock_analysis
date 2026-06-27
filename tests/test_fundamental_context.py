@@ -595,6 +595,51 @@ class TestFundamentalContext(unittest.TestCase):
         with self.assertRaises(ValueError):
             DataFetcherManager._has_meaningful_payload(payload)
 
+    def test_offshore_bundle_valuation_merged_into_valuation_data(self) -> None:
+        """yfinance bundle's valuation (pe_ttm/pb/market_cap etc.) must be merged
+        into result_ctx['valuation']['data'] so pipeline._attach_valuation_fundamental_snapshot
+        can read them via the 'data' subkey.  Regression test for the R5B fix."""
+        manager = DataFetcherManager(fetchers=[])
+        cfg = SimpleNamespace(
+            enable_fundamental_pipeline=True,
+            fundamental_cache_ttl_seconds=0,
+            fundamental_stage_timeout_seconds=2.0,
+            fundamental_fetch_timeout_seconds=1.5,
+            fundamental_retry_max=1,
+        )
+        bundle = {
+            "status": "partial",
+            "valuation": {
+                "pe_ttm": 32.5, "pe_forward": 28.1, "pb": 12.3,
+                "dividend_yield": 0.72, "market_cap": 3.08e12,
+            },
+            "growth": {
+                "revenue_yoy": 17.2, "net_profit_yoy": 21.4,
+                "roe": 35.2, "gross_margin": 69.4,
+            },
+            "earnings": {},
+            "belong_boards": [],
+            "source_chain": [],
+            "errors": [],
+        }
+        with patch("src.config.get_config", return_value=cfg), \
+                patch.object(manager, "get_realtime_quote", return_value=None), \
+                patch(
+                    "data_provider.yfinance_fundamental_adapter.YfinanceFundamentalAdapter.get_fundamental_bundle",
+                    return_value=bundle,
+                ):
+            ctx = manager.get_fundamental_context("MSFT")
+
+        valuation_data = ctx["valuation"].get("data") or {}
+        self.assertAlmostEqual(valuation_data.get("pe_ttm"), 32.5)
+        self.assertAlmostEqual(valuation_data.get("pe_forward"), 28.1)
+        self.assertAlmostEqual(valuation_data.get("pb"), 12.3)
+        self.assertAlmostEqual(valuation_data.get("dividend_yield"), 0.72)
+        self.assertAlmostEqual(valuation_data.get("market_cap"), 3.08e12)
+        growth_data = ctx["growth"].get("data") or {}
+        self.assertAlmostEqual(growth_data.get("revenue_yoy"), 17.2)
+        self.assertAlmostEqual(growth_data.get("roe"), 35.2)
+
     def test_missing_value_helpers_propagate_unexpected_pd_isna_errors(self) -> None:
         sentinel = object()
         with patch("data_provider.base.pd.isna", side_effect=RuntimeError("boom")):

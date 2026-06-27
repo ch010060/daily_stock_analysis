@@ -4,7 +4,7 @@ import { adaptToVisualReport } from './reportVisualSummaryAdapter';
 import { MarketRiskGauge } from './MarketRiskGauge';
 import { MultiPeriodTrendBars } from './MultiPeriodTrendBars';
 import { TechnicalSnapshotCards } from './TechnicalSnapshotCards';
-import { DataAvailabilityCards } from './DataAvailabilityCards';
+import { FinancialResultCards } from './FinancialResultCards';
 import { ActionPlanCards } from './ActionPlanCards';
 
 interface ReportVisualSummaryProps {
@@ -140,17 +140,6 @@ export const ReportVisualSummary: React.FC<ReportVisualSummaryProps> = ({ report
           </div>
           <div className="text-[9px] text-muted-foreground">{keyTrigger.caption}</div>
         </div>
-        {vm.vixLevel !== null && (
-          <div className="px-3 py-2.5">
-            <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">VIX</div>
-            <div className="font-mono text-lg font-bold text-amber-600">
-              {vm.vixLevel.toFixed(2)}
-            </div>
-            {vm.vixStatus && (
-              <div className="text-[9px] text-muted-foreground">{vm.vixStatus}</div>
-            )}
-          </div>
-        )}
         {vm.rsi !== null && (
           <div className="px-3 py-2.5">
             <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">RSI</div>
@@ -182,8 +171,6 @@ export const ReportVisualSummary: React.FC<ReportVisualSummaryProps> = ({ report
 
         {/* Technical cards */}
         <TechnicalSnapshotCards
-          currentPrice={vm.currentPrice}
-          changePct={vm.changePct}
           ma5={vm.ma5}
           ma10={vm.ma10}
           ma20={vm.ma20}
@@ -198,8 +185,8 @@ export const ReportVisualSummary: React.FC<ReportVisualSummaryProps> = ({ report
           rsi={vm.rsi}
         />
 
-        {/* Data availability */}
-        <DataAvailabilityCards items={vm.dataAvailability} />
+        {/* Financial result cards (investor-facing) */}
+        <FinancialResultCards valuation={vm.valuationCard} fundamental={vm.fundamentalCard} />
 
         {/* Action plan */}
         <ActionPlanCards

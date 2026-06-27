@@ -1052,19 +1052,23 @@ class StockAnalysisPipeline:
                 ctx = fundamental_context if isinstance(fundamental_context, dict) else {}
                 valuation_block = ctx.get("valuation") or {}
                 growth_block = ctx.get("growth") or {}
+                # _build_fundamental_block wraps numeric fields under "data"; fall back
+                # to the block itself for callers that pass raw dicts directly.
+                valuation_data = valuation_block.get("data") or valuation_block
+                growth_data = growth_block.get("data") or growth_block
                 valuation_raw = {
-                    "pe_ttm": valuation_block.get("pe_ttm"),
-                    "pe_forward": valuation_block.get("pe_forward"),
-                    "pb": valuation_block.get("pb"),
-                    "dividend_yield": valuation_block.get("dividend_yield"),
-                    "market_cap": valuation_block.get("market_cap"),
+                    "pe_ttm": valuation_data.get("pe_ttm"),
+                    "pe_forward": valuation_data.get("pe_forward"),
+                    "pb": valuation_data.get("pb"),
+                    "dividend_yield": valuation_data.get("dividend_yield"),
+                    "market_cap": valuation_data.get("market_cap"),
                 }
                 fundamental_raw = {
-                    "revenue_yoy": growth_block.get("revenue_yoy"),
-                    "earnings_yoy": growth_block.get("net_profit_yoy"),
-                    "net_profit_yoy": growth_block.get("net_profit_yoy"),
-                    "roe": growth_block.get("roe"),
-                    "gross_margin": growth_block.get("gross_margin"),
+                    "revenue_yoy": growth_data.get("revenue_yoy"),
+                    "earnings_yoy": growth_data.get("net_profit_yoy"),
+                    "net_profit_yoy": growth_data.get("net_profit_yoy"),
+                    "roe": growth_data.get("roe"),
+                    "gross_margin": growth_data.get("gross_margin"),
                 }
                 source = "yfinance"
             else:
