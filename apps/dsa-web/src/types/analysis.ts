@@ -461,6 +461,39 @@ export interface StockBarResponse {
   items: StockBarItem[];
 }
 
+// ============ K-line Types ============
+
+export type KlineRange = '1w' | '1m' | '3m' | '1y';
+
+export interface KlineBar {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number | null;
+  ma20?: number | null;
+  ma60?: number | null;
+  ma120?: number | null;
+  ma252?: number | null;
+}
+
+export interface KlineResponse {
+  historyId?: number | null;
+  symbol: string;
+  market: 'tw' | 'us' | 'unknown' | string;
+  instrumentType: InstrumentType | string;
+  range: KlineRange;
+  source: string;
+  sourceType: 'db_cache' | 'provider' | 'data_gap' | string;
+  asOf?: string | null;
+  rows: KlineBar[];
+  currentPrice?: number | null;
+  supportLevel?: number | null;
+  resistanceLevel?: number | null;
+  dataGapReason?: string | null;
+}
+
 // ============ Error Types ============
 
 export interface ApiError {

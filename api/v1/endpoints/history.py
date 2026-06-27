@@ -10,7 +10,7 @@
 """
 
 import logging
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Depends, Body
 
@@ -31,6 +31,7 @@ from api.v1.schemas.history import (
     RunDiagnosticSummaryResponse,
     StockBarItem,
     StockBarResponse,
+    KlineResponse,
 )
 from api.v1.schemas.common import ErrorResponse
 from src.storage import DatabaseManager
@@ -42,6 +43,7 @@ from src.report_language import (
     normalize_report_language,
 )
 from src.services.history_service import HistoryService, MarkdownReportGenerationError
+from src.services.kline_snapshot import KlineHistoryNotFound, build_history_kline
 from src.services.report_renderer import sanitize_narrative_text
 from src.utils.data_processing import (
     normalize_model_used,
@@ -58,6 +60,8 @@ from src.market_phase_summary import extract_market_phase_summary
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+KlineRange = Literal["1w", "1m", "3m", "1y"]
 
 
 def _normalize_code_for_grouping(code: str) -> str:
@@ -469,6 +473,45 @@ def get_history_detail(
                 "error": "internal_error",
                 "message": f"查詢歷史詳情失敗: {str(e)}"
             }
+        )
+
+
+@router.get(
+    "/{record_id}/kline",
+    response_model=KlineResponse,
+    responses={
+        200: {"description": "K-line chart data"},
+        404: {"description": "報告不存在", "model": ErrorResponse},
+        500: {"description": "伺服器錯誤", "model": ErrorResponse},
+    },
+    summary="獲取歷史報告 K-line 資料",
+    description="根據分析歷史記錄 ID 取得 DB/cache 優先的日線 OHLCV K-line 資料",
+)
+def get_history_kline(
+    record_id: str,
+    range: KlineRange = Query("3m", description="顯示範圍：1w/1m/3m/1y"),
+    db_manager: DatabaseManager = Depends(get_database_manager),
+) -> KlineResponse:
+    try:
+        return KlineResponse(**build_history_kline(db_manager, record_id, range))
+    except KlineHistoryNotFound:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "history_not_found",
+                "message": f"未找到 id/query_id={record_id} 的分析記錄",
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("K-line 查詢失敗: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": "K-line 查詢失敗",
+            },
         )
 
 

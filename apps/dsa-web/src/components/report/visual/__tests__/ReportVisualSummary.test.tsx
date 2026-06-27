@@ -1,7 +1,13 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ReportVisualSummary } from '../ReportVisualSummary';
 import { MSFT_REPORT, MINIMAL_REPORT } from './fixtures';
+
+vi.mock('../KlineChartBlock', () => ({
+  KlineChartBlock: ({ instrumentType }: { instrumentType: string }) => (
+    <div data-testid="kline-chart-block">K-line {instrumentType}</div>
+  ),
+}));
 
 describe('ReportVisualSummary', () => {
   it('renders the main container with testid', () => {
@@ -103,27 +109,50 @@ describe('ReportVisualSummary', () => {
     expect(trigger.textContent).not.toContain('下方');
   });
 
-  // R1: CandlestickChartBlock stays disabled in production drawer pending chart-library/removal decision
-  it('does not render CandlestickChartBlock when historyId is provided', () => {
+  it('renders KlineChartBlock when historyId is provided', () => {
+    render(<ReportVisualSummary report={MSFT_REPORT} historyId={58} />);
+    expect(screen.getByTestId('kline-chart-block')).toBeInTheDocument();
+  });
+
+  it('does not restore old CandlestickChartBlock when historyId is provided', () => {
     render(<ReportVisualSummary report={MSFT_REPORT} historyId={58} />);
     expect(screen.queryByTestId('candlestick-chart-block')).not.toBeInTheDocument();
     expect(screen.queryByTestId('candlestick-data-gap')).not.toBeInTheDocument();
   });
 
-  it('does not render CandlestickChartBlock without historyId', () => {
+  it('does not render KlineChartBlock without historyId', () => {
     render(<ReportVisualSummary report={MSFT_REPORT} />);
+    expect(screen.queryByTestId('kline-chart-block')).not.toBeInTheDocument();
     expect(screen.queryByTestId('candlestick-chart-block')).not.toBeInTheDocument();
     expect(screen.queryByTestId('candlestick-data-gap')).not.toBeInTheDocument();
   });
 
-  it('renders MultiPeriodTrendBars after MarketRiskGauge when candlestick is disabled', () => {
+  it('renders KlineChartBlock between MarketRiskGauge and MultiPeriodTrendBars', () => {
     render(<ReportVisualSummary report={MSFT_REPORT} historyId={58} />);
     expect(screen.getByTestId('market-risk-gauge')).toBeInTheDocument();
+    expect(screen.getByTestId('kline-chart-block')).toBeInTheDocument();
     expect(screen.getByTestId('multi-period-trend-bars')).toBeInTheDocument();
     const gaugeEl = screen.getByTestId('market-risk-gauge');
+    const klineEl = screen.getByTestId('kline-chart-block');
     const trendEl = screen.getByTestId('multi-period-trend-bars');
-    const pos = gaugeEl.compareDocumentPosition(trendEl);
+    const gaugeToKline = gaugeEl.compareDocumentPosition(klineEl);
+    const klineToTrend = klineEl.compareDocumentPosition(trendEl);
     // DOCUMENT_POSITION_FOLLOWING = 4
-    expect(pos & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(gaugeToKline & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(klineToTrend & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('does not render KlineChartBlock for unknown instrument type', () => {
+    const report = {
+      ...MSFT_REPORT,
+      details: {
+        rawResult: {
+          ...MSFT_REPORT.details?.rawResult,
+          instrumentType: 'unknown',
+        },
+      },
+    };
+    render(<ReportVisualSummary report={report} historyId={58} />);
+    expect(screen.queryByTestId('kline-chart-block')).not.toBeInTheDocument();
   });
 });

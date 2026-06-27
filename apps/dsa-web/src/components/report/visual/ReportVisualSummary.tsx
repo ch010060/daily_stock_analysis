@@ -6,6 +6,7 @@ import { MultiPeriodTrendBars } from './MultiPeriodTrendBars';
 import { TechnicalSnapshotCards } from './TechnicalSnapshotCards';
 import { FinancialResultCards } from './FinancialResultCards';
 import { ActionPlanCards } from './ActionPlanCards';
+import { KlineChartBlock } from './KlineChartBlock';
 
 interface ReportVisualSummaryProps {
   report: AnalysisReport;
@@ -65,7 +66,7 @@ function deriveKeyTrigger(...values: Array<string | null>): { value: string; cap
   return { value: '等待確認', caption: '訊號未齊' };
 }
 
-export const ReportVisualSummary: React.FC<ReportVisualSummaryProps> = ({ report }) => {
+export const ReportVisualSummary: React.FC<ReportVisualSummaryProps> = ({ report, historyId }) => {
   let vm;
   try {
     vm = adaptToVisualReport(report);
@@ -162,6 +163,10 @@ export const ReportVisualSummary: React.FC<ReportVisualSummaryProps> = ({ report
           spxChangePct={vm.spxChangePct}
           dataGap={vm.vixDataGap}
         />
+
+        {historyId && ['stock', 'etf', 'index'].includes(vm.instrumentType) && (
+          <KlineChartBlock historyId={historyId} instrumentType={vm.instrumentType} />
+        )}
 
         {/* Multi-Period Trend */}
         <MultiPeriodTrendBars

@@ -85,6 +85,39 @@ class DeleteHistoryResponse(BaseModel):
     deleted: int = Field(..., description="實際刪除的歷史記錄數量")
 
 
+class KlineBar(BaseModel):
+    """K-line OHLCV bar with server-side moving averages."""
+
+    date: str = Field(..., description="交易日期 YYYY-MM-DD")
+    open: float = Field(..., description="開盤價")
+    high: float = Field(..., description="最高價")
+    low: float = Field(..., description="最低價")
+    close: float = Field(..., description="收盤價")
+    volume: Optional[float] = Field(None, description="成交量")
+    ma20: Optional[float] = Field(None, description="20 日均線")
+    ma60: Optional[float] = Field(None, description="60 日均線")
+    ma120: Optional[float] = Field(None, description="120 日均線")
+    ma252: Optional[float] = Field(None, description="252 日均線")
+
+
+class KlineResponse(BaseModel):
+    """History-scoped K-line chart response."""
+
+    history_id: Optional[int] = Field(None, description="分析歷史記錄 ID")
+    symbol: str = Field(..., description="標的代號")
+    market: str = Field(..., description="市場：tw/us/unknown")
+    instrument_type: str = Field(..., description="工具類型：stock/etf/index/unknown")
+    range: Literal["1w", "1m", "3m", "1y"] = Field(..., description="K-line 顯示範圍")
+    source: str = Field(..., description="OHLC 資料來源")
+    source_type: Literal["db_cache", "provider", "data_gap"] = Field(..., description="來源類型")
+    as_of: Optional[str] = Field(None, description="最新資料日期")
+    rows: List[KlineBar] = Field(default_factory=list, description="K-line rows")
+    current_price: Optional[float] = Field(None, description="目前價格或最新收盤價")
+    support_level: Optional[float] = Field(None, description="支撐價")
+    resistance_level: Optional[float] = Field(None, description="壓力價")
+    data_gap_reason: Optional[str] = Field(None, description="資料缺口原因")
+
+
 class NewsIntelItem(BaseModel):
     """新聞情報條目"""
 

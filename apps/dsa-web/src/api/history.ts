@@ -9,6 +9,8 @@ import type {
   NewsIntelItem,
   RunDiagnosticSummary,
   StockBarResponse,
+  KlineRange,
+  KlineResponse,
 } from '../types/analysis';
 
 // ============ API 介面 ============
@@ -89,6 +91,16 @@ export const historyApi = {
   getDiagnostics: async (recordId: number): Promise<RunDiagnosticSummary> => {
     const response = await apiClient.get<Record<string, unknown>>(`/api/v1/history/${recordId}/diagnostics`);
     return toCamelCase<RunDiagnosticSummary>(response.data);
+  },
+
+  /**
+   * 獲取歷史報告 K-line 日線資料
+   */
+  getKline: async (recordId: number, range: KlineRange = '3m'): Promise<KlineResponse> => {
+    const response = await apiClient.get<Record<string, unknown>>(`/api/v1/history/${recordId}/kline`, {
+      params: { range },
+    });
+    return toCamelCase<KlineResponse>(response.data);
   },
 
   /**
