@@ -1062,6 +1062,7 @@ class StockAnalysisPipeline:
                 fundamental_raw = {
                     "revenue_yoy": growth_block.get("revenue_yoy"),
                     "earnings_yoy": growth_block.get("net_profit_yoy"),
+                    "net_profit_yoy": growth_block.get("net_profit_yoy"),
                     "roe": growth_block.get("roe"),
                     "gross_margin": growth_block.get("gross_margin"),
                 }

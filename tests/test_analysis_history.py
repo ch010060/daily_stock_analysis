@@ -1252,7 +1252,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
 
         self.assertEqual(markdown, "# 🎯 大盤覆盤\n\n## 今日大盤\n\n覆盤正文")
 
-    def test_history_markdown_collapses_unavailable_chip_structure(self) -> None:
+    def test_history_markdown_suppresses_deprecated_chip_structure(self) -> None:
         result = AnalysisResult(
             code="2330",
             name="台積電",
@@ -1293,7 +1293,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         markdown = HistoryService(self.db).get_markdown_report(str(record_id))
 
         self.assertIsNotNone(markdown)
-        self.assertIn("**籌碼**: 籌碼分佈未啟用或資料來源暫不可用，未納入籌碼判斷。", markdown)
+        self.assertNotIn("籌碼", markdown)
         self.assertEqual(markdown.count("資料缺失，無法判斷"), 0)
 
     def test_history_detail_returns_persisted_market_review_report(self) -> None:

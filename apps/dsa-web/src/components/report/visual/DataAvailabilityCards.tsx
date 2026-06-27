@@ -20,6 +20,13 @@ function StatusBadge({ status }: { status: DataAvailabilityVM['status'] }) {
       </span>
     );
   }
+  if (status === 'partial') {
+    return (
+      <span className="rounded border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-warning">
+        部分可用
+      </span>
+    );
+  }
   return (
     <span className="rounded border border-border bg-muted/30 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
       不適用
@@ -40,8 +47,8 @@ export const DataAvailabilityCards: React.FC<DataAvailabilityCardsProps> = ({ it
           <div key={item.key} className="flex flex-col gap-1">
             <div className="text-[10px] font-semibold text-foreground">{item.label}</div>
             <StatusBadge status={item.status} />
-            {item.status === 'gap' && (
-              <div className="text-[9px] text-muted-foreground">{item.reason ?? 'yfinance 暫時缺口'}</div>
+            {(item.status === 'gap' || item.status === 'partial') && item.reason && (
+              <div className="text-[9px] text-muted-foreground">{item.reason}</div>
             )}
           </div>
         ))}

@@ -17,7 +17,7 @@ export interface TrendPeriodVM {
   barWidthPct: number;
 }
 
-export type DataAvailStatus = 'ok' | 'gap' | 'na';
+export type DataAvailStatus = 'ok' | 'partial' | 'gap' | 'na';
 
 export interface DataAvailabilityVM {
   key: string;
@@ -125,9 +125,21 @@ function buildTrendPeriods(periods: MultiPeriodTrendPeriod[]): TrendPeriodVM[] {
   });
 }
 
-function isAllGap(snap: { dataGapFields?: string[] } | null | undefined): boolean {
-  if (!snap) return true;
-  return Array.isArray(snap.dataGapFields) && snap.dataGapFields.length > 0;
+const VALUATION_FIELD_COUNT = 5;
+const FUNDAMENTAL_FIELD_COUNT = 5;
+
+function snapshotAvailability(
+  snap: { dataGapFields?: string[] } | null | undefined,
+  fieldCount: number,
+  applicable: boolean,
+): { status: DataAvailStatus; reason?: string } {
+  if (!applicable) return { status: 'na' };
+  if (!snap) return { status: 'gap', reason: '未產生快照' };
+
+  const gaps = Array.isArray(snap.dataGapFields) ? snap.dataGapFields : [];
+  if (gaps.length === 0) return { status: 'ok' };
+  if (gaps.length >= fieldCount) return { status: 'gap', reason: '欄位全缺' };
+  return { status: 'partial', reason: `缺少 ${gaps.length}/${fieldCount} 欄位` };
 }
 
 // ─── Public adapter ───────────────────────────────────────────
@@ -163,18 +175,32 @@ export function adaptToVisualReport(report: AnalysisReport): VisualReportViewMod
 
   const rsi = toNum(raw.rsi12) ?? toNum(raw.rsi6) ?? toNum(raw.rsi);
 
+  const instrType: InstrumentType =
+    (toStr(raw.instrumentType) as InstrumentType | null) ?? 'unknown';
+  const stockOnlySnapshotsApply = instrType === 'stock';
+  const valuationAvailability = snapshotAvailability(
+    raw.valuationSnapshot,
+    VALUATION_FIELD_COUNT,
+    stockOnlySnapshotsApply,
+  );
+  const fundamentalAvailability = snapshotAvailability(
+    raw.fundamentalSnapshot,
+    FUNDAMENTAL_FIELD_COUNT,
+    stockOnlySnapshotsApply,
+  );
+
   const avail: DataAvailabilityVM[] = [
     {
       key: 'valuation',
       label: '估值快照',
-      status: isAllGap(raw.valuationSnapshot) ? 'gap' : 'ok',
-      reason: toStr(raw.valuationSnapshot?.gapReason) ?? undefined,
+      status: valuationAvailability.status,
+      reason: toStr(raw.valuationSnapshot?.gapReason) ?? valuationAvailability.reason,
     },
     {
       key: 'fundamental',
       label: '基本面',
-      status: isAllGap(raw.fundamentalSnapshot) ? 'gap' : 'ok',
-      reason: toStr(raw.fundamentalSnapshot?.gapReason) ?? undefined,
+      status: fundamentalAvailability.status,
+      reason: toStr(raw.fundamentalSnapshot?.gapReason) ?? fundamentalAvailability.reason,
     },
     {
       key: 'market_risk',
@@ -189,14 +215,13 @@ export function adaptToVisualReport(report: AnalysisReport): VisualReportViewMod
   ];
 
   // Add exposure only for ETF/index
-  const instrType: InstrumentType =
-    (toStr(raw.instrumentType) as InstrumentType | null) ?? 'unknown';
   if (instrType === 'etf' || instrType === 'index') {
+    const exposureAvailability = snapshotAvailability(raw.exposureSnapshot, 1, true);
     avail.push({
       key: 'exposure',
       label: '曝險摘要',
-      status: isAllGap(raw.exposureSnapshot) ? 'gap' : 'ok',
-      reason: toStr(raw.exposureSnapshot?.gapReason) ?? undefined,
+      status: exposureAvailability.status,
+      reason: toStr(raw.exposureSnapshot?.gapReason) ?? exposureAvailability.reason,
     });
   }
 

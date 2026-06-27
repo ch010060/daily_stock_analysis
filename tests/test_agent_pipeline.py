@@ -3120,6 +3120,7 @@ class TestAttachValuationFundamentalSnapshot(unittest.TestCase):
         self.assertEqual(result.valuation_snapshot["pe_ttm"], 32.5)
         self.assertEqual(result.valuation_snapshot["source"], "yfinance")
         self.assertEqual(result.fundamental_snapshot["earnings_yoy"], 19.3)  # mapped from net_profit_yoy
+        self.assertEqual(result.fundamental_snapshot["net_profit_yoy"], 19.3)
         self.assertEqual(result.fundamental_snapshot["source"], "yfinance")
 
     def test_exception_degrades_to_no_snapshot(self) -> None:

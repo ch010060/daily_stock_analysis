@@ -38,6 +38,54 @@ describe('adaptToVisualReport', () => {
     expect(valuationItem?.status).toBe('ok');
   });
 
+  it('data availability shows partial when usable valuation fields exist with some gaps', () => {
+    const report = {
+      ...MSFT_REPORT,
+      details: {
+        rawResult: {
+          ...MSFT_REPORT.details?.rawResult,
+          valuationSnapshot: {
+            peTtm: 32.5,
+            marketCap: 3200000000000,
+            dataGapFields: ['pe_forward', 'pb'],
+          },
+          fundamentalSnapshot: {
+            revenueYoy: 16.6,
+            grossMargin: 47.9,
+            dataGapFields: ['earnings_yoy'],
+          },
+        },
+      },
+    };
+
+    const vm = adaptToVisualReport(report);
+    const valuationItem = vm.dataAvailability.find((d) => d.key === 'valuation');
+    const fundamentalItem = vm.dataAvailability.find((d) => d.key === 'fundamental');
+    expect(valuationItem?.status).toBe('partial');
+    expect(valuationItem?.reason).toBe('缺少 2/5 欄位');
+    expect(fundamentalItem?.status).toBe('partial');
+    expect(fundamentalItem?.reason).toBe('缺少 1/5 欄位');
+  });
+
+  it('data availability shows not applicable for stock-only snapshots on ETF reports', () => {
+    const etfReport = {
+      ...MSFT_REPORT,
+      details: {
+        rawResult: {
+          ...MSFT_REPORT.details?.rawResult,
+          instrumentType: 'etf',
+          valuationSnapshot: null,
+          fundamentalSnapshot: null,
+          exposureSnapshot: { dataGapFields: [] },
+        },
+      },
+    };
+
+    const vm = adaptToVisualReport(etfReport);
+    expect(vm.dataAvailability.find((d) => d.key === 'valuation')?.status).toBe('na');
+    expect(vm.dataAvailability.find((d) => d.key === 'fundamental')?.status).toBe('na');
+  });
+
   it('does not include exposure item for stock type', () => {
     const vm = adaptToVisualReport(MSFT_REPORT);
     expect(vm.dataAvailability.find((d) => d.key === 'exposure')).toBeUndefined();
