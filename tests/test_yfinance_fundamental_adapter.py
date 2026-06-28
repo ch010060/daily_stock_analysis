@@ -132,6 +132,41 @@ class TestYfinanceFundamentalAdapter(unittest.TestCase):
             ],
         )
 
+    def test_populates_valuation_block_for_us_stock(self) -> None:
+        """Phase 19B.2: trailingPE/forwardPE/priceToBook/marketCap extracted,
+        dividend_yield reuses the already-computed TTM-cash-based yield_pct
+        (not the raw, sometimes-unreliable info.dividendYield)."""
+        info = {
+            "financialCurrency": "USD",
+            "currency": "USD",
+            "currentPrice": 210.0,
+            "trailingPE": 32.5,
+            "forwardPE": 28.1,
+            "priceToBook": 48.2,
+            "marketCap": 3.2e12,
+            "dividendYield": 0.36,
+            "trailingAnnualDividendRate": 1.04,
+        }
+        ticker = _build_mock_ticker(info)
+        with patch("yfinance.Ticker", return_value=ticker):
+            bundle = YfinanceFundamentalAdapter().get_fundamental_bundle("AAPL")
+
+        self.assertEqual(bundle["status"], "partial")
+        valuation = bundle["valuation"]
+        self.assertEqual(valuation["pe_ttm"], 32.5)
+        self.assertEqual(valuation["pe_forward"], 28.1)
+        self.assertEqual(valuation["pb"], 48.2)
+        self.assertEqual(valuation["market_cap"], 3.2e12)
+        # ttm_cash (1.04) / currentPrice (210) * 100 ≈ 0.495 — not the raw 0.36.
+        self.assertAlmostEqual(valuation["dividend_yield"], 0.4952, places=3)
+
+    def test_valuation_block_absent_when_no_fields_available(self) -> None:
+        info = {"financialCurrency": "USD"}
+        ticker = _build_mock_ticker(info)
+        with patch("yfinance.Ticker", return_value=ticker):
+            bundle = YfinanceFundamentalAdapter().get_fundamental_bundle("AAPL")
+        self.assertNotIn("valuation", bundle)
+
     def test_falls_back_to_info_when_statements_only_have_4_quarters(self) -> None:
         """yfinance default is 4 quarters → statement-derived YoY refuses to use QoQ.
 

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ReportOverview } from '../ReportOverview';
 
@@ -113,6 +113,62 @@ describe('ReportOverview', () => {
 
     expect(screen.queryByText(/市場階段/)).not.toBeInTheDocument();
     expect(screen.queryByText('日線未完成')).not.toBeInTheDocument();
+  });
+
+  it('labels the internal score as system score with provenance', () => {
+    render(<ReportOverview meta={baseMeta} summary={baseSummary} />);
+
+    const label = screen.getByText('系統評分');
+    expect(label).toBeInTheDocument();
+    expect(label).toHaveAttribute('aria-label', expect.stringContaining('非市場官方指數'));
+    expect(label).toHaveAttribute('aria-label', expect.stringContaining('非 VIX'));
+    expect(label).toHaveAttribute('aria-label', expect.stringContaining('非 VIXTWN'));
+    expect(label).toHaveAttribute('aria-label', expect.stringContaining('沒有固定公開公式'));
+    expect(screen.queryByText(['恐慌', '貪婪', '指數'].join(''))).not.toBeInTheDocument();
+  });
+
+  it('renders market fear index and system score in one dashboard card when snapshot exists', () => {
+    render(
+      <ReportOverview
+        meta={{ ...baseMeta, reportLanguage: 'zh_TW' }}
+        summary={{ ...baseSummary, sentimentScore: 42 }}
+        details={{
+          rawResult: {
+            instrumentType: 'etf',
+            marketFearIndexSnapshot: {
+              market: 'tw',
+              kind: 'vixtwn',
+              label: '台灣恐慌指數 VIXTWN',
+              value: 44.27,
+              asOf: '2026-06-26',
+              source: 'taifex',
+              sourceUrlKey: 'taifex_vixtwn_daily_txt',
+              status: 'unknown',
+              dataGapReason: null,
+            },
+          },
+        }}
+      />,
+    );
+
+    const gauge = screen.getByTestId('market-risk-gauge');
+    expect(gauge.textContent).toContain('VIXTWN');
+    expect(within(gauge).getByText('VIXTWN')).not.toHaveClass('truncate');
+    expect(screen.getByTestId('market-fear-value')).toHaveTextContent('44.27');
+    expect(gauge.textContent).not.toContain('VIXTWN 44.27');
+    expect(gauge.textContent).toContain('日期：2026-06-26');
+    expect(within(gauge).getByText('日期：')).toBeInTheDocument();
+    expect(within(gauge).getByText('2026-06-26')).toBeInTheDocument();
+    expect(gauge.textContent).toContain('系統評分');
+    expect(gauge.textContent).toContain('恐慌');
+    expect(gauge.textContent).toContain('中性');
+    expect(screen.getByTestId('market-fear-meter')).toBeInTheDocument();
+    expect(screen.getByTestId('market-fear-meter').querySelectorAll('path')).toHaveLength(4);
+    expect(screen.getByTestId('market-fear-pointer')).toBeInTheDocument();
+    expect(screen.queryByTestId('market-fear-marker-row')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('system-score-pointer')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('market-fear-scale')).not.toBeInTheDocument();
+    expect(screen.queryByText('市場情緒')).not.toBeInTheDocument();
   });
 
   it('renders related boards with leading and lagging markers', () => {

@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 完整分析報告新增直接下載 PDF 功能，後端以列印專用報告頁產生完整 PDF 檔。
+
+- [改進] 優化市場恐慌指標卡片的視覺排版與官方指標 marker，移除「原始標籤」冗餘文字，讓個股分析與完整報告中的 VIX／VIXTWN 與「系統評分」更清楚可讀。
+
+- [改進] 恐慌指標卡 UI polish：個股分析側欄改為半圓雙指針 gauge，完整報告保留橫向雙指針 meter；VIX/VIXTWN 與「系統評分」各自顯示狀態 tag、日期與 info 說明，並修正 tooltip 重複/重疊問題。
+
+- [新功能] 完整報告與分析儀表板改為單一雙指針恐慌指標卡，同時顯示市場恐慌指數（美股 VIX／台股 VIXTWN）與「系統評分」，並顯示指標日期與 hover 說明。
+
+- [修復] 將完整報告與儀表板中的內部情緒分數標籤改為「系統評分」，並補充 hover 說明其為本系統分析分數、非市場官方指數、非 VIX/VIXTWN，避免與正式恐慌指數混淆。
+
+- [修復] 將完整報告與儀表板中的內部情緒分數標籤改為「系統評分」，並補充 hover 說明其為本系統分析分數、非市場官方指數、非 VIX/VIXTWN，避免與正式恐慌指數混淆。
+
+- [修復] 將完整報告與儀表板中的內部情緒分數標籤改為「系統評分」，並補充 hover 說明其為本系統分析分數、非市場官方指數、非 VIX/VIXTWN，避免與正式恐慌指數混淆。
+- [修復] 台股/台股 ETF 完整報告的市場風險卡在無 VIX 快照但已有分析情緒分數時，改顯示「市場情緒 · 恐慌貪婪分數」與既有儀表板分數，避免將內部情緒分數誤標為 VIX 或顯示誤導性的「VIX 資料不足」。
+- [新功能] 完整分析報告 K-line 圖表新增 1D/5D 盤中 snapshot 分頁，抽屜分頁調整為 1D/5D/1M/3M/1Y（隱藏 1W UI、保留後端相容），盤中分頁讀取報告保存的 `/kline` snapshot、不顯示日線 MA，並依 `MARKET_REVIEW_COLOR_SCHEME` 套用紅漲綠跌或綠漲紅跌至 K 線與成交量。
+- [新功能] 完整分析報告視覺摘要新增 market-aware K-line 圖表：透過新的 `/api/v1/history/{id}/kline` DB/cache 優先端點讀取日線 OHLCV，台股/台股 ETF 保持 FinMind-backed cache 路徑，美股/美股 ETF 保持 yfinance-backed cache 路徑，前端使用 TradingView Lightweight Charts 顯示 K 線、成交量、MA20/60/120/252 與固定 hover 數值列。
+- [修復] 修正 US 股票 fresh 分析時 FinancialResultCards 全部顯示「—」的問題：`_build_offshore_fundamental_context` 漏合併 yfinance bundle `valuation` block，`_attach_valuation_fundamental_snapshot` 從 `_build_fundamental_block` 包裝層的頂層而非 `"data"` subkey 讀取數值；同時移除 Visual Summary 中重複的 現價（TechnicalSnapshotCards）與重複的 VIX（KPI row）顯示（Phase 19G-R5B）。
+- [改進] WebUI 視覺摘要「估值快照」與「基本面」卡片改為直接顯示投資人關注數值（PE(TTM)/Forward PE/PB/股息率/市值；營收 YoY/淨利 YoY/ROE/毛利率），取代先前以「可用/資料缺口/部分可用/不適用」badge 為主的資料可用性面板；ETF/指數不渲染財務卡片；缺少欄位顯示「—」；資料來源（yfinance/finmind · as_of）以 footnote 形式呈現於各卡片底部（Phase 19G-R5）。
+- [改進] WebUI 報告抽屜新增視覺摘要面板（Phase 19G）：在 Markdown 全文之上插入決策卡、VIX gauge、多週期趨勢條、技術指標卡、資料可用性面板與作戰計畫卡；平行 fetch 不阻塞 Markdown 渲染，detail fetch 失敗時靜默降級。
+- [新功能] 個股／ETF／指數完整報告新增「📈 多週期趨勢快照」區塊（1週/1月/1季/半年/52週），位於「🌡️ 市場風險溫度計」之後、作戰計劃之前；數值由後端從既有 OHLC 資料決定性計算（漲跌幅、區間高低點、自高點回撤、均線位置、趨勢狀態），52 週區間獨立向資料庫優先的歷史資料載入器請求最多 252 個交易日（不調整既有 89 天技術指標視窗），資料不足的週期顯示「資料不足」而非省略或臆測；LLM 不參與該區塊數值生成；未知類型不顯示。
+- [新功能] 完整報告新增「🧭 ETF／指數曝險摘要」（限 ETF/指數）與「🌡️ 市場風險溫度計」（個股／ETF／指數皆顯示，未知類型不顯示）兩個區塊，位於估值與基本面快照之後、作戰計劃之前；美股市場風險溫度計重用既有 `fetcher_manager.get_realtime_quote()` 讀取 VIX/SPX（無新資料源、無新快取，沿用既有 CircuitBreaker），台股本期不發起任何外部資料請求，固定顯示資料不足與原因說明；LLM 不參與該區塊數值生成。
+- [新功能] 個股（`instrument_type=stock`）完整報告新增「🧾 估值與基本面快照」區塊，位於資料透視之後、作戰計劃之前；數值由後端決定性組裝（台股使用 FinMind `TaiwanStockPER`/`TaiwanStockMonthRevenue`，美股重用既有 yfinance 基本面資料），LLM 不參與該區塊數值生成；缺失欄位顯示為資料缺口而非省略；ETF/指數/未知類型不顯示此區塊。
 - [新功能] 個股完整報告新增可選的「附錄：價值網路圖」Mermaid 流程圖區塊，由新環境變數 `ENABLE_VALUE_NETWORK_MERMAID`（預設 `false`）控制是否在 Prompt 中請求 LLM 產出；後端會驗證圖表型別、長度、節點/分類數量並過濾危險內容，驗證失敗則靜默省略，不影響報告其餘內容；WebUI 以 `mermaid`（`securityLevel: strict`）安全渲染，渲染失敗時顯示提示並保留原始 Mermaid 原始碼。
 - [修復] 市場概覽任務完成後會即時更新 MARKET 個股欄卡片與市場概覽歷史資料，完成後不需重新整理整頁即可看到最新市場概覽入口。
 - [修復] Route B 相關資訊/新聞納入規則改為台股/美股正向相關性策略：非台美來源詞不再作為台美新聞正向訊號，無台美公司/財務/產業/市場關聯的內容會在進入 context/cache/tool output 前被丟棄，並保留具財務意義的 App/下載/活躍使用者等商業指標新聞。

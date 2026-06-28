@@ -311,6 +311,7 @@ class YfinanceFundamentalAdapter:
         if ttm_cash is None:
             ttm_cash = _safe_float(info.get("trailingAnnualDividendRate"))
 
+        yield_pct: Optional[float] = None
         if events or ttm_cash is not None:
             events.sort(key=lambda item: item.get("event_date") or "", reverse=True)
             dividend_payload: Dict[str, Any] = {
@@ -332,7 +333,6 @@ class YfinanceFundamentalAdapter:
                 or _safe_float(info.get("regularMarketPrice"))
                 or _safe_float(info.get("previousClose"))
             )
-            yield_pct: Optional[float] = None
             if ttm_cash is not None and latest_price not in (None, 0):
                 yield_pct = round(float(ttm_cash) / float(latest_price) * 100.0, 4)
             elif _safe_float(info.get("trailingAnnualDividendYield")) is not None:
@@ -346,6 +346,18 @@ class YfinanceFundamentalAdapter:
                 dividend_payload["ttm_dividend_yield_pct"] = yield_pct
             result.setdefault("earnings", {})["dividend"] = dividend_payload
             result["source_chain"].append("earnings.dividend:yfinance")
+
+        # ---------------- valuation block (Phase 19B.2) ----------------
+        valuation_payload: Dict[str, Any] = {
+            "pe_ttm": _safe_float(info.get("trailingPE")),
+            "pe_forward": _safe_float(info.get("forwardPE")),
+            "pb": _safe_float(info.get("priceToBook")),
+            "market_cap": _safe_float(info.get("marketCap")),
+            "dividend_yield": yield_pct,
+        }
+        if any(v is not None for v in valuation_payload.values()):
+            result["valuation"] = valuation_payload
+            result["source_chain"].append("valuation:yfinance.info")
 
         # ---------------- belong_boards (sector + industry) ----------------
         belong_boards: List[Dict[str, Any]] = []
@@ -363,6 +375,7 @@ class YfinanceFundamentalAdapter:
             result.get("growth")
             or result.get("earnings")
             or result.get("belong_boards")
+            or result.get("valuation")
         )
         result["status"] = "partial" if has_content else "not_supported"
         return result

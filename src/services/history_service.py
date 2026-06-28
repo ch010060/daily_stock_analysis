@@ -12,6 +12,7 @@ Responsibilities:
 from __future__ import annotations
 import json
 import logging
+import math
 import re
 from datetime import date, datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple, TYPE_CHECKING
@@ -22,10 +23,8 @@ from src.report_language import (
     get_localized_stock_name,
     get_report_labels,
     get_signal_level,
-    get_chip_unavailable_reason,
-    is_chip_structure_unavailable,
+    get_instrument_report_title,
     localize_bias_status,
-    localize_chip_health,
     localize_operation_advice,
     localize_trend_prediction,
     normalize_report_language,
@@ -851,6 +850,13 @@ class HistoryService:
                 change_pct=raw_result.get("change_pct"),
                 model_used=raw_result.get("model_used"),
                 value_network_mermaid=raw_result.get("value_network_mermaid"),
+                instrument_type=raw_result.get("instrument_type", "unknown"),
+                valuation_snapshot=raw_result.get("valuation_snapshot"),
+                fundamental_snapshot=raw_result.get("fundamental_snapshot"),
+                exposure_snapshot=raw_result.get("exposure_snapshot"),
+                market_risk_snapshot=raw_result.get("market_risk_snapshot"),
+                multi_period_trend_snapshot=raw_result.get("multi_period_trend_snapshot"),
+                market_fear_index_snapshot=raw_result.get("market_fear_index_snapshot"),
             )
         except Exception as e:
             logger.error(f"Failed to rebuild AnalysisResult: {e}", exc_info=True)
@@ -896,8 +902,11 @@ class HistoryService:
         signal_text, signal_emoji, signal_tag = self._get_signal_level(result)
         dashboard = result.dashboard if hasattr(result, 'dashboard') and result.dashboard else {}
 
+        report_title = get_instrument_report_title(
+            report_language, getattr(result, "instrument_type", "unknown")
+        )
         report_lines = [
-            f"# 📊 {name_escaped} ({result.code}) {labels['report_title']}",
+            f"# 📊 {name_escaped} ({result.code}) {report_title}",
             "",
             f"> {analysis_date_label}: **{report_date}** | {report_time_label}: {report_time}",
             "",
@@ -973,7 +982,6 @@ class HistoryService:
             trend_data = data_persp.get('trend_status', {})
             price_data = data_persp.get('price_position', {})
             vol_data = data_persp.get('volume_analysis', {})
-            chip_data = data_persp.get('chip_structure', {})
 
             report_lines.extend([
                 f"### 📊 {labels['data_perspective_heading']}",
@@ -1017,35 +1025,190 @@ class HistoryService:
                     f"💡 *{vol_data.get('volume_meaning', '')}*",
                     "",
                 ])
-            # 籌碼結構
-            if chip_data:
-                if is_chip_structure_unavailable(chip_data):
+
+        # ========== 估值與基本面快照（Phase 19B.2，僅 stock，後端決定性組裝）==========
+        if getattr(result, "instrument_type", "unknown") == "stock":
+            valuation_snapshot = getattr(result, "valuation_snapshot", None)
+            fundamental_snapshot = getattr(result, "fundamental_snapshot", None)
+            if isinstance(valuation_snapshot, dict) or isinstance(fundamental_snapshot, dict):
+                report_lines.extend([
+                    f"### 🧾 {labels['valuation_fundamental_heading']}",
+                    "",
+                ])
+                gap_label = labels['snapshot_data_gap_label']
+
+                def _snapshot_value(snapshot: Optional[Dict[str, Any]], field: str, is_pct: bool) -> str:
+                    if not isinstance(snapshot, dict):
+                        return gap_label
+                    value = snapshot.get(field)
+                    if value is None:
+                        return gap_label
+                    return f"{value}%" if is_pct else str(value)
+
+                if isinstance(valuation_snapshot, dict):
                     report_lines.extend([
-                        f"**{labels['chip_label']}**: {get_chip_unavailable_reason(chip_data, report_language)}",
+                        f"**{labels['valuation_metrics_label']}**",
+                        "",
+                        f"| {labels['pe_ttm_label']} | {labels['pe_forward_label']} | {labels['pb_label']} | "
+                        f"{labels['dividend_yield_label']} | {labels['market_cap_label']} |",
+                        "|---|---|---|---|---|",
+                        f"| {_snapshot_value(valuation_snapshot, 'pe_ttm', False)} | "
+                        f"{_snapshot_value(valuation_snapshot, 'pe_forward', False)} | "
+                        f"{_snapshot_value(valuation_snapshot, 'pb', False)} | "
+                        f"{_snapshot_value(valuation_snapshot, 'dividend_yield', True)} | "
+                        f"{_snapshot_value(valuation_snapshot, 'market_cap', False)} |",
                         "",
                     ])
-                else:
-                    raw_chip_health = chip_data.get('chip_health', 'N/A')
-                    chip_health = localize_chip_health(raw_chip_health, report_language)
-                    normalized_chip_health = str(raw_chip_health or "").strip().lower()
-                    if normalized_chip_health in {"健康", "healthy"}:
-                        chip_emoji = "✅"
-                    elif normalized_chip_health in {"一般", "average"}:
-                        chip_emoji = "⚠️"
-                    else:
-                        chip_emoji = "🚨"
+                if isinstance(fundamental_snapshot, dict):
                     report_lines.extend([
-                        f"**{labels['chip_label']}**: {chip_data.get('profit_ratio', 'N/A')} | {chip_data.get('avg_cost', 'N/A')} | "
-                        f"{chip_data.get('concentration', 'N/A')} {chip_emoji}{chip_health}",
+                        f"**{labels['fundamental_metrics_label']}**",
+                        "",
+                        f"| {labels['revenue_yoy_label']} | {labels['earnings_yoy_label']} | "
+                        f"{labels['net_profit_yoy_label']} | {labels['roe_label']} | {labels['gross_margin_label']} |",
+                        "|---|---|---|---|---|",
+                        f"| {_snapshot_value(fundamental_snapshot, 'revenue_yoy', True)} | "
+                        f"{_snapshot_value(fundamental_snapshot, 'earnings_yoy', True)} | "
+                        f"{_snapshot_value(fundamental_snapshot, 'net_profit_yoy', True)} | "
+                        f"{_snapshot_value(fundamental_snapshot, 'roe', True)} | "
+                        f"{_snapshot_value(fundamental_snapshot, 'gross_margin', True)} |",
                         "",
                     ])
-            else:
-                chip_unavailable_reason = get_chip_unavailable_reason(data_persp, report_language)
-                if chip_unavailable_reason:
+                snapshot_source = (
+                    (valuation_snapshot or {}).get("source")
+                    or (fundamental_snapshot or {}).get("source")
+                )
+                snapshot_as_of = (
+                    (valuation_snapshot or {}).get("as_of")
+                    or (fundamental_snapshot or {}).get("as_of")
+                )
+                if snapshot_source or snapshot_as_of:
                     report_lines.extend([
-                        f"**{labels['chip_label']}**: {chip_unavailable_reason}",
+                        f"*{labels['snapshot_source_label']}: {snapshot_source or 'N/A'} | "
+                        f"{labels['snapshot_as_of_label']}: {snapshot_as_of or 'N/A'}*",
                         "",
                     ])
+
+        # ========== ETF/指數曝險摘要 + 市場風險溫度計 ==========
+        # Phase 19B.3: exposure_snapshot stays etf/index-only.
+        # Phase 19B.3A: market_risk_snapshot gating broadened to stock/etf/index
+        # (a market-risk thermometer is useful for stock reports too; the
+        # exposure/leverage summary is not). Each field is gated independently
+        # by instrument_type as defense-in-depth on top of the pipeline gate.
+        instrument_type = getattr(result, "instrument_type", "unknown")
+        show_exposure = instrument_type in ("etf", "index")
+        show_market_risk = instrument_type in ("stock", "etf", "index")
+        if show_exposure or show_market_risk:
+            exposure_snapshot = getattr(result, "exposure_snapshot", None)
+            market_risk_snapshot = getattr(result, "market_risk_snapshot", None)
+            gap_label = labels['snapshot_data_gap_label']
+
+            def _exposure_value(snapshot: Optional[Dict[str, Any]], field: str) -> str:
+                if not isinstance(snapshot, dict):
+                    return gap_label
+                value = snapshot.get(field)
+                return gap_label if value is None else str(value)
+
+            def _format_decimal(snapshot: Optional[Dict[str, Any]], field: str, digits: int = 2) -> str:
+                if not isinstance(snapshot, dict):
+                    return gap_label
+                value = snapshot.get(field)
+                if value is None:
+                    return gap_label
+                try:
+                    f = float(value)
+                    return gap_label if not math.isfinite(f) else f"{f:.{digits}f}"
+                except (TypeError, ValueError):
+                    return gap_label
+
+            if show_exposure and isinstance(exposure_snapshot, dict):
+                report_lines.extend([
+                    f"### 🧭 {labels['exposure_heading']}",
+                    "",
+                    f"| {labels['underlying_index_label']} | {labels['leverage_factor_label']} | "
+                    f"{labels['is_leveraged_label']} | {labels['is_inverse_label']} |",
+                    "|---|---|---|---|",
+                    f"| {_exposure_value(exposure_snapshot, 'underlying_index')} | "
+                    f"{_exposure_value(exposure_snapshot, 'leverage_factor')} | "
+                    f"{_exposure_value(exposure_snapshot, 'is_leveraged')} | "
+                    f"{_exposure_value(exposure_snapshot, 'is_inverse')} |",
+                    "",
+                ])
+
+            if show_market_risk and isinstance(market_risk_snapshot, dict):
+                report_lines.extend([
+                    f"### 🌡️ {labels['market_risk_heading']}",
+                    "",
+                    f"| {labels['vix_level_label']} | {labels['vix_status_label']} | "
+                    f"{labels['spx_change_pct_label']} |",
+                    "|---|---|---|",
+                    f"| {_format_decimal(market_risk_snapshot, 'vix_level')} | "
+                    f"{_exposure_value(market_risk_snapshot, 'vix_status')} | "
+                    f"{_exposure_value(market_risk_snapshot, 'spx_change_pct')} |",
+                    "",
+                ])
+                gap_reason = market_risk_snapshot.get("gap_reason")
+                mrs_source = market_risk_snapshot.get("source")
+                mrs_as_of = market_risk_snapshot.get("as_of")
+                if gap_reason:
+                    report_lines.extend([f"*{gap_reason}*", ""])
+                elif mrs_source or mrs_as_of:
+                    report_lines.extend([
+                        f"*{labels['snapshot_source_label']}: {mrs_source or 'N/A'} | "
+                        f"{labels['snapshot_as_of_label']}: {mrs_as_of or 'N/A'}*",
+                        "",
+                    ])
+
+        # ========== 多週期趨勢快照 ==========
+        # Phase 19B.4: deterministic, backend-computed — stock/etf/index only.
+        show_trend_snapshot = instrument_type in ("stock", "etf", "index")
+        if show_trend_snapshot:
+            trend_snapshot = getattr(result, "multi_period_trend_snapshot", None)
+            if isinstance(trend_snapshot, dict):
+                gap_label = labels['snapshot_data_gap_label']
+                periods = trend_snapshot.get("periods") or []
+                status_label_map = {
+                    "uptrend": labels['trend_status_uptrend_label'],
+                    "downtrend": labels['trend_status_downtrend_label'],
+                    "neutral": labels['trend_status_neutral_label'],
+                    "insufficient_data": labels['trend_status_insufficient_data_label'],
+                }
+
+                def _trend_value(period: Dict[str, Any], field: str, *, is_pct: bool = False) -> str:
+                    if period.get("data_gap_fields") and field in period["data_gap_fields"]:
+                        return gap_label
+                    value = period.get(field)
+                    if value is None:
+                        return gap_label
+                    return f"{value:.2f}%" if is_pct else str(value)
+
+                if periods:
+                    report_lines.extend([
+                        f"### 📈 {labels['multi_period_trend_heading']}",
+                        "",
+                        f"| {labels['period_label']} | {labels['change_pct_label']} | "
+                        f"{labels['drawdown_from_high_pct_label']} | {labels['price_vs_ma_pct_label']} | "
+                        f"{labels['trend_status_label']} |",
+                        "|---|---|---|---|---|",
+                    ])
+                    for period in periods:
+                        status_key = period.get("trend_status") or "insufficient_data"
+                        status_text = status_label_map.get(status_key, gap_label)
+                        report_lines.append(
+                            f"| {period.get('label', period.get('period', 'N/A'))} | "
+                            f"{_trend_value(period, 'change_pct', is_pct=True)} | "
+                            f"{_trend_value(period, 'drawdown_from_high_pct', is_pct=True)} | "
+                            f"{_trend_value(period, 'price_vs_ma_pct', is_pct=True)} | "
+                            f"{status_text} |"
+                        )
+                    report_lines.append("")
+                    ts_source = trend_snapshot.get("source")
+                    ts_as_of = trend_snapshot.get("as_of")
+                    if ts_source or ts_as_of:
+                        report_lines.extend([
+                            f"*{labels['snapshot_source_label']}: {ts_source or 'N/A'} | "
+                            f"{labels['snapshot_as_of_label']}: {ts_as_of or 'N/A'}*",
+                            "",
+                        ])
 
         # ========== 作戰計劃 ==========
         battle = dashboard.get('battle_plan', {}) if dashboard else {}

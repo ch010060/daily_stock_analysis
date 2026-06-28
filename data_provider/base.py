@@ -2821,6 +2821,17 @@ class DataFetcherManager:
         earnings_payload = bundle_payload.get("earnings", {}) if isinstance(bundle_payload.get("earnings"), dict) else {}
         belong_boards = bundle_payload.get("belong_boards") if isinstance(bundle_payload.get("belong_boards"), list) else []
 
+        # Merge yfinance bundle valuation (pe_ttm/pe_forward/pb/market_cap/dividend_yield)
+        # into result_ctx["valuation"]["data"].  The block was built from the realtime-quote
+        # fields (pe_ratio/pb_ratio/total_mv/circ_mv) which use different key names and
+        # therefore never satisfy the pe_ttm/pb/market_cap lookups in
+        # _attach_valuation_fundamental_snapshot.
+        bundle_valuation_payload = bundle_payload.get("valuation") if isinstance(bundle_payload.get("valuation"), dict) else {}
+        if bundle_valuation_payload:
+            result_ctx["valuation"].setdefault("data", {}).update(bundle_valuation_payload)
+            if result_ctx["valuation"].get("status") in ("failed", "not_supported"):
+                result_ctx["valuation"]["status"] = self._infer_block_status(bundle_valuation_payload, "partial")
+
         growth_status = self._infer_block_status(growth_payload, str(bundle_payload.get("status", "not_supported")))
         earnings_status = self._infer_block_status(earnings_payload, str(bundle_payload.get("status", "not_supported")))
 

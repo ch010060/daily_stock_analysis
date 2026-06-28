@@ -9,6 +9,8 @@ import type {
   NewsIntelItem,
   RunDiagnosticSummary,
   StockBarResponse,
+  KlineRange,
+  KlineResponse,
 } from '../types/analysis';
 
 // ============ API 介面 ============
@@ -18,6 +20,20 @@ export interface GetHistoryListParams extends HistoryFilters {
   limit?: number;
   reportType?: string;
 }
+
+const pdfFilenameFromDisposition = (contentDisposition?: string): string | null => {
+  if (!contentDisposition) return null;
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition);
+  if (encoded?.[1]) {
+    try {
+      return decodeURIComponent(encoded[1].trim());
+    } catch {
+      return encoded[1].trim();
+    }
+  }
+  const quoted = /filename="([^"]+)"/i.exec(contentDisposition);
+  return quoted?.[1]?.trim() || null;
+};
 
 export const historyApi = {
   /**
@@ -83,12 +99,36 @@ export const historyApi = {
   },
 
   /**
+   * 下載歷史報告 PDF
+   * @param recordId 分析歷史記錄主鍵 ID
+   */
+  getPdf: async (recordId: number): Promise<{ blob: Blob; filename: string }> => {
+    const response = await apiClient.get<Blob>(`/api/v1/history/${recordId}/pdf`, {
+      responseType: 'blob',
+    });
+    return {
+      blob: response.data,
+      filename: pdfFilenameFromDisposition(response.headers['content-disposition']) || `analysis_report_${recordId}.pdf`,
+    };
+  },
+
+  /**
    * 獲取歷史報告執行診斷摘要
    * @param recordId 分析歷史記錄主鍵 ID
    */
   getDiagnostics: async (recordId: number): Promise<RunDiagnosticSummary> => {
     const response = await apiClient.get<Record<string, unknown>>(`/api/v1/history/${recordId}/diagnostics`);
     return toCamelCase<RunDiagnosticSummary>(response.data);
+  },
+
+  /**
+   * 獲取歷史報告 K-line 日線資料
+   */
+  getKline: async (recordId: number, range: KlineRange = '3m'): Promise<KlineResponse> => {
+    const response = await apiClient.get<Record<string, unknown>>(`/api/v1/history/${recordId}/kline`, {
+      params: { range },
+    });
+    return toCamelCase<KlineResponse>(response.data);
   },
 
   /**

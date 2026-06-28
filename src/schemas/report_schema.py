@@ -9,7 +9,7 @@ Aligns with SYSTEM_PROMPT in src/analyzer.py.
 Uses Optional for lenient parsing; business-layer integrity checks are separate.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -174,3 +174,32 @@ class AnalysisReportSchema(BaseModel):
     search_performed: Optional[bool] = None
     data_sources: Optional[str] = None
     value_network_mermaid: Optional[str] = None
+
+    # Phase 19B.1: deterministic report contract field. Sourced only from
+    # SymbolRecord.instrument_type (src/services/symbol_universe.py) — never
+    # LLM-inferred. The LLM never populates this; it defaults to "unknown"
+    # during LLM-JSON schema validation and is set by the pipeline afterward.
+    instrument_type: Optional[Literal["stock", "etf", "index", "unknown"]] = "unknown"
+
+    # Phase 19B.2: deterministic valuation/fundamental snapshots for stock-only
+    # instruments. Backend-built (FinMind for TW, yfinance for US) after LLM-JSON
+    # validation — never LLM-populated, so any value supplied by the LLM here is
+    # discarded and overwritten by the pipeline, same pattern as instrument_type.
+    valuation_snapshot: Optional[Dict[str, Any]] = None
+    fundamental_snapshot: Optional[Dict[str, Any]] = None
+
+    # Phase 19B.3: deterministic exposure / market-risk snapshots for
+    # etf/index-only instruments. Same contract as 19B.2 above — backend
+    # built after LLM-JSON validation, never LLM-populated.
+    exposure_snapshot: Optional[Dict[str, Any]] = None
+    market_risk_snapshot: Optional[Dict[str, Any]] = None
+
+    # Phase 19B.4: deterministic multi-period trend snapshot for
+    # stock/etf/index instruments. Same contract as 19B.2/19B.3 above —
+    # backend-computed from already-fetched OHLC rows after LLM-JSON
+    # validation, never LLM-populated.
+    multi_period_trend_snapshot: Optional[Dict[str, Any]] = None
+
+    # Phase 19G-R7B: deterministic market fear index snapshot. Pipeline-built
+    # after LLM validation; never trusted from model output.
+    market_fear_index_snapshot: Optional[Dict[str, Any]] = None

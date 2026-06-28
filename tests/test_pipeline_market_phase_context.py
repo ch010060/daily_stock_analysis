@@ -103,6 +103,10 @@ def _make_pipeline(*, agent_mode: bool = False, save_context_snapshot: bool = Tr
     pipeline.search_service.is_available = False
     pipeline.search_service.news_window_days = 3
     pipeline._emit_progress = MagicMock()
+    pipeline._attach_valuation_fundamental_snapshot = MagicMock()
+    pipeline._attach_exposure_and_market_risk_snapshot = MagicMock()
+    pipeline._attach_market_fear_index_snapshot = MagicMock()
+    pipeline._attach_multi_period_trend_snapshot = MagicMock()
     return pipeline
 
 

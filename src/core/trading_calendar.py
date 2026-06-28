@@ -14,6 +14,7 @@
 """
 
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import Enum
@@ -35,21 +36,34 @@ except ImportError:
         "Run: pip install exchange-calendars"
     )
 
-# Market -> exchange code (exchange-calendars)
-MARKET_EXCHANGE = {"cn": "XSHG", "hk": "XHKG", "us": "XNYS", "tw": "XTAI"}
+# Market -> exchange code (exchange-calendars). Project scope is TW/US only
+# (see README); "cn"/"hk" were removed from per-stock market routing.
+MARKET_EXCHANGE = {"us": "XNYS", "tw": "XTAI"}
 
 # Market -> IANA timezone for "today"
 MARKET_TIMEZONE = {
-    "cn": "Asia/Shanghai",
-    "hk": "Asia/Hong_Kong",
     "us": "America/New_York",
     "tw": "Asia/Taipei",
 }
 
+# TW stock/ETF code pattern: 4-5 digit numeric, optionally with a trailing
+# board-lot letter (e.g. '00981A'). Unambiguous: CN A-share codes are always
+# exactly 6 digits, so nothing in this 4-5 char range can collide with them.
+_TW_CODE_PATTERN = re.compile(r"^\d{4,5}[A-Z]?$")
+
+# Bare 6-digit numeric is ambiguous: most TW ETFs in this range (e.g.
+# '006208' Fubon TW50) collide in shape with CN A-share codes (e.g. '002594'
+# Shenzhen-listed BYD) -- both are 6 digits, some even share the '00' lead.
+# Digit-pattern alone cannot disambiguate; resolve via the local-first TW/US
+# symbol universe (src/services/symbol_universe.py), which is built from the
+# TWSE/TPEx ISIN directory and already lru_cache'd in memory, no network call.
+_TW_AMBIGUOUS_SIX_DIGIT_PATTERN = re.compile(r"^\d{6}$")
+
 # P0 market phase baseline (Issue #1386). This is an intentionally small
 # regular-session inference layer; it does not change existing fail-open
 # trading-day filtering or effective-date behavior.
-_CLOSING_AUCTION_WINDOW_MINUTES = {"cn": 3, "hk": 10, "us": 5}
+# TWSE closing call auction window is ~5 minutes (13:25-13:30).
+_CLOSING_AUCTION_WINDOW_MINUTES = {"us": 5, "tw": 5}
 _SUPPORTED_ANALYSIS_PHASES = {
     "auto",
     "premarket",
@@ -109,24 +123,33 @@ class MarketPhaseContext:
 
 def get_market_for_stock(code: str) -> Optional[str]:
     """
-    Infer market region for a stock code.
+    Infer market region for a stock code. Project scope is TW/US only.
 
     Returns:
-        'cn' | 'hk' | 'us' | None (None = unrecognized, fail-open: treat as open)
+        'tw' | 'us' | None (None = unrecognized, fail-open: treat as open)
     """
     if not code or not isinstance(code, str):
         return None
     code = (code or "").strip().upper()
 
-    from data_provider import is_us_stock_code, is_us_index_code, is_hk_stock_code
+    from data_provider import is_us_stock_code, is_us_index_code
 
     if is_us_stock_code(code) or is_us_index_code(code):
         return "us"
-    if is_hk_stock_code(code):
-        return "hk"
-    # A-share: 6-digit numeric
-    if code.isdigit() and len(code) == 6:
-        return "cn"
+    if _TW_CODE_PATTERN.fullmatch(code):
+        return "tw"
+    if _TW_AMBIGUOUS_SIX_DIGIT_PATTERN.fullmatch(code):
+        # ponytail: digit shape alone can't tell '006208' (TW ETF) from
+        # '002594' (CN A-share); consult the local TW/US symbol registry.
+        try:
+            from src.services.symbol_universe import get_default_symbol_universe_cache
+
+            record = get_default_symbol_universe_cache().get_by_raw_symbol(code)
+            if record is not None and (record.market or "").upper() == "TW":
+                return "tw"
+        except Exception:
+            logger.debug("symbol universe lookup failed for %s", code, exc_info=True)
+        return None
     return None
 
 
@@ -137,7 +160,7 @@ def is_market_open(market: str, check_date: date) -> bool:
     Fail-open: returns True if exchange-calendars unavailable or date out of range.
 
     Args:
-        market: 'cn' | 'hk' | 'us'
+        market: 'tw' | 'us'
         check_date: Date to check
 
     Returns:
@@ -512,10 +535,10 @@ def get_open_markets_today() -> Set[str]:
     Get markets that are open today (by each market's local timezone).
 
     Returns:
-        Set of market keys ('cn', 'hk', 'us') that are trading today
+        Set of market keys ('tw', 'us') that are trading today
     """
     if not _XCALS_AVAILABLE:
-        return {"cn", "hk", "us"}
+        return {"tw", "us"}
     result: Set[str] = set()
     for mkt, tz_name in MARKET_TIMEZONE.items():
         try:

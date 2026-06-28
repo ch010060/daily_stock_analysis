@@ -52,6 +52,7 @@ from src.analysis_context_pack_overview import render_analysis_context_pack_over
 from src.market_phase_summary import MARKET_PHASE_SUMMARY_KEY, render_market_phase_summary
 from src.phase_decision_guardrail import apply_phase_decision_guardrails
 from src.services.social_sentiment_service import SocialSentimentService
+from src.services.symbol_universe import resolve_report_instrument_type
 from src.services.analysis_context_builder import (
     AnalysisContextBuilder,
     PipelineAnalysisArtifacts,
@@ -662,6 +663,11 @@ class StockAnalysisPipeline:
             if result:
                 self._emit_progress(94, f"{stock_name}：正在校驗並整理分析結果")
                 result.query_id = query_id
+                result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
+                self._attach_valuation_fundamental_snapshot(result, code, fundamental_context)
+                self._attach_exposure_and_market_risk_snapshot(result, code, fundamental_context)
+                self._attach_market_fear_index_snapshot(result, code)
+                self._attach_multi_period_trend_snapshot(result, code)
                 realtime_data = enhanced_context.get('realtime', {})
                 result.current_price = realtime_data.get('price')
                 result.change_pct = realtime_data.get('change_pct')
@@ -1002,6 +1008,238 @@ class StockAnalysisPipeline:
         enriched_context["belong_boards"] = boards
         return enriched_context
 
+    def _attach_valuation_fundamental_snapshot(
+        self,
+        result: Any,
+        code: str,
+        fundamental_context: Optional[Dict[str, Any]],
+    ) -> None:
+        """
+        Phase 19B.2: attach deterministic `valuation_snapshot` / `fundamental_snapshot`.
+
+        Stock-only (etf/index/unknown render nothing — Phase 19B.3 scope).
+        TW market triggers one additional, narrowly-scoped FinMind fetch
+        (TaiwanStockPER + TaiwanStockMonthRevenue only). US market reuses the
+        yfinance `info` dict already fetched into `fundamental_context` by
+        `get_fundamental_context()` — no extra network call. Never raises;
+        any failure degrades to "no snapshot" rather than aborting the report.
+        """
+        if getattr(result, "instrument_type", "unknown") != "stock":
+            return
+        try:
+            market = get_market_for_stock(normalize_stock_code(code))
+            valuation_raw: Dict[str, Any] = {}
+            fundamental_raw: Dict[str, Any] = {}
+            source: Optional[str] = None
+
+            if market == "tw":
+                from src.finmind.tw_stock_analysis import (
+                    build_tw_valuation_fundamental_snapshot,
+                    normalize_tw_symbol,
+                )
+
+                stock_id, err = normalize_tw_symbol(code)
+                if err or not stock_id:
+                    return
+                from src.services.history_loader import get_frozen_target_date
+
+                frozen = get_frozen_target_date()
+                end_date = (frozen if frozen else get_market_now(market).date()).isoformat()
+                valuation_raw, fundamental_raw = build_tw_valuation_fundamental_snapshot(
+                    stock_id, end_date=end_date,
+                )
+                source = "finmind"
+            elif market == "us":
+                ctx = fundamental_context if isinstance(fundamental_context, dict) else {}
+                valuation_block = ctx.get("valuation") or {}
+                growth_block = ctx.get("growth") or {}
+                # _build_fundamental_block wraps numeric fields under "data"; fall back
+                # to the block itself for callers that pass raw dicts directly.
+                valuation_data = valuation_block.get("data") or valuation_block
+                growth_data = growth_block.get("data") or growth_block
+                valuation_raw = {
+                    "pe_ttm": valuation_data.get("pe_ttm"),
+                    "pe_forward": valuation_data.get("pe_forward"),
+                    "pb": valuation_data.get("pb"),
+                    "dividend_yield": valuation_data.get("dividend_yield"),
+                    "market_cap": valuation_data.get("market_cap"),
+                }
+                fundamental_raw = {
+                    "revenue_yoy": growth_data.get("revenue_yoy"),
+                    "earnings_yoy": growth_data.get("net_profit_yoy"),
+                    "net_profit_yoy": growth_data.get("net_profit_yoy"),
+                    "roe": growth_data.get("roe"),
+                    "gross_margin": growth_data.get("gross_margin"),
+                }
+                source = "yfinance"
+            else:
+                return
+
+            from src.services.valuation_fundamental_snapshot import (
+                build_fundamental_snapshot,
+                build_valuation_snapshot,
+            )
+
+            result.valuation_snapshot = build_valuation_snapshot(valuation_raw, source=source)
+            result.fundamental_snapshot = build_fundamental_snapshot(fundamental_raw, source=source)
+        except Exception as exc:
+            logger.warning("[valuation_fundamental_snapshot] skipped for %s: %s", code, exc)
+
+    def _attach_exposure_and_market_risk_snapshot(
+        self,
+        result: Any,
+        code: str,
+        fundamental_context: Optional[Dict[str, Any]],
+    ) -> None:
+        """
+        Phase 19B.3 / 19B.3A: attach deterministic `exposure_snapshot` /
+        `market_risk_snapshot`.
+
+        `exposure_snapshot` is ETF/index-only. `market_risk_snapshot` is
+        stock/ETF/index (broadened in 19B.3A — a stock report still benefits
+        from a market-risk thermometer even without an exposure summary).
+        `unknown` remains a no-op for both fields.
+
+        US market reuses the existing `fetcher_manager.get_realtime_quote()`
+        dispatcher (already circuit-breaker protected) to read VIX/SPX —
+        no new provider, no new cache. TW market makes no fetch attempt at
+        all this phase (security constraint following the 19B.2A FinMind
+        token-leak incident) and always renders a deterministic data-gap
+        snapshot. Never raises; any failure degrades to "no snapshot"
+        rather than aborting the report.
+        """
+        instrument_type = getattr(result, "instrument_type", "unknown")
+        should_build_exposure = instrument_type in ("etf", "index")
+        should_build_market_risk = instrument_type in ("stock", "etf", "index")
+        if not should_build_exposure and not should_build_market_risk:
+            return
+        try:
+            from src.services.exposure_market_risk_snapshot import (
+                TW_MARKET_RISK_GAP_REASON,
+                build_exposure_snapshot,
+                build_market_risk_snapshot,
+                classify_vix_status,
+            )
+
+            market = get_market_for_stock(normalize_stock_code(code))
+            exposure_raw: Dict[str, Any] = {}
+
+            if market == "us":
+                market_risk_raw: Dict[str, Any] = {}
+                vix_quote = self.fetcher_manager.get_realtime_quote("VIX", log_final_failure=False)
+                if vix_quote:
+                    vix_level = getattr(vix_quote, "price", None)
+                    market_risk_raw["vix_level"] = vix_level
+                    market_risk_raw["vix_status"] = classify_vix_status(vix_level)
+                spx_quote = self.fetcher_manager.get_realtime_quote("SPX", log_final_failure=False)
+                if spx_quote:
+                    market_risk_raw["spx_change_pct"] = getattr(spx_quote, "change_pct", None)
+                if should_build_exposure:
+                    result.exposure_snapshot = build_exposure_snapshot(exposure_raw, source=None)
+                if should_build_market_risk:
+                    result.market_risk_snapshot = build_market_risk_snapshot(
+                        market_risk_raw, source="yfinance" if (vix_quote or spx_quote) else None,
+                    )
+            elif market == "tw":
+                if should_build_exposure:
+                    result.exposure_snapshot = build_exposure_snapshot(exposure_raw, source=None)
+                if should_build_market_risk:
+                    result.market_risk_snapshot = build_market_risk_snapshot(
+                        {}, source=None, gap_reason=TW_MARKET_RISK_GAP_REASON,
+                    )
+            else:
+                return
+        except Exception as exc:
+            logger.warning("[exposure_market_risk_snapshot] skipped for %s: %s", code, exc)
+
+    def _attach_market_fear_index_snapshot(self, result: Any, code: str) -> None:
+        """Attach latest market-level fear index snapshot at analysis time only."""
+        instrument_type = getattr(result, "instrument_type", "unknown")
+        if instrument_type not in ("stock", "etf", "index"):
+            return
+        try:
+            from src.services.market_fear_index_snapshot import (
+                build_tw_vixtwn_market_fear_snapshot,
+                build_us_vix_market_fear_snapshot,
+            )
+
+            market = get_market_for_stock(normalize_stock_code(code))
+            if market == "us":
+                market_risk = getattr(result, "market_risk_snapshot", None)
+                value = market_risk.get("vix_level") if isinstance(market_risk, dict) else None
+                as_of = market_risk.get("as_of") if isinstance(market_risk, dict) else None
+                vix_quote = None
+                if value is None:
+                    vix_quote = self.fetcher_manager.get_realtime_quote("VIX", log_final_failure=False)
+                    value = getattr(vix_quote, "price", None) if vix_quote else None
+                if vix_quote and as_of is None:
+                    as_of = (
+                        getattr(vix_quote, "date", None)
+                        or getattr(vix_quote, "trade_date", None)
+                        or getattr(vix_quote, "timestamp", None)
+                    )
+                result.market_fear_index_snapshot = build_us_vix_market_fear_snapshot(
+                    value,
+                    as_of=str(as_of)[:10] if as_of else None,
+                )
+            elif market == "tw":
+                from src.services.taifex_vixtwn_fetcher import fetch_latest_vixtwn
+
+                result.market_fear_index_snapshot = build_tw_vixtwn_market_fear_snapshot(
+                    fetch_latest_vixtwn()
+                )
+        except Exception as exc:
+            logger.warning("[market_fear_index_snapshot] skipped for %s: %s", code, exc)
+            try:
+                if get_market_for_stock(normalize_stock_code(code)) == "tw":
+                    from src.services.market_fear_index_snapshot import build_tw_vixtwn_gap_snapshot
+
+                    result.market_fear_index_snapshot = build_tw_vixtwn_gap_snapshot()
+            except Exception:
+                return
+
+    def _attach_multi_period_trend_snapshot(
+        self,
+        result: Any,
+        code: str,
+    ) -> None:
+        """
+        Phase 19B.4: attach deterministic `multi_period_trend_snapshot`.
+
+        stock/etf/index only (unknown is a no-op). Computes 5D/20D/60D/120D/
+        252D return, drawdown-from-high, and MA-position rows from OHLC rows
+        loaded via `src.services.history_loader.load_history_df` — a DB-first
+        helper already reused elsewhere (Issue #1066), so this adds at most
+        one additional network fetch (only on a DB-cache miss) and never
+        widens or otherwise touches the existing ~89-day window that feeds
+        MA60/trend_result (this class's main fetch, see the `timedelta(days=89)`
+        window above). Periods without enough rows degrade to
+        `insufficient_data` with `data_gap_fields` populated — never a
+        hallucinated 52W number. Never raises; any failure degrades to
+        "no snapshot" rather than aborting the report.
+        """
+        if getattr(result, "instrument_type", "unknown") not in ("stock", "etf", "index"):
+            return
+        try:
+            from src.services.history_loader import load_history_df
+            from src.services.multi_period_trend_snapshot import (
+                build_multi_period_trend_snapshot,
+            )
+
+            # `days=252` is a trading-day-count request, not a calendar-day
+            # window: load_history_df() internally converts it to a
+            # ~1.8x + 10 calendar-day DB lookback buffer (~463 calendar days
+            # for 252), the same convention already used by
+            # `_ensure_agent_history()`'s `min_days * 1.8` above and by
+            # `data_tools._handle_get_daily_history()`. Pinned by
+            # tests/test_history_loader.py::test_252_trading_days_uses_wide_calendar_buffer.
+            df, source = load_history_df(code, days=252)
+            result.multi_period_trend_snapshot = build_multi_period_trend_snapshot(
+                df, source=(source if df is not None else None),
+            )
+        except Exception as exc:
+            logger.warning("[multi_period_trend_snapshot] skipped for %s: %s", code, exc)
+
     def _ensure_agent_history(self, code: str, min_days: int = 240) -> None:
         """Ensure at least *min_days* of K-line history is in DB for agent tools."""
         from src.services.history_loader import get_frozen_target_date
@@ -1159,6 +1397,11 @@ class StockAnalysisPipeline:
             )
             if result:
                 result.query_id = query_id
+                result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
+                self._attach_valuation_fundamental_snapshot(result, code, fundamental_context)
+                self._attach_exposure_and_market_risk_snapshot(result, code, fundamental_context)
+                self._attach_market_fear_index_snapshot(result, code)
+                self._attach_multi_period_trend_snapshot(result, code)
             # Agent weak integrity: placeholder fill only, no LLM retry
             if result and getattr(self.config, "report_integrity_enabled", False):
                 from src.analyzer import check_content_integrity, apply_placeholder_fill

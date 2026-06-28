@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import re
 
 from src.data.stock_mapping import STOCK_NAME_MAP
+from src.services import symbol_universe
 from src.services.symbol_universe import (
     CuratedSeedSymbolProvider,
     JsonSymbolUniverseProvider,
@@ -14,6 +15,7 @@ from src.services.symbol_universe import (
     SymbolRecord,
     SymbolResolver,
     SymbolUniverseCache,
+    resolve_report_instrument_type,
 )
 
 
@@ -136,6 +138,63 @@ def test_resolver_exact_aliases_and_index_aliases_are_deterministic() -> None:
         assert result.selected.market == market
         assert result.selected.raw_symbol == symbol
         assert result.candidates[0].match_reason == reason
+
+
+# ============================================================
+# Phase 19B.1: resolve_report_instrument_type source verification
+# ============================================================
+# These tests confirm the report-contract helper sources instrument_type
+# exclusively from the already-loaded local SymbolRecord cache (no network
+# call, no universe rebuild, no LLM), and never invents a classification
+# outside the {"stock", "etf", "index", "unknown"} contract.
+
+def test_resolve_report_instrument_type_reads_only_from_symbol_record(monkeypatch) -> None:
+    cache = SymbolUniverseCache.from_providers([
+        StaticSymbolUniverseProvider(
+            "test_provider",
+            [
+                _record("TW:0050", "0050", "TW", "元大台灣50", instrument_type="etf"),
+                _record("TW:2330", "2330", "TW", "台積電", instrument_type="stock"),
+            ],
+        )
+    ])
+    monkeypatch.setattr(symbol_universe, "get_default_symbol_universe_cache", lambda: cache)
+
+    assert resolve_report_instrument_type("0050") == "etf"
+    assert resolve_report_instrument_type("2330") == "stock"
+
+
+def test_resolve_report_instrument_type_maps_unrecognized_types_to_unknown(monkeypatch) -> None:
+    """SymbolRecord.instrument_type has values outside the report contract
+    (e.g. etn, preferred_stock) — these must degrade to 'unknown', never be
+    invented as a new report category."""
+    cache = SymbolUniverseCache.from_providers([
+        StaticSymbolUniverseProvider(
+            "test_provider",
+            [_record("TW:00772B", "00772B", "TW", "測試ETN", instrument_type="etn")],
+        )
+    ])
+    monkeypatch.setattr(symbol_universe, "get_default_symbol_universe_cache", lambda: cache)
+
+    assert resolve_report_instrument_type("00772B") == "unknown"
+
+
+def test_resolve_report_instrument_type_unknown_when_not_in_universe() -> None:
+    assert resolve_report_instrument_type("NOT_A_REAL_SYMBOL_XYZ") == "unknown"
+
+
+def test_resolve_report_instrument_type_never_raises_on_lookup_failure(monkeypatch) -> None:
+    """Lookup must never crash report generation; any cache failure degrades to 'unknown'."""
+
+    class _BoomCache:
+        def get_by_raw_symbol(self, raw_symbol: str):
+            raise RuntimeError("simulated cache failure")
+
+    monkeypatch.setattr(symbol_universe, "get_default_symbol_universe_cache", lambda: _BoomCache())
+
+    assert resolve_report_instrument_type("2330") == "unknown"
+    assert resolve_report_instrument_type("") == "unknown"
+    assert resolve_report_instrument_type(None) == "unknown"
 
 
 def test_spy_does_not_resolve_to_syre_even_when_syre_exists() -> None:

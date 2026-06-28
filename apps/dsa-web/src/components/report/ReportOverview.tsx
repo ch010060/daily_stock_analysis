@@ -5,6 +5,8 @@ import type {
   ReportSummary as ReportSummaryType,
 } from '../../types/analysis';
 import { Badge, Button, Card, ScoreGauge } from '../common';
+import { MarketRiskGauge } from './visual/MarketRiskGauge';
+import { adaptToVisualReport } from './visual/reportVisualSummaryAdapter';
 import { formatDateTime } from '../../utils/format';
 import { getMarketPhaseSummaryLabel, getPartialBarLabel } from '../../utils/marketPhase';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
@@ -95,6 +97,12 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
   const relatedBoards = (Array.isArray(details?.belongBoards) ? details.belongBoards : [])
     .filter((board) => normalizeBoardName(board?.name).length > 0);
   const boardSignals = buildBoardSignalMap(details);
+  let visualSummaryVm: ReturnType<typeof adaptToVisualReport> | null = null;
+  try {
+    visualSummaryVm = adaptToVisualReport({ meta, summary, details });
+  } catch {
+    visualSummaryVm = null;
+  }
 
   const getPriceChangeStyle = (changePct: number | undefined): React.CSSProperties | undefined => {
     if (changePct === undefined || changePct === null) {
@@ -313,12 +321,28 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
               </div>
             </Card>
           )}
-          <Card variant="bordered" padding="md" className="home-panel-card home-rail-card !overflow-visible">
-            <div className="text-center">
-              <h3 className="mb-5 text-sm font-medium tracking-wide text-foreground">{text.marketSentiment}</h3>
-              <ScoreGauge score={summary.sentimentScore} size="lg" language={reportLanguage} />
-            </div>
-          </Card>
+          {visualSummaryVm ? (
+            <MarketRiskGauge
+              vixLevel={visualSummaryVm.vixLevel}
+              vixStatus={visualSummaryVm.vixStatus}
+              spxChangePct={visualSummaryVm.spxChangePct}
+              dataGap={visualSummaryVm.marketRiskDataGap}
+              marketRiskKind={visualSummaryVm.marketRiskKind}
+              sentimentScore={visualSummaryVm.marketRiskSentimentScore}
+              sentimentLabel={visualSummaryVm.marketRiskSentimentLabel}
+              marketFearIndex={visualSummaryVm.marketFearIndex}
+              systemScore={visualSummaryVm.systemScore}
+              layout="dashboard"
+              className="home-panel-card home-rail-card !overflow-visible"
+            />
+          ) : (
+            <Card variant="bordered" padding="md" className="home-panel-card home-rail-card !overflow-visible">
+              <div className="text-center">
+                <h3 className="mb-5 text-sm font-medium tracking-wide text-foreground">{text.marketSentiment}</h3>
+                <ScoreGauge score={summary.sentimentScore} size="lg" language={reportLanguage} />
+              </div>
+            </Card>
+          )}
         </div>
       </div>
     </div>

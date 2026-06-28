@@ -461,6 +461,50 @@ export interface StockBarResponse {
   items: StockBarItem[];
 }
 
+// ============ K-line Types ============
+
+export type KlineRange = '1d' | '5d' | '1w' | '1m' | '3m' | '1y';
+export type VisibleKlineRange = '1d' | '5d' | '1m' | '3m' | '1y';
+export type KlineGranularity = 'intraday' | 'daily' | string;
+
+export interface KlineBar {
+  date?: string;
+  timestamp?: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number | null;
+  ma20?: number | null;
+  ma60?: number | null;
+  ma120?: number | null;
+  ma252?: number | null;
+}
+
+export interface KlineResponse {
+  historyId?: number | null;
+  symbol: string;
+  market: 'tw' | 'us' | 'unknown' | string;
+  instrumentType: InstrumentType | string;
+  range: KlineRange;
+  granularity?: KlineGranularity;
+  interval?: string | null;
+  currency?: string | null;
+  timezone?: string | null;
+  source: string;
+  sourceType: 'db_cache' | 'provider' | 'data_gap' | string;
+  sourceChain?: string[];
+  asOf?: string | null;
+  isCached?: boolean | null;
+  rows: KlineBar[];
+  candles?: KlineBar[];
+  snapshotCreatedAt?: string | null;
+  currentPrice?: number | null;
+  supportLevel?: number | null;
+  resistanceLevel?: number | null;
+  dataGapReason?: string | null;
+}
+
 // ============ Error Types ============
 
 export interface ApiError {
@@ -502,3 +546,106 @@ export const getSentimentColor = (score: number): string => {
   if (score <= 80) return '#22c55e'; // green-500
   return '#10b981'; // emerald-500
 };
+
+// ============ Visual Report Snapshot Types (Phase 19B raw_result overlay) ============
+// These types mirror the backend snapshot dicts after camelCase conversion.
+// Access via AnalysisReport.details.rawResult cast to VisualReportRawResult.
+
+export type InstrumentType = 'stock' | 'etf' | 'index' | 'unknown';
+
+export interface MarketRiskSnapshot {
+  source?: string;
+  asOf?: string;
+  vixLevel?: number | null;
+  vixStatus?: string | null;
+  spxChangePct?: number | null;
+  gapReason?: string | null;
+  dataGapFields?: string[];
+}
+
+export type MarketFearIndexKind = 'vix' | 'vixtwn';
+
+export interface MarketFearIndexSnapshot {
+  market?: 'us' | 'tw' | string | null;
+  kind?: MarketFearIndexKind | string | null;
+  label?: string | null;
+  value?: number | null;
+  asOf?: string | null;
+  source?: string | null;
+  sourceUrlKey?: string | null;
+  status?: string | null;
+  dataGapReason?: string | null;
+}
+
+export interface MultiPeriodTrendPeriod {
+  label?: string;
+  period?: string;
+  changePct?: number | null;
+  drawdownPct?: number | null;
+  // API returns drawdown_from_high_pct → toCamelCase → drawdownFromHighPct
+  drawdownFromHighPct?: number | null;
+  priceVsMaPct?: number | null;
+  // test fixtures use `status`; real API returns trend_status → toCamelCase → trendStatus
+  status?: string | null;
+  trendStatus?: string | null;
+}
+
+export interface MultiPeriodTrendSnapshot {
+  source?: string;
+  asOf?: string;
+  periods?: MultiPeriodTrendPeriod[];
+  dataGapFields?: string[];
+}
+
+export interface DataSnapshot {
+  source?: string;
+  asOf?: string;
+  dataGapFields?: string[];
+  gapReason?: string | null;
+  [key: string]: unknown;
+}
+
+export interface ValuationSnapshot extends DataSnapshot {
+  peTtm?: number | null;
+  peForward?: number | null;
+  pb?: number | null;
+  dividendYield?: number | null;
+  marketCap?: number | null;
+}
+
+export interface FundamentalSnapshot extends DataSnapshot {
+  revenueYoy?: number | null;
+  earningsYoy?: number | null;
+  netProfitYoy?: number | null;
+  roe?: number | null;
+  grossMargin?: number | null;
+}
+
+/** Typed overlay for AnalysisReport.details.rawResult in history detail responses */
+export interface VisualReportRawResult {
+  instrumentType?: InstrumentType;
+  // Price/technical fields (also in meta, but raw_result may have richer data)
+  currentPrice?: number | null;
+  changePct?: number | null;
+  ma5?: number | null;
+  ma10?: number | null;
+  ma20?: number | null;
+  deviationRate?: number | null;
+  supportLevel?: number | null;
+  resistanceLevel?: number | null;
+  trendStrength?: number | null;
+  volumeRatio?: number | null;
+  turnoverRate?: number | null;
+  rsi?: number | null;
+  rsi6?: number | null;
+  rsi12?: number | null;
+  // Phase 19B snapshots
+  marketRiskSnapshot?: MarketRiskSnapshot | null;
+  marketFearIndexSnapshot?: MarketFearIndexSnapshot | null;
+  multiPeriodTrendSnapshot?: MultiPeriodTrendSnapshot | null;
+  valuationSnapshot?: ValuationSnapshot | null;
+  fundamentalSnapshot?: FundamentalSnapshot | null;
+  exposureSnapshot?: DataSnapshot | null;
+  valueNetworkMermaid?: string | null;
+  [key: string]: unknown;
+}

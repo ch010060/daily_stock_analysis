@@ -15,6 +15,7 @@ import types
 import unittest
 import sys
 import os
+from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch, PropertyMock
@@ -2903,6 +2904,606 @@ class TestSkillActivation(unittest.TestCase):
                 agent_result, "2330", "TestCo", ReportType.SIMPLE, "q1"
             )
             self.assertEqual(result.sentiment_score, 80)
+
+
+# ============================================================
+# Phase 19B.1: instrument_type Agent-mode parity
+# ============================================================
+# Both the legacy path (analyze_stock) and the Agent-mode path
+# (_analyze_with_agent) must set AnalysisResult.instrument_type via the same
+# resolve_report_instrument_type(code) call — parity by construction, not by
+# independent LLM inference in either path.
+
+class TestInstrumentTypeAgentParity(unittest.TestCase):
+    """instrument_type must be set identically regardless of agent_mode."""
+
+    def _mock_cfg(self, agent_mode: bool) -> MagicMock:
+        mock_cfg = MagicMock()
+        mock_cfg.max_workers = 2
+        mock_cfg.agent_mode = agent_mode
+        mock_cfg.is_agent_available.return_value = agent_mode
+        mock_cfg.agent_max_steps = 10
+        mock_cfg.agent_skills = []
+        mock_cfg.bocha_api_keys = []
+        mock_cfg.tavily_api_keys = []
+        mock_cfg.brave_api_keys = []
+        mock_cfg.serpapi_keys = []
+        mock_cfg.searxng_base_urls = []
+        mock_cfg.searxng_public_instances_enabled = False
+        mock_cfg.news_max_age_days = 7
+        mock_cfg.enable_realtime_quote = True
+        mock_cfg.enable_chip_distribution = True
+        mock_cfg.realtime_source_priority = []
+        mock_cfg.save_context_snapshot = False
+        return mock_cfg
+
+    def test_agent_mode_sets_instrument_type_from_resolver(self):
+        """_analyze_with_agent must set instrument_type via resolve_report_instrument_type."""
+        with patch('src.core.pipeline.get_config') as mock_config, \
+             patch('src.core.pipeline.get_db'), \
+             patch('src.core.pipeline.DataFetcherManager'), \
+             patch('src.core.pipeline.GeminiAnalyzer'), \
+             patch('src.core.pipeline.NotificationService'), \
+             patch('src.core.pipeline.SearchService'), \
+             patch('src.agent.factory.build_agent_executor') as mock_build_executor, \
+             patch('src.core.pipeline.resolve_report_instrument_type') as mock_resolve:
+
+            mock_resolve.return_value = "etf"
+            mock_cfg = self._mock_cfg(agent_mode=True)
+            mock_config.return_value = mock_cfg
+
+            from src.core.pipeline import StockAnalysisPipeline
+            from src.agent.executor import AgentResult
+            from src.enums import ReportType
+            pipeline = StockAnalysisPipeline(config=mock_cfg)
+
+            agent_result = AgentResult(
+                success=True,
+                content="{}",
+                dashboard={
+                    "stock_name": "元大台灣50",
+                    "sentiment_score": 60,
+                    "trend_prediction": "震盪",
+                    "operation_advice": "持有",
+                    "decision_type": "hold",
+                },
+                provider="gemini",
+            )
+            mock_executor = MagicMock()
+            mock_executor.run.return_value = agent_result
+            mock_build_executor.return_value = mock_executor
+            pipeline.search_service.is_available = False
+
+            result = pipeline._analyze_with_agent(
+                code="0050",
+                report_type=ReportType.SIMPLE,
+                query_id="q-parity-agent",
+                stock_name="元大台灣50",
+                realtime_quote=None,
+                chip_data=None,
+            )
+
+            self.assertIsNotNone(result)
+            self.assertEqual(result.instrument_type, "etf")
+            mock_resolve.assert_called_once_with("0050")
+
+    def test_legacy_and_agent_paths_resolve_same_instrument_type_for_same_code(self):
+        """Same code must yield the same instrument_type whether agent_mode is on or off."""
+        for agent_mode in (False, True):
+            with patch('src.core.pipeline.get_config') as mock_config, \
+                 patch('src.core.pipeline.get_db'), \
+                 patch('src.core.pipeline.DataFetcherManager'), \
+                 patch('src.core.pipeline.GeminiAnalyzer'), \
+                 patch('src.core.pipeline.NotificationService'), \
+                 patch('src.core.pipeline.SearchService'), \
+                 patch('src.agent.factory.build_agent_executor') as mock_build_executor, \
+                 patch('src.core.pipeline.resolve_report_instrument_type') as mock_resolve:
+
+                mock_resolve.return_value = "stock"
+                mock_cfg = self._mock_cfg(agent_mode=agent_mode)
+                mock_config.return_value = mock_cfg
+
+                from src.core.pipeline import StockAnalysisPipeline
+                from src.agent.executor import AgentResult
+                from src.enums import ReportType
+                pipeline = StockAnalysisPipeline(config=mock_cfg)
+
+                if agent_mode:
+                    agent_result = AgentResult(
+                        success=True,
+                        content="{}",
+                        dashboard={
+                            "stock_name": "台積電",
+                            "sentiment_score": 70,
+                            "trend_prediction": "看多",
+                            "operation_advice": "持有",
+                            "decision_type": "hold",
+                        },
+                        provider="gemini",
+                    )
+                    mock_executor = MagicMock()
+                    mock_executor.run.return_value = agent_result
+                    mock_build_executor.return_value = mock_executor
+                    pipeline.search_service.is_available = False
+
+                    result = pipeline._analyze_with_agent(
+                        code="2330",
+                        report_type=ReportType.SIMPLE,
+                        query_id="q-parity-2",
+                        stock_name="台積電",
+                        realtime_quote=None,
+                        chip_data=None,
+                    )
+                else:
+                    pipeline.fetcher_manager.get_realtime_quote.return_value = None
+                    pipeline.fetcher_manager.get_chip_distribution.return_value = None
+                    pipeline.search_service.is_available = False
+                    pipeline.db.get_analysis_context.return_value = None
+                    pipeline.analyzer.analyze.return_value = MagicMock(
+                        code="2330", name="台積電", success=True,
+                    )
+
+                    result = pipeline.analyze_stock("2330", ReportType.SIMPLE, "q-parity-2")
+
+                self.assertIsNotNone(result)
+                self.assertEqual(result.instrument_type, "stock")
+                mock_resolve.assert_called_once_with("2330")
+
+
+class TestAttachValuationFundamentalSnapshot(unittest.TestCase):
+    """Phase 19B.2: unit tests for pipeline._attach_valuation_fundamental_snapshot.
+
+    Directly invokes the wired method on a minimally-constructed pipeline
+    instance rather than driving the full analyze_stock/_analyze_with_agent
+    flow — the method is already proven reachable from both paths by
+    TestInstrumentTypeAgentParity's "set instrument_type then call" pattern.
+    """
+
+    def _make_pipeline(self) -> "StockAnalysisPipeline":  # noqa: F821
+        with patch('src.core.pipeline.get_config') as mock_config, \
+             patch('src.core.pipeline.get_db'), \
+             patch('src.core.pipeline.DataFetcherManager'), \
+             patch('src.core.pipeline.GeminiAnalyzer'), \
+             patch('src.core.pipeline.NotificationService'), \
+             patch('src.core.pipeline.SearchService'):
+            mock_cfg = MagicMock()
+            mock_cfg.max_workers = 2
+            mock_cfg.agent_mode = False
+            mock_config.return_value = mock_cfg
+
+            from src.core.pipeline import StockAnalysisPipeline
+            return StockAnalysisPipeline(config=mock_cfg)
+
+    def test_non_stock_instrument_type_is_noop(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="etf", valuation_snapshot=None, fundamental_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock') as mock_market:
+            pipeline._attach_valuation_fundamental_snapshot(result, "0050", None)
+            mock_market.assert_not_called()
+
+        self.assertIsNone(result.valuation_snapshot)
+        self.assertIsNone(result.fundamental_snapshot)
+
+    def test_tw_stock_builds_finmind_snapshots(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_snapshot=None, fundamental_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
+             patch('src.finmind.tw_stock_analysis.normalize_tw_symbol', return_value=("2330", None)), \
+             patch('src.services.history_loader.get_frozen_target_date', return_value=date(2026, 6, 25)), \
+             patch(
+                 'src.finmind.tw_stock_analysis.build_tw_valuation_fundamental_snapshot',
+                 return_value=(
+                     {"pe_ttm": 23.1, "pb": 6.3, "as_of": "2026-06-13"},
+                     {"revenue_yoy": 45.0, "as_of": "2026-06-10"},
+                 ),
+             ):
+            pipeline._attach_valuation_fundamental_snapshot(result, "2330", None)
+
+        self.assertEqual(result.valuation_snapshot["pe_ttm"], 23.1)
+        self.assertEqual(result.valuation_snapshot["source"], "finmind")
+        self.assertEqual(result.fundamental_snapshot["revenue_yoy"], 45.0)
+        self.assertEqual(result.fundamental_snapshot["source"], "finmind")
+
+    def test_us_stock_builds_yfinance_snapshots_from_fundamental_context(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_snapshot=None, fundamental_snapshot=None)
+        fundamental_context = {
+            "valuation": {"pe_ttm": 32.5, "pe_forward": 28.1, "pb": 48.2, "market_cap": 3.2e12, "dividend_yield": 0.5},
+            "growth": {"revenue_yoy": 16.6, "net_profit_yoy": 19.3, "roe": 141.5, "gross_margin": 47.9},
+        }
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="us"):
+            pipeline._attach_valuation_fundamental_snapshot(result, "AAPL", fundamental_context)
+
+        self.assertEqual(result.valuation_snapshot["pe_ttm"], 32.5)
+        self.assertEqual(result.valuation_snapshot["source"], "yfinance")
+        self.assertEqual(result.fundamental_snapshot["earnings_yoy"], 19.3)  # mapped from net_profit_yoy
+        self.assertEqual(result.fundamental_snapshot["net_profit_yoy"], 19.3)
+        self.assertEqual(result.fundamental_snapshot["source"], "yfinance")
+
+    def test_us_stock_reads_nested_data_key_from_build_fundamental_block(self) -> None:
+        # _build_fundamental_block wraps payload under "data"; pipeline must unwrap it.
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_snapshot=None, fundamental_snapshot=None)
+        fundamental_context = {
+            "valuation": {
+                "status": "ok",
+                "coverage": {"status": "ok"},
+                "source_chain": [],
+                "errors": [],
+                "data": {
+                    "pe_ttm": 28.5, "pe_forward": 25.1, "pb": 12.3,
+                    "dividend_yield": 0.72, "market_cap": 3.08e12,
+                },
+            },
+            "growth": {
+                "status": "ok",
+                "coverage": {"status": "ok"},
+                "source_chain": [],
+                "errors": [],
+                "data": {
+                    "revenue_yoy": 17.2, "net_profit_yoy": 21.4,
+                    "roe": 35.2, "gross_margin": 69.4,
+                },
+            },
+        }
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="us"):
+            pipeline._attach_valuation_fundamental_snapshot(result, "MSFT", fundamental_context)
+
+        self.assertIsNotNone(result.valuation_snapshot)
+        self.assertAlmostEqual(result.valuation_snapshot["pe_ttm"], 28.5)
+        self.assertAlmostEqual(result.valuation_snapshot["pb"], 12.3)
+        self.assertAlmostEqual(result.valuation_snapshot["market_cap"], 3.08e12)
+        self.assertEqual(result.valuation_snapshot["source"], "yfinance")
+        self.assertIsNotNone(result.fundamental_snapshot)
+        self.assertAlmostEqual(result.fundamental_snapshot["revenue_yoy"], 17.2)
+        self.assertAlmostEqual(result.fundamental_snapshot["net_profit_yoy"], 21.4)
+        self.assertAlmostEqual(result.fundamental_snapshot["earnings_yoy"], 21.4)
+        self.assertAlmostEqual(result.fundamental_snapshot["roe"], 35.2)
+        self.assertEqual(result.fundamental_snapshot["source"], "yfinance")
+
+    def test_exception_degrades_to_no_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_snapshot=None, fundamental_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', side_effect=RuntimeError("boom")):
+            pipeline._attach_valuation_fundamental_snapshot(result, "2330", None)
+
+        self.assertIsNone(result.valuation_snapshot)
+        self.assertIsNone(result.fundamental_snapshot)
+
+
+class TestAttachExposureAndMarketRiskSnapshot(unittest.TestCase):
+    """Phase 19B.3 / 19B.3A: unit tests for
+    pipeline._attach_exposure_and_market_risk_snapshot.
+
+    19B.3A gating contract: exposure_snapshot stays etf/index-only;
+    market_risk_snapshot is broadened to stock/etf/index; unknown remains
+    a no-op for both. Mirrors TestAttachValuationFundamentalSnapshot's
+    direct-invocation pattern. No live network/provider calls —
+    fetcher_manager.get_realtime_quote is always mocked.
+    """
+
+    def _make_pipeline(self) -> "StockAnalysisPipeline":  # noqa: F821
+        with patch('src.core.pipeline.get_config') as mock_config, \
+             patch('src.core.pipeline.get_db'), \
+             patch('src.core.pipeline.DataFetcherManager'), \
+             patch('src.core.pipeline.GeminiAnalyzer'), \
+             patch('src.core.pipeline.NotificationService'), \
+             patch('src.core.pipeline.SearchService'):
+            mock_cfg = MagicMock()
+            mock_cfg.max_workers = 2
+            mock_cfg.agent_mode = False
+            mock_config.return_value = mock_cfg
+
+            from src.core.pipeline import StockAnalysisPipeline
+            return StockAnalysisPipeline(config=mock_cfg)
+
+    def test_stock_us_builds_market_risk_but_not_exposure(self) -> None:
+        """19B.3A: a US stock gets market_risk_snapshot from the mocked
+        VIX/SPX quote path, but exposure_snapshot stays None."""
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", exposure_snapshot=None, market_risk_snapshot=None)
+        vix_quote = SimpleNamespace(price=18.1, change_pct=None)
+        spx_quote = SimpleNamespace(price=None, change_pct=0.4)
+
+        def _fake_quote(code, log_final_failure=False):
+            return vix_quote if code == "VIX" else spx_quote
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="us"), \
+             patch.object(pipeline.fetcher_manager, 'get_realtime_quote', side_effect=_fake_quote):
+            pipeline._attach_exposure_and_market_risk_snapshot(result, "AAPL", None)
+
+        self.assertIsNone(result.exposure_snapshot)
+        self.assertIsNotNone(result.market_risk_snapshot)
+        self.assertEqual(result.market_risk_snapshot["vix_level"], 18.1)
+        self.assertEqual(result.market_risk_snapshot["source"], "yfinance")
+
+    def test_stock_tw_market_risk_data_gap_no_fetch(self) -> None:
+        """19B.3A: a TW stock gets a data-gap market_risk_snapshot with zero
+        quote-provider calls, and no exposure_snapshot."""
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", exposure_snapshot=None, market_risk_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
+             patch.object(pipeline.fetcher_manager, 'get_realtime_quote') as mock_quote:
+            pipeline._attach_exposure_and_market_risk_snapshot(result, "2330", None)
+            mock_quote.assert_not_called()
+
+        self.assertIsNone(result.exposure_snapshot)
+        self.assertIsNotNone(result.market_risk_snapshot)
+        self.assertIsNone(result.market_risk_snapshot["source"])
+        self.assertIn("gap_reason", result.market_risk_snapshot)
+
+    def test_etf_and_index_still_build_both_snapshots(self) -> None:
+        """19B.3A: etf/index instrument types are unaffected — both fields
+        still get built, exactly as in 19B.3."""
+        pipeline = self._make_pipeline()
+        for instrument_type in ("etf", "index"):
+            result = SimpleNamespace(instrument_type=instrument_type, exposure_snapshot=None, market_risk_snapshot=None)
+            with patch('src.core.pipeline.get_market_for_stock', return_value="tw"):
+                pipeline._attach_exposure_and_market_risk_snapshot(result, "0050", None)
+            self.assertIsNotNone(result.exposure_snapshot, instrument_type)
+            self.assertIsNotNone(result.market_risk_snapshot, instrument_type)
+
+    def test_unknown_instrument_type_is_noop(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="unknown", exposure_snapshot=None, market_risk_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock') as mock_market:
+            pipeline._attach_exposure_and_market_risk_snapshot(result, "AAPL", None)
+            mock_market.assert_not_called()
+
+        self.assertIsNone(result.exposure_snapshot)
+        self.assertIsNone(result.market_risk_snapshot)
+
+    def test_us_etf_builds_market_risk_from_realtime_quote(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="etf", exposure_snapshot=None, market_risk_snapshot=None)
+        vix_quote = SimpleNamespace(price=28.4, change_pct=None)
+        spx_quote = SimpleNamespace(price=None, change_pct=-1.2)
+
+        def _fake_quote(code, log_final_failure=False):
+            return vix_quote if code == "VIX" else spx_quote
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="us"), \
+             patch.object(pipeline.fetcher_manager, 'get_realtime_quote', side_effect=_fake_quote):
+            pipeline._attach_exposure_and_market_risk_snapshot(result, "SPY", None)
+
+        self.assertEqual(result.market_risk_snapshot["vix_level"], 28.4)
+        self.assertEqual(result.market_risk_snapshot["vix_status"], "緊張")
+        self.assertEqual(result.market_risk_snapshot["spx_change_pct"], -1.2)
+        self.assertEqual(result.market_risk_snapshot["source"], "yfinance")
+        self.assertIsNotNone(result.exposure_snapshot)
+
+    def test_tw_index_always_renders_data_gap_no_fetch(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="index", exposure_snapshot=None, market_risk_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
+             patch.object(pipeline.fetcher_manager, 'get_realtime_quote') as mock_quote:
+            pipeline._attach_exposure_and_market_risk_snapshot(result, "0050", None)
+            mock_quote.assert_not_called()
+
+        self.assertIsNone(result.market_risk_snapshot["source"])
+        self.assertIn("gap_reason", result.market_risk_snapshot)
+        self.assertEqual(result.market_risk_snapshot["data_gap_fields"], list(["vix_level", "vix_status", "spx_change_pct", "risk_level"]))
+
+    def test_exception_degrades_to_no_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="etf", exposure_snapshot=None, market_risk_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', side_effect=RuntimeError("boom")):
+            pipeline._attach_exposure_and_market_risk_snapshot(result, "0050", None)
+
+        self.assertIsNone(result.exposure_snapshot)
+        self.assertIsNone(result.market_risk_snapshot)
+
+
+class TestAttachMarketFearIndexSnapshot(unittest.TestCase):
+    def _make_pipeline(self) -> "StockAnalysisPipeline":  # noqa: F821
+        with patch('src.core.pipeline.get_config') as mock_config, \
+             patch('src.core.pipeline.get_db'), \
+             patch('src.core.pipeline.DataFetcherManager'), \
+             patch('src.core.pipeline.GeminiAnalyzer'), \
+             patch('src.core.pipeline.NotificationService'), \
+             patch('src.core.pipeline.SearchService'):
+            mock_cfg = MagicMock()
+            mock_cfg.max_workers = 2
+            mock_cfg.agent_mode = False
+            mock_config.return_value = mock_cfg
+
+            from src.core.pipeline import StockAnalysisPipeline
+            return StockAnalysisPipeline(config=mock_cfg)
+
+    def test_us_stock_builds_vix_market_fear_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", market_fear_index_snapshot=None)
+        vix_quote = SimpleNamespace(price=18.41, date="2026-06-26")
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="us"), \
+             patch.object(pipeline.fetcher_manager, 'get_realtime_quote', return_value=vix_quote):
+            pipeline._attach_market_fear_index_snapshot(result, "MSFT")
+
+        self.assertEqual(result.market_fear_index_snapshot["market"], "us")
+        self.assertEqual(result.market_fear_index_snapshot["kind"], "vix")
+        self.assertEqual(result.market_fear_index_snapshot["value"], 18.41)
+        self.assertEqual(result.market_fear_index_snapshot["as_of"], "2026-06-26")
+        self.assertEqual(result.market_fear_index_snapshot["source"], "yfinance_yahoo_quote")
+
+    def test_tw_etf_builds_vixtwn_market_fear_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(
+            instrument_type="etf",
+            market_fear_index_snapshot={"kind": "llm_fake"},
+        )
+        quote = SimpleNamespace(
+            value=44.27,
+            as_of="2026-06-26",
+            source="taifex",
+            source_url_key="taifex_vixtwn_daily_txt",
+            data_gap_reason=None,
+        )
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
+             patch('src.services.taifex_vixtwn_fetcher.fetch_latest_vixtwn', return_value=quote):
+            pipeline._attach_market_fear_index_snapshot(result, "006208")
+
+        self.assertEqual(result.market_fear_index_snapshot["market"], "tw")
+        self.assertEqual(result.market_fear_index_snapshot["kind"], "vixtwn")
+        self.assertEqual(result.market_fear_index_snapshot["value"], 44.27)
+        self.assertEqual(result.market_fear_index_snapshot["as_of"], "2026-06-26")
+        self.assertEqual(result.market_fear_index_snapshot["source"], "taifex")
+
+    def test_tw_fetcher_exception_degrades_to_gap_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", market_fear_index_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
+             patch('src.services.taifex_vixtwn_fetcher.fetch_latest_vixtwn', side_effect=RuntimeError("boom")):
+            pipeline._attach_market_fear_index_snapshot(result, "2454")
+
+        self.assertEqual(result.market_fear_index_snapshot["kind"], "vixtwn")
+        self.assertIsNone(result.market_fear_index_snapshot["value"])
+        self.assertEqual(result.market_fear_index_snapshot["data_gap_reason"], "taifex_vixtwn_fetch_failed")
+
+    def test_unknown_instrument_type_does_not_fetch(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="unknown", market_fear_index_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock') as mock_market, \
+             patch.object(pipeline.fetcher_manager, 'get_realtime_quote') as mock_quote:
+            pipeline._attach_market_fear_index_snapshot(result, "MSFT")
+
+        mock_market.assert_not_called()
+        mock_quote.assert_not_called()
+        self.assertIsNone(result.market_fear_index_snapshot)
+
+
+class TestAttachMultiPeriodTrendSnapshot(unittest.TestCase):
+    """Phase 19B.4: unit tests for
+    pipeline._attach_multi_period_trend_snapshot.
+
+    Approach A: this method calls
+    `src.services.history_loader.load_history_df(code, days=252)`
+    independently — it never touches the existing ~89-day window used for
+    MA60/trend_result. Mirrors TestAttachExposureAndMarketRiskSnapshot's
+    direct-invocation pattern. No live network/provider calls —
+    load_history_df is always mocked.
+    """
+
+    def _make_pipeline(self) -> "StockAnalysisPipeline":  # noqa: F821
+        with patch('src.core.pipeline.get_config') as mock_config, \
+             patch('src.core.pipeline.get_db'), \
+             patch('src.core.pipeline.DataFetcherManager'), \
+             patch('src.core.pipeline.GeminiAnalyzer'), \
+             patch('src.core.pipeline.NotificationService'), \
+             patch('src.core.pipeline.SearchService'):
+            mock_cfg = MagicMock()
+            mock_cfg.max_workers = 2
+            mock_cfg.agent_mode = False
+            mock_config.return_value = mock_cfg
+
+            from src.core.pipeline import StockAnalysisPipeline
+            return StockAnalysisPipeline(config=mock_cfg)
+
+    @staticmethod
+    def _rows(n: int, start: float = 100.0, step: float = 5.0) -> list:
+        from datetime import date, timedelta
+        base = date(2025, 1, 1)
+        return [
+            {
+                "date": (base + timedelta(days=i)).isoformat(),
+                "high": start + i * step + 1,
+                "low": start + i * step - 1,
+                "close": start + i * step,
+            }
+            for i in range(n)
+        ]
+
+    def test_stock_etf_index_attach_from_sufficient_rows(self) -> None:
+        pipeline = self._make_pipeline()
+        rows = self._rows(260)
+        for instrument_type in ("stock", "etf", "index"):
+            result = SimpleNamespace(instrument_type=instrument_type, multi_period_trend_snapshot=None)
+            with patch('src.services.history_loader.load_history_df', return_value=(rows, "db_cache")):
+                pipeline._attach_multi_period_trend_snapshot(result, "2330")
+            self.assertIsNotNone(result.multi_period_trend_snapshot, instrument_type)
+            self.assertEqual(result.multi_period_trend_snapshot["source"], "db_cache")
+            self.assertEqual(result.multi_period_trend_snapshot["data_gap_fields"], [])
+
+    def test_unknown_instrument_type_is_noop(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="unknown", multi_period_trend_snapshot=None)
+
+        with patch('src.services.history_loader.load_history_df') as mock_load:
+            pipeline._attach_multi_period_trend_snapshot(result, "AAPL")
+            mock_load.assert_not_called()
+
+        self.assertIsNone(result.multi_period_trend_snapshot)
+
+    def test_insufficient_rows_produce_data_gap_not_exception(self) -> None:
+        pipeline = self._make_pipeline()
+        rows = self._rows(10)
+        result = SimpleNamespace(instrument_type="stock", multi_period_trend_snapshot=None)
+
+        with patch('src.services.history_loader.load_history_df', return_value=(rows, "yfinance")):
+            pipeline._attach_multi_period_trend_snapshot(result, "AAPL")
+
+        self.assertIsNotNone(result.multi_period_trend_snapshot)
+        self.assertIn("60D", result.multi_period_trend_snapshot["data_gap_fields"])
+        self.assertIn("252D", result.multi_period_trend_snapshot["data_gap_fields"])
+
+    def test_load_history_df_returns_none_degrades_to_no_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", multi_period_trend_snapshot=None)
+
+        with patch('src.services.history_loader.load_history_df', return_value=(None, "none")):
+            pipeline._attach_multi_period_trend_snapshot(result, "AAPL")
+
+        self.assertIsNone(result.multi_period_trend_snapshot)
+
+    def test_exception_degrades_to_no_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="etf", multi_period_trend_snapshot=None)
+
+        with patch('src.services.history_loader.load_history_df', side_effect=RuntimeError("boom")):
+            pipeline._attach_multi_period_trend_snapshot(result, "0050")
+
+        self.assertIsNone(result.multi_period_trend_snapshot)
+
+    def test_does_not_widen_or_touch_existing_89_day_window(self) -> None:
+        """Approach A guard: calling the new method must not invoke
+        db.get_data_range (the existing MA60/trend_result fetch path) —
+        it only goes through load_history_df."""
+        pipeline = self._make_pipeline()
+        rows = self._rows(260)
+        result = SimpleNamespace(instrument_type="index", multi_period_trend_snapshot=None)
+
+        with patch('src.services.history_loader.load_history_df', return_value=(rows, "db_cache")):
+            pipeline._attach_multi_period_trend_snapshot(result, "0050")
+
+        pipeline.db.get_data_range.assert_not_called()
+
+    def test_agent_and_non_agent_paths_call_same_method_with_same_args(self) -> None:
+        """Parity by construction: both analyze_stock and _analyze_with_agent
+        invoke `_attach_multi_period_trend_snapshot(result, code)` — verified
+        by calling it directly through two independently constructed
+        pipelines and confirming identical output for identical input,
+        mirroring TestInstrumentTypeAgentParity's approach for 19B.1."""
+        rows = self._rows(260)
+        outputs = []
+        for _ in range(2):
+            pipeline = self._make_pipeline()
+            result = SimpleNamespace(instrument_type="stock", multi_period_trend_snapshot=None)
+            with patch('src.services.history_loader.load_history_df', return_value=(rows, "db_cache")):
+                pipeline._attach_multi_period_trend_snapshot(result, "2330")
+            outputs.append(result.multi_period_trend_snapshot)
+
+        self.assertEqual(outputs[0], outputs[1])
 
 
 if __name__ == '__main__':

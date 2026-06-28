@@ -137,6 +137,147 @@ class TestAnalysisReportSchema(unittest.TestCase):
         schema = AnalysisReportSchema.model_validate(data)
         self.assertEqual(schema.value_network_mermaid, "flowchart TB\n  A --> B")
 
+    def test_schema_instrument_type_defaults_to_unknown(self) -> None:
+        """Phase 19B.1: instrument_type is declared and defaults to 'unknown'."""
+        self.assertIn("instrument_type", AnalysisReportSchema.model_fields)
+
+        data = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        schema = AnalysisReportSchema.model_validate(data)
+        self.assertEqual(schema.instrument_type, "unknown")
+
+    def test_schema_instrument_type_accepts_contract_values(self) -> None:
+        """Phase 19B.1: only stock/etf/index/unknown are valid; others reject."""
+        base = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        for value in ("stock", "etf", "index", "unknown"):
+            schema = AnalysisReportSchema.model_validate({**base, "instrument_type": value})
+            self.assertEqual(schema.instrument_type, value)
+
+        with self.assertRaises(Exception):
+            AnalysisReportSchema.model_validate({**base, "instrument_type": "warrant"})
+
+    def test_schema_valuation_fundamental_snapshot_fields_default_to_none(self) -> None:
+        """Phase 19B.2: declared, Optional[Dict], default None, extra="allow"
+        means any LLM-supplied value is accepted by the schema but is later
+        discarded/overwritten by the pipeline (same pattern as instrument_type)."""
+        self.assertIn("valuation_snapshot", AnalysisReportSchema.model_fields)
+        self.assertIn("fundamental_snapshot", AnalysisReportSchema.model_fields)
+
+        data = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        schema = AnalysisReportSchema.model_validate(data)
+        self.assertIsNone(schema.valuation_snapshot)
+        self.assertIsNone(schema.fundamental_snapshot)
+
+    def test_schema_valuation_fundamental_snapshot_accepts_dict(self) -> None:
+        base = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        snapshot = {"pe_ttm": 23.1, "source": "finmind", "data_gap_fields": []}
+        schema = AnalysisReportSchema.model_validate(
+            {**base, "valuation_snapshot": snapshot, "fundamental_snapshot": snapshot}
+        )
+        self.assertEqual(schema.valuation_snapshot, snapshot)
+        self.assertEqual(schema.fundamental_snapshot, snapshot)
+
+    def test_schema_exposure_market_risk_snapshot_fields_default_to_none(self) -> None:
+        """Phase 19B.3: same declared-Optional-Dict-default-None pattern as 19B.2."""
+        self.assertIn("exposure_snapshot", AnalysisReportSchema.model_fields)
+        self.assertIn("market_risk_snapshot", AnalysisReportSchema.model_fields)
+
+        data = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        schema = AnalysisReportSchema.model_validate(data)
+        self.assertIsNone(schema.exposure_snapshot)
+        self.assertIsNone(schema.market_risk_snapshot)
+
+    def test_schema_exposure_market_risk_snapshot_accepts_dict(self) -> None:
+        base = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        snapshot = {"vix_level": 18.2, "source": "yfinance", "data_gap_fields": []}
+        schema = AnalysisReportSchema.model_validate(
+            {**base, "exposure_snapshot": snapshot, "market_risk_snapshot": snapshot}
+        )
+        self.assertEqual(schema.exposure_snapshot, snapshot)
+        self.assertEqual(schema.market_risk_snapshot, snapshot)
+
+    def test_schema_multi_period_trend_snapshot_defaults_to_none(self) -> None:
+        """Phase 19B.4: same declared-Optional-Dict-default-None pattern as 19B.2/19B.3."""
+        self.assertIn("multi_period_trend_snapshot", AnalysisReportSchema.model_fields)
+        self.assertIn("market_fear_index_snapshot", AnalysisReportSchema.model_fields)
+
+        data = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        schema = AnalysisReportSchema.model_validate(data)
+        self.assertIsNone(schema.multi_period_trend_snapshot)
+        self.assertIsNone(schema.market_fear_index_snapshot)
+
+    def test_schema_multi_period_trend_snapshot_accepts_dict(self) -> None:
+        base = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        snapshot = {"periods": [], "source": "db_cache", "data_gap_fields": []}
+        schema = AnalysisReportSchema.model_validate(
+            {**base, "multi_period_trend_snapshot": snapshot}
+        )
+        self.assertEqual(schema.multi_period_trend_snapshot, snapshot)
+
+    def test_schema_market_fear_index_snapshot_accepts_dict(self) -> None:
+        base = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        snapshot = {"market": "tw", "kind": "vixtwn", "value": 44.27, "status": "unknown"}
+        schema = AnalysisReportSchema.model_validate(
+            {**base, "market_fear_index_snapshot": snapshot}
+        )
+        self.assertEqual(schema.market_fear_index_snapshot, snapshot)
+
+    def test_schema_old_payload_without_multi_period_trend_snapshot_still_parses(self) -> None:
+        """Old payloads recorded before Phase 19B.4 must still validate."""
+        data = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+            "exposure_snapshot": {"leverage_factor": 1},
+        }
+        schema = AnalysisReportSchema.model_validate(data)
+        self.assertIsNone(schema.multi_period_trend_snapshot)
+
 
 class TestAnalyzerSchemaFallback(unittest.TestCase):
     """Analyzer fallback when schema validation fails."""
@@ -239,3 +380,73 @@ class TestAnalyzerSchemaFallback(unittest.TestCase):
         self.assertEqual(result.trend_prediction, "Bullish")
         self.assertEqual(result.operation_advice, "Buy")
         self.assertEqual(result.confidence_level, "Low")
+
+    def test_parse_response_ignores_llm_supplied_instrument_type(self) -> None:
+        """Phase 19B.1: instrument_type must never be LLM-inferred; it stays
+        at the dataclass default regardless of what the LLM JSON contains.
+        The pipeline (not the analyzer) is responsible for setting it from
+        SymbolRecord."""
+        analyzer = GeminiAnalyzer()
+        response = json.dumps({
+            "stock_name": "台積電",
+            "sentiment_score": 72,
+            "trend_prediction": "看多",
+            "operation_advice": "持有",
+            "decision_type": "hold",
+            "analysis_summary": "技術面向好",
+            "instrument_type": "etf",
+        })
+        result = analyzer._parse_response(response, "2330", "股票2330")
+        self.assertEqual(result.instrument_type, "unknown")
+
+    def test_parse_response_ignores_llm_supplied_valuation_fundamental_snapshot(self) -> None:
+        """Phase 19B.2: same non-LLM-inferred contract as instrument_type —
+        the pipeline (not the analyzer) builds these from FinMind/yfinance."""
+        analyzer = GeminiAnalyzer()
+        response = json.dumps({
+            "stock_name": "台積電",
+            "sentiment_score": 72,
+            "trend_prediction": "看多",
+            "operation_advice": "持有",
+            "decision_type": "hold",
+            "analysis_summary": "技術面向好",
+            "valuation_snapshot": {"pe_ttm": 999.0},
+            "fundamental_snapshot": {"revenue_yoy": 999.0},
+        })
+        result = analyzer._parse_response(response, "2330", "股票2330")
+        self.assertIsNone(result.valuation_snapshot)
+        self.assertIsNone(result.fundamental_snapshot)
+
+    def test_parse_response_ignores_llm_supplied_exposure_market_risk_snapshot(self) -> None:
+        """Phase 19B.3: same non-LLM-inferred contract — the pipeline (not
+        the analyzer) builds these from realtime-quote data / data-gap."""
+        analyzer = GeminiAnalyzer()
+        response = json.dumps({
+            "stock_name": "0050",
+            "sentiment_score": 72,
+            "trend_prediction": "看多",
+            "operation_advice": "持有",
+            "decision_type": "hold",
+            "analysis_summary": "技術面向好",
+            "exposure_snapshot": {"leverage_factor": 999},
+            "market_risk_snapshot": {"vix_level": 999.0},
+        })
+        result = analyzer._parse_response(response, "0050", "元大台灣50")
+        self.assertIsNone(result.exposure_snapshot)
+        self.assertIsNone(result.market_risk_snapshot)
+
+    def test_parse_response_ignores_llm_supplied_multi_period_trend_snapshot(self) -> None:
+        """Phase 19B.4: same non-LLM-inferred contract — the pipeline (not
+        the analyzer) builds this from OHLC rows via load_history_df."""
+        analyzer = GeminiAnalyzer()
+        response = json.dumps({
+            "stock_name": "0050",
+            "sentiment_score": 72,
+            "trend_prediction": "看多",
+            "operation_advice": "持有",
+            "decision_type": "hold",
+            "analysis_summary": "技術面向好",
+            "multi_period_trend_snapshot": {"periods": [{"period": "5D", "change_pct": 999.0}]},
+        })
+        result = analyzer._parse_response(response, "0050", "元大台灣50")
+        self.assertIsNone(result.multi_period_trend_snapshot)

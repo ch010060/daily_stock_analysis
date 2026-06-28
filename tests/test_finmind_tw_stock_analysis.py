@@ -29,6 +29,7 @@ from src.finmind.tw_stock_analysis import (
     _extract_price_volume,
     _extract_valuation,
     _generate_analysis_prompts,
+    build_tw_valuation_fundamental_snapshot,
     normalize_tw_symbol,
 )
 
@@ -405,6 +406,60 @@ class TestTWStockAnalysisCollector(unittest.TestCase):
         rev = snap.sections["monthly_revenue"]
         self.assertTrue(rev["yoy_available"])
         self.assertAlmostEqual(rev["yoy_pct"], 45.0, places=0)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Tests: Phase 19B.2 narrow valuation/fundamental snapshot fetch
+# ──────────────────────────────────────────────────────────────────────────────
+
+class TestBuildTwValuationFundamentalSnapshot(unittest.TestCase):
+    """Only TaiwanStockPER + TaiwanStockMonthRevenue are fetched — confirmed by
+    the recorded-calls fetcher below not seeing any other dataset name."""
+
+    class _RecordingFetcher(MockFetcher):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.calls: List[str] = []
+
+        def fetch(self, dataset: str, *, data_id: str, start_date: str, end_date: str, **kwargs) -> Dict:
+            self.calls.append(dataset)
+            return super().fetch(dataset, data_id=data_id, start_date=start_date, end_date=end_date, **kwargs)
+
+    def test_happy_path_extracts_both_sections(self):
+        fetcher = self._RecordingFetcher()
+        valuation_raw, fundamental_raw = build_tw_valuation_fundamental_snapshot(
+            "2330", end_date="2026-06-14", fetcher=fetcher
+        )
+        self.assertEqual(valuation_raw["pe_ttm"], 23.1)
+        self.assertEqual(valuation_raw["pb"], 6.3)
+        self.assertEqual(valuation_raw["dividend_yield"], 1.77)
+        self.assertIsNotNone(valuation_raw["as_of"])
+        self.assertAlmostEqual(fundamental_raw["revenue_yoy"], 45.0, places=0)
+        self.assertIsNotNone(fundamental_raw["as_of"])
+        # Scope guard: only the two targeted datasets, not the full 12-section
+        # TWStockAnalysisCollector fetch surface.
+        self.assertEqual(set(fetcher.calls), {"TaiwanStockPER", "TaiwanStockMonthRevenue"})
+
+    def test_unavailable_datasets_degrade_to_empty_dicts(self):
+        fetcher = self._RecordingFetcher(
+            unavailable=["TaiwanStockPER", "TaiwanStockMonthRevenue"]
+        )
+        valuation_raw, fundamental_raw = build_tw_valuation_fundamental_snapshot(
+            "2330", end_date="2026-06-14", fetcher=fetcher
+        )
+        self.assertEqual(valuation_raw, {})
+        self.assertEqual(fundamental_raw, {})
+
+    def test_fetcher_exception_never_raises(self):
+        class _RaisingFetcher:
+            def fetch(self, *args, **kwargs):
+                raise RuntimeError("network down")
+
+        valuation_raw, fundamental_raw = build_tw_valuation_fundamental_snapshot(
+            "2330", end_date="2026-06-14", fetcher=_RaisingFetcher()
+        )
+        self.assertEqual(valuation_raw, {})
+        self.assertEqual(fundamental_raw, {})
 
 
 if __name__ == "__main__":

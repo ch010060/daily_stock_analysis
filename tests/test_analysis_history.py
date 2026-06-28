@@ -16,7 +16,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 # Keep this test runnable when optional LLM runtime deps are not installed.
 try:
@@ -240,6 +240,50 @@ class AnalysisHistoryTestCase(unittest.TestCase):
                 self.fail("未找到儲存的歷史記錄")
             payload = json.loads(row.raw_result or "{}")
             self.assertEqual(payload.get("model_used"), "gemini/gemini-2.0-flash")
+
+    def test_save_analysis_history_backfills_missing_tw_market_fear_snapshot(self) -> None:
+        """TW stock/ETF reports must persist VIXTWN even if the pipeline attach was missed."""
+        result = AnalysisResult(
+            code="006208",
+            name="富邦台50",
+            sentiment_score=43,
+            trend_prediction="中性",
+            operation_advice="觀望",
+            analysis_summary="summary",
+        )
+        result.instrument_type = "etf"
+
+        with patch(
+            "src.services.taifex_vixtwn_fetcher.fetch_latest_vixtwn",
+            return_value=SimpleNamespace(
+                value=44.27,
+                as_of="2026-06-26",
+                source="taifex",
+                source_url_key="taifex_vixtwn_daily_txt",
+                data_gap_reason=None,
+            ),
+        ):
+            saved = self.db.save_analysis_history(
+                result=result,
+                query_id="query_vixtwn_backfill",
+                report_type="full",
+                news_content=None,
+                context_snapshot=None,
+                save_snapshot=False,
+            )
+
+        self.assertEqual(saved, 1)
+        with self.db.get_session() as session:
+            row = session.query(AnalysisHistory).filter(
+                AnalysisHistory.query_id == "query_vixtwn_backfill"
+            ).first()
+            if row is None:
+                self.fail("未找到儲存的歷史記錄")
+            payload = json.loads(row.raw_result or "{}")
+            snapshot = payload.get("market_fear_index_snapshot")
+            self.assertEqual(snapshot["kind"], "vixtwn")
+            self.assertEqual(snapshot["value"], 44.27)
+            self.assertEqual(snapshot["as_of"], "2026-06-26")
 
     def test_update_analysis_history_diagnostics_preserves_snapshot_fields(self) -> None:
         """通知傳送後補寫 diagnostics 時，不應覆蓋已有上下文欄位。"""
@@ -676,6 +720,67 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(payload["items"][0]["title"], "台積電法說會最新重點")
         self.assertEqual(payload["items"][0]["snippet"], "AI 需求與先進製程仍是市場關注焦點。")
         self.assertEqual(payload["items"][0]["url"], "https://news.example.com/tsmc")
+
+    @patch("src.auth.is_auth_enabled", return_value=False)
+    def test_history_pdf_api_returns_pdf_attachment(self, mock_auth) -> None:
+        """GET /api/v1/history/{id}/pdf should return generated PDF bytes."""
+        if TestClient is None or create_app is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        record_id = self._save_history("query_pdf_api_001")
+        static_dir = Path(self._temp_dir.name) / "empty-static"
+        static_dir.mkdir(exist_ok=True)
+        client = TestClient(create_app(static_dir=static_dir))
+        pdf_mock = AsyncMock(return_value=b"%PDF fake")
+
+        with patch("api.v1.endpoints.history.generate_pdf_from_print_route", pdf_mock):
+            response = client.get(f"/api/v1/history/{record_id}/pdf")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"%PDF fake")
+        self.assertEqual(response.headers["content-type"], "application/pdf")
+        self.assertIn("attachment", response.headers["content-disposition"])
+        self.assertIn("filename*=", response.headers["content-disposition"])
+        pdf_mock.assert_awaited_once()
+        print_url = pdf_mock.await_args.args[0]
+        self.assertTrue(print_url.endswith(f"/reports/{record_id}/print?pdf=1"))
+
+    @patch("src.auth.is_auth_enabled", return_value=False)
+    def test_history_pdf_api_missing_report_returns_404(self, mock_auth) -> None:
+        """Missing history id should not invoke PDF generation."""
+        if TestClient is None or create_app is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        static_dir = Path(self._temp_dir.name) / "empty-static"
+        static_dir.mkdir(exist_ok=True)
+        client = TestClient(create_app(static_dir=static_dir))
+        pdf_mock = AsyncMock(return_value=b"%PDF fake")
+
+        with patch("api.v1.endpoints.history.generate_pdf_from_print_route", pdf_mock):
+            response = client.get("/api/v1/history/999999/pdf")
+
+        self.assertEqual(response.status_code, 404)
+        pdf_mock.assert_not_awaited()
+
+    @patch("src.auth.is_auth_enabled", return_value=False)
+    def test_history_pdf_api_unavailable_returns_controlled_error(self, mock_auth) -> None:
+        """Unavailable browser runtime should be surfaced as a controlled 503."""
+        if TestClient is None or create_app is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        from src.services.report_pdf_service import ReportPdfUnavailable
+
+        record_id = self._save_history("query_pdf_api_002")
+        static_dir = Path(self._temp_dir.name) / "empty-static"
+        static_dir.mkdir(exist_ok=True)
+        client = TestClient(create_app(static_dir=static_dir))
+        pdf_mock = AsyncMock(side_effect=ReportPdfUnavailable("unavailable"))
+
+        with patch("api.v1.endpoints.history.generate_pdf_from_print_route", pdf_mock):
+            response = client.get(f"/api/v1/history/{record_id}/pdf")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["error"], "pdf_unavailable")
 
     @patch("src.auth.is_auth_enabled", return_value=False)
     def test_history_news_api_links_duplicate_relevant_news_to_current_report(self, mock_auth) -> None:
@@ -1252,7 +1357,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
 
         self.assertEqual(markdown, "# 🎯 大盤覆盤\n\n## 今日大盤\n\n覆盤正文")
 
-    def test_history_markdown_collapses_unavailable_chip_structure(self) -> None:
+    def test_history_markdown_suppresses_deprecated_chip_structure(self) -> None:
         result = AnalysisResult(
             code="2330",
             name="台積電",
@@ -1293,7 +1398,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         markdown = HistoryService(self.db).get_markdown_report(str(record_id))
 
         self.assertIsNotNone(markdown)
-        self.assertIn("**籌碼**: 籌碼分佈未啟用或資料來源暫不可用，未納入籌碼判斷。", markdown)
+        self.assertNotIn("籌碼", markdown)
         self.assertEqual(markdown.count("資料缺失，無法判斷"), 0)
 
     def test_history_detail_returns_persisted_market_review_report(self) -> None:
@@ -1579,6 +1684,365 @@ class AnalysisHistoryTestCase(unittest.TestCase):
 
         self.assertIsNotNone(rebuilt)
         self.assertIsNone(rebuilt.value_network_mermaid)
+
+    def test_rebuild_analysis_result_carries_instrument_type(self) -> None:
+        """Phase 19B.1: _rebuild_analysis_result carries instrument_type from raw_result."""
+        record_id = self._save_history("query_instrument_type_001")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            raw_result = {
+                "code": "0050",
+                "name": "元大台灣50",
+                "instrument_type": "etf",
+            }
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertEqual(rebuilt.instrument_type, "etf")
+
+    def test_rebuild_analysis_result_defaults_instrument_type_to_unknown(self) -> None:
+        """Phase 19B.1: old history records (no instrument_type key) rebuild as 'unknown',
+        not a crash and not a missing attribute — backward compatibility contract."""
+        record_id = self._save_history("query_instrument_type_002")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            raw_result = {
+                "code": "2330",
+                "name": "台積電",
+            }
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertEqual(rebuilt.instrument_type, "unknown")
+
+    def test_rebuild_analysis_result_carries_exposure_and_market_risk_snapshot(self) -> None:
+        """Phase 19B.3: _rebuild_analysis_result carries exposure_snapshot/
+        market_risk_snapshot from raw_result, mirroring 19B.2's snapshot fields."""
+        record_id = self._save_history("query_exposure_market_risk_001")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            raw_result = {
+                "code": "0050",
+                "name": "元大台灣50",
+                "instrument_type": "etf",
+                "exposure_snapshot": {"leverage_factor": 1, "data_gap_fields": []},
+                "market_risk_snapshot": {"vix_level": 18.2, "source": "yfinance"},
+                "market_fear_index_snapshot": {"market": "tw", "kind": "vixtwn", "value": 44.27},
+            }
+            with patch("src.services.taifex_vixtwn_fetcher.fetch_latest_vixtwn", side_effect=RuntimeError("should not fetch")):
+                rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertEqual(rebuilt.exposure_snapshot, {"leverage_factor": 1, "data_gap_fields": []})
+        self.assertEqual(rebuilt.market_risk_snapshot, {"vix_level": 18.2, "source": "yfinance"})
+        self.assertEqual(rebuilt.market_fear_index_snapshot, {"market": "tw", "kind": "vixtwn", "value": 44.27})
+
+    def test_rebuild_analysis_result_defaults_exposure_market_risk_to_none(self) -> None:
+        """Old history records (no exposure/market_risk keys) rebuild as None,
+        not a crash — same backward compatibility contract as 19B.1/19B.2."""
+        record_id = self._save_history("query_exposure_market_risk_002")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            raw_result = {"code": "2330", "name": "台積電"}
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertIsNone(rebuilt.exposure_snapshot)
+        self.assertIsNone(rebuilt.market_risk_snapshot)
+        self.assertIsNone(rebuilt.market_fear_index_snapshot)
+
+    def test_generate_single_stock_markdown_renders_exposure_and_market_risk_for_etf(self) -> None:
+        """Phase 19B.3: markdown renders the new sections for etf/index only,
+        positioned after the 19B.2 valuation/fundamental section."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "etf"
+        result.exposure_snapshot = {"underlying_index": "S&P 500", "leverage_factor": 2, "data_gap_fields": []}
+        result.market_risk_snapshot = {
+            "vix_level": 18.2, "vix_status": "平穩", "spx_change_pct": 0.4,
+            "source": "yfinance", "data_gap_fields": [],
+        }
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn("ETF／指數曝險摘要", markdown)
+        self.assertIn("市場風險溫度計", markdown)
+        self.assertIn("S&P 500", markdown)
+        self.assertIn("18.2", markdown)
+
+    def test_generate_single_stock_markdown_omits_exposure_section_for_stock(self) -> None:
+        """19B.3A: stock-type results must never show the etf/index-only
+        exposure section, even if the field is somehow populated
+        (defensive — should not happen given the pipeline gate)."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "stock"
+        result.exposure_snapshot = {"underlying_index": "should not render"}
+        result.market_risk_snapshot = {"vix_level": 18.2}
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertNotIn("ETF／指數曝險摘要", markdown)
+
+    def test_generate_single_stock_markdown_renders_market_risk_for_stock(self) -> None:
+        """19B.3A: stock-type results DO render the market risk thermometer
+        section (the broadened gate), as long as market_risk_snapshot is set."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "stock"
+        result.exposure_snapshot = None
+        result.market_risk_snapshot = {
+            "vix_level": 18.2, "vix_status": "平穩", "spx_change_pct": 0.4,
+            "source": "yfinance", "data_gap_fields": [],
+        }
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn("市場風險溫度計", markdown)
+        self.assertIn("18.2", markdown)
+        self.assertNotIn("ETF／指數曝險摘要", markdown)
+
+    def test_generate_single_stock_markdown_omits_both_sections_for_unknown(self) -> None:
+        """19B.3A: unknown instrument_type remains a no-op for both sections,
+        even if fields are somehow populated (defensive)."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "unknown"
+        result.exposure_snapshot = {"underlying_index": "should not render"}
+        result.market_risk_snapshot = {"vix_level": 18.2}
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertNotIn("ETF／指數曝險摘要", markdown)
+        self.assertNotIn("市場風險溫度計", markdown)
+
+    def test_market_risk_markdown_formats_vix_level_to_two_decimals(self) -> None:
+        """Phase 19D-F1: raw binary-float VIX values must be rounded to 2dp in
+        the rendered Markdown — regression guard for 18.889999389648438."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "stock"
+        result.exposure_snapshot = None
+        result.market_risk_snapshot = {
+            "vix_level": 18.889999389648438,
+            "vix_status": "平穩",
+            "spx_change_pct": -0.01,
+            "source": "yfinance",
+            "data_gap_fields": [],
+        }
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn("18.89", markdown)
+        self.assertNotIn("18.889999389648438", markdown)
+        self.assertIn("市場風險溫度計", markdown)
+
+    def test_market_risk_markdown_formats_vix_level_none_as_gap(self) -> None:
+        """Phase 19D-F1: vix_level=None renders 資料不足, not 'None'."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "stock"
+        result.exposure_snapshot = None
+        result.market_risk_snapshot = {
+            "vix_level": None,
+            "vix_status": None,
+            "spx_change_pct": None,
+            "gap_reason": "資料來源不可用",
+            "data_gap_fields": ["vix_level", "vix_status", "spx_change_pct"],
+        }
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertNotIn("None", markdown)
+        self.assertIn("市場風險溫度計", markdown)
+
+    def test_generate_single_stock_markdown_shows_tw_gap_reason(self) -> None:
+        """TW market_risk_snapshot this phase always carries a gap_reason
+        instead of source/as_of — markdown must surface that reason verbatim."""
+        from datetime import datetime as _datetime
+        from src.services.exposure_market_risk_snapshot import TW_MARKET_RISK_GAP_REASON
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "index"
+        result.exposure_snapshot = {"data_gap_fields": ["underlying_index", "leverage_factor", "is_leveraged", "is_inverse"]}
+        result.market_risk_snapshot = {
+            "vix_level": None, "vix_status": None, "spx_change_pct": None,
+            "source": None, "gap_reason": TW_MARKET_RISK_GAP_REASON, "data_gap_fields": [],
+        }
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn(TW_MARKET_RISK_GAP_REASON, markdown)
+
+    def test_rebuild_analysis_result_carries_multi_period_trend_snapshot(self) -> None:
+        """Phase 19B.4: _rebuild_analysis_result carries multi_period_trend_snapshot
+        from raw_result, mirroring 19B.3's snapshot fields."""
+        record_id = self._save_history("query_multi_period_trend_001")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            snapshot = {
+                "source": "db_cache",
+                "periods": [{"period": "5D", "label": "1週", "change_pct": 1.2, "data_gap_fields": []}],
+                "data_gap_fields": [],
+            }
+            raw_result = {
+                "code": "2330",
+                "name": "台積電",
+                "instrument_type": "stock",
+                "multi_period_trend_snapshot": snapshot,
+            }
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertEqual(rebuilt.multi_period_trend_snapshot, snapshot)
+
+    def test_rebuild_analysis_result_defaults_multi_period_trend_snapshot_to_none(self) -> None:
+        """Old history records (no multi_period_trend_snapshot key) rebuild as
+        None, not a crash — same backward compatibility contract as 19B.1-19B.3."""
+        record_id = self._save_history("query_multi_period_trend_002")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            raw_result = {"code": "2330", "name": "台積電"}
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertIsNone(rebuilt.multi_period_trend_snapshot)
+
+    def test_generate_single_stock_markdown_renders_multi_period_trend_for_stock_etf_index(self) -> None:
+        """Phase 19B.4: markdown renders the new section for stock/etf/index,
+        positioned after the market-risk thermometer section."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        for instrument_type in ("stock", "etf", "index"):
+            result = self._build_result()
+            result.instrument_type = instrument_type
+            result.multi_period_trend_snapshot = {
+                "source": "db_cache",
+                "as_of": "2026-04-09",
+                "periods": [
+                    {
+                        "period": "5D", "label": "1週", "change_pct": 3.5,
+                        "drawdown_from_high_pct": -1.2, "price_vs_ma_pct": 0.8,
+                        "trend_status": "neutral", "data_gap_fields": [],
+                    },
+                    {
+                        "period": "252D", "label": "52週", "change_pct": None,
+                        "drawdown_from_high_pct": None, "price_vs_ma_pct": None,
+                        "trend_status": "insufficient_data",
+                        "data_gap_fields": ["change_pct", "drawdown_from_high_pct", "price_vs_ma_pct"],
+                    },
+                ],
+                "data_gap_fields": ["252D"],
+            }
+            markdown = service._generate_single_stock_markdown(result, record)
+
+            self.assertIn("多週期趨勢快照", markdown)
+            self.assertIn("1週", markdown)
+            self.assertIn("資料不足", markdown)
+            # Mermaid appendix (if present) must still come after this section.
+            market_risk_idx = markdown.find("多週期趨勢快照")
+            battle_idx = markdown.find("作戰計")
+            if battle_idx != -1:
+                self.assertLess(market_risk_idx, battle_idx)
+
+    def test_generate_single_stock_markdown_omits_multi_period_trend_for_unknown(self) -> None:
+        """Unknown instrument_type remains a no-op, even if the field is
+        somehow populated (defensive — should not happen given the pipeline gate)."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        result = self._build_result()
+        result.instrument_type = "unknown"
+        result.multi_period_trend_snapshot = {
+            "periods": [{"period": "5D", "label": "1週", "change_pct": 1.0, "data_gap_fields": []}],
+            "data_gap_fields": [],
+        }
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertNotIn("多週期趨勢快照", markdown)
+
+    def test_generate_single_stock_markdown_title_switches_by_instrument_type(self) -> None:
+        """Phase 19B.1: title contract — etf/index get dedicated titles, stock/unknown
+        keep the existing generic title (backward compatible with old reports)."""
+        from datetime import datetime as _datetime
+
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+        service = HistoryService(self.db)
+
+        cases = {
+            "etf": "ETF分析報告",
+            "index": "指數分析報告",
+            "stock": "股票分析報告",
+            "unknown": "股票分析報告",
+        }
+        for instrument_type, expected_title in cases.items():
+            result = self._build_result()
+            result.instrument_type = instrument_type
+            markdown = service._generate_single_stock_markdown(result, record)
+            self.assertIn(expected_title, markdown)
+
+    def test_generate_single_stock_markdown_defaults_title_when_instrument_type_missing(self) -> None:
+        """Old AnalysisResult objects without the instrument_type attribute must not crash
+        markdown generation and must keep the existing title."""
+        from datetime import datetime as _datetime
+
+        result = self._build_result()
+        del result.__dict__["instrument_type"]  # simulate a pre-19B.1 in-memory object
+        record = SimpleNamespace(created_at=_datetime(2026, 4, 10, 9, 30, 0))
+
+        service = HistoryService(self.db)
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn("股票分析報告", markdown)
 
 
 class HistoryItemSchemaNegativeSentimentTest(unittest.TestCase):
