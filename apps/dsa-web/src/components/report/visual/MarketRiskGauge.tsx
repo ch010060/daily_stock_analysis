@@ -265,18 +265,6 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
 
   const marketHelp = resolvedMarketFear ? <MarketHelp kind={resolvedMarketFear.kind} valueText={valueText} /> : null;
   const systemHelp = <SystemScoreHelp explanation={resolvedSystemScore.explanation} />;
-  const dashboardMeta = layout === 'dashboard' ? (
-    <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 px-1 text-[10px] font-semibold leading-tight">
-      <span className="min-w-0 text-muted-foreground">
-        <span className="font-mono">{resolvedMarketFear?.asOf ?? '—'}</span>
-      </span>
-      {spxStr && (
-        <span className="ml-auto whitespace-nowrap" style={{ color: spxColor }}>
-          S&amp;P 500 {spxStr}
-        </span>
-      )}
-    </div>
-  ) : null;
   const metricSummary = layout === 'dashboard' ? (
     <div className="min-w-0 rounded-xl border border-border/60 bg-muted/20 px-2.5 py-2.5">
       <div className="grid min-w-0 grid-cols-2 divide-x divide-border/60">
@@ -355,7 +343,7 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
     </div>
   );
   const legend = (
-    <div className="mt-2 grid gap-1.5 text-[12px] font-semibold text-muted-foreground sm:grid-cols-2">
+    <div className="mt-2 grid gap-1.5 text-[12px] font-semibold text-muted-foreground">
       <span>恐慌指數：數值越高代表市場恐慌程度越高</span>
       <span>系統評分：分數越高代表本標的評估越偏多</span>
     </div>
@@ -368,12 +356,6 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
 
       return (
       <div data-testid="market-risk-gauge" className={`min-w-0 rounded-lg border bg-card p-3 ${className}`}>
-        {dashboardMeta}
-        {layout !== 'dashboard' && spxStr && (
-          <div className="mb-2 text-right text-xs font-semibold" style={{ color: spxColor }}>
-            S&amp;P 500 {spxStr}
-          </div>
-        )}
         {metricSummary}
         <svg
           data-testid="market-fear-meter"
@@ -395,9 +377,9 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
             />
           ))}
           {splitTicks.map((tick) => {
-            const p = arcPoint(tick.pct, ARC_R + 24);
+            const p = arcPoint(tick.pct, ARC_R + 10);
             return (
-              <text key={tick.label} x={p.x} y={p.y} textAnchor="middle" className="fill-muted-foreground text-[14px] font-black">
+              <text key={tick.label} x={p.x} y={p.y} textAnchor="middle" className="fill-muted-foreground text-[22px] font-black">
                 {tick.label}
               </text>
             );
@@ -423,9 +405,9 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
                       strokeLinecap="round"
                       opacity="0.38"
                     />
-                    <g transform={`translate(${dashboardLabelX - 23}, ${dashboardLabelY - 9})`}>
-                    <rect width="46" height="18" rx="9" fill={MARKER_FILL} stroke={MARKER_STROKE} strokeWidth="1.5" />
-                    <text x="23" y="13" textAnchor="middle" className="fill-slate-950 text-[11px] font-black">
+                    <g transform={`translate(${dashboardLabelX - 33}, ${dashboardLabelY - 13})`}>
+                    <rect width="66" height="26" rx="13" fill={MARKER_FILL} stroke={MARKER_STROKE} strokeWidth="1.5" />
+                    <text x="33" y="18" textAnchor="middle" className="fill-slate-950 text-[16px] font-black">
                       {valueText}
                     </text>
                     </g>
