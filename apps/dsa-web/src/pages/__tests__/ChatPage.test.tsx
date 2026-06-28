@@ -1026,6 +1026,22 @@ describe('watchlist button with code variants', () => {
 });
 
 describe('Google Finance ask helper', () => {
+  it('shows the Google Finance helper while typing a stock code before sending', async () => {
+    render(
+      <MemoryRouter>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const textarea = await screen.findByPlaceholderText(/例如/);
+    expect(screen.queryByRole('button', { name: '在 Google Finance 提問' })).not.toBeInTheDocument();
+
+    fireEvent.change(textarea, { target: { value: '分析 SPY' } });
+
+    expect(await screen.findByRole('button', { name: '在 Google Finance 提問' })).toBeInTheDocument();
+    expect(screen.getByText('SPY')).toBeInTheDocument();
+  });
+
   it('copies a prepared research prompt and opens a resolvable quote page', async () => {
     mockResolveSymbol.mockResolvedValueOnce({
       query: 'SPY',
@@ -1115,5 +1131,49 @@ describe('Google Finance ask helper', () => {
       );
     });
     expect(window.open).not.toHaveBeenCalled();
+  });
+
+  it('opens Google Finance even when clipboard copy is blocked', async () => {
+    vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(new Error('clipboard blocked'));
+    mockResolveSymbol.mockResolvedValueOnce({
+      query: 'NVDA',
+      status: 'resolved',
+      selected: {
+        canonicalSymbol: 'US:NVDA',
+        rawSymbol: 'NVDA',
+        symbol: 'NVDA',
+        market: 'US',
+        exchange: 'NASDAQ',
+        instrumentType: 'stock',
+        name: 'NVIDIA Corporation',
+        aliases: [],
+        providerSource: 'symbol_universe',
+        isActive: true,
+        lastUpdated: null,
+        confidence: 1,
+        matchReason: 'exact_symbol',
+      },
+      candidates: [],
+      message: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const textarea = await screen.findByPlaceholderText(/例如/);
+    fireEvent.change(textarea, { target: { value: '分析 NVDA' } });
+    fireEvent.click(await screen.findByRole('button', { name: '在 Google Finance 提問' }));
+
+    await waitFor(() => {
+      expect(window.open).toHaveBeenCalledWith(
+        'https://www.google.com/finance/beta/quote/NVDA:NASDAQ',
+        '_blank',
+        'noopener,noreferrer'
+      );
+    });
+    expect(await screen.findByText('已開啟 Google Finance，但無法複製研究問題')).toBeInTheDocument();
   });
 });

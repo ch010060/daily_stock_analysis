@@ -93,6 +93,7 @@ const ChatPage: React.FC = () => {
   const followUpContextRef = useRef<ChatFollowUpContext | null>(null);
   const shouldStickToBottomRef = useRef(true);
   const pendingScrollBehaviorRef = useRef<ScrollBehavior>('auto');
+  const googleFinanceStockCode = extractStockCodeFromMessage(input) ?? activeStockCode;
 
   // Get localized text (default to Chinese)
   const text = getReportText('zh');
@@ -500,14 +501,6 @@ const ChatPage: React.FC = () => {
 
   const handleAskGoogleFinance = useCallback(async (stockCode: string) => {
     const prompt = buildGoogleFinanceResearchPrompt({ symbol: stockCode });
-    try {
-      await navigator.clipboard.writeText(prompt);
-      showSendFeedback({ type: 'success', message: '已複製 Google Finance 研究問題' }, 3000);
-    } catch {
-      showSendFeedback({ type: 'error', message: '無法複製 Google Finance 研究問題' }, 3000);
-      return;
-    }
-
     let url: string | null = null;
     try {
       const resolved = await stocksApi.resolveSymbol(stockCode);
@@ -525,6 +518,16 @@ const ChatPage: React.FC = () => {
     }
     if (url) {
       window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
+    try {
+      await navigator.clipboard.writeText(prompt);
+      showSendFeedback({ type: 'success', message: '已複製 Google Finance 研究問題' }, 3000);
+    } catch {
+      showSendFeedback({
+        type: url ? 'success' : 'error',
+        message: url ? '已開啟 Google Finance，但無法複製研究問題' : '無法複製 Google Finance 研究問題',
+      }, 3000);
     }
   }, [showSendFeedback]);
 
@@ -1237,22 +1240,22 @@ const ChatPage: React.FC = () => {
               </div>
             )}
 
-            {activeStockCode && (
+            {googleFinanceStockCode && (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-text font-mono">{activeStockCode}</span>
+                <span className="text-xs text-muted-text font-mono">{googleFinanceStockCode}</span>
                 <Button
                   variant="secondary"
                   size="xsm"
                   isLoading={isWatchlistActioning}
-                  onClick={() => void handleToggleWatchlist(activeStockCode)}
+                  onClick={() => void handleToggleWatchlist(googleFinanceStockCode)}
                   className="text-[11px]"
                 >
-                  {stockInWatchlist(activeStockCode) ? '從自選刪除' : '加入自選'}
+                  {stockInWatchlist(googleFinanceStockCode) ? '從自選刪除' : '加入自選'}
                 </Button>
                 <Button
                   variant="secondary"
                   size="xsm"
-                  onClick={() => void handleAskGoogleFinance(activeStockCode)}
+                  onClick={() => void handleAskGoogleFinance(googleFinanceStockCode)}
                   className="text-[11px]"
                 >
                   在 Google Finance 提問

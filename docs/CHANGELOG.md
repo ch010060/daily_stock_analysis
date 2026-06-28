@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修復] 問股頁 Google Finance helper 在輸入股票代號時即時顯示，且即使瀏覽器阻擋剪貼簿複製，仍會開啟可解析標的的 Google Finance 外部頁。
+
 - [改進] Google Finance 外部參考入口移至個股分析主介面工具列，完整報告內不顯示該入口；連結仍使用 persisted metadata/exchange resolver，未知交易所維持隱藏。
 
 - [改進] Google Finance 外部參考改為使用台美標的 metadata/exchange resolver 產生連結，美股不再依賴前端 ticker-level mapping；未知交易所維持隱藏連結、不猜測。
