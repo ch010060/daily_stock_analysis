@@ -22,7 +22,7 @@
 ## 🖥️ 產品預覽
 
 <p align="center">
-  <img src="docs/assets/readme_workspace_tour_20260510.gif" alt="DSA Web 工作臺演示" width="720">
+  <img src="docs/assets/readme_workspace_tour_us+tw_20260628.jpg" alt="DSA Web 工作臺演示" width="720">
 </p>
 
 ## ✨ 功能特性
@@ -30,9 +30,9 @@
 | 能力 | 覆蓋內容 |
 |------|------|
 | AI 決策報告 | 核心結論、評分、趨勢、買賣點位、風險警報、催化因素、操作檢查清單 |
-| 台股 / 美股資料聚合 | 台股、美股、ETF、主要指數；行情、K 線、技術指標、資金流、籌碼、新聞、公告和基本面 |
+| 台股 / 美股資料聚合 | 台股、美股、ETF、主要指數；行情、K 線、技術指標、資金流、新聞、公告和基本面 |
 | 本地標的查詢 | Local-first TW/US symbol universe，支援股票代號、股票名稱、常見英文別名與候選選擇 |
-| Web / 桌面工作臺 | 手動分析、任務進度、歷史報告、完整 Markdown、回測、持股、配置管理、淺色 / 深色主題 |
+| Web / 桌面工作臺 | 手動分析、任務進度、歷史報告、完整報告PDF、回測、持股、配置管理、淺色 / 深色主題 |
 | Agent 策略問股 | 多輪追問，支援均線、纏論、波浪、趨勢、熱點、事件、成長、預期等內建策略，覆蓋 Web/Bot/API |
 | 智慧匯入與補全 | 圖片、CSV/Excel、剪貼簿匯入；股票代號 / 名稱 / 別名補全 |
 | 自動化與推送 | GitHub Actions、Docker、本地定時任務、FastAPI 服務和企業微信 / 飛書 / Telegram / Discord / Slack / 郵件推送 |
