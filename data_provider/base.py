@@ -3404,11 +3404,8 @@ class DataFetcherManager:
 
     def get_sector_rankings(self, n: int = 5) -> Tuple[List[Dict], List[Dict]]:
         """獲取板塊漲跌榜（自動切換資料來源）"""
-        # 按需求固定回退順序：Akshare(EM) -> Akshare(Sina) -> Tushare -> Efinance
-        top, bottom, _, last_error = self._get_sector_rankings_with_meta(n)
-        if top or bottom:
-            return top, bottom
-        logger.warning(f"[板塊排行] 所有資料來源均失敗，最終錯誤: {last_error}")
+        # Route B only supports TW/US analysis; legacy CN sector ranking providers
+        # (Eastmoney/Sina/Tushare/Efinance) must not run from stock analysis paths.
         return [], []
 
     def get_concept_rankings(self, n: int = 5) -> Tuple[List[Dict], List[Dict]]:

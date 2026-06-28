@@ -38,7 +38,6 @@ _THINKING_TOOL_LABELS: Dict[str, str] = {
     "search_stock_news": "新聞搜尋",
     "search_comprehensive_intel": "綜合情報搜尋",
     "get_market_indices": "市場概覽獲取",
-    "get_sector_rankings": "行業板塊分析",
     "get_analysis_context": "歷史分析上下文",
     "get_stock_info": "基本資訊獲取",
     "analyze_pattern": "K線形態識別",

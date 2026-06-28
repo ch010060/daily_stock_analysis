@@ -4,7 +4,6 @@ Market tools — wraps DataFetcherManager market-level methods as agent tools.
 
 Tools:
 - get_market_indices: major market index data
-- get_sector_rankings: sector performance rankings
 """
 
 import logging
@@ -58,51 +57,6 @@ get_market_indices_tool = ToolDefinition(
 )
 
 
-# ============================================================
-# get_sector_rankings
-# ============================================================
-
-def _handle_get_sector_rankings(top_n: int = 10) -> dict:
-    """Get sector performance rankings."""
-    manager = _get_fetcher_manager()
-    result = manager.get_sector_rankings(n=top_n)
-
-    if result is None:
-        return {"error": "No sector ranking data available"}
-
-    # get_sector_rankings returns Tuple[List[Dict], List[Dict]]
-    # (top_sectors, bottom_sectors)
-    if isinstance(result, tuple) and len(result) == 2:
-        top_sectors, bottom_sectors = result
-        return {
-            "top_sectors": top_sectors,
-            "bottom_sectors": bottom_sectors,
-        }
-    elif isinstance(result, list):
-        return {"sectors": result}
-    else:
-        return {"data": str(result)}
-
-
-get_sector_rankings_tool = ToolDefinition(
-    name="get_sector_rankings",
-    description="Get sector/industry performance rankings. Returns top N and bottom N "
-                "sectors by daily change percentage. Useful for sector rotation analysis.",
-    parameters=[
-        ToolParameter(
-            name="top_n",
-            type="integer",
-            description="Number of top/bottom sectors to return (default: 10)",
-            required=False,
-            default=10,
-        ),
-    ],
-    handler=_handle_get_sector_rankings,
-    category="market",
-)
-
-
 ALL_MARKET_TOOLS = [
     get_market_indices_tool,
-    get_sector_rankings_tool,
 ]

@@ -119,20 +119,20 @@ def _epoch_to_date(value: Any) -> Optional[str]:
 
 
 def _convert_to_yf_symbol(stock_code: str) -> str:
-    """Convert internal code to yfinance ticker. Lightweight inline reproduction
-    of YFinanceFetcher._convert_stock_code to avoid pulling the full fetcher
-    into the fundamental path.
-    """
+    """Convert internal code to a Yahoo/yfinance ticker."""
     code = (stock_code or "").strip().upper()
     if not code:
         return code
     if code.startswith("HK"):
         digits = code[2:].lstrip("0") or "0"
         return f"{digits.zfill(4)}.HK"
-    if "." in code:
+    if code.endswith((".HK", ".TW", ".TWO")):
         return code
-    # Assume US ticker by default for non-HK / non-CN callers
-    return code
+    if code.endswith(".US"):
+        code = code.removesuffix(".US")
+    from data_provider.yfinance_fetcher import _to_yahoo_us_stock_symbol
+
+    return _to_yahoo_us_stock_symbol(code)
 
 
 class YfinanceFundamentalAdapter:
