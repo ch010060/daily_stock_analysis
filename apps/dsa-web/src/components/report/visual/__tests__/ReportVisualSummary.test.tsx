@@ -101,7 +101,7 @@ describe('ReportVisualSummary', () => {
     expect(gauge.textContent).not.toContain(['恐慌', '貪婪', '分數'].join(''));
     expect(gauge.textContent).not.toContain('VIX 資料不足');
     expect(gauge.textContent).not.toContain('VIX 恐慌指數');
-    expect(screen.getByText('系統評分')).toHaveAttribute('title', expect.stringContaining('非 VIXTWN'));
+    expect(screen.getByText('系統評分')).toHaveAttribute('aria-label', expect.stringContaining('非 VIXTWN'));
   });
 
   it('renders TW VIXTWN and system score in one market gauge when snapshot exists', () => {

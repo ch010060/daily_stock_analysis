@@ -17,6 +17,8 @@ type TooltipStyle = {
   left: number;
 };
 
+const TOOLTIP_OPEN_EVENT = 'dsa-tooltip-open';
+
 export const Tooltip: React.FC<TooltipProps> = ({
   content,
   children,
@@ -31,6 +33,15 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const [open, setOpen] = useState(false);
   const [resolvedSide, setResolvedSide] = useState<'top' | 'bottom'>(side);
   const [style, setStyle] = useState<TooltipStyle>({ top: 0, left: 0 });
+
+  const show = useCallback(() => {
+    window.dispatchEvent(new CustomEvent(TOOLTIP_OPEN_EVENT, { detail: tooltipId }));
+    setOpen(true);
+  }, [tooltipId]);
+
+  const hide = useCallback(() => {
+    setOpen(false);
+  }, []);
 
   const updatePosition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -83,15 +94,46 @@ export const Tooltip: React.FC<TooltipProps> = ({
   }, [open, content, updatePosition]);
 
   useEffect(() => {
+    const handleOtherTooltip = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== tooltipId) {
+        setOpen(false);
+      }
+    };
+    window.addEventListener(TOOLTIP_OPEN_EVENT, handleOtherTooltip);
+    return () => {
+      window.removeEventListener(TOOLTIP_OPEN_EVENT, handleOtherTooltip);
+    };
+  }, [tooltipId]);
+
+  useEffect(() => {
     if (!open) {
       return;
     }
 
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (
+        target &&
+        (triggerRef.current?.contains(target) || tooltipRef.current?.contains(target))
+      ) {
+        return;
+      }
+      setOpen(false);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
     const handleViewportChange = () => updatePosition();
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
     window.addEventListener('resize', handleViewportChange);
     window.addEventListener('scroll', handleViewportChange, true);
 
     return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
       window.removeEventListener('resize', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
     };
@@ -106,13 +148,21 @@ export const Tooltip: React.FC<TooltipProps> = ({
       <span
         ref={triggerRef}
         className={cn('inline-flex', className)}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (open) {
+            hide();
+          } else {
+            show();
+          }
+        }}
+        onFocus={show}
+        onBlur={hide}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
-            setOpen(false);
+            hide();
           }
         }}
         tabIndex={focusable ? 0 : undefined}

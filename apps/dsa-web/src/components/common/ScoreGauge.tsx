@@ -151,7 +151,6 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
         <Tooltip content={text.systemScoreProvenance} focusable className="mb-3">
           <span
             className="label-uppercase text-secondary-text"
-            title={text.systemScoreProvenance}
             aria-label={`${text.systemScore}：${text.systemScoreProvenance}`}
           >
             {text.systemScore}

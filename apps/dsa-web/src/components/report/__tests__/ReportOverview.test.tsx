@@ -120,10 +120,10 @@ describe('ReportOverview', () => {
 
     const label = screen.getByText('系統評分');
     expect(label).toBeInTheDocument();
-    expect(label).toHaveAttribute('title', expect.stringContaining('非市場官方指數'));
-    expect(label).toHaveAttribute('title', expect.stringContaining('非 VIX'));
-    expect(label).toHaveAttribute('title', expect.stringContaining('非 VIXTWN'));
-    expect(label).toHaveAttribute('title', expect.stringContaining('沒有固定公開公式'));
+    expect(label).toHaveAttribute('aria-label', expect.stringContaining('非市場官方指數'));
+    expect(label).toHaveAttribute('aria-label', expect.stringContaining('非 VIX'));
+    expect(label).toHaveAttribute('aria-label', expect.stringContaining('非 VIXTWN'));
+    expect(label).toHaveAttribute('aria-label', expect.stringContaining('沒有固定公開公式'));
     expect(screen.queryByText(['恐慌', '貪婪', '指數'].join(''))).not.toBeInTheDocument();
   });
 
@@ -156,9 +156,13 @@ describe('ReportOverview', () => {
     expect(gauge.textContent).toContain('VIXTWN 44.27');
     expect(gauge.textContent).toContain('日期：2026-06-26');
     expect(gauge.textContent).toContain('系統評分');
+    expect(gauge.textContent).toContain('恐慌');
+    expect(gauge.textContent).toContain('中性');
     expect(screen.getByTestId('market-fear-meter')).toBeInTheDocument();
+    expect(screen.getByTestId('market-fear-meter').querySelectorAll('path')).toHaveLength(4);
     expect(screen.getByTestId('market-fear-pointer')).toBeInTheDocument();
     expect(screen.getByTestId('system-score-pointer')).toBeInTheDocument();
+    expect(screen.queryByTestId('market-fear-scale')).not.toBeInTheDocument();
     expect(screen.queryByText('市場情緒')).not.toBeInTheDocument();
   });
 

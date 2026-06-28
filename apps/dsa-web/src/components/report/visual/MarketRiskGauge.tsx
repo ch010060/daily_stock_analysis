@@ -14,17 +14,29 @@ interface MarketRiskGaugeProps {
   sentimentLabel?: string | null;
   marketFearIndex?: MarketFearIndexVM | null;
   systemScore?: SystemScoreVM;
+  layout?: 'report' | 'dashboard';
   className?: string;
 }
 
-const SVG_W = 600;
-const SYSTEM_SCORE_TEXT = getReportText('zh_TW');
+const TEXT = getReportText('zh_TW');
+const HORIZONTAL_W = 600;
+const ARC_W = 340;
+const ARC_CX = 170;
+const ARC_CY = 150;
+const ARC_R = 116;
+const SEGMENT_COLORS = ['#16A34A', '#2563EB', '#EA580C', '#DC2626'];
 
-function pctToX(pct: number): number {
-  return Math.max(0, Math.min(SVG_W, (pct / 100) * SVG_W));
+type Bucket = 'green' | 'blue' | 'orange' | 'red' | 'unknown';
+
+function clampPct(v: number): number {
+  return Math.max(0, Math.min(100, v));
 }
 
-function bucketTextClass(bucket: string | undefined): string {
+function pctToX(pct: number): number {
+  return Math.max(0, Math.min(HORIZONTAL_W, (pct / 100) * HORIZONTAL_W));
+}
+
+function bucketTextClass(bucket: Bucket | undefined): string {
   if (bucket === 'green') return 'text-success';
   if (bucket === 'blue') return 'text-blue-600';
   if (bucket === 'orange') return 'text-orange-600';
@@ -32,9 +44,123 @@ function bucketTextClass(bucket: string | undefined): string {
   return 'text-foreground';
 }
 
+function bucketTagClass(bucket: Bucket | undefined): string {
+  if (bucket === 'green') return 'border-green-500/40 bg-green-50 text-green-700';
+  if (bucket === 'blue') return 'border-blue-500/40 bg-blue-50 text-blue-700';
+  if (bucket === 'orange') return 'border-orange-500/40 bg-orange-50 text-orange-700';
+  if (bucket === 'red') return 'border-red-500/40 bg-red-50 text-red-700';
+  return 'border-border bg-muted text-muted-foreground';
+}
+
+function marketStatusLabel(bucket: Bucket | undefined): string {
+  if (bucket === 'green') return '平穩';
+  if (bucket === 'blue') return '警戒';
+  if (bucket === 'orange') return '緊張';
+  if (bucket === 'red') return '恐慌';
+  return '未知';
+}
+
+function systemScoreLabel(score: number | null): string {
+  if (score === null) return '—';
+  if (score <= 24) return '明顯偏空';
+  if (score <= 39) return '偏空';
+  if (score <= 59) return '中性';
+  if (score <= 74) return '偏多';
+  return '明顯偏多';
+}
+
+function systemTagClass(score: number | null): string {
+  if (score === null) return 'border-border bg-muted text-muted-foreground';
+  if (score <= 24) return 'border-red-500/40 bg-red-50 text-red-700';
+  if (score <= 39) return 'border-orange-500/40 bg-orange-50 text-orange-700';
+  if (score <= 59) return 'border-amber-500/40 bg-amber-50 text-amber-700';
+  if (score <= 74) return 'border-green-500/40 bg-green-50 text-green-700';
+  return 'border-emerald-500/40 bg-emerald-50 text-emerald-700';
+}
+
+function systemTextClass(score: number | null): string {
+  if (score === null) return 'text-muted-foreground';
+  if (score <= 24) return 'text-danger';
+  if (score <= 39) return 'text-orange-600';
+  if (score <= 59) return 'text-warning';
+  return 'text-success';
+}
+
+function arcPoint(pct: number, radius = ARC_R): { x: number; y: number } {
+  const angle = Math.PI * (1 - clampPct(pct) / 100);
+  return {
+    x: ARC_CX + radius * Math.cos(angle),
+    y: ARC_CY - radius * Math.sin(angle),
+  };
+}
+
+function arcPath(startPct: number, endPct: number): string {
+  const start = arcPoint(startPct);
+  const end = arcPoint(endPct);
+  return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${ARC_R} ${ARC_R} 0 0 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+}
+
+function InfoIcon({ label }: { label: string }) {
+  return (
+    <button
+      type="button"
+      className="inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-black leading-none text-muted-foreground hover:border-foreground/50 hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+      aria-label={label}
+    >
+      i
+    </button>
+  );
+}
+
+function StatusTag({ children, className }: { children: React.ReactNode; className: string }) {
+  return (
+    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-black leading-none ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+function SystemScoreHelp({ explanation }: { explanation: string }) {
+  return (
+    <span className="block max-w-[24rem] space-y-1 text-left">
+      <span className="block font-semibold">系統評分說明</span>
+      <span className="block">0–24 明顯偏空</span>
+      <span className="block">25–39 偏空</span>
+      <span className="block">40–59 中性</span>
+      <span className="block">60–74 偏多</span>
+      <span className="block">75–100 明顯偏多</span>
+      <span className="block pt-1 text-muted-foreground">{explanation}</span>
+    </span>
+  );
+}
+
+function MarketHelp({ kind, valueText }: { kind: 'vix' | 'vixtwn'; valueText: string }) {
+  if (kind === 'vixtwn') {
+    return (
+      <span className="block max-w-[25rem] space-y-1 text-left">
+        <span className="block font-semibold">VIXTWN 台灣市場恐慌指標</span>
+        <span className="block">目前 VIXTWN：約 {valueText}</span>
+        <span className="block">綠色（VIXTWN &lt; 20）：正常水位，台灣市場平穩，多頭常態。</span>
+        <span className="block">藍色（20 ≤ VIXTWN &lt; 30）：警戒狀態，市場波動加劇，留意風險。</span>
+        <span className="block">橘色（30 ≤ VIXTWN &lt; 40）：過度恐慌，投資人大舉買進避險，殺盤發生，可能為布局機會。</span>
+        <span className="block">紅色（VIXTWN ≥ 40）：史詩級極度恐慌，通常伴隨系統性風險或重大黑天鵝，歷史上為強力買點。</span>
+      </span>
+    );
+  }
+  return (
+    <span className="block max-w-[25rem] space-y-1 text-left">
+      <span className="block font-semibold">VIX 市場恐慌指標</span>
+      <span className="block">目前 VIX：約 {valueText}</span>
+      <span className="block">綠色（VIX &lt; 20）：市場平穩。</span>
+      <span className="block">藍色（20 ≤ VIX &lt; 28.7）：此時買進未來 12 個月的投資報酬率其實非常差。</span>
+      <span className="block">橘色（28.7 ≤ VIX &lt; 33.5）：此時買進未來 12 個月的平均報酬約可達 15%。</span>
+      <span className="block">紅色（VIX ≥ 33.5）：此時買進未來 12 個月的平均報酬約可達 25%。</span>
+    </span>
+  );
+}
+
 export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
   vixLevel,
-  vixStatus,
   spxChangePct,
   dataGap = false,
   marketRiskKind = 'vix',
@@ -42,6 +168,7 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
   sentimentLabel = null,
   marketFearIndex = null,
   systemScore,
+  layout = 'report',
   className = '',
 }) => {
   const pct = (n: number | null, decimals = 2) =>
@@ -51,8 +178,8 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
     label: '系統評分',
     value: sentimentScore,
     sentimentLabel,
-    pointerPosition: sentimentScore === null ? null : Math.max(0, Math.min(100, 100 - sentimentScore)),
-    explanation: SYSTEM_SCORE_TEXT.systemScoreProvenance,
+    pointerPosition: sentimentScore === null ? null : clampPct(100 - sentimentScore),
+    explanation: TEXT.systemScoreProvenance,
   };
   const resolvedMarketFear: MarketFearIndexVM | null = marketFearIndex ?? (
     vixLevel !== null
@@ -75,7 +202,7 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
     return (
       <div data-testid="market-risk-gauge" className={`rounded-lg border bg-muted/30 p-3 ${className}`}>
         <div className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          {marketRiskKind === 'sentiment' ? SYSTEM_SCORE_TEXT.systemScore : '恐慌指數 VIX'}
+          {marketRiskKind === 'sentiment' ? TEXT.systemScore : '恐慌指數 VIX'}
         </div>
         <p className="text-xs text-muted-foreground">
           {marketRiskKind === 'sentiment' ? '系統評分資料不足 / 暫不可用' : '指數資料暫不可用'}
@@ -84,181 +211,230 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
     );
   }
 
-  const title = resolvedMarketFear?.title ?? SYSTEM_SCORE_TEXT.systemScore;
+  if (!resolvedMarketFear) {
+    const scoreValue = hasSystem ? resolvedSystemScore.value!.toFixed(0) : '—';
+    const systemStatus = systemScoreLabel(resolvedSystemScore.value);
+    const systemTone = systemTextClass(resolvedSystemScore.value);
+
+    return (
+      <div data-testid="market-risk-gauge" className={`rounded-lg border bg-card p-3 ${className}`}>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="text-xs font-black uppercase tracking-wider text-muted-foreground"
+            aria-label={`${resolvedSystemScore.label}：${resolvedSystemScore.explanation}`}
+          >
+            {resolvedSystemScore.label}
+          </span>
+          <Tooltip content={<SystemScoreHelp explanation={resolvedSystemScore.explanation} />} focusable contentClassName="max-w-[26rem]">
+            <InfoIcon label="系統評分說明" />
+          </Tooltip>
+        </div>
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className={`font-mono text-2xl font-black ${systemTone}`}>{scoreValue}</span>
+          <StatusTag className={systemTagClass(resolvedSystemScore.value)}>{systemStatus}</StatusTag>
+          {resolvedSystemScore.sentimentLabel && (
+            <span className="text-xs text-muted-foreground">原始標籤：{resolvedSystemScore.sentimentLabel}</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const title = resolvedMarketFear?.title ?? TEXT.systemScore;
   const indexCode = resolvedMarketFear?.kind === 'vixtwn' ? 'VIXTWN' : 'VIX';
   const valueText = hasMarket ? resolvedMarketFear!.value!.toFixed(2) : '—';
   const marketValueClass = bucketTextClass(resolvedMarketFear?.bucket);
-  const marketPointerX = resolvedMarketFear?.pointerPosition !== null && resolvedMarketFear?.pointerPosition !== undefined
-    ? pctToX(resolvedMarketFear.pointerPosition)
-    : null;
-  const systemPointerX = resolvedSystemScore.pointerPosition !== null ? pctToX(resolvedSystemScore.pointerPosition) : null;
+  const marketStatus = hasMarket ? marketStatusLabel(resolvedMarketFear?.bucket) : '指數資料暫缺';
+  const marketPointerPct = resolvedMarketFear?.pointerPosition ?? null;
+  const marketPointerX = marketPointerPct !== null ? pctToX(marketPointerPct) : null;
+  const systemPointerPct = resolvedSystemScore.pointerPosition;
+  const systemPointerX = systemPointerPct !== null ? pctToX(systemPointerPct) : null;
   const spxStr = spxChangePct !== null ? pct(spxChangePct) : null;
   const spxColor = spxChangePct !== null && spxChangePct < 0 ? '#DC2626' : '#16A34A';
   const scoreValue = hasSystem ? resolvedSystemScore.value!.toFixed(0) : '—';
-  const showSystemLabelInValueRow = Boolean(resolvedMarketFear);
-  const systemTone =
-    !hasSystem ? 'text-muted-foreground' : resolvedSystemScore.value! <= 40 ? 'text-danger' : resolvedSystemScore.value! <= 60 ? 'text-warning' : 'text-success';
-  const marketHelp = resolvedMarketFear?.kind === 'vixtwn'
-    ? (
-        <span className="block max-w-[22rem] space-y-1 text-left">
-          <span className="block font-semibold">VIXTWN 台灣市場恐慌指標</span>
-          <span className="block">目前 VIXTWN：約 {valueText}</span>
-          <span className="block">綠色（VIXTWN &lt; 20）：正常水位，台灣市場平穩，多頭常態。</span>
-          <span className="block">藍色（20 ≤ VIXTWN &lt; 30）：警戒狀態，市場波動加劇，留意風險。</span>
-          <span className="block">橘色（30 ≤ VIXTWN &lt; 40）：過度恐慌，可能為布局機會。</span>
-          <span className="block">紅色（VIXTWN ≥ 40）：極度恐慌，通常伴隨系統性風險或重大黑天鵝。</span>
-        </span>
-      )
-    : (
-        <span className="block max-w-[22rem] space-y-1 text-left">
-          <span className="block font-semibold">VIX 市場恐慌指標</span>
-          <span className="block">目前 VIX：約 {valueText}</span>
-          <span className="block">綠色（VIX &lt; 20）：市場平穩。</span>
-          <span className="block">藍色（20 ≤ VIX &lt; 28.7）：此時買進未來 12 個月的投資報酬率其實非常差。</span>
-          <span className="block">橘色（28.7 ≤ VIX &lt; 33.5）：此時買進未來 12 個月的平均報酬約可達 15%。</span>
-          <span className="block">紅色（VIX ≥ 33.5）：此時買進未來 12 個月的平均報酬約可達 25%。</span>
-        </span>
-      );
-  const scaleTicks = resolvedMarketFear?.kind === 'vixtwn'
+  const systemStatus = systemScoreLabel(resolvedSystemScore.value);
+  const systemTone = systemTextClass(resolvedSystemScore.value);
+  const splitTicks = resolvedMarketFear?.kind === 'vixtwn'
     ? [
-        { range: '0', className: 'text-muted-foreground' },
-        { range: '20', className: 'text-muted-foreground' },
-        { range: '30', className: 'text-muted-foreground' },
-        { range: '40', className: 'text-muted-foreground' },
+        { label: '20', pct: 25 },
+        { label: '30', pct: 50 },
+        { label: '40', pct: 75 },
       ]
     : [
-        { range: '0', className: 'text-muted-foreground' },
-        { range: '20', className: 'text-muted-foreground' },
-        { range: '28.7', className: 'text-muted-foreground' },
-        { range: '33.5', className: 'text-muted-foreground' },
+        { label: '20', pct: 25 },
+        { label: '28.7', pct: 50 },
+        { label: '33.5', pct: 75 },
       ];
+  const allTicks = resolvedMarketFear?.kind === 'vixtwn' ? ['0', '20', '30', '40'] : ['0', '20', '28.7', '33.5'];
 
-  return (
-    <div data-testid="market-risk-gauge" className={`rounded-lg border bg-card p-3 ${className}`}>
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <span
-            className="text-xs font-bold uppercase tracking-wider text-muted-foreground"
-            title={!resolvedMarketFear ? resolvedSystemScore.explanation : undefined}
-            aria-label={!resolvedMarketFear ? `${resolvedSystemScore.label}：${resolvedSystemScore.explanation}` : undefined}
-          >
-            {title}
-          </span>
+  const marketHelp = resolvedMarketFear ? <MarketHelp kind={resolvedMarketFear.kind} valueText={valueText} /> : null;
+  const systemHelp = <SystemScoreHelp explanation={resolvedSystemScore.explanation} />;
+  const metricSummary = (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="rounded-lg border bg-background/80 p-3">
+        <div className="mb-2 flex items-center gap-1.5">
+          <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">{title}</span>
           {resolvedMarketFear && (
-            <Tooltip content={marketHelp} focusable contentClassName="max-w-[24rem]">
-              <span
-                className="inline-flex h-4 w-4 items-center justify-center rounded-full border text-[10px] font-bold text-muted-foreground"
-                aria-label={`${title} 說明`}
-                title={`${title} 說明`}
-              >
-                i
-              </span>
+            <Tooltip content={marketHelp} focusable contentClassName="max-w-[26rem]">
+              <InfoIcon label={`${title} 說明`} />
             </Tooltip>
           )}
         </div>
-        {spxStr && (
-          <span className="text-xs font-semibold" style={{ color: spxColor }}>
-            S&amp;P 500 {spxStr}
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className={`font-mono text-xl font-black ${marketValueClass}`} data-testid="market-fear-value">
+            {resolvedMarketFear ? `${indexCode} ${valueText}` : '—'}
           </span>
+          <StatusTag className={bucketTagClass(resolvedMarketFear?.bucket)}>{marketStatus}</StatusTag>
+        </div>
+        <div className="mt-1 text-[12px] text-muted-foreground">日期：{resolvedMarketFear?.asOf ?? '—'}</div>
+        {!hasMarket && resolvedMarketFear?.dataGapReason && (
+          <div className="mt-1 text-[11px] text-muted-foreground">{resolvedMarketFear.dataGapReason}</div>
         )}
       </div>
+      <div className="rounded-lg border bg-background/80 p-3">
+        <div className="mb-2 flex items-center gap-1.5">
+          <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">{resolvedSystemScore.label}</span>
+          <Tooltip content={systemHelp} focusable contentClassName="max-w-[26rem]">
+            <InfoIcon label="系統評分說明" />
+          </Tooltip>
+        </div>
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className={`font-mono text-xl font-black ${systemTone}`}>{scoreValue}</span>
+          <StatusTag className={systemTagClass(resolvedSystemScore.value)}>{systemStatus}</StatusTag>
+        </div>
+        {resolvedSystemScore.sentimentLabel && (
+          <div className="mt-1 text-[12px] text-muted-foreground">原始標籤：{resolvedSystemScore.sentimentLabel}</div>
+        )}
+      </div>
+    </div>
+  );
+  const legend = (
+    <div className="mt-2 grid gap-1.5 text-[12px] font-semibold text-muted-foreground sm:grid-cols-2">
+      <span>恐慌指數：數值越高代表市場恐慌程度越高</span>
+      <span>系統評分：分數越高代表市場越樂觀</span>
+    </div>
+  );
 
-      <div className="mb-2 grid gap-1.5 text-xs">
-        {resolvedMarketFear && (
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className={`font-mono text-lg font-bold ${marketValueClass}`} data-testid="market-fear-value">
-              {indexCode} {valueText}
-            </span>
-            <span className="text-muted-foreground">日期：{resolvedMarketFear.asOf ?? '—'}</span>
-            {vixStatus && !marketFearIndex && (
-              <span className="rounded border border-amber-400 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                {vixStatus}
-              </span>
-            )}
-            {!hasMarket && (
-              <span className="text-muted-foreground">
-                指數資料暫缺{resolvedMarketFear.dataGapReason ? `：${resolvedMarketFear.dataGapReason}` : ''}
-              </span>
-            )}
+  if (layout === 'dashboard') {
+    const marketPoint = marketPointerPct !== null ? arcPoint(marketPointerPct, ARC_R - 8) : null;
+    const systemPoint = systemPointerPct !== null ? arcPoint(systemPointerPct, ARC_R - 26) : null;
+    const hub = arcPoint(50, 0);
+
+    return (
+      <div data-testid="market-risk-gauge" className={`rounded-lg border bg-card p-3 ${className}`}>
+        {spxStr && (
+          <div className="mb-2 text-right text-xs font-semibold" style={{ color: spxColor }}>
+            S&amp;P 500 {spxStr}
           </div>
         )}
-        <Tooltip content={resolvedSystemScore.explanation} focusable>
-          <span
-            className="inline-flex w-fit flex-wrap items-baseline gap-x-2"
-            title={resolvedSystemScore.explanation}
-            aria-label={`${resolvedSystemScore.label}：${resolvedSystemScore.explanation}`}
-          >
-            {showSystemLabelInValueRow && (
-              <span
-                className={`font-semibold ${systemTone}`}
-                title={resolvedSystemScore.explanation}
-                aria-label={`${resolvedSystemScore.label}：${resolvedSystemScore.explanation}`}
-              >
-                {resolvedSystemScore.label}
-              </span>
-            )}
-            <span className={`font-mono text-base font-bold ${systemTone}`}>
-              {scoreValue}
-            </span>
-            {resolvedSystemScore.sentimentLabel && (
-              <span className={`rounded border border-current px-1.5 py-0.5 text-[10px] font-bold ${systemTone}`}>
-                {resolvedSystemScore.sentimentLabel}
-              </span>
-            )}
-          </span>
-        </Tooltip>
+        {metricSummary}
+        <svg
+          data-testid="market-fear-meter"
+          viewBox={`0 0 ${ARC_W} 188`}
+          width="100%"
+          className="mt-3 overflow-visible"
+          aria-label={`${title} 與系統評分半圓雙指針量表`}
+          role="img"
+        >
+          {[0, 25, 50, 75].map((start, index) => (
+            <path
+              key={start}
+              d={arcPath(start, start + 25)}
+              fill="none"
+              stroke={SEGMENT_COLORS[index]}
+              strokeWidth="17"
+              strokeLinecap="round"
+              opacity="0.82"
+            />
+          ))}
+          {splitTicks.map((tick) => {
+            const p = arcPoint(tick.pct, ARC_R + 24);
+            return (
+              <text key={tick.label} x={p.x} y={p.y} textAnchor="middle" className="fill-muted-foreground text-[14px] font-black">
+                {tick.label}
+              </text>
+            );
+          })}
+          <circle cx={hub.x} cy={hub.y} r="4" fill="#111827" opacity="0.75" />
+          {marketPoint && (
+            <g data-testid="market-fear-pointer" aria-label={`${title} 指標位置：${valueText}`}>
+              <title>{`${title} 指標位置：${valueText}`}</title>
+              <line x1={hub.x} y1={hub.y} x2={marketPoint.x} y2={marketPoint.y} stroke="#111827" strokeWidth="3.5" strokeLinecap="round" />
+              <polygon
+                points={`${marketPoint.x},${marketPoint.y - 9} ${marketPoint.x - 8},${marketPoint.y + 7} ${marketPoint.x + 8},${marketPoint.y + 7}`}
+                fill="#111827"
+              />
+              <text x={marketPoint.x} y={Math.max(18, marketPoint.y - 14)} textAnchor="middle" className="fill-slate-950 text-[13px] font-black">
+                {indexCode}
+              </text>
+            </g>
+          )}
+          {systemPoint && (
+            <g data-testid="system-score-pointer" aria-label={`系統評分指標位置：${scoreValue}`}>
+              <title>{`系統評分指標位置：${scoreValue}`}</title>
+              <line x1={hub.x} y1={hub.y} x2={systemPoint.x} y2={systemPoint.y} stroke="#111827" strokeWidth="2.5" strokeDasharray="5 4" strokeLinecap="round" />
+              <circle cx={systemPoint.x} cy={systemPoint.y} r="7" fill="white" stroke="#111827" strokeWidth="3" />
+              <text x={systemPoint.x} y={Math.min(182, systemPoint.y + 24)} textAnchor="middle" className="fill-slate-950 text-[13px] font-black">
+                系統
+              </text>
+            </g>
+          )}
+        </svg>
+        {legend}
       </div>
+    );
+  }
 
-      {resolvedMarketFear && (
-        <div className="mb-1 flex items-center justify-end gap-4 text-[12px] font-bold text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-0 w-0 border-x-[6px] border-b-[10px] border-x-transparent border-b-slate-950" />
-            {indexCode}
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-3.5 w-3.5 rounded-full border-[2.5px] border-slate-950 bg-white" />
-            系統評分
-          </span>
+  return (
+    <div data-testid="market-risk-gauge" className={`rounded-lg border bg-card p-3 ${className}`}>
+      {spxStr && (
+        <div className="mb-2 text-right text-xs font-semibold" style={{ color: spxColor }}>
+          S&amp;P 500 {spxStr}
         </div>
       )}
-
-
+      {metricSummary}
       <svg
         data-testid="market-fear-meter"
-        viewBox="0 0 600 56"
+        viewBox="0 0 600 104"
         width="100%"
+        className="mt-2 overflow-visible"
         aria-label={`${title} 與系統評分雙指針量表`}
         role="img"
       >
-        <rect x="0" y="24" width="150" height="16" rx="2" fill="#16A34A" opacity="0.78" />
-        <rect x="150" y="24" width="150" height="16" fill="#2563EB" opacity="0.72" />
-        <rect x="300" y="24" width="150" height="16" fill="#EA580C" opacity="0.76" />
-        <rect x="450" y="24" width="150" height="16" rx="2" fill="#DC2626" opacity="0.72" />
+        <rect x="0" y="16" width="150" height="16" rx="2" fill="#16A34A" opacity="0.78" />
+        <rect x="150" y="16" width="150" height="16" fill="#2563EB" opacity="0.72" />
+        <rect x="300" y="16" width="150" height="16" fill="#EA580C" opacity="0.76" />
+        <rect x="450" y="16" width="150" height="16" rx="2" fill="#DC2626" opacity="0.72" />
         {[150, 300, 450].map((x) => (
-          <line key={x} x1={x} y1="22" x2={x} y2="42" stroke="white" strokeWidth="2" />
+          <line key={x} x1={x} y1="14" x2={x} y2="34" stroke="white" strokeWidth="2" />
+        ))}
+        {allTicks.map((label, index) => (
+          <text key={label} x={index * 150} y="50" textAnchor={index === 0 ? 'start' : 'middle'} className="fill-muted-foreground text-[15px] font-black">
+            {label}
+          </text>
         ))}
         {marketPointerX !== null && (
           <g data-testid="market-fear-pointer" aria-label={`${title} 指標位置：${valueText}`}>
             <title>{`${title} 指標位置：${valueText}`}</title>
-            <polygon points={`${marketPointerX},24 ${marketPointerX - 13},5 ${marketPointerX + 13},5`} fill="#111827" />
-            <line x1={marketPointerX} y1="5" x2={marketPointerX} y2="25" stroke="#111827" strokeWidth="2.25" />
+            <polygon points={`${marketPointerX},36 ${marketPointerX - 11},55 ${marketPointerX + 11},55`} fill="#111827" />
+            <line x1={marketPointerX} y1="32" x2={marketPointerX} y2="58" stroke="#111827" strokeWidth="2.5" />
+            <text x={marketPointerX} y="75" textAnchor="middle" className="fill-slate-950 text-[14px] font-black">
+              {indexCode}
+            </text>
           </g>
         )}
         {systemPointerX !== null && (
           <g data-testid="system-score-pointer" aria-label={`系統評分指標位置：${scoreValue}`}>
             <title>{`系統評分指標位置：${scoreValue}`}</title>
-            <circle cx={systemPointerX} cy="49" r="7" fill="white" stroke="#111827" strokeWidth="2.5" />
-            <line x1={systemPointerX} y1="40" x2={systemPointerX} y2="49" stroke="#111827" strokeWidth="2" strokeDasharray="3 2" />
+            <line x1={systemPointerX} y1="32" x2={systemPointerX} y2="68" stroke="#111827" strokeWidth="2" strokeDasharray="4 3" />
+            <circle cx={systemPointerX} cy="68" r="7" fill="white" stroke="#111827" strokeWidth="3" />
+            <text x={systemPointerX} y="91" textAnchor="middle" className="fill-slate-950 text-[14px] font-black">
+              系統
+            </text>
           </g>
         )}
       </svg>
-      <div data-testid="market-fear-scale" className="-mt-1 grid grid-cols-4 gap-1 text-center text-[15px] font-black leading-tight">
-        {scaleTicks.map((tick) => (
-          <span key={tick.range} className={tick.className}>
-            {tick.range}
-          </span>
-        ))}
-      </div>
+      {legend}
     </div>
   );
 };

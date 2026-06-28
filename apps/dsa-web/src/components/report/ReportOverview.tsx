@@ -332,6 +332,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
               sentimentLabel={visualSummaryVm.marketRiskSentimentLabel}
               marketFearIndex={visualSummaryVm.marketFearIndex}
               systemScore={visualSummaryVm.systemScore}
+              layout="dashboard"
               className="home-panel-card home-rail-card !overflow-visible"
             />
           ) : (
