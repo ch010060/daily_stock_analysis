@@ -79,6 +79,11 @@ const historyReport = {
     stockName: '台積電',
     reportType: 'detailed' as const,
     reportLanguage: 'zh' as const,
+    market: 'TW' as const,
+    exchange: 'TWSE',
+    instrumentType: 'stock' as const,
+    googleFinanceExchange: 'TPE',
+    exchangeSource: 'static_tpe',
     createdAt: '2026-03-18T08:00:00Z',
   },
   summary: {
@@ -178,6 +183,75 @@ describe('HomePage', () => {
       }),
     ).toBeInTheDocument();
     expect(historyApi.getMarkdown).not.toHaveBeenCalled();
+  });
+
+  it('shows a Google Finance link in the main report toolbar when exchange metadata is resolvable', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 1,
+      page: 1,
+      limit: 20,
+      items: [historyItem],
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue({
+      ...historyReport,
+      meta: {
+        ...historyReport.meta,
+        stockCode: 'SPY',
+        stockName: 'SPDR S&P 500 ETF',
+        market: 'US',
+        exchange: 'NYSEARCA',
+        instrumentType: 'etf',
+        googleFinanceExchange: 'NYSEARCA',
+        exchangeSource: 'symbol_universe',
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const googleFinanceLink = await screen.findByRole('link', { name: '在Google財經查看' });
+
+    expect(googleFinanceLink).toHaveAttribute(
+      'href',
+      'https://www.google.com/finance/beta/quote/SPY:NYSEARCA',
+    );
+    expect(googleFinanceLink).toHaveAttribute('target', '_blank');
+    expect(googleFinanceLink).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('hides the main Google Finance link when US exchange metadata is unknown', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 1,
+      page: 1,
+      limit: 20,
+      items: [historyItem],
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue({
+      ...historyReport,
+      meta: {
+        ...historyReport.meta,
+        stockCode: 'TEST',
+        stockName: 'Unknown Exchange Stock',
+        market: 'US',
+        exchange: null,
+        instrumentType: 'stock',
+        googleFinanceExchange: null,
+        exchangeSource: 'unknown',
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText('趨勢維持強勢');
+
+    expect(screen.queryByRole('link', { name: '在Google財經查看' })).not.toBeInTheDocument();
   });
 
   it('loads markdown only after opening the full report drawer', async () => {

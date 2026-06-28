@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
+import { stocksApi } from '../api/stocks';
 import { ApiErrorAlert, Badge, Button, ConfirmDialog, EmptyState, InlineAlert, ScrollArea, Tooltip } from '../components/common';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
@@ -27,6 +28,10 @@ import { isNearBottom } from '../utils/chatScroll';
 import { getReportText } from '../utils/reportLanguage';
 import { extractStockCodeFromMessage } from '../utils/chatStockCode';
 import { normalizeStockCode } from '../utils/stockCode';
+import {
+  buildGoogleFinanceQuoteUrl,
+  buildGoogleFinanceResearchPrompt,
+} from '../utils/googleFinance';
 
 // Quick question examples shown on empty state
 const QUICK_QUESTIONS = [
@@ -88,6 +93,7 @@ const ChatPage: React.FC = () => {
   const followUpContextRef = useRef<ChatFollowUpContext | null>(null);
   const shouldStickToBottomRef = useRef(true);
   const pendingScrollBehaviorRef = useRef<ScrollBehavior>('auto');
+  const googleFinanceStockCode = extractStockCodeFromMessage(input) ?? activeStockCode;
 
   // Get localized text (default to Chinese)
   const text = getReportText('zh');
@@ -492,6 +498,38 @@ const ChatPage: React.FC = () => {
       sendToastTimerRef.current = null;
     }, durationMs);
   }, []);
+
+  const handleAskGoogleFinance = useCallback(async (stockCode: string) => {
+    const prompt = buildGoogleFinanceResearchPrompt({ symbol: stockCode });
+    let url: string | null = null;
+    try {
+      const resolved = await stocksApi.resolveSymbol(stockCode);
+      const selected = resolved.selected;
+      if (selected) {
+        url = buildGoogleFinanceQuoteUrl({
+          symbol: selected.rawSymbol || selected.symbol || stockCode,
+          market: selected.market,
+          exchange: selected.exchange,
+          assetType: selected.instrumentType,
+        });
+      }
+    } catch {
+      url = null;
+    }
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
+    try {
+      await navigator.clipboard.writeText(prompt);
+      showSendFeedback({ type: 'success', message: '已複製 Google Finance 研究問題' }, 3000);
+    } catch {
+      showSendFeedback({
+        type: url ? 'success' : 'error',
+        message: url ? '已開啟 Google Finance，但無法複製研究問題' : '無法複製 Google Finance 研究問題',
+      }, 3000);
+    }
+  }, [showSendFeedback]);
 
   const toggleThinking = (msgId: string) => {
     setExpandedThinking((prev) => {
@@ -1202,17 +1240,25 @@ const ChatPage: React.FC = () => {
               </div>
             )}
 
-            {activeStockCode && (
+            {googleFinanceStockCode && (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-text font-mono">{activeStockCode}</span>
+                <span className="text-xs text-muted-text font-mono">{googleFinanceStockCode}</span>
                 <Button
                   variant="secondary"
                   size="xsm"
                   isLoading={isWatchlistActioning}
-                  onClick={() => void handleToggleWatchlist(activeStockCode)}
+                  onClick={() => void handleToggleWatchlist(googleFinanceStockCode)}
                   className="text-[11px]"
                 >
-                  {stockInWatchlist(activeStockCode) ? '從自選刪除' : '加入自選'}
+                  {stockInWatchlist(googleFinanceStockCode) ? '從自選刪除' : '加入自選'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="xsm"
+                  onClick={() => void handleAskGoogleFinance(googleFinanceStockCode)}
+                  className="text-[11px]"
+                >
+                  在 Google Finance 提問
                 </Button>
                 {watchlistMessage && (
                   <span className="text-[11px] text-secondary-text animate-in fade-in">{watchlistMessage}</span>

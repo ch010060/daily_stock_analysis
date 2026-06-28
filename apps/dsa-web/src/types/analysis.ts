@@ -70,6 +70,11 @@ export interface ReportMeta {
   queryId: string;
   stockCode: string;
   stockName: string;
+  market?: 'TW' | 'US' | string | null;
+  exchange?: string | null;
+  instrumentType?: string | null;
+  googleFinanceExchange?: string | null;
+  exchangeSource?: string | null;
   reportType: ReportType;
   reportLanguage?: ReportLanguage;
   createdAt: string;

@@ -266,4 +266,38 @@ describe('ReportMarkdownPanel', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('PDF 產生失敗，請稍後再試。');
   });
 
+
+  it('does not show a Google Finance link inside the full report panel', async () => {
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue('# Google finance report');
+
+    render(
+      <ReportMarkdownPanel
+        recordId={1}
+        stockName="台積電"
+        stockCode="2330"
+        onRequestClose={() => {}}
+        initialDetail={{
+          meta: {
+            id: 1,
+            queryId: 'q-tw',
+            stockCode: '2330',
+            stockName: '台積電',
+            reportType: 'detailed',
+            createdAt: '2026-06-28T08:00:00Z',
+            market: 'TW',
+            instrumentType: 'stock',
+            exchange: 'TWSE',
+            googleFinanceExchange: 'TPE',
+            exchangeSource: 'static_tpe',
+          },
+          summary: {},
+          strategy: {},
+        } as never}
+      />
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Google finance report' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '在 Google Finance 查看' })).not.toBeInTheDocument();
+  });
+
 });

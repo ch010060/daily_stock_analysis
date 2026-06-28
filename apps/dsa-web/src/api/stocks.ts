@@ -1,4 +1,5 @@
 import apiClient from './index';
+import { toCamelCase } from './utils';
 
 export type ExtractItem = {
   code?: string | null;
@@ -12,7 +13,41 @@ export type ExtractFromImageResponse = {
   rawText?: string;
 };
 
+export type SymbolCandidateResponse = {
+  canonicalSymbol: string;
+  rawSymbol: string;
+  symbol: string;
+  market: string;
+  exchange?: string | null;
+  instrumentType: string;
+  name: string;
+  aliases: string[];
+  providerSource: string;
+  isActive: boolean;
+  lastUpdated?: string | null;
+  confidence: number;
+  matchReason: string;
+};
+
+export type SymbolResolveResponse = {
+  query: string;
+  status: string;
+  selected?: SymbolCandidateResponse | null;
+  candidates: SymbolCandidateResponse[];
+  message?: string | null;
+};
+
 export const stocksApi = {
+  async resolveSymbol(q: string, market?: 'TW' | 'US' | 'tw' | 'us'): Promise<SymbolResolveResponse> {
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/stocks/resolve', {
+      params: {
+        q,
+        ...(market ? { market } : {}),
+      },
+    });
+    return toCamelCase<SymbolResolveResponse>(response.data);
+  },
+
   async extractFromImage(file: File): Promise<ExtractFromImageResponse> {
     const formData = new FormData();
     formData.append('file', file);

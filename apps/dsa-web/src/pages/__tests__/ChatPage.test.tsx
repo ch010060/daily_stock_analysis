@@ -28,6 +28,7 @@ const {
   mockRemoveFromWatchlist,
   mockDownloadSession,
   mockFormatSessionAsMarkdown,
+  mockResolveSymbol,
 } = vi.hoisted(() => ({
   mockGetSkills: vi.fn(),
   mockDeleteChatSession: vi.fn(),
@@ -39,6 +40,7 @@ const {
   mockRemoveFromWatchlist: vi.fn(),
   mockDownloadSession: vi.fn(),
   mockFormatSessionAsMarkdown: vi.fn(),
+  mockResolveSymbol: vi.fn(),
 }));
 
 const mockLoadSessions = vi.fn();
@@ -100,6 +102,12 @@ vi.mock('../../api/history', () => ({
   },
 }));
 
+vi.mock('../../api/stocks', () => ({
+  stocksApi: {
+    resolveSymbol: mockResolveSymbol,
+  },
+}));
+
 vi.mock('../../stores/agentChatStore', () => {
   const useAgentChatStore = (
     selector?: (state: typeof mockStoreState) => unknown
@@ -141,6 +149,18 @@ beforeAll(() => {
     writable: true,
     value: vi.fn(),
   });
+
+  Object.defineProperty(navigator, 'clipboard', {
+    writable: true,
+    value: {
+      writeText: vi.fn(),
+    },
+  });
+
+  Object.defineProperty(window, 'open', {
+    writable: true,
+    value: vi.fn(),
+  });
 });
 
 beforeEach(() => {
@@ -168,6 +188,8 @@ beforeEach(() => {
   });
   mockDeleteChatSession.mockResolvedValue(undefined);
   mockSendChat.mockResolvedValue({ success: true });
+  vi.mocked(navigator.clipboard.writeText).mockResolvedValue(undefined);
+  vi.mocked(window.open).mockReturnValue(null);
   mockGetWatchlist.mockResolvedValue([]);
   mockGetSystemConfig.mockResolvedValue({
     configVersion: 'cfg-v1',
@@ -192,6 +214,7 @@ beforeEach(() => {
   });
   mockDownloadSession.mockImplementation(() => {});
   mockFormatSessionAsMarkdown.mockReturnValue('# exported session');
+  mockResolveSymbol.mockResolvedValue({ query: '', status: 'not_found', selected: null, candidates: [], message: null });
 });
 
 describe('ChatPage', () => {
@@ -632,7 +655,7 @@ describe('ChatPage', () => {
     vi.mocked(historyApi.getDetail).mockImplementation(() => deferred.promise);
 
     render(
-      <MemoryRouter initialEntries={['/chat?stock=2330&name=%E8%B2%B4%E5%B7%9E%E8%8C%85%E8%87%BA&recordId=1']}>
+      <MemoryRouter initialEntries={['/chat?stock=2330&name=%E5%8F%B0%E7%A9%8D%E9%9B%BB&recordId=1']}>
         <ChatPage />
       </MemoryRouter>
     );
@@ -728,7 +751,7 @@ describe('ChatPage', () => {
     });
 
     render(
-      <MemoryRouter initialEntries={['/chat?stock=2330&name=%E8%B2%B4%E5%B7%9E%E8%8C%85%E8%87%BA&recordId=1']}>
+      <MemoryRouter initialEntries={['/chat?stock=2330&name=%E5%8F%B0%E7%A9%8D%E9%9B%BB&recordId=1']}>
         <ChatPage />
       </MemoryRouter>
     );
@@ -813,7 +836,7 @@ describe('ChatPage', () => {
     const router = createMemoryRouter(
       [{ path: '/chat', element: <ChatPage /> }],
       {
-        initialEntries: ['/chat?stock=2330&name=%E8%B2%B4%E5%B7%9E%E8%8C%85%E8%87%BA&recordId=1'],
+        initialEntries: ['/chat?stock=2330&name=%E5%8F%B0%E7%A9%8D%E9%9B%BB&recordId=1'],
       },
     );
 
@@ -999,5 +1022,158 @@ describe('watchlist button with code variants', () => {
     fireEvent.keyDown(textarea, { key: 'Enter' });
 
     expect(await screen.findByText('從自選刪除')).toBeInTheDocument();
+  });
+});
+
+describe('Google Finance ask helper', () => {
+  it('shows the Google Finance helper while typing a stock code before sending', async () => {
+    render(
+      <MemoryRouter>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const textarea = await screen.findByPlaceholderText(/例如/);
+    expect(screen.queryByRole('button', { name: '在 Google Finance 提問' })).not.toBeInTheDocument();
+
+    fireEvent.change(textarea, { target: { value: '分析 SPY' } });
+
+    expect(await screen.findByRole('button', { name: '在 Google Finance 提問' })).toBeInTheDocument();
+    expect(screen.getByText('SPY')).toBeInTheDocument();
+  });
+
+  it('copies a prepared research prompt and opens a resolvable quote page', async () => {
+    mockResolveSymbol.mockResolvedValueOnce({
+      query: 'SPY',
+      status: 'resolved',
+      selected: {
+        canonicalSymbol: 'US:SPY',
+        rawSymbol: 'SPY',
+        symbol: 'SPY',
+        market: 'US',
+        exchange: 'NYSE Arca',
+        instrumentType: 'etf',
+        name: 'SPDR S&P 500 ETF',
+        aliases: [],
+        providerSource: 'symbol_universe',
+        isActive: true,
+        lastUpdated: null,
+        confidence: 1,
+        matchReason: 'exact_symbol',
+      },
+      candidates: [],
+      message: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const textarea = await screen.findByPlaceholderText(/例如/);
+    fireEvent.change(textarea, { target: { value: '分析 SPY' } });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+
+    fireEvent.click(await screen.findByRole('button', { name: '在 Google Finance 提問' }));
+
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        '請分析 SPY 近期是否適合長期持有，請結合股價趨勢、財報、新聞、估值與主要風險。'
+      );
+    });
+    expect(window.open).toHaveBeenCalledWith(
+      'https://www.google.com/finance/beta/quote/SPY:NYSEARCA',
+      '_blank',
+      'noopener,noreferrer'
+    );
+    expect(await screen.findByText('已複製 Google Finance 研究問題')).toBeInTheDocument();
+  });
+
+  it('copies the research prompt without guessing an unknown US exchange', async () => {
+    mockResolveSymbol.mockResolvedValueOnce({
+      query: 'ABC',
+      status: 'resolved',
+      selected: {
+        canonicalSymbol: 'US:ABC',
+        rawSymbol: 'ABC',
+        symbol: 'ABC',
+        market: 'US',
+        exchange: null,
+        instrumentType: 'etf',
+        name: 'Unknown ETF',
+        aliases: [],
+        providerSource: 'test',
+        isActive: true,
+        lastUpdated: null,
+        confidence: 1,
+        matchReason: 'exact_symbol',
+      },
+      candidates: [],
+      message: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const textarea = await screen.findByPlaceholderText(/例如/);
+    fireEvent.change(textarea, { target: { value: '分析 ABC' } });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+
+    fireEvent.click(await screen.findByRole('button', { name: '在 Google Finance 提問' }));
+
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        '請分析 ABC 近期是否適合長期持有，請結合股價趨勢、財報、新聞、估值與主要風險。'
+      );
+    });
+    expect(window.open).not.toHaveBeenCalled();
+  });
+
+  it('opens Google Finance even when clipboard copy is blocked', async () => {
+    vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(new Error('clipboard blocked'));
+    mockResolveSymbol.mockResolvedValueOnce({
+      query: 'NVDA',
+      status: 'resolved',
+      selected: {
+        canonicalSymbol: 'US:NVDA',
+        rawSymbol: 'NVDA',
+        symbol: 'NVDA',
+        market: 'US',
+        exchange: 'NASDAQ',
+        instrumentType: 'stock',
+        name: 'NVIDIA Corporation',
+        aliases: [],
+        providerSource: 'symbol_universe',
+        isActive: true,
+        lastUpdated: null,
+        confidence: 1,
+        matchReason: 'exact_symbol',
+      },
+      candidates: [],
+      message: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const textarea = await screen.findByPlaceholderText(/例如/);
+    fireEvent.change(textarea, { target: { value: '分析 NVDA' } });
+    fireEvent.click(await screen.findByRole('button', { name: '在 Google Finance 提問' }));
+
+    await waitFor(() => {
+      expect(window.open).toHaveBeenCalledWith(
+        'https://www.google.com/finance/beta/quote/NVDA:NASDAQ',
+        '_blank',
+        'noopener,noreferrer'
+      );
+    });
+    expect(await screen.findByText('已開啟 Google Finance，但無法複製研究問題')).toBeInTheDocument();
   });
 });

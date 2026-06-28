@@ -632,6 +632,49 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(report.meta.current_price, 2510.0)
         self.assertEqual(report.meta.change_pct, 4.15)
 
+    def test_history_detail_exposes_google_finance_exchange_metadata(self) -> None:
+        """History detail should expose local exchange metadata for external links."""
+        if get_history_detail is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        tw_record_id = self._save_history("query_google_finance_tw_2330")
+        tw_report = get_history_detail(str(tw_record_id), db_manager=self.db)
+        self.assertEqual(tw_report.meta.market, "TW")
+        self.assertEqual(tw_report.meta.instrument_type, "stock")
+        self.assertEqual(tw_report.meta.google_finance_exchange, "TPE")
+        self.assertEqual(tw_report.meta.exchange_source, "static_tpe")
+
+        us_result = AnalysisResult(
+            code="SPY",
+            name="SPDR S&P 500 ETF",
+            sentiment_score=55,
+            trend_prediction="震盪",
+            operation_advice="持有",
+            analysis_summary="測試摘要",
+        )
+        saved = self.db.save_analysis_history(
+            result=us_result,
+            query_id="query_google_finance_us_spy",
+            report_type="simple",
+            news_content="新聞摘要",
+            context_snapshot=None,
+            save_snapshot=False,
+        )
+        self.assertEqual(saved, 1)
+        with self.db.get_session() as session:
+            row = session.query(AnalysisHistory).filter(
+                AnalysisHistory.query_id == "query_google_finance_us_spy"
+            ).first()
+            if row is None:
+                self.fail("未找到儲存的歷史記錄")
+            us_record_id = row.id
+
+        us_report = get_history_detail(str(us_record_id), db_manager=self.db)
+        self.assertEqual(us_report.meta.market, "US")
+        self.assertEqual(us_report.meta.instrument_type, "etf")
+        self.assertEqual(us_report.meta.google_finance_exchange, "NYSEARCA")
+        self.assertEqual(us_report.meta.exchange_source, "symbol_universe")
+
     @patch("src.auth.is_auth_enabled", return_value=False)
     def test_history_detail_ignores_non_dict_realtime_quote_raw(self, mock_auth) -> None:
         """GET /api/v1/history/{id} should tolerate truthy non-dict realtime_quote_raw."""

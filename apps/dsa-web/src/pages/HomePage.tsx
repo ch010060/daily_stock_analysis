@@ -18,6 +18,7 @@ import { useDashboardLifecycle, useHomeDashboardState } from '../hooks';
 import { useWatchlist } from '../hooks/useWatchlist';
 import type { SetupStatusResponse } from '../types/systemConfig';
 import { getReportText, normalizeReportLanguage } from '../utils/reportLanguage';
+import { buildGoogleFinanceQuoteUrl } from '../utils/googleFinance';
 import type { StockBarItem } from '../types/analysis';
 
 const DUPLICATE_BANNER_AUTO_DISMISS_MS = 5000;
@@ -214,6 +215,15 @@ const HomePage: React.FC = () => {
   const reportLanguage = normalizeReportLanguage(selectedReport?.meta.reportLanguage);
   const reportText = getReportText(reportLanguage);
   const isMarketReviewHistoryReport = selectedReport?.meta.reportType === 'market_review';
+  const selectedReportGoogleFinanceUrl =
+    selectedReport && !isMarketReviewHistoryReport
+      ? buildGoogleFinanceQuoteUrl({
+          symbol: selectedReport.meta.stockCode,
+          market: selectedReport.meta.market ?? undefined,
+          exchange: selectedReport.meta.googleFinanceExchange ?? selectedReport.meta.exchange,
+          assetType: selectedReport.meta.instrumentType ?? undefined,
+        })
+      : null;
   const isHistoryTrendUnavailable = !selectedReport || !selectedReport.meta.stockCode;
 
   useEffect(() => {
@@ -969,6 +979,21 @@ const HomePage: React.FC = () => {
                     </svg>
                     {reportText.fullReport}
                   </Button>
+                  {selectedReportGoogleFinanceUrl ? (
+                    <a
+                      href={selectedReportGoogleFinanceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="在Google財經查看"
+                      className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--home-action-ai-border)] bg-[var(--home-action-ai-bg)] px-3 text-sm font-medium text-[var(--home-action-ai-text)] transition-all duration-200 hover:bg-[var(--home-action-ai-hover-bg)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan/15 focus-visible:ring-offset-0"
+                      style={{ color: 'var(--home-action-ai-text)' }}
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.5 6H18m0 0v4.5M18 6l-7.5 7.5M6 8.25A2.25 2.25 0 018.25 6h1.5M6 8.25v7.5A2.25 2.25 0 008.25 18h7.5A2.25 2.25 0 0018 15.75v-1.5" />
+                      </svg>
+                      <span>在Google財經查看</span>
+                    </a>
+                  ) : null}
                 </div>
                 {isHistoryTrendOpen ? (
                   <StockHistoryTrendDrawer
