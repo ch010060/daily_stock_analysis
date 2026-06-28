@@ -44,6 +44,7 @@ from src.report_language import (
     normalize_report_language,
 )
 from src.services.history_service import HistoryService, MarkdownReportGenerationError
+from src.services.google_finance_reference import build_google_finance_reference_metadata
 from src.services.kline_snapshot import KlineHistoryNotFound, build_history_kline
 from src.services.report_pdf_service import (
     ReportPdfError,
@@ -66,12 +67,45 @@ from src.analysis_context_pack_overview import (
     sanitize_context_snapshot_for_api,
 )
 from src.market_phase_summary import extract_market_phase_summary
+from src.services.symbol_universe import get_default_symbol_resolver
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 KlineRange = Literal["1d", "5d", "1w", "1m", "3m", "1y"]
+
+
+def _resolve_google_finance_report_metadata(stock_code: str, raw_result: dict) -> dict[str, str | None]:
+    """Resolve external-reference metadata from local symbol metadata only."""
+
+    try:
+        resolved = get_default_symbol_resolver().resolve(stock_code, limit=1)
+        record = resolved.selected
+    except Exception:
+        record = None
+
+    if record is not None:
+        return build_google_finance_reference_metadata(
+            symbol=record.raw_symbol,
+            market=record.market,
+            exchange=record.exchange,
+            instrument_type=record.instrument_type,
+            exchange_source="symbol_universe",
+        ) or {}
+
+    market = None
+    market_fear_snapshot = raw_result.get("market_fear_index_snapshot")
+    if isinstance(market_fear_snapshot, dict):
+        market = market_fear_snapshot.get("market")
+
+    return build_google_finance_reference_metadata(
+        symbol=stock_code,
+        market=str(market or "").upper(),
+        exchange=None,
+        instrument_type=raw_result.get("instrument_type"),
+        exchange_source="unknown",
+    ) or {}
 
 
 def _normalize_code_for_grouping(code: str) -> str:
@@ -401,6 +435,10 @@ def get_history_detail(
             result.get("stock_code", ""),
             report_language,
         )
+        google_finance_meta = _resolve_google_finance_report_metadata(
+            result.get("stock_code", ""),
+            raw_result,
+        )
 
         # 構建響應模型
         meta = ReportMeta(
@@ -408,6 +446,11 @@ def get_history_detail(
             query_id=result.get("query_id", ""),
             stock_code=result.get("stock_code", ""),
             stock_name=stock_name,
+            market=google_finance_meta.get("market"),
+            exchange=google_finance_meta.get("exchange"),
+            instrument_type=google_finance_meta.get("instrument_type") or raw_result.get("instrument_type"),
+            google_finance_exchange=google_finance_meta.get("google_finance_exchange"),
+            exchange_source=google_finance_meta.get("exchange_source"),
             report_type=result.get("report_type"),
             report_language=report_language,
             created_at=result.get("created_at"),

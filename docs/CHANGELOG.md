@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [改進] Google Finance 外部參考入口移至個股分析主介面工具列，完整報告內不顯示該入口；連結仍使用 persisted metadata/exchange resolver，未知交易所維持隱藏。
+
+- [改進] Google Finance 外部參考改為使用台美標的 metadata/exchange resolver 產生連結，美股不再依賴前端 ticker-level mapping；未知交易所維持隱藏連結、不猜測。
+
+- [新功能] Web 個股分析工具列與問股頁新增 Google Finance 外部參考入口，可開啟已知 TW/US 標的的 Google Finance quote 頁並複製研究問題提示；不抓取、不嵌入、不自動提交 Google 內容。
+
 - [新功能] 完整分析報告新增直接下載 PDF 功能，後端以列印專用報告頁產生完整 PDF 檔。
 
 - [改進] 優化市場恐慌指標卡片的視覺排版與官方指標 marker，移除「原始標籤」冗餘文字，讓個股分析與完整報告中的 VIX／VIXTWN 與「系統評分」更清楚可讀。
