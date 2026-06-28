@@ -265,7 +265,55 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
 
   const marketHelp = resolvedMarketFear ? <MarketHelp kind={resolvedMarketFear.kind} valueText={valueText} /> : null;
   const systemHelp = <SystemScoreHelp explanation={resolvedSystemScore.explanation} />;
-  const metricSummary = (
+  const dashboardMeta = layout === 'dashboard' ? (
+    <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 px-1 text-[10px] font-semibold leading-tight">
+      <span className="min-w-0 text-muted-foreground">
+        <span className="font-mono">{resolvedMarketFear?.asOf ?? '—'}</span>
+      </span>
+      {spxStr && (
+        <span className="ml-auto whitespace-nowrap" style={{ color: spxColor }}>
+          S&amp;P 500 {spxStr}
+        </span>
+      )}
+    </div>
+  ) : null;
+  const metricSummary = layout === 'dashboard' ? (
+    <div className="min-w-0 rounded-xl border border-border/60 bg-muted/20 px-2.5 py-2.5">
+      <div className="grid min-w-0 grid-cols-2 divide-x divide-border/60">
+        <div className="min-w-0 px-1.5 text-center">
+          <div className="mb-1 flex min-w-0 items-center justify-center gap-1">
+            <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-wider text-muted-foreground">{indexCode}</span>
+            {resolvedMarketFear && (
+              <Tooltip content={marketHelp} focusable contentClassName="max-w-[26rem]">
+                <InfoIcon label={`${indexCode} 說明`} />
+              </Tooltip>
+            )}
+          </div>
+          <div className="flex min-w-0 flex-col items-center gap-1">
+            <span className={`font-mono text-xl font-black leading-none ${marketValueClass}`} data-testid="market-fear-value">
+              {valueText}
+            </span>
+            <StatusTag className={bucketTagClass(resolvedMarketFear?.bucket)}>{marketStatus}</StatusTag>
+          </div>
+          {!hasMarket && resolvedMarketFear?.dataGapReason && (
+            <div className="mt-1 text-[11px] text-muted-foreground">{resolvedMarketFear.dataGapReason}</div>
+          )}
+        </div>
+        <div className="min-w-0 px-1.5 text-center">
+          <div className="mb-1 flex min-w-0 items-center justify-center gap-1">
+            <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-wider text-muted-foreground">{resolvedSystemScore.label}</span>
+            <Tooltip content={systemHelp} focusable contentClassName="max-w-[26rem]">
+              <InfoIcon label="系統評分說明" />
+            </Tooltip>
+          </div>
+          <div className="flex min-w-0 flex-col items-center gap-1">
+            <span className={`font-mono text-xl font-black leading-none ${systemTone}`}>{scoreValue}</span>
+            <StatusTag className={systemTagClass(resolvedSystemScore.value)}>{systemStatus}</StatusTag>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : (
     <div className="min-w-0 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5">
       <div className="grid min-w-0 gap-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-3">
         <div className="min-w-0">
@@ -320,7 +368,8 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
 
       return (
       <div data-testid="market-risk-gauge" className={`min-w-0 rounded-lg border bg-card p-3 ${className}`}>
-        {spxStr && (
+        {dashboardMeta}
+        {layout !== 'dashboard' && spxStr && (
           <div className="mb-2 text-right text-xs font-semibold" style={{ color: spxColor }}>
             S&amp;P 500 {spxStr}
           </div>

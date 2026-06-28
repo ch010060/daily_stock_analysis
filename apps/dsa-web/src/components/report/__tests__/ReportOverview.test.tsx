@@ -156,8 +156,7 @@ describe('ReportOverview', () => {
     expect(within(gauge).getByText('VIXTWN')).not.toHaveClass('truncate');
     expect(screen.getByTestId('market-fear-value')).toHaveTextContent('44.27');
     expect(gauge.textContent).not.toContain('VIXTWN 44.27');
-    expect(gauge.textContent).toContain('日期：2026-06-26');
-    expect(within(gauge).getByText('日期：')).toBeInTheDocument();
+    expect(gauge.textContent).not.toContain('日期：');
     expect(within(gauge).getByText('2026-06-26')).toBeInTheDocument();
     expect(gauge.textContent).toContain('系統評分');
     expect(gauge.textContent).toContain('恐慌');
