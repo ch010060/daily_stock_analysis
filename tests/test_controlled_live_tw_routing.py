@@ -118,6 +118,24 @@ class TestControlledLiveTWRouting(unittest.TestCase):
         for fetcher in legacy:
             self.assertEqual(fetcher.calls, [])
 
+    def test_controlled_live_tw_letter_suffix_routes_directly_to_finmind(self):
+        finmind = _RecordingDailyFetcher("TaiwanFinMindFetcher", 99)
+        legacy = _legacy_poison_fetchers()
+        manager = DataFetcherManager(fetchers=[*legacy, finmind])
+
+        with patch.dict(os.environ, _controlled_live_env(), clear=False):
+            df, source = manager.get_daily_data(
+                "00981A",
+                start_date="2025-01-02",
+                end_date="2025-01-10",
+            )
+
+        self.assertEqual(source, "TaiwanFinMindFetcher")
+        self.assertFalse(df.empty)
+        self.assertEqual(finmind.calls, [("TW:00981A", "2025-01-02", "2025-01-10")])
+        for fetcher in legacy:
+            self.assertEqual(fetcher.calls, [])
+
     def test_controlled_live_tw_stock_name_uses_local_label_without_legacy_providers(self):
         finmind = _RecordingDailyFetcher("TaiwanFinMindFetcher", 99)
         legacy = _legacy_poison_fetchers()
@@ -135,7 +153,7 @@ class TestControlledLiveTWRouting(unittest.TestCase):
         for fetcher in legacy:
             self.assertEqual(fetcher.calls, [])
 
-    def test_finmind_disabled_preserves_existing_live_provider_order(self):
+    def test_finmind_disabled_does_not_fallback_to_non_tw_daily_providers(self):
         efinance = _RecordingDailyFetcher("EfinanceFetcher", 0)
         finmind = _RecordingDailyFetcher("TaiwanFinMindFetcher", 99)
         manager = DataFetcherManager(fetchers=[efinance, finmind])
@@ -151,10 +169,19 @@ class TestControlledLiveTWRouting(unittest.TestCase):
                 end_date="2025-01-10",
             )
 
-        self.assertEqual(source, "EfinanceFetcher")
+        self.assertEqual(source, "TaiwanFinMindFetcher")
         self.assertFalse(df.empty)
-        self.assertEqual(efinance.calls, [("2330", "2025-01-02", "2025-01-10")])
-        self.assertEqual(finmind.calls, [])
+        self.assertEqual(efinance.calls, [])
+        self.assertEqual(finmind.calls, [("2330", "2025-01-02", "2025-01-10")])
+
+    def test_tw_letter_suffix_realtime_uses_tw_guard_not_cn_sources(self):
+        manager = DataFetcherManager(fetchers=[])
+
+        with patch.object(manager, "_try_fetcher_quote", return_value=None) as quote_mock:
+            quote = manager.get_realtime_quote("00981A")
+
+        self.assertIsNone(quote)
+        quote_mock.assert_called_once_with("00981A", "YfinanceFetcher")
 
     def test_us_symbol_not_affected_by_tw_live_guard(self):
         manager = DataFetcherManager(fetchers=[])

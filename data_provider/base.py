@@ -145,15 +145,16 @@ def _is_hk_market(code: str) -> bool:
 
 
 def _is_tw_market(code: str) -> bool:
-    """判定是否為台股程式碼（4 位純數字，或 TW: 字首 / .TW 字尾）。"""
+    """判定是否為台股程式碼（Route B TW symbols, including ETF suffix forms）。"""
     normalized = (code or "").strip().upper()
+    tw_pattern = re.compile(r"^(?:\d{4,6}|\d{4,5}[A-Z])$")
     if normalized.startswith("TW:"):
         base = normalized[3:]
-        return base.isdigit() and 1 <= len(base) <= 6
+        return bool(tw_pattern.fullmatch(base))
     if normalized.endswith(".TW"):
         base = normalized[:-3]
-        return base.isdigit() and 1 <= len(base) <= 6
-    return normalized.isdigit() and len(normalized) == 4
+        return bool(tw_pattern.fullmatch(base))
+    return bool(tw_pattern.fullmatch(normalized))
 
 
 def _is_etf_code(code: str) -> bool:
@@ -690,7 +691,7 @@ class DataFetcherManager:
         market: str,
     ) -> List[BaseFetcher]:
         """Skip built-in daily fetchers that are known not to support a market."""
-        if market not in {"cn", "hk", "us"}:
+        if market not in {"cn", "hk", "us", "tw"}:
             return fetchers
 
         kept: List[BaseFetcher] = []
@@ -1433,8 +1434,11 @@ class DataFetcherManager:
         #   - 美股指數:       始終 YFinance 為首選（Longbridge 不提供指數K線）
         is_us_index = is_us_index_code(stock_code)
         is_us = is_us_index or is_us_stock_code(stock_code)
-        is_hk = (not is_us) and _is_hk_market(stock_code)
-        if is_hk:
+        is_tw = (not is_us) and _is_tw_market(stock_code)
+        is_hk = (not is_us and not is_tw) and _is_hk_market(stock_code)
+        if is_tw:
+            fetchers = self._filter_daily_fetchers_for_market(fetchers, "tw")
+        elif is_hk:
             fetchers = self._filter_daily_fetchers_for_market(fetchers, "hk")
         fetchers = self._filter_fetchers_by_capability(fetchers, capability="daily_data")
         total_fetchers = len(fetchers)

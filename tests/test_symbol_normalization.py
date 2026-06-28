@@ -80,6 +80,18 @@ class TestSymbolNormalization(unittest.TestCase):
         self.assertEqual(result.canonical, "TW:00981A")
         self.assertEqual(result.provider_symbol, "00981A")
 
+    def test_tw_bare_etf_with_uppercase_suffix_defaults_to_tw(self):
+        result = normalize_symbol("00981A")
+        self.assertEqual(result.market, "TW")
+        self.assertEqual(result.canonical, "TW:00981A")
+        self.assertEqual(result.provider_symbol, "00981A")
+
+    def test_known_tw_bare_six_digit_etf_defaults_to_tw(self):
+        result = normalize_symbol("006208")
+        self.assertEqual(result.market, "TW")
+        self.assertEqual(result.canonical, "TW:006208")
+        self.assertEqual(result.provider_symbol, "006208")
+
     def test_stock_code_helper_supports_tw_us_only(self):
         self.assertEqual(normalize_stock_code("TW:00981A"), "00981A")
         self.assertEqual(normalize_stock_code("006208.TW"), "006208")

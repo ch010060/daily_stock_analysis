@@ -18,7 +18,8 @@ class NormalizedSymbol:
 
 
 _TW_CODE_RE = re.compile(r"^\d{4,6}[A-Z]?$")
-_TW_4DIGIT_RE = re.compile(r"^\d{4}$")
+_TW_UNAMBIGUOUS_RE = re.compile(r"^\d{4,5}[A-Z]?$")
+_TW_AMBIGUOUS_SIX_DIGIT_RE = re.compile(r"^\d{6}$")
 _US_SYMBOL_RE = re.compile(r"^[A-Z]{1,5}([.\-][A-Z])?$")
 
 
@@ -45,10 +46,22 @@ def normalize_symbol(symbol: str, market: Optional[str] = None) -> NormalizedSym
     if market_hint:
         raise SymbolNormalizationError(f"unsupported market: {market_hint}")
 
-    if _TW_4DIGIT_RE.fullmatch(upper):
+    if _TW_UNAMBIGUOUS_RE.fullmatch(upper):
+        return _normalize_tw(upper)
+    if _TW_AMBIGUOUS_SIX_DIGIT_RE.fullmatch(upper) and _is_known_tw_symbol(upper):
         return _normalize_tw(upper)
 
     raise SymbolNormalizationError(f"market is required for ambiguous symbol: {raw}")
+
+
+def _is_known_tw_symbol(code: str) -> bool:
+    try:
+        from src.services.symbol_universe import get_default_symbol_universe_cache
+
+        record = get_default_symbol_universe_cache().get_by_raw_symbol(code)
+        return record is not None and (record.market or "").upper() == "TW"
+    except Exception:
+        return False
 
 
 def _normalize_tw(code: str) -> NormalizedSymbol:
