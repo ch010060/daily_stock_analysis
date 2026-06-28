@@ -165,6 +165,8 @@ export const ReportVisualSummary: React.FC<ReportVisualSummaryProps> = ({ report
           marketRiskKind={vm.marketRiskKind}
           sentimentScore={vm.marketRiskSentimentScore}
           sentimentLabel={vm.marketRiskSentimentLabel}
+          marketFearIndex={vm.marketFearIndex}
+          systemScore={vm.systemScore}
         />
 
         {historyId && ['stock', 'etf', 'index'].includes(vm.instrumentType) && (

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 完整報告與分析儀表板改為單一雙指針恐慌指標卡，同時顯示市場恐慌指數（美股 VIX／台股 VIXTWN）與「系統評分」，並顯示指標日期與 hover 說明。
+
 - [修復] 將完整報告與儀表板中的內部情緒分數標籤改為「系統評分」，並補充 hover 說明其為本系統分析分數、非市場官方指數、非 VIX/VIXTWN，避免與正式恐慌指數混淆。
 
 - [修復] 將完整報告與儀表板中的內部情緒分數標籤改為「系統評分」，並補充 hover 說明其為本系統分析分數、非市場官方指數、非 VIX/VIXTWN，避免與正式恐慌指數混淆。

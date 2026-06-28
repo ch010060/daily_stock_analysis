@@ -127,6 +127,41 @@ describe('ReportOverview', () => {
     expect(screen.queryByText(['恐慌', '貪婪', '指數'].join(''))).not.toBeInTheDocument();
   });
 
+  it('renders market fear index and system score in one dashboard card when snapshot exists', () => {
+    render(
+      <ReportOverview
+        meta={{ ...baseMeta, reportLanguage: 'zh_TW' }}
+        summary={{ ...baseSummary, sentimentScore: 42 }}
+        details={{
+          rawResult: {
+            instrumentType: 'etf',
+            marketFearIndexSnapshot: {
+              market: 'tw',
+              kind: 'vixtwn',
+              label: '台灣恐慌指數 VIXTWN',
+              value: 44.27,
+              asOf: '2026-06-26',
+              source: 'taifex',
+              sourceUrlKey: 'taifex_vixtwn_daily_txt',
+              status: 'unknown',
+              dataGapReason: null,
+            },
+          },
+        }}
+      />,
+    );
+
+    const gauge = screen.getByTestId('market-risk-gauge');
+    expect(gauge.textContent).toContain('台灣恐慌指數 VIXTWN');
+    expect(gauge.textContent).toContain('VIXTWN 44.27');
+    expect(gauge.textContent).toContain('日期：2026-06-26');
+    expect(gauge.textContent).toContain('系統評分');
+    expect(screen.getByTestId('market-fear-meter')).toBeInTheDocument();
+    expect(screen.getByTestId('market-fear-pointer')).toBeInTheDocument();
+    expect(screen.getByTestId('system-score-pointer')).toBeInTheDocument();
+    expect(screen.queryByText('市場情緒')).not.toBeInTheDocument();
+  });
+
   it('renders related boards with leading and lagging markers', () => {
     render(
       <ReportOverview

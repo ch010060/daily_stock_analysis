@@ -1391,6 +1391,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
         sniper_points = self._extract_sniper_points(result)
         raw_result = self._build_raw_result(result)
+        self._ensure_market_fear_index_snapshot(result, raw_result)
         context_text = None
         if save_snapshot and context_snapshot is not None:
             context_text = self._safe_json_dumps(context_snapshot)
@@ -2172,6 +2173,51 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             'raw_response': getattr(result, 'raw_response', None),
         })
         return data
+
+    @staticmethod
+    def _ensure_market_fear_index_snapshot(result: Any, raw_result: Dict[str, Any]) -> None:
+        """Fill missing analysis-time market fear snapshot before persistence."""
+        if raw_result.get("market_fear_index_snapshot"):
+            return
+        instrument_type = (
+            raw_result.get("instrument_type")
+            or getattr(result, "instrument_type", None)
+            or "unknown"
+        )
+        if instrument_type not in ("stock", "etf", "index"):
+            return
+        try:
+            from data_provider.base import normalize_stock_code
+            from src.core.trading_calendar import get_market_for_stock
+            from src.services.market_fear_index_snapshot import (
+                build_tw_vixtwn_market_fear_snapshot,
+                build_us_vix_market_fear_snapshot,
+            )
+
+            code = normalize_stock_code(getattr(result, "code", "") or raw_result.get("code", ""))
+            market = get_market_for_stock(code)
+            if market == "tw":
+                from src.services.taifex_vixtwn_fetcher import fetch_latest_vixtwn
+
+                raw_result["market_fear_index_snapshot"] = build_tw_vixtwn_market_fear_snapshot(
+                    fetch_latest_vixtwn()
+                )
+                return
+            if market == "us":
+                market_risk = raw_result.get("market_risk_snapshot")
+                value = market_risk.get("vix_level") if isinstance(market_risk, dict) else None
+                as_of = market_risk.get("as_of") if isinstance(market_risk, dict) else None
+                if value is not None:
+                    raw_result["market_fear_index_snapshot"] = build_us_vix_market_fear_snapshot(
+                        value,
+                        as_of=str(as_of)[:10] if as_of else None,
+                    )
+        except Exception as exc:
+            logger.warning(
+                "[market_fear_index_snapshot] persistence fallback skipped for %s: %s",
+                getattr(result, "code", raw_result.get("code", "")),
+                exc,
+            )
 
     @staticmethod
     def _parse_sniper_value(value: Any) -> Optional[float]:

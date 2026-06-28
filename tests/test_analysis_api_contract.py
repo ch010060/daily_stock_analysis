@@ -1113,6 +1113,46 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             "intraday",
         )
 
+    def test_build_analysis_response_includes_raw_result_for_market_fear_ui(self) -> None:
+        service = AnalysisService()
+        raw_result = {
+            "instrument_type": "etf",
+            "market_fear_index_snapshot": {
+                "market": "tw",
+                "kind": "vixtwn",
+                "value": 44.27,
+                "as_of": "2026-06-26",
+                "source": "taifex",
+            },
+        }
+
+        result = service._build_analysis_response(
+            SimpleNamespace(
+                code="006208",
+                name="富邦台50",
+                current_price=130.0,
+                change_pct=0.5,
+                model_used="test-model",
+                analysis_summary="summary",
+                operation_advice="hold",
+                trend_prediction="neutral",
+                sentiment_score=43,
+                news_summary="news",
+                technical_analysis="tech",
+                fundamental_analysis="fundamental",
+                risk_warning="risk",
+                to_dict=lambda: raw_result,
+                get_sniper_points=lambda: {},
+            ),
+            "q1",
+            report_type="full",
+        )
+
+        self.assertEqual(
+            result["report"]["details"]["raw_result"]["market_fear_index_snapshot"]["kind"],
+            "vixtwn",
+        )
+
     def test_analysis_service_passes_analysis_phase_to_pipeline(self) -> None:
         service = AnalysisService()
         pipeline_instance = MagicMock()

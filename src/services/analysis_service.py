@@ -178,9 +178,10 @@ class AnalysisService:
             context_snapshot = {"diagnostics": diagnostic_snapshot}
         else:
             context_snapshot = None
+        raw_result = result.to_dict() if hasattr(result, "to_dict") else None
         diagnostic_summary = build_run_diagnostic_summary(
             context_snapshot=context_snapshot,
-            raw_result=result.to_dict() if hasattr(result, "to_dict") else None,
+            raw_result=raw_result,
             report_saved=True,
             query_id=query_id,
             stock_code=result.code,
@@ -218,6 +219,7 @@ class AnalysisService:
                 "technical_analysis": result.technical_analysis,
                 "fundamental_analysis": result.fundamental_analysis,
                 "risk_warning": result.risk_warning,
+                "raw_result": raw_result,
             }
         }
         

@@ -563,6 +563,20 @@ export interface MarketRiskSnapshot {
   dataGapFields?: string[];
 }
 
+export type MarketFearIndexKind = 'vix' | 'vixtwn';
+
+export interface MarketFearIndexSnapshot {
+  market?: 'us' | 'tw' | string | null;
+  kind?: MarketFearIndexKind | string | null;
+  label?: string | null;
+  value?: number | null;
+  asOf?: string | null;
+  source?: string | null;
+  sourceUrlKey?: string | null;
+  status?: string | null;
+  dataGapReason?: string | null;
+}
+
 export interface MultiPeriodTrendPeriod {
   label?: string;
   period?: string;
@@ -627,6 +641,7 @@ export interface VisualReportRawResult {
   rsi12?: number | null;
   // Phase 19B snapshots
   marketRiskSnapshot?: MarketRiskSnapshot | null;
+  marketFearIndexSnapshot?: MarketFearIndexSnapshot | null;
   multiPeriodTrendSnapshot?: MultiPeriodTrendSnapshot | null;
   valuationSnapshot?: ValuationSnapshot | null;
   fundamentalSnapshot?: FundamentalSnapshot | null;

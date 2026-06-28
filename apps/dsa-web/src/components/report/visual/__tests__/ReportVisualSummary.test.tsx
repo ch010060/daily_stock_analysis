@@ -104,6 +104,60 @@ describe('ReportVisualSummary', () => {
     expect(screen.getByText('系統評分')).toHaveAttribute('title', expect.stringContaining('非 VIXTWN'));
   });
 
+  it('renders TW VIXTWN and system score in one market gauge when snapshot exists', () => {
+    const twEtfReport = {
+      ...MSFT_REPORT,
+      meta: {
+        ...MSFT_REPORT.meta,
+        stockCode: '006208',
+        stockName: '富邦台50',
+      },
+      summary: {
+        ...MSFT_REPORT.summary,
+        sentimentScore: 42,
+        sentimentLabel: '中性' as const,
+      },
+      details: {
+        rawResult: {
+          ...MSFT_REPORT.details?.rawResult,
+          instrumentType: 'etf',
+          marketFearIndexSnapshot: {
+            market: 'tw',
+            kind: 'vixtwn',
+            label: '台灣恐慌指數 VIXTWN',
+            value: 44.27,
+            asOf: '2026-06-26',
+            source: 'taifex',
+            sourceUrlKey: 'taifex_vixtwn_daily_txt',
+            status: 'unknown',
+            dataGapReason: null,
+          },
+          marketRiskSnapshot: {
+            source: null,
+            vixLevel: null,
+            vixStatus: null,
+            spxChangePct: null,
+            dataGapFields: ['vix_level', 'vix_status', 'spx_change_pct'],
+          },
+          exposureSnapshot: { dataGapFields: [] },
+        },
+      },
+    };
+
+    render(<ReportVisualSummary report={twEtfReport} />);
+    const gauge = screen.getByTestId('market-risk-gauge');
+    expect(gauge.textContent).toContain('台灣恐慌指數 VIXTWN');
+    expect(gauge.textContent).toContain('VIXTWN 44.27');
+    expect(gauge.textContent).toContain('日期：2026-06-26');
+    expect(gauge.textContent).toContain('系統評分');
+    expect(screen.getAllByTestId(/market-risk-gauge/)).toHaveLength(1);
+    expect(screen.getByTestId('market-fear-meter')).toBeInTheDocument();
+    expect(screen.getByTestId('market-fear-pointer')).toBeInTheDocument();
+    expect(screen.getByTestId('system-score-pointer')).toBeInTheDocument();
+    expect(gauge.textContent).not.toContain('市場情緒 ·');
+    expect(gauge.textContent).not.toContain('市場風險 ·');
+  });
+
   it('renders without crashing on malformed rawResult', () => {
     const badReport = {
       ...MSFT_REPORT,

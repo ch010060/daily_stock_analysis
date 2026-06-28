@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { adaptToVisualReport } from '../reportVisualSummaryAdapter';
+import {
+  adaptToVisualReport,
+  marketFearBucket,
+  marketFearPointerPosition,
+} from '../reportVisualSummaryAdapter';
 import { MSFT_REPORT, MINIMAL_REPORT } from './fixtures';
 
 describe('adaptToVisualReport', () => {
@@ -10,8 +14,116 @@ describe('adaptToVisualReport', () => {
     expect(vm.vixDataGap).toBe(false);
     expect(vm.marketRiskKind).toBe('vix');
     expect(vm.marketRiskDataGap).toBe(false);
+    expect(vm.marketFearIndex?.kind).toBe('vix');
+    expect(vm.marketFearIndex?.title).toBe('恐慌指數 VIX');
+    expect(vm.marketFearIndex?.asOf).toBe('2025-03-14');
+    expect(vm.systemScore.value).toBe(42);
+    expect(vm.systemScore.pointerPosition).toBe(58);
     expect(vm.trendPeriods).toHaveLength(5);
     expect(vm.trendDataGap).toBe(false);
+  });
+
+  it('maps persisted TW VIXTWN snapshot to market fear VM', () => {
+    const twReport = {
+      ...MSFT_REPORT,
+      meta: {
+        ...MSFT_REPORT.meta,
+        stockCode: '006208',
+        stockName: '富邦台50',
+      },
+      summary: {
+        ...MSFT_REPORT.summary,
+        sentimentScore: 42,
+        sentimentLabel: '中性' as const,
+      },
+      details: {
+        rawResult: {
+          ...MSFT_REPORT.details?.rawResult,
+          instrumentType: 'etf',
+          marketFearIndexSnapshot: {
+            market: 'tw',
+            kind: 'vixtwn',
+            label: '台灣恐慌指數 VIXTWN',
+            value: 44.27,
+            asOf: '2026-06-26',
+            source: 'taifex',
+            sourceUrlKey: 'taifex_vixtwn_daily_txt',
+            status: 'unknown',
+            dataGapReason: null,
+          },
+          marketRiskSnapshot: {
+            source: null,
+            vixLevel: null,
+            vixStatus: null,
+            spxChangePct: null,
+            dataGapFields: ['vix_level', 'vix_status', 'spx_change_pct'],
+          },
+          exposureSnapshot: { dataGapFields: [] },
+        },
+      },
+    };
+
+    const vm = adaptToVisualReport(twReport);
+    expect(vm.marketRiskKind).toBe('market_fear');
+    expect(vm.marketRiskDataGap).toBe(false);
+    expect(vm.marketFearIndex?.kind).toBe('vixtwn');
+    expect(vm.marketFearIndex?.title).toBe('台灣恐慌指數 VIXTWN');
+    expect(vm.marketFearIndex?.value).toBe(44.27);
+    expect(vm.marketFearIndex?.asOf).toBe('2026-06-26');
+    expect(vm.marketFearIndex?.bucket).toBe('red');
+    expect(vm.systemScore.pointerPosition).toBe(58);
+  });
+
+  it('reads persisted snake_case market fear snapshots from raw_result', () => {
+    const twReport = {
+      ...MSFT_REPORT,
+      meta: {
+        ...MSFT_REPORT.meta,
+        stockCode: '006208',
+        stockName: '富邦台50',
+      },
+      details: {
+        rawResult: {
+          instrument_type: 'etf',
+          market_fear_index_snapshot: {
+            market: 'tw',
+            kind: 'vixtwn',
+            label: '台灣恐慌指數 VIXTWN',
+            value: 44.27,
+            as_of: '2026-06-26',
+            source: 'taifex',
+            source_url_key: 'taifex_vixtwn_daily_txt',
+            status: 'unknown',
+            data_gap_reason: null,
+          },
+          market_risk_snapshot: {
+            vix_level: null,
+            vix_status: null,
+            spx_change_pct: null,
+          },
+        },
+      },
+    };
+
+    const vm = adaptToVisualReport(twReport);
+    expect(vm.marketRiskKind).toBe('market_fear');
+    expect(vm.marketFearIndex?.kind).toBe('vixtwn');
+    expect(vm.marketFearIndex?.value).toBe(44.27);
+    expect(vm.marketFearIndex?.asOf).toBe('2026-06-26');
+    expect(vm.marketRiskDataGap).toBe(false);
+  });
+
+  it('normalizes market fear buckets and system-score risk direction', () => {
+    expect(marketFearBucket('vix', 19.99)).toBe('green');
+    expect(marketFearBucket('vix', 20)).toBe('blue');
+    expect(marketFearBucket('vix', 28.7)).toBe('orange');
+    expect(marketFearBucket('vix', 33.5)).toBe('red');
+    expect(marketFearBucket('vixtwn', 19.99)).toBe('green');
+    expect(marketFearBucket('vixtwn', 20)).toBe('blue');
+    expect(marketFearBucket('vixtwn', 30)).toBe('orange');
+    expect(marketFearBucket('vixtwn', 40)).toBe('red');
+    expect(marketFearPointerPosition('vix', -1)).toBe(0);
+    expect(marketFearPointerPosition('vixtwn', 80)).toBe(100);
   });
 
   it('uses dashboard sentiment for TW stock when VIX is absent', () => {

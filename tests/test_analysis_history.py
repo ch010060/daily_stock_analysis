@@ -241,6 +241,50 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             payload = json.loads(row.raw_result or "{}")
             self.assertEqual(payload.get("model_used"), "gemini/gemini-2.0-flash")
 
+    def test_save_analysis_history_backfills_missing_tw_market_fear_snapshot(self) -> None:
+        """TW stock/ETF reports must persist VIXTWN even if the pipeline attach was missed."""
+        result = AnalysisResult(
+            code="006208",
+            name="富邦台50",
+            sentiment_score=43,
+            trend_prediction="中性",
+            operation_advice="觀望",
+            analysis_summary="summary",
+        )
+        result.instrument_type = "etf"
+
+        with patch(
+            "src.services.taifex_vixtwn_fetcher.fetch_latest_vixtwn",
+            return_value=SimpleNamespace(
+                value=44.27,
+                as_of="2026-06-26",
+                source="taifex",
+                source_url_key="taifex_vixtwn_daily_txt",
+                data_gap_reason=None,
+            ),
+        ):
+            saved = self.db.save_analysis_history(
+                result=result,
+                query_id="query_vixtwn_backfill",
+                report_type="full",
+                news_content=None,
+                context_snapshot=None,
+                save_snapshot=False,
+            )
+
+        self.assertEqual(saved, 1)
+        with self.db.get_session() as session:
+            row = session.query(AnalysisHistory).filter(
+                AnalysisHistory.query_id == "query_vixtwn_backfill"
+            ).first()
+            if row is None:
+                self.fail("未找到儲存的歷史記錄")
+            payload = json.loads(row.raw_result or "{}")
+            snapshot = payload.get("market_fear_index_snapshot")
+            self.assertEqual(snapshot["kind"], "vixtwn")
+            self.assertEqual(snapshot["value"], 44.27)
+            self.assertEqual(snapshot["as_of"], "2026-06-26")
+
     def test_update_analysis_history_diagnostics_preserves_snapshot_fields(self) -> None:
         """通知傳送後補寫 diagnostics 時，不應覆蓋已有上下文欄位。"""
         saved = self.db.save_analysis_history(
