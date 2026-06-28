@@ -59,6 +59,11 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def _to_yahoo_us_stock_symbol(code: str) -> str:
+    """Yahoo uses hyphenated class tickers, e.g. BRK-B instead of BRK.B."""
+    return (code or "").strip().upper().replace(".", "-")
+
+
 class YfinanceFetcher(BaseFetcher):
     """
     Yahoo Finance 資料來源實現
@@ -163,10 +168,11 @@ class YfinanceFetcher(BaseFetcher):
             logger.debug(f"識別為美股指數: {code} -> {yf_symbol}")
             return yf_symbol
 
-        # 美股：1-5 個大寫字母（可選 .X 字尾），原樣返回
+        # 美股：Yahoo class shares use hyphen syntax (BRK-B), not dot syntax (BRK.B).
         if is_us_stock_code(code):
-            logger.debug(f"識別為美股程式碼: {code}")
-            return code
+            yf_code = _to_yahoo_us_stock_symbol(code)
+            logger.debug(f"識別為美股程式碼: {code} -> {yf_code}")
+            return yf_code
 
         # 港股：hk字首 -> .HK字尾
         if code.startswith('HK'):
@@ -504,7 +510,8 @@ class YfinanceFetcher(BaseFetcher):
         被限流時，至少能為 Web UI 提供可用價格；若可獲取到昨收價，則同時提供漲跌幅等衍生指標。
         """
         symbol = stock_code.strip().upper()
-        stooq_symbol = f"{symbol.lower()}.us"
+        provider_symbol = _to_yahoo_us_stock_symbol(symbol)
+        stooq_symbol = f"{provider_symbol.lower()}.us"
         url = f"https://stooq.com/q/l/?s={stooq_symbol}"
         request = Request(
             url,
@@ -763,9 +770,10 @@ class YfinanceFetcher(BaseFetcher):
 
         try:
             symbol = stock_code.strip().upper()
-            logger.debug(f"[Yfinance] 獲取美股 {symbol} 實時行情")
+            provider_symbol = _to_yahoo_us_stock_symbol(symbol)
+            logger.debug(f"[Yfinance] 獲取美股 {symbol} 實時行情 (provider={provider_symbol})")
 
-            ticker = yf.Ticker(symbol)
+            ticker = yf.Ticker(provider_symbol)
 
             # 嘗試獲取 fast_info（更快，但欄位較少）
             try:
