@@ -856,6 +856,7 @@ class HistoryService:
                 exposure_snapshot=raw_result.get("exposure_snapshot"),
                 market_risk_snapshot=raw_result.get("market_risk_snapshot"),
                 multi_period_trend_snapshot=raw_result.get("multi_period_trend_snapshot"),
+                market_fear_index_snapshot=raw_result.get("market_fear_index_snapshot"),
             )
         except Exception as e:
             logger.error(f"Failed to rebuild AnalysisResult: {e}", exc_info=True)

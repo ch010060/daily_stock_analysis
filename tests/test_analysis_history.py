@@ -1634,12 +1634,15 @@ class AnalysisHistoryTestCase(unittest.TestCase):
                 "instrument_type": "etf",
                 "exposure_snapshot": {"leverage_factor": 1, "data_gap_fields": []},
                 "market_risk_snapshot": {"vix_level": 18.2, "source": "yfinance"},
+                "market_fear_index_snapshot": {"market": "tw", "kind": "vixtwn", "value": 44.27},
             }
-            rebuilt = service._rebuild_analysis_result(raw_result, record)
+            with patch("src.services.taifex_vixtwn_fetcher.fetch_latest_vixtwn", side_effect=RuntimeError("should not fetch")):
+                rebuilt = service._rebuild_analysis_result(raw_result, record)
 
         self.assertIsNotNone(rebuilt)
         self.assertEqual(rebuilt.exposure_snapshot, {"leverage_factor": 1, "data_gap_fields": []})
         self.assertEqual(rebuilt.market_risk_snapshot, {"vix_level": 18.2, "source": "yfinance"})
+        self.assertEqual(rebuilt.market_fear_index_snapshot, {"market": "tw", "kind": "vixtwn", "value": 44.27})
 
     def test_rebuild_analysis_result_defaults_exposure_market_risk_to_none(self) -> None:
         """Old history records (no exposure/market_risk keys) rebuild as None,
@@ -1657,6 +1660,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertIsNotNone(rebuilt)
         self.assertIsNone(rebuilt.exposure_snapshot)
         self.assertIsNone(rebuilt.market_risk_snapshot)
+        self.assertIsNone(rebuilt.market_fear_index_snapshot)
 
     def test_generate_single_stock_markdown_renders_exposure_and_market_risk_for_etf(self) -> None:
         """Phase 19B.3: markdown renders the new sections for etf/index only,

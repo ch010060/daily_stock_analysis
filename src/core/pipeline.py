@@ -666,6 +666,7 @@ class StockAnalysisPipeline:
                 result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
                 self._attach_valuation_fundamental_snapshot(result, code, fundamental_context)
                 self._attach_exposure_and_market_risk_snapshot(result, code, fundamental_context)
+                self._attach_market_fear_index_snapshot(result, code)
                 self._attach_multi_period_trend_snapshot(result, code)
                 realtime_data = enhanced_context.get('realtime', {})
                 result.current_price = realtime_data.get('price')
@@ -1151,6 +1152,52 @@ class StockAnalysisPipeline:
         except Exception as exc:
             logger.warning("[exposure_market_risk_snapshot] skipped for %s: %s", code, exc)
 
+    def _attach_market_fear_index_snapshot(self, result: Any, code: str) -> None:
+        """Attach latest market-level fear index snapshot at analysis time only."""
+        instrument_type = getattr(result, "instrument_type", "unknown")
+        if instrument_type not in ("stock", "etf", "index"):
+            return
+        try:
+            from src.services.market_fear_index_snapshot import (
+                build_tw_vixtwn_market_fear_snapshot,
+                build_us_vix_market_fear_snapshot,
+            )
+
+            market = get_market_for_stock(normalize_stock_code(code))
+            if market == "us":
+                market_risk = getattr(result, "market_risk_snapshot", None)
+                value = market_risk.get("vix_level") if isinstance(market_risk, dict) else None
+                as_of = market_risk.get("as_of") if isinstance(market_risk, dict) else None
+                vix_quote = None
+                if value is None:
+                    vix_quote = self.fetcher_manager.get_realtime_quote("VIX", log_final_failure=False)
+                    value = getattr(vix_quote, "price", None) if vix_quote else None
+                if vix_quote and as_of is None:
+                    as_of = (
+                        getattr(vix_quote, "date", None)
+                        or getattr(vix_quote, "trade_date", None)
+                        or getattr(vix_quote, "timestamp", None)
+                    )
+                result.market_fear_index_snapshot = build_us_vix_market_fear_snapshot(
+                    value,
+                    as_of=str(as_of)[:10] if as_of else None,
+                )
+            elif market == "tw":
+                from src.services.taifex_vixtwn_fetcher import fetch_latest_vixtwn
+
+                result.market_fear_index_snapshot = build_tw_vixtwn_market_fear_snapshot(
+                    fetch_latest_vixtwn()
+                )
+        except Exception as exc:
+            logger.warning("[market_fear_index_snapshot] skipped for %s: %s", code, exc)
+            try:
+                if get_market_for_stock(normalize_stock_code(code)) == "tw":
+                    from src.services.market_fear_index_snapshot import build_tw_vixtwn_gap_snapshot
+
+                    result.market_fear_index_snapshot = build_tw_vixtwn_gap_snapshot()
+            except Exception:
+                return
+
     def _attach_multi_period_trend_snapshot(
         self,
         result: Any,
@@ -1353,6 +1400,7 @@ class StockAnalysisPipeline:
                 result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
                 self._attach_valuation_fundamental_snapshot(result, code, fundamental_context)
                 self._attach_exposure_and_market_risk_snapshot(result, code, fundamental_context)
+                self._attach_market_fear_index_snapshot(result, code)
                 self._attach_multi_period_trend_snapshot(result, code)
             # Agent weak integrity: placeholder fill only, no LLM retry
             if result and getattr(self.config, "report_integrity_enabled", False):

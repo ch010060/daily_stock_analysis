@@ -1572,6 +1572,8 @@ class AnalysisResult:
     market_risk_snapshot: Optional[Dict[str, Any]] = None
     # Phase 19B.4：股票/ETF/指數多週期趨勢快照，由後端從已抓取的 OHLC 資料決定性計算，非 LLM 推論
     multi_period_trend_snapshot: Optional[Dict[str, Any]] = None
+    # Phase 19G-R7B：市場恐慌指標快照。US=VIX，TW=VIXTWN；分析時決定性擷取，非 LLM 推論
+    market_fear_index_snapshot: Optional[Dict[str, Any]] = None
     success: bool = True
     error_message: Optional[str] = None
 
@@ -1631,6 +1633,7 @@ class AnalysisResult:
             'exposure_snapshot': self.exposure_snapshot,
             'market_risk_snapshot': self.market_risk_snapshot,
             'multi_period_trend_snapshot': self.multi_period_trend_snapshot,
+            'market_fear_index_snapshot': self.market_fear_index_snapshot,
         }
 
     def get_core_conclusion(self) -> str:

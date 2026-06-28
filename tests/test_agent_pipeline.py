@@ -3303,6 +3303,86 @@ class TestAttachExposureAndMarketRiskSnapshot(unittest.TestCase):
         self.assertIsNone(result.market_risk_snapshot)
 
 
+class TestAttachMarketFearIndexSnapshot(unittest.TestCase):
+    def _make_pipeline(self) -> "StockAnalysisPipeline":  # noqa: F821
+        with patch('src.core.pipeline.get_config') as mock_config, \
+             patch('src.core.pipeline.get_db'), \
+             patch('src.core.pipeline.DataFetcherManager'), \
+             patch('src.core.pipeline.GeminiAnalyzer'), \
+             patch('src.core.pipeline.NotificationService'), \
+             patch('src.core.pipeline.SearchService'):
+            mock_cfg = MagicMock()
+            mock_cfg.max_workers = 2
+            mock_cfg.agent_mode = False
+            mock_config.return_value = mock_cfg
+
+            from src.core.pipeline import StockAnalysisPipeline
+            return StockAnalysisPipeline(config=mock_cfg)
+
+    def test_us_stock_builds_vix_market_fear_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", market_fear_index_snapshot=None)
+        vix_quote = SimpleNamespace(price=18.41, date="2026-06-26")
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="us"), \
+             patch.object(pipeline.fetcher_manager, 'get_realtime_quote', return_value=vix_quote):
+            pipeline._attach_market_fear_index_snapshot(result, "MSFT")
+
+        self.assertEqual(result.market_fear_index_snapshot["market"], "us")
+        self.assertEqual(result.market_fear_index_snapshot["kind"], "vix")
+        self.assertEqual(result.market_fear_index_snapshot["value"], 18.41)
+        self.assertEqual(result.market_fear_index_snapshot["as_of"], "2026-06-26")
+        self.assertEqual(result.market_fear_index_snapshot["source"], "yfinance_yahoo_quote")
+
+    def test_tw_etf_builds_vixtwn_market_fear_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(
+            instrument_type="etf",
+            market_fear_index_snapshot={"kind": "llm_fake"},
+        )
+        quote = SimpleNamespace(
+            value=44.27,
+            as_of="2026-06-26",
+            source="taifex",
+            source_url_key="taifex_vixtwn_daily_txt",
+            data_gap_reason=None,
+        )
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
+             patch('src.services.taifex_vixtwn_fetcher.fetch_latest_vixtwn', return_value=quote):
+            pipeline._attach_market_fear_index_snapshot(result, "006208")
+
+        self.assertEqual(result.market_fear_index_snapshot["market"], "tw")
+        self.assertEqual(result.market_fear_index_snapshot["kind"], "vixtwn")
+        self.assertEqual(result.market_fear_index_snapshot["value"], 44.27)
+        self.assertEqual(result.market_fear_index_snapshot["as_of"], "2026-06-26")
+        self.assertEqual(result.market_fear_index_snapshot["source"], "taifex")
+
+    def test_tw_fetcher_exception_degrades_to_gap_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", market_fear_index_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
+             patch('src.services.taifex_vixtwn_fetcher.fetch_latest_vixtwn', side_effect=RuntimeError("boom")):
+            pipeline._attach_market_fear_index_snapshot(result, "2454")
+
+        self.assertEqual(result.market_fear_index_snapshot["kind"], "vixtwn")
+        self.assertIsNone(result.market_fear_index_snapshot["value"])
+        self.assertEqual(result.market_fear_index_snapshot["data_gap_reason"], "taifex_vixtwn_fetch_failed")
+
+    def test_unknown_instrument_type_does_not_fetch(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="unknown", market_fear_index_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock') as mock_market, \
+             patch.object(pipeline.fetcher_manager, 'get_realtime_quote') as mock_quote:
+            pipeline._attach_market_fear_index_snapshot(result, "MSFT")
+
+        mock_market.assert_not_called()
+        mock_quote.assert_not_called()
+        self.assertIsNone(result.market_fear_index_snapshot)
+
+
 class TestAttachMultiPeriodTrendSnapshot(unittest.TestCase):
     """Phase 19B.4: unit tests for
     pipeline._attach_multi_period_trend_snapshot.

@@ -199,3 +199,7 @@ class AnalysisReportSchema(BaseModel):
     # backend-computed from already-fetched OHLC rows after LLM-JSON
     # validation, never LLM-populated.
     multi_period_trend_snapshot: Optional[Dict[str, Any]] = None
+
+    # Phase 19G-R7B: deterministic market fear index snapshot. Pipeline-built
+    # after LLM validation; never trusted from model output.
+    market_fear_index_snapshot: Optional[Dict[str, Any]] = None

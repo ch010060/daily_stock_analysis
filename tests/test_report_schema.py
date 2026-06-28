@@ -228,6 +228,7 @@ class TestAnalysisReportSchema(unittest.TestCase):
     def test_schema_multi_period_trend_snapshot_defaults_to_none(self) -> None:
         """Phase 19B.4: same declared-Optional-Dict-default-None pattern as 19B.2/19B.3."""
         self.assertIn("multi_period_trend_snapshot", AnalysisReportSchema.model_fields)
+        self.assertIn("market_fear_index_snapshot", AnalysisReportSchema.model_fields)
 
         data = {
             "stock_name": "測試",
@@ -237,6 +238,7 @@ class TestAnalysisReportSchema(unittest.TestCase):
         }
         schema = AnalysisReportSchema.model_validate(data)
         self.assertIsNone(schema.multi_period_trend_snapshot)
+        self.assertIsNone(schema.market_fear_index_snapshot)
 
     def test_schema_multi_period_trend_snapshot_accepts_dict(self) -> None:
         base = {
@@ -250,6 +252,19 @@ class TestAnalysisReportSchema(unittest.TestCase):
             {**base, "multi_period_trend_snapshot": snapshot}
         )
         self.assertEqual(schema.multi_period_trend_snapshot, snapshot)
+
+    def test_schema_market_fear_index_snapshot_accepts_dict(self) -> None:
+        base = {
+            "stock_name": "測試",
+            "sentiment_score": 50,
+            "trend_prediction": "震盪",
+            "operation_advice": "觀望",
+        }
+        snapshot = {"market": "tw", "kind": "vixtwn", "value": 44.27, "status": "unknown"}
+        schema = AnalysisReportSchema.model_validate(
+            {**base, "market_fear_index_snapshot": snapshot}
+        )
+        self.assertEqual(schema.market_fear_index_snapshot, snapshot)
 
     def test_schema_old_payload_without_multi_period_trend_snapshot_still_parses(self) -> None:
         """Old payloads recorded before Phase 19B.4 must still validate."""
