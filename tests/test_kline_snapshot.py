@@ -24,6 +24,9 @@ class KlineSnapshotHelperTest(unittest.TestCase):
     def test_yfinance_intraday_symbol_maps_us_symbols(self):
         self.assertEqual(_yfinance_intraday_symbol("MSFT", "us"), "MSFT")
         self.assertEqual(_yfinance_intraday_symbol("SPY.US", "us"), "SPY")
+        self.assertEqual(_yfinance_intraday_symbol("BRK.B", "us"), "BRK-B")
+        self.assertEqual(_yfinance_intraday_symbol("BRK.A", "us"), "BRK-A")
+        self.assertEqual(_yfinance_intraday_symbol("BF.B", "us"), "BF-B")
 
 
 def _record():

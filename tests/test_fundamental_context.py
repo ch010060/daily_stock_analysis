@@ -23,8 +23,10 @@ class _DummyFetcher:
         self.name = name
         self.priority = priority
         self._rankings = rankings
+        self.called = False
 
     def get_sector_rankings(self, _n: int = 5):
+        self.called = True
         return self._rankings
 
 
@@ -210,7 +212,7 @@ class TestFundamentalContext(unittest.TestCase):
         self.assertEqual(ctx["coverage"].get("dragon_tiger"), "not_supported")
         self.assertEqual(ctx["coverage"].get("boards"), "not_supported")
 
-    def test_sector_rankings_use_ordered_fallback(self) -> None:
+    def test_sector_rankings_disabled_for_tw_us_route_b(self) -> None:
         akshare = _DummyFetcher("AkshareFetcher", priority=5, rankings=None)
         tushare = _DummyFetcher(
             "TushareFetcher",
@@ -224,8 +226,39 @@ class TestFundamentalContext(unittest.TestCase):
         )
         manager = DataFetcherManager(fetchers=[efinance, tushare, akshare])
         top, bottom = manager.get_sector_rankings(1)
-        self.assertEqual(top[0]["name"], "地產")
-        self.assertEqual(bottom[0]["name"], "煤炭")
+        self.assertEqual(top, [])
+        self.assertEqual(bottom, [])
+        self.assertFalse(akshare.called)
+        self.assertFalse(tushare.called)
+        self.assertFalse(efinance.called)
+
+    def test_us_class_share_context_does_not_fetch_cn_sector_rankings(self) -> None:
+        manager = DataFetcherManager(fetchers=[])
+        cfg = SimpleNamespace(
+            enable_fundamental_pipeline=True,
+            fundamental_cache_ttl_seconds=0,
+            fundamental_stage_timeout_seconds=1.5,
+            fundamental_fetch_timeout_seconds=0.8,
+            fundamental_retry_max=1,
+        )
+        empty_bundle = {
+            "status": "not_supported",
+            "growth": {},
+            "earnings": {},
+            "belong_boards": [],
+            "source_chain": [],
+            "errors": [],
+        }
+        with patch("src.config.get_config", return_value=cfg), \
+                patch.object(manager, "get_realtime_quote", return_value=None), \
+                patch.object(manager, "_get_sector_rankings_with_meta", side_effect=AssertionError("CN sector ranking called")), \
+                patch(
+                    "data_provider.yfinance_fundamental_adapter.YfinanceFundamentalAdapter.get_fundamental_bundle",
+                    return_value=empty_bundle,
+                ):
+            ctx = manager.get_fundamental_context("BRK.B")
+        self.assertEqual(ctx["market"], "us")
+        self.assertEqual(ctx["coverage"].get("boards"), "not_supported")
 
     def test_fundamental_context_aggregates_blocks(self) -> None:
         manager = DataFetcherManager(fetchers=[])

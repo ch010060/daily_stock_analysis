@@ -1,4 +1,3 @@
-import type React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiError, createParsedApiError } from '../../api/error';
@@ -68,15 +67,6 @@ vi.mock('../../api/portfolio', () => ({
     updateAccount,
     archiveAccount,
   },
-}));
-
-vi.mock('recharts', () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  PieChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Pie: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Tooltip: () => null,
-  Legend: () => null,
-  Cell: () => null,
 }));
 
 type AccountItem = {
@@ -174,7 +164,10 @@ function makeSnapshot(options: {
   };
 }
 
-function makeRisk() {
+function makeRisk(options: {
+  topPositions?: Array<Record<string, unknown>>;
+  topSectors?: Array<Record<string, unknown>>;
+} = {}) {
   return {
     asOf: '2026-03-19',
     accountId: null,
@@ -183,15 +176,15 @@ function makeRisk() {
     thresholds: {},
     concentration: {
       totalMarketValue: 0,
-      topWeightPct: 0,
-      alert: false,
-      topPositions: [],
+      topWeightPct: options.topPositions?.length ? 81.84 : 0,
+      alert: Boolean(options.topPositions?.length),
+      topPositions: options.topPositions ?? [],
     },
     sectorConcentration: {
       totalMarketValue: 0,
-      topWeightPct: 0,
-      alert: false,
-      topSectors: [],
+      topWeightPct: options.topSectors?.length ? 100 : 0,
+      alert: Boolean(options.topSectors?.length),
+      topSectors: options.topSectors ?? [],
       coverage: {},
       errors: [],
     },
@@ -800,6 +793,27 @@ describe('PortfolioPage FX refresh', () => {
     const aaplRowCells = within(aaplRow as HTMLTableRowElement).getAllByRole('cell');
     expect(hkRowCells.at(-1)).toHaveClass('text-success');
     expect(aaplRowCells.at(-1)).toHaveClass('text-secondary');
+  });
+
+  it('renders non-empty concentration data without a chart runtime dependency', async () => {
+    getRisk.mockResolvedValueOnce(makeRisk({
+      topPositions: [
+        { symbol: 'INTC', marketValueBase: 4055.94, weightPct: 81.84, isAlert: true },
+        { symbol: '2379', marketValueBase: 900, weightPct: 18.16, isAlert: false },
+      ],
+      topSectors: [
+        { sector: 'UNCLASSIFIED', marketValueBase: 4955.94, weightPct: 100, symbolCount: 2, isAlert: true },
+      ],
+    }));
+
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+
+    expect(await screen.findByText('行業集中度分佈')).toBeInTheDocument();
+    expect(screen.getByText('UNCLASSIFIED')).toBeInTheDocument();
+    expect(screen.getAllByText('100.00%').length).toBeGreaterThan(0);
+    expect(screen.getByText('板塊集中度警告: 是')).toBeInTheDocument();
   });
 
   it('prefers disabled feedback over empty-pair feedback when refresh is disabled', async () => {

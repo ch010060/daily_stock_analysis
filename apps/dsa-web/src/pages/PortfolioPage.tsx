@@ -1,6 +1,5 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pie, PieChart, ResponsiveContainer, Tooltip, Legend, Cell } from 'recharts';
 import { portfolioApi } from '../api/portfolio';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
@@ -1436,18 +1435,34 @@ const PortfolioPage: React.FC = () => {
         <Card padding="md">
           <h2 className="text-sm font-semibold text-foreground mb-3">{concentrationMode === 'sector' ? '行業集中度分佈' : '行業資料暫不可用，當前展示個股集中度'}</h2>
           {concentrationPieData.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={concentrationPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}>
-                    {concentrationPieData.map((entry, index) => (
-                      <Cell key={`cell-${entry.name}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => `${Number(value).toFixed(2)}%`} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="space-y-3">
+              {concentrationPieData.map((entry, index) => {
+                const pct = Math.max(0, Math.min(100, entry.value));
+                return (
+                  <div key={entry.name} className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
+                          aria-hidden="true"
+                        />
+                        <span className="truncate text-foreground">{entry.name}</span>
+                      </div>
+                      <span className="shrink-0 font-mono text-secondary">{formatPct(entry.value)}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${pct}%`,
+                          backgroundColor: PIE_COLORS[index % PIE_COLORS.length],
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <EmptyState

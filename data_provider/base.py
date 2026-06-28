@@ -145,15 +145,16 @@ def _is_hk_market(code: str) -> bool:
 
 
 def _is_tw_market(code: str) -> bool:
-    """判定是否為台股程式碼（4 位純數字，或 TW: 字首 / .TW 字尾）。"""
+    """判定是否為台股程式碼（Route B TW symbols, including ETF suffix forms）。"""
     normalized = (code or "").strip().upper()
+    tw_pattern = re.compile(r"^(?:\d{4,6}|\d{4,5}[A-Z])$")
     if normalized.startswith("TW:"):
         base = normalized[3:]
-        return base.isdigit() and 1 <= len(base) <= 6
+        return bool(tw_pattern.fullmatch(base))
     if normalized.endswith(".TW"):
         base = normalized[:-3]
-        return base.isdigit() and 1 <= len(base) <= 6
-    return normalized.isdigit() and len(normalized) == 4
+        return bool(tw_pattern.fullmatch(base))
+    return bool(tw_pattern.fullmatch(normalized))
 
 
 def _is_etf_code(code: str) -> bool:
@@ -690,7 +691,7 @@ class DataFetcherManager:
         market: str,
     ) -> List[BaseFetcher]:
         """Skip built-in daily fetchers that are known not to support a market."""
-        if market not in {"cn", "hk", "us"}:
+        if market not in {"cn", "hk", "us", "tw"}:
             return fetchers
 
         kept: List[BaseFetcher] = []
@@ -1433,8 +1434,11 @@ class DataFetcherManager:
         #   - 美股指數:       始終 YFinance 為首選（Longbridge 不提供指數K線）
         is_us_index = is_us_index_code(stock_code)
         is_us = is_us_index or is_us_stock_code(stock_code)
-        is_hk = (not is_us) and _is_hk_market(stock_code)
-        if is_hk:
+        is_tw = (not is_us) and _is_tw_market(stock_code)
+        is_hk = (not is_us and not is_tw) and _is_hk_market(stock_code)
+        if is_tw:
+            fetchers = self._filter_daily_fetchers_for_market(fetchers, "tw")
+        elif is_hk:
             fetchers = self._filter_daily_fetchers_for_market(fetchers, "hk")
         fetchers = self._filter_fetchers_by_capability(fetchers, capability="daily_data")
         total_fetchers = len(fetchers)
@@ -2125,74 +2129,16 @@ class DataFetcherManager:
 
     def get_chip_distribution(self, stock_code: str):
         """
-        獲取籌碼分佈資料（帶熔斷和多資料來源降級）
-
-        策略：
-        1. 檢查配置開關
-        2. 檢查熔斷器狀態
-        3. 依次嘗試多個資料來源：資料來源優先順序與獲取daily的資料優先順序一致
-        4. 所有資料來源失敗則返回 None（降級兜底）
+        Route B TW/US 分析不再支援籌碼分佈資料。
 
         Args:
             stock_code: 股票程式碼
 
         Returns:
-            ChipDistribution 物件，失敗則返回 None
+            None
         """
-        # Normalize code (strip SH/SZ prefix etc.)
         stock_code = normalize_stock_code(stock_code)
-
-        from .realtime_types import get_chip_circuit_breaker
-        from src.config import get_config
-
-        config = get_config()
-
-        # 如果籌碼分佈功能被禁用，直接返回 None
-        if not config.enable_chip_distribution:
-            logger.debug(f"[籌碼分佈] 功能已禁用，跳過 {stock_code}")
-            return None
-
-        if self._fixture_no_network_mode_enabled():
-            logger.debug(f"[籌碼分佈] fixture/no-network 模式已啟用，跳過 {stock_code}")
-            return None
-
-        circuit_breaker = get_chip_circuit_breaker()
-
-        # 直接遍歷管理器已經按 priority 排好序的資料來源列表
-        for fetcher in self._get_fetchers_snapshot():
-            # 只處理實現了籌碼分佈邏輯的資料來源
-            if not hasattr(fetcher, 'get_chip_distribution'):
-                continue
-            
-            fetcher_name = fetcher.name
-            # 動態生成熔斷器的 key，例如 "TushareFetcher" -> "tushare_chip"
-            source_key = f"{fetcher_name.replace('Fetcher', '').lower()}_chip"
-
-            # 檢查熔斷器狀態
-            if not circuit_breaker.is_available(source_key):
-                logger.debug(f"[熔斷] {fetcher_name} 籌碼介面處於熔斷狀態，嘗試下一個")
-                continue
-
-            try:
-                chip = self._call_fetcher_method(fetcher, 'get_chip_distribution', stock_code)
-                if _is_meaningful_chip_distribution(chip):
-                    circuit_breaker.record_success(source_key)
-                    logger.info(f"[籌碼分佈] {stock_code} 成功獲取 (來源: {fetcher_name})")
-                    return chip
-                else:
-                    if chip is not None:
-                        logger.warning(
-                            "[籌碼分佈] %s 返回欄位不完整或佔位值，繼續嘗試下一個資料來源",
-                            fetcher_name,
-                        )
-                    # 空結果或佔位結果：釋放 HALF_OPEN 探測名額，避免卡死
-                    circuit_breaker.record_inconclusive(source_key)
-            except Exception as e:
-                logger.warning(f"[籌碼分佈] {fetcher_name} 獲取 {stock_code} 失敗: {e}")
-                circuit_breaker.record_failure(source_key, str(e))
-                continue
-
-        logger.warning(f"[籌碼分佈] {stock_code} 所有資料來源均失敗")
+        logger.debug("[籌碼分佈] Route B 已移除籌碼分佈資料來源，跳過 %s", stock_code)
         return None
 
     def get_stock_name(self, stock_code: str, allow_realtime: bool = True) -> Optional[str]:
@@ -3458,11 +3404,8 @@ class DataFetcherManager:
 
     def get_sector_rankings(self, n: int = 5) -> Tuple[List[Dict], List[Dict]]:
         """獲取板塊漲跌榜（自動切換資料來源）"""
-        # 按需求固定回退順序：Akshare(EM) -> Akshare(Sina) -> Tushare -> Efinance
-        top, bottom, _, last_error = self._get_sector_rankings_with_meta(n)
-        if top or bottom:
-            return top, bottom
-        logger.warning(f"[板塊排行] 所有資料來源均失敗，最終錯誤: {last_error}")
+        # Route B only supports TW/US analysis; legacy CN sector ranking providers
+        # (Eastmoney/Sina/Tushare/Efinance) must not run from stock analysis paths.
         return [], []
 
     def get_concept_rankings(self, n: int = 5) -> Tuple[List[Dict], List[Dict]]:

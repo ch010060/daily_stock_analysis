@@ -175,6 +175,10 @@ def _yfinance_intraday_symbol(symbol: str, market: str) -> str:
     normalized = canonical_stock_code(normalize_stock_code(symbol))
     if market == "tw" and not normalized.endswith(".TW"):
         return f"{normalized}.TW"
+    if market == "us":
+        from data_provider.yfinance_fetcher import _to_yahoo_us_stock_symbol
+
+        return _to_yahoo_us_stock_symbol(normalized.removesuffix(".US"))
     return normalized.removesuffix(".US")
 
 

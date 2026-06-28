@@ -22,7 +22,6 @@ from src.services.symbol_universe import get_default_symbol_resolver
 TOOL_DISPLAY_NAMES: Dict[str, str] = {
     "get_realtime_quote":         "獲取實時行情",
     "get_daily_history":          "獲取歷史K線",
-    "get_chip_distribution":      "分析籌碼分佈",
     "get_analysis_context":       "獲取分析上下文",
     "get_stock_info":             "獲取股票基本面",
     "search_stock_news":          "搜尋股票新聞",

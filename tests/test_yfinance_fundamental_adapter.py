@@ -40,8 +40,13 @@ class TestYfinanceSymbolConversion(unittest.TestCase):
         self.assertEqual(_convert_to_yf_symbol(" tsla "), "TSLA")
 
     def test_already_suffixed(self) -> None:
-        self.assertEqual(_convert_to_yf_symbol("AAPL.US"), "AAPL.US")
+        self.assertEqual(_convert_to_yf_symbol("AAPL.US"), "AAPL")
         self.assertEqual(_convert_to_yf_symbol("2330.TW"), "2330.TW")
+
+    def test_us_class_share_symbols_use_yahoo_hyphen(self) -> None:
+        self.assertEqual(_convert_to_yf_symbol("BRK.B"), "BRK-B")
+        self.assertEqual(_convert_to_yf_symbol("BRK.A"), "BRK-A")
+        self.assertEqual(_convert_to_yf_symbol("BF.B"), "BF-B")
 
     def test_empty(self) -> None:
         self.assertEqual(_convert_to_yf_symbol(""), "")

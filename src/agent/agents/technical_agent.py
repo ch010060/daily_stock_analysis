@@ -30,7 +30,6 @@ class TechnicalAgent(BaseAgent):
         "calculate_ma",
         "get_volume_analysis",
         "analyze_pattern",
-        "get_chip_distribution",
         "get_analysis_context",
     ]
 
@@ -100,4 +99,3 @@ Return **only** a JSON object (no markdown fences):
             },
             raw_data=parsed,
         )
-
