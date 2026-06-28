@@ -95,11 +95,13 @@ describe('ReportVisualSummary', () => {
 
     render(<ReportVisualSummary report={twEtfReport} />);
     const gauge = screen.getByTestId('market-risk-gauge');
-    expect(gauge.textContent).toContain('市場情緒 · 恐慌貪婪分數');
+    expect(gauge.textContent).toContain('系統評分');
     expect(gauge.textContent).toContain('42');
     expect(gauge.textContent).toContain('中性');
+    expect(gauge.textContent).not.toContain(['恐慌', '貪婪', '分數'].join(''));
     expect(gauge.textContent).not.toContain('VIX 資料不足');
     expect(gauge.textContent).not.toContain('VIX 恐慌指數');
+    expect(screen.getByText('系統評分')).toHaveAttribute('title', expect.stringContaining('非 VIXTWN'));
   });
 
   it('renders without crashing on malformed rawResult', () => {

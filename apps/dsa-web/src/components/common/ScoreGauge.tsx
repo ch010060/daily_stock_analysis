@@ -4,6 +4,7 @@ import { useTheme } from 'next-themes';
 import { getSentimentLabel, type ReportLanguage } from '../../types/analysis';
 import { cn } from '../../utils/cn';
 import { normalizeReportLanguage, getReportText } from '../../utils/reportLanguage';
+import { Tooltip } from './Tooltip';
 
 interface ScoreGaugeProps {
   score: number;
@@ -147,9 +148,15 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
   return (
     <div className={cn('flex flex-col items-center', className)}>
       {showLabel && (
-        <span className="label-uppercase mb-3 text-secondary-text">
-          {text.fearGreedIndex}
-        </span>
+        <Tooltip content={text.systemScoreProvenance} focusable className="mb-3">
+          <span
+            className="label-uppercase text-secondary-text"
+            title={text.systemScoreProvenance}
+            aria-label={`${text.systemScore}：${text.systemScoreProvenance}`}
+          >
+            {text.systemScore}
+          </span>
+        </Tooltip>
       )}
 
       <div className="relative" style={{ width, height: width }}>

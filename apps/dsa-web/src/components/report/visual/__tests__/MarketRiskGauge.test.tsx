@@ -39,10 +39,13 @@ describe('MarketRiskGauge', () => {
       />
     );
     const gauge = screen.getByTestId('market-risk-gauge');
-    expect(gauge.textContent).toContain('市場情緒 · 恐慌貪婪分數');
+    expect(gauge.textContent).toContain('系統評分');
     expect(gauge.textContent).toContain('42');
     expect(gauge.textContent).toContain('中性');
     expect(gauge.textContent).not.toContain('VIX');
+    expect(gauge.textContent).not.toContain(['恐慌', '貪婪', '分數'].join(''));
+    expect(screen.getByText('系統評分')).toHaveAttribute('title', expect.stringContaining('非 VIX'));
+    expect(screen.getByText('系統評分')).toHaveAttribute('title', expect.stringContaining('沒有固定公開公式'));
   });
 
   it('renders TW sentiment data gap without a VIX unavailable label', () => {
@@ -57,7 +60,7 @@ describe('MarketRiskGauge', () => {
       />
     );
     const gauge = screen.getByTestId('market-risk-gauge');
-    expect(gauge.textContent).toContain('情緒分數資料不足');
+    expect(gauge.textContent).toContain('系統評分資料不足');
     expect(gauge.textContent).not.toContain('VIX 資料不足');
   });
 

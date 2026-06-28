@@ -115,6 +115,18 @@ describe('ReportOverview', () => {
     expect(screen.queryByText('日線未完成')).not.toBeInTheDocument();
   });
 
+  it('labels the internal score as system score with provenance', () => {
+    render(<ReportOverview meta={baseMeta} summary={baseSummary} />);
+
+    const label = screen.getByText('系統評分');
+    expect(label).toBeInTheDocument();
+    expect(label).toHaveAttribute('title', expect.stringContaining('非市場官方指數'));
+    expect(label).toHaveAttribute('title', expect.stringContaining('非 VIX'));
+    expect(label).toHaveAttribute('title', expect.stringContaining('非 VIXTWN'));
+    expect(label).toHaveAttribute('title', expect.stringContaining('沒有固定公開公式'));
+    expect(screen.queryByText(['恐慌', '貪婪', '指數'].join(''))).not.toBeInTheDocument();
+  });
+
   it('renders related boards with leading and lagging markers', () => {
     render(
       <ReportOverview

@@ -1,4 +1,6 @@
 import type React from 'react';
+import { Tooltip } from '../../common/Tooltip';
+import { getReportText } from '../../../utils/reportLanguage';
 
 interface MarketRiskGaugeProps {
   vixLevel: number | null;
@@ -8,12 +10,12 @@ interface MarketRiskGaugeProps {
   marketRiskKind?: 'vix' | 'sentiment';
   sentimentScore?: number | null;
   sentimentLabel?: string | null;
-  sentimentSourceLabel?: string | null;
 }
 
 // VIX scale: 0-45. SVG viewBox 600 wide.
 const SCALE_MAX = 45;
 const SVG_W = 600;
+const SYSTEM_SCORE_TEXT = getReportText('zh_TW');
 
 function vixToX(vix: number): number {
   return Math.min(SVG_W, Math.max(0, (Math.min(vix, SCALE_MAX) / SCALE_MAX) * SVG_W));
@@ -27,7 +29,6 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
   marketRiskKind = 'vix',
   sentimentScore = null,
   sentimentLabel = null,
-  sentimentSourceLabel = '分析儀表板分數',
 }) => {
   const pct = (n: number | null, decimals = 2) =>
     n !== null ? `${n > 0 ? '+' : ''}${n.toFixed(decimals)}%` : '—';
@@ -36,10 +37,16 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
     if (dataGap || sentimentScore === null) {
       return (
         <div data-testid="market-risk-gauge" className="rounded-lg border bg-muted/30 p-3">
-          <div className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            市場情緒 · 恐慌貪婪分數
-          </div>
-          <p className="text-xs text-muted-foreground">情緒分數資料不足 / 暫不可用</p>
+          <Tooltip content={SYSTEM_SCORE_TEXT.systemScoreProvenance} focusable className="mb-1">
+            <span
+              className="block text-xs font-bold uppercase tracking-wider text-muted-foreground"
+              title={SYSTEM_SCORE_TEXT.systemScoreProvenance}
+              aria-label={`${SYSTEM_SCORE_TEXT.systemScore}：${SYSTEM_SCORE_TEXT.systemScoreProvenance}`}
+            >
+              {SYSTEM_SCORE_TEXT.systemScore}
+            </span>
+          </Tooltip>
+          <p className="text-xs text-muted-foreground">系統評分資料不足 / 暫不可用</p>
         </div>
       );
     }
@@ -50,9 +57,15 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
 
     return (
       <div data-testid="market-risk-gauge" className="rounded-lg border bg-card p-3">
-        <div className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          市場情緒 · 恐慌貪婪分數
-        </div>
+        <Tooltip content={SYSTEM_SCORE_TEXT.systemScoreProvenance} focusable className="mb-2">
+          <span
+            className="block text-xs font-bold uppercase tracking-wider text-muted-foreground"
+            title={SYSTEM_SCORE_TEXT.systemScoreProvenance}
+            aria-label={`${SYSTEM_SCORE_TEXT.systemScore}：${SYSTEM_SCORE_TEXT.systemScoreProvenance}`}
+          >
+            {SYSTEM_SCORE_TEXT.systemScore}
+          </span>
+        </Tooltip>
         <div className="mb-2 flex items-baseline gap-2">
           <span className="font-mono text-2xl font-bold text-foreground">
             {boundedScore.toFixed(0)}
@@ -67,15 +80,14 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
           <div
             className={`h-2 rounded-full ${toneClass.split(' ')[0]}`}
             style={{ width: `${boundedScore}%` }}
-            aria-label={`恐慌貪婪分數 ${boundedScore.toFixed(0)}`}
+            aria-label={`系統評分 ${boundedScore.toFixed(0)}`}
           />
         </div>
         <div className="mt-1 flex justify-between text-[9px] text-muted-foreground">
-          <span>恐慌</span>
+          <span>悲觀</span>
           <span>中性</span>
-          <span>貪婪</span>
+          <span>樂觀</span>
         </div>
-        <p className="mt-2 text-[10px] text-muted-foreground">來源：{sentimentSourceLabel}</p>
       </div>
     );
   }
