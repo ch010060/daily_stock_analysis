@@ -21,6 +21,20 @@ export interface GetHistoryListParams extends HistoryFilters {
   reportType?: string;
 }
 
+const pdfFilenameFromDisposition = (contentDisposition?: string): string | null => {
+  if (!contentDisposition) return null;
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition);
+  if (encoded?.[1]) {
+    try {
+      return decodeURIComponent(encoded[1].trim());
+    } catch {
+      return encoded[1].trim();
+    }
+  }
+  const quoted = /filename="([^"]+)"/i.exec(contentDisposition);
+  return quoted?.[1]?.trim() || null;
+};
+
 export const historyApi = {
   /**
    * 獲取歷史分析列表
@@ -82,6 +96,20 @@ export const historyApi = {
   getMarkdown: async (recordId: number): Promise<string> => {
     const response = await apiClient.get<{ content: string }>(`/api/v1/history/${recordId}/markdown`);
     return response.data.content;
+  },
+
+  /**
+   * 下載歷史報告 PDF
+   * @param recordId 分析歷史記錄主鍵 ID
+   */
+  getPdf: async (recordId: number): Promise<{ blob: Blob; filename: string }> => {
+    const response = await apiClient.get<Blob>(`/api/v1/history/${recordId}/pdf`, {
+      responseType: 'blob',
+    });
+    return {
+      blob: response.data,
+      filename: pdfFilenameFromDisposition(response.headers['content-disposition']) || `analysis_report_${recordId}.pdf`,
+    };
   },
 
   /**

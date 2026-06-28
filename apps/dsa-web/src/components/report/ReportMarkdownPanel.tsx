@@ -233,6 +233,9 @@ export interface ReportMarkdownPanelProps {
   stockCode: string;
   onRequestClose: () => void;
   reportLanguage?: ReportLanguage;
+  variant?: 'drawer' | 'print';
+  initialDetail?: AnalysisReport | null;
+  onContentReady?: () => void;
 }
 
 export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
@@ -241,6 +244,9 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
   stockCode,
   onRequestClose,
   reportLanguage = 'zh',
+  variant = 'drawer',
+  initialDetail,
+  onContentReady,
 }) => {
   const text = getReportText(normalizeReportLanguage(reportLanguage));
   const loadReportFailedText = text.loadReportFailed;
@@ -248,9 +254,12 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedType, setCopiedType] = useState<'markdown' | 'text' | null>(null);
-  const [detail, setDetail] = useState<AnalysisReport | null>(null);
+  const [detail, setDetail] = useState<AnalysisReport | null>(initialDetail ?? null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const sanitizedContent = sanitizeReportMarkdown(content);
   const sections = splitMarkdownSections(sanitizedContent);
+  const isPrintVariant = variant === 'print';
 
   const handleCopyMarkdown = useCallback(async () => {
     if (!content) return;
@@ -275,6 +284,31 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
     }
   }, [content]);
 
+  const handleDownloadPdf = useCallback(async () => {
+    if (!content || isGeneratingPdf) return;
+    setPdfError(null);
+    setIsGeneratingPdf(true);
+    try {
+      const { blob, filename } = await historyApi.getPdf(recordId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      try {
+        link.click();
+      } finally {
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      setPdfError('PDF 產生失敗，請稍後再試。');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  }, [content, isGeneratingPdf, recordId]);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -282,9 +316,10 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
       setIsLoading(true);
       setError(null);
       try {
+        const shouldFetchDetail = initialDetail === undefined;
         const [markdownContent, detailResult] = await Promise.allSettled([
           historyApi.getMarkdown(recordId),
-          historyApi.getDetail(recordId),
+          shouldFetchDetail ? historyApi.getDetail(recordId) : Promise.resolve(initialDetail),
         ]);
         if (isMounted) {
           if (markdownContent.status === 'fulfilled') {
@@ -309,10 +344,17 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [recordId, loadReportFailedText]);
+  }, [recordId, loadReportFailedText, initialDetail]);
+
+  useEffect(() => {
+    if (!isLoading && !error && content) {
+      onContentReady?.();
+    }
+  }, [content, error, isLoading, onContentReady]);
 
   return (
     <>
+      {!isPrintVariant && (
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex flex-1 items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--home-action-report-bg)] text-[var(--home-action-report-text)]">
@@ -326,7 +368,22 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
           </div>
         </div>
 
+        {!isPrintVariant && (
         <div className="flex items-center gap-2">
+          <Tooltip content={isGeneratingPdf ? '產生 PDF...' : text.downloadPdf}>
+            <span className="inline-flex">
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={isLoading || !content || isGeneratingPdf}
+                className="home-surface-button flex h-10 min-w-10 items-center justify-center rounded-lg px-2 text-xs font-bold text-secondary-text hover:text-foreground disabled:opacity-50"
+                aria-label={text.downloadPdf}
+              >
+                {isGeneratingPdf ? '產生 PDF...' : 'PDF'}
+              </button>
+            </span>
+          </Tooltip>
+
           <Tooltip content={text.copyMarkdownSource}>
             <span className="inline-flex">
               <button
@@ -371,7 +428,15 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
             </span>
           </Tooltip>
         </div>
+        )}
       </div>
+      )}
+
+      {!isPrintVariant && pdfError && (
+        <p role="alert" className="mb-3 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+          {pdfError}
+        </p>
+      )}
 
       {isLoading ? (
         <div className="flex h-64 flex-col items-center justify-center">
@@ -385,14 +450,20 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <p className="text-sm text-danger">{error}</p>
-          <button
-            type="button"
-            onClick={onRequestClose}
-            className="home-surface-button mt-4 rounded-lg px-4 py-2 text-sm text-secondary-text"
-          >
-            {text.dismiss}
-          </button>
+          <p className="text-sm font-semibold text-danger">
+            {isPrintVariant ? '無法載入列印報告' : error}
+          </p>
+          {isPrintVariant ? (
+            <p className="mt-2 text-sm text-muted-text">請返回完整分析報告後再試一次。</p>
+          ) : (
+            <button
+              type="button"
+              onClick={onRequestClose}
+              className="home-surface-button mt-4 rounded-lg px-4 py-2 text-sm text-secondary-text"
+            >
+              {text.dismiss}
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -416,6 +487,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
         </>
       )}
 
+      {!isPrintVariant && (
       <div className="home-divider mt-6 flex justify-end border-t pt-4">
         <button
           type="button"
@@ -425,6 +497,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
           {text.dismiss}
         </button>
       </div>
+      )}
     </>
   );
 };

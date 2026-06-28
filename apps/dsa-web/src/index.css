@@ -3326,6 +3326,121 @@ textarea {
   }
 }
 
+.report-print-page {
+  min-height: 100vh;
+  background: #f8fafc;
+  color: #111827;
+}
+
+.report-print-content {
+  width: min(100%, 64rem);
+  margin: 0 auto;
+  padding: 2rem 1rem 3rem;
+  overflow: visible;
+}
+
+.report-print-header {
+  margin-bottom: 1rem;
+  border: 1px solid #d8dee8;
+  background: #ffffff;
+  padding: 1.25rem;
+  box-shadow: 0 14px 36px rgb(15 23 42 / 0.07);
+}
+
+.report-print-header h1 {
+  margin: 0.2rem 0 0.75rem;
+  color: #111827;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-weight: 850;
+  letter-spacing: -0.03em;
+}
+
+.report-print-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.9rem;
+  color: #475569;
+  font-size: 0.8rem;
+}
+
+.report-print-panel {
+  overflow: visible;
+}
+
+.report-print-error {
+  margin: 4rem auto;
+  max-width: 32rem;
+  border: 1px solid #fecaca;
+  background: #fff7f7;
+  padding: 1.5rem;
+}
+
+.report-print-error h1 {
+  color: #991b1b;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.report-print-error p {
+  margin-top: 0.5rem;
+  color: #475569;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  html,
+  body,
+  #root {
+    background: white !important;
+    color: #111827 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .report-print-page {
+    width: 100% !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  .report-print-content {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .report-print-header {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border-color: #d1d5db !important;
+    box-shadow: none !important;
+  }
+
+  .report-print-section,
+  .report-print-panel [data-testid="report-visual-summary"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .report-print-panel,
+  .report-print-panel .report-markdown-body {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
 /* Phase 19G-R2 editorial refinements: convert backend emoji label lines into report subheads. */
 .report-body-label-line {
   margin-top: 1.15rem;

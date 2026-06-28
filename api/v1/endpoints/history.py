@@ -12,7 +12,8 @@
 import logging
 from typing import Literal, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Depends, Body
+from fastapi import APIRouter, HTTPException, Query, Depends, Body, Request
+from fastapi.responses import Response
 
 from api.deps import get_database_manager
 from api.v1.schemas.history import (
@@ -44,6 +45,15 @@ from src.report_language import (
 )
 from src.services.history_service import HistoryService, MarkdownReportGenerationError
 from src.services.kline_snapshot import KlineHistoryNotFound, build_history_kline
+from src.services.report_pdf_service import (
+    ReportPdfError,
+    ReportPdfUnavailable,
+    build_print_url,
+    content_disposition_for_pdf,
+    generate_pdf_from_print_route,
+    playwright_cookies_from_request,
+    sanitize_pdf_filename,
+)
 from src.services.report_renderer import sanitize_narrative_text
 from src.utils.data_processing import (
     normalize_model_used,
@@ -513,6 +523,73 @@ def get_history_kline(
                 "message": "K-line 查詢失敗",
             },
         )
+
+
+@router.get(
+    "/{record_id}/pdf",
+    responses={
+        200: {
+            "description": "PDF report",
+            "content": {"application/pdf": {}},
+        },
+        404: {"description": "報告不存在", "model": ErrorResponse},
+        503: {"description": "PDF 服務不可用", "model": ErrorResponse},
+        500: {"description": "PDF 產生失敗", "model": ErrorResponse},
+    },
+    summary="下載歷史報告 PDF",
+    description="根據分析歷史記錄 ID 由列印專用頁產生完整 PDF 檔案",
+)
+async def get_history_pdf(
+    record_id: int,
+    request: Request,
+    db_manager: DatabaseManager = Depends(get_database_manager),
+) -> Response:
+    service = HistoryService(db_manager)
+    detail = service.get_history_detail_by_id(record_id)
+    if detail is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "not_found",
+                "message": "找不到指定的分析報告。",
+            },
+        )
+
+    filename = sanitize_pdf_filename(
+        history_id=record_id,
+        stock_code=detail.get("stock_code"),
+        stock_name=detail.get("stock_name"),
+        created_at=detail.get("created_at"),
+    )
+    print_url = build_print_url(str(request.base_url), record_id)
+    cookies = playwright_cookies_from_request(str(request.base_url), dict(request.cookies))
+
+    try:
+        pdf_bytes = await generate_pdf_from_print_route(print_url, cookies=cookies)
+    except ReportPdfUnavailable as exc:
+        logger.warning("PDF generation unavailable for history %s: %s", record_id, exc)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "pdf_unavailable",
+                "message": "PDF 產生服務目前不可用。",
+            },
+        )
+    except ReportPdfError as exc:
+        logger.error("PDF generation failed for history %s: %s", record_id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "pdf_generation_failed",
+                "message": "PDF 產生失敗，請稍後再試。",
+            },
+        )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": content_disposition_for_pdf(filename)},
+    )
 
 
 @router.get(

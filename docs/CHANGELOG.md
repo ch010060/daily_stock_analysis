@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 完整分析報告新增直接下載 PDF 功能，後端以列印專用報告頁產生完整 PDF 檔。
+
 - [改進] 優化市場恐慌指標卡片的視覺排版與官方指標 marker，移除「原始標籤」冗餘文字，讓個股分析與完整報告中的 VIX／VIXTWN 與「系統評分」更清楚可讀。
 
 - [改進] 恐慌指標卡 UI polish：個股分析側欄改為半圓雙指針 gauge，完整報告保留橫向雙指針 meter；VIX/VIXTWN 與「系統評分」各自顯示狀態 tag、日期與 info 說明，並修正 tooltip 重複/重疊問題。

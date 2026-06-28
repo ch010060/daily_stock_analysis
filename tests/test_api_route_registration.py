@@ -72,6 +72,19 @@ class TestApiRouteRegistration(unittest.TestCase):
         self.assertIn("/api/v1/history/", paths,
                       "History list route /api/v1/history/ must be registered")
 
+    def test_history_pdf_route_registered(self):
+        from api.app import create_app
+        app = create_app()
+        try:
+            paths = set(app.openapi().get("paths", {}).keys())
+        except Exception:
+            paths = set()
+        self.assertIn(
+            "/api/v1/history/{record_id}/pdf",
+            paths,
+            "History PDF route must be registered",
+        )
+
     def test_no_empty_path_in_registered_routes(self):
         from api.app import create_app
         app = create_app()

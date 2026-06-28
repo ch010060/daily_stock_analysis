@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { historyApi } from '../../../api/history';
 import { ReportMarkdownPanel } from '../ReportMarkdownPanel';
 
@@ -7,6 +7,7 @@ vi.mock('../../../api/history', () => ({
   historyApi: {
     getMarkdown: vi.fn(),
     getDetail: vi.fn().mockResolvedValue(null),
+    getPdf: vi.fn(),
   },
 }));
 
@@ -23,6 +24,14 @@ vi.mock('../MermaidDiagram', () => ({
 describe('ReportMarkdownPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(historyApi.getPdf).mockResolvedValue({
+      blob: new Blob(['%PDF'], { type: 'application/pdf' }),
+      filename: 'report.pdf',
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('renders a normal fenced code block as plain code, with no MermaidDiagram stub present', async () => {
@@ -195,6 +204,66 @@ describe('ReportMarkdownPanel', () => {
     expect(body.className).toContain('report-markdown-body');
     expect(body.className).toContain('report-body-paper');
     expect(summary.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('downloads the PDF from the backend endpoint without changing report content', async () => {
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue('# Printable report');
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+    const clickSpy = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:report-pdf'),
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    const createElementSpy = vi.spyOn(document, 'createElement');
+    createElementSpy.mockImplementation((tagName: string) => {
+      const element = document.createElementNS('http://www.w3.org/1999/xhtml', tagName) as HTMLElement;
+      if (tagName === 'a') {
+        Object.defineProperty(element, 'click', { value: clickSpy });
+      }
+      return element;
+    });
+
+    render(
+      <ReportMarkdownPanel
+        recordId={74}
+        stockName="富邦台50"
+        stockCode="006208"
+        onRequestClose={() => {}}
+      />
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '下載 PDF' }));
+
+    await waitFor(() => {
+      expect(historyApi.getPdf).toHaveBeenCalledWith(74);
+    });
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:report-pdf');
+    expect(await screen.findByRole('heading', { name: 'Printable report' })).toBeInTheDocument();
+  });
+
+  it('shows a controlled PDF error when direct download fails', async () => {
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue('# Printable report');
+    vi.mocked(historyApi.getPdf).mockRejectedValue(new Error('pdf failed'));
+
+    render(
+      <ReportMarkdownPanel
+        recordId={74}
+        stockName="富邦台50"
+        stockCode="006208"
+        onRequestClose={() => {}}
+      />
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '下載 PDF' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('PDF 產生失敗，請稍後再試。');
   });
 
 });

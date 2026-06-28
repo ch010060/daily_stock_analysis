@@ -16,7 +16,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 # Keep this test runnable when optional LLM runtime deps are not installed.
 try:
@@ -720,6 +720,67 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(payload["items"][0]["title"], "台積電法說會最新重點")
         self.assertEqual(payload["items"][0]["snippet"], "AI 需求與先進製程仍是市場關注焦點。")
         self.assertEqual(payload["items"][0]["url"], "https://news.example.com/tsmc")
+
+    @patch("src.auth.is_auth_enabled", return_value=False)
+    def test_history_pdf_api_returns_pdf_attachment(self, mock_auth) -> None:
+        """GET /api/v1/history/{id}/pdf should return generated PDF bytes."""
+        if TestClient is None or create_app is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        record_id = self._save_history("query_pdf_api_001")
+        static_dir = Path(self._temp_dir.name) / "empty-static"
+        static_dir.mkdir(exist_ok=True)
+        client = TestClient(create_app(static_dir=static_dir))
+        pdf_mock = AsyncMock(return_value=b"%PDF fake")
+
+        with patch("api.v1.endpoints.history.generate_pdf_from_print_route", pdf_mock):
+            response = client.get(f"/api/v1/history/{record_id}/pdf")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"%PDF fake")
+        self.assertEqual(response.headers["content-type"], "application/pdf")
+        self.assertIn("attachment", response.headers["content-disposition"])
+        self.assertIn("filename*=", response.headers["content-disposition"])
+        pdf_mock.assert_awaited_once()
+        print_url = pdf_mock.await_args.args[0]
+        self.assertTrue(print_url.endswith(f"/reports/{record_id}/print?pdf=1"))
+
+    @patch("src.auth.is_auth_enabled", return_value=False)
+    def test_history_pdf_api_missing_report_returns_404(self, mock_auth) -> None:
+        """Missing history id should not invoke PDF generation."""
+        if TestClient is None or create_app is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        static_dir = Path(self._temp_dir.name) / "empty-static"
+        static_dir.mkdir(exist_ok=True)
+        client = TestClient(create_app(static_dir=static_dir))
+        pdf_mock = AsyncMock(return_value=b"%PDF fake")
+
+        with patch("api.v1.endpoints.history.generate_pdf_from_print_route", pdf_mock):
+            response = client.get("/api/v1/history/999999/pdf")
+
+        self.assertEqual(response.status_code, 404)
+        pdf_mock.assert_not_awaited()
+
+    @patch("src.auth.is_auth_enabled", return_value=False)
+    def test_history_pdf_api_unavailable_returns_controlled_error(self, mock_auth) -> None:
+        """Unavailable browser runtime should be surfaced as a controlled 503."""
+        if TestClient is None or create_app is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        from src.services.report_pdf_service import ReportPdfUnavailable
+
+        record_id = self._save_history("query_pdf_api_002")
+        static_dir = Path(self._temp_dir.name) / "empty-static"
+        static_dir.mkdir(exist_ok=True)
+        client = TestClient(create_app(static_dir=static_dir))
+        pdf_mock = AsyncMock(side_effect=ReportPdfUnavailable("unavailable"))
+
+        with patch("api.v1.endpoints.history.generate_pdf_from_print_route", pdf_mock):
+            response = client.get(f"/api/v1/history/{record_id}/pdf")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["error"], "pdf_unavailable")
 
     @patch("src.auth.is_auth_enabled", return_value=False)
     def test_history_news_api_links_duplicate_relevant_news_to_current_report(self, mock_auth) -> None:

@@ -21,6 +21,7 @@ const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
 const AlertsPage = lazy(() => import('./pages/AlertsPage'));
 const StockScreeningPage = lazy(() => import('./pages/StockScreeningPage'));
 const TokenUsagePage = lazy(() => import('./pages/TokenUsagePage'));
+const ReportPrintPage = lazy(() => import('./pages/ReportPrintPage'));
 
 const AppContent: React.FC = () => {
   const location = useLocation();
@@ -69,6 +70,14 @@ const AppContent: React.FC = () => {
 
   return (
     <Routes>
+      <Route
+        path="/reports/:historyId/print"
+        element={(
+          <StandaloneRouteBoundary>
+            <ReportPrintPage />
+          </StandaloneRouteBoundary>
+        )}
+      />
       <Route
         element={(
           <Shell>
