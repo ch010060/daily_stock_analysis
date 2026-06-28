@@ -63,7 +63,6 @@ export interface SystemScoreVM {
   label: '系統評分';
   value: number | null;
   sentimentLabel: string | null;
-  pointerPosition: number | null;
   explanation: string;
 }
 
@@ -306,16 +305,6 @@ export function marketFearPointerPosition(kind: MarketFearIndexKind, value: numb
   return 100;
 }
 
-function systemScorePointer(score: number | null, kind: MarketFearIndexKind | null): number | null {
-  if (score === null) return null;
-  const systemRisk = clampPct(100 - score);
-  if (!kind) return systemRisk;
-  const mappedMarketValue = kind === 'vixtwn'
-    ? (systemRisk / 100) * 40
-    : (systemRisk / 100) * 33.5;
-  return marketFearPointerPosition(kind, mappedMarketValue);
-}
-
 function marketFearKind(v: unknown): MarketFearIndexKind | null {
   if (v === 'vix' || v === 'vixtwn') return v;
   return null;
@@ -394,7 +383,6 @@ export function adaptToVisualReport(report: AnalysisReport): VisualReportViewMod
     label: '系統評分',
     value: rawSentimentScore,
     sentimentLabel: marketRiskSentimentLabel,
-    pointerPosition: systemScorePointer(rawSentimentScore, marketFearIndex?.kind ?? null),
     explanation: getReportText(meta.reportLanguage ?? 'zh_TW').systemScoreProvenance,
   };
 

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ReportOverview } from '../ReportOverview';
 
@@ -152,16 +152,21 @@ describe('ReportOverview', () => {
     );
 
     const gauge = screen.getByTestId('market-risk-gauge');
-    expect(gauge.textContent).toContain('台灣恐慌指數 VIXTWN');
-    expect(gauge.textContent).toContain('VIXTWN 44.27');
+    expect(gauge.textContent).toContain('VIXTWN');
+    expect(within(gauge).getByText('VIXTWN')).not.toHaveClass('truncate');
+    expect(screen.getByTestId('market-fear-value')).toHaveTextContent('44.27');
+    expect(gauge.textContent).not.toContain('VIXTWN 44.27');
     expect(gauge.textContent).toContain('日期：2026-06-26');
+    expect(within(gauge).getByText('日期：')).toBeInTheDocument();
+    expect(within(gauge).getByText('2026-06-26')).toBeInTheDocument();
     expect(gauge.textContent).toContain('系統評分');
     expect(gauge.textContent).toContain('恐慌');
     expect(gauge.textContent).toContain('中性');
     expect(screen.getByTestId('market-fear-meter')).toBeInTheDocument();
     expect(screen.getByTestId('market-fear-meter').querySelectorAll('path')).toHaveLength(4);
     expect(screen.getByTestId('market-fear-pointer')).toBeInTheDocument();
-    expect(screen.getByTestId('system-score-pointer')).toBeInTheDocument();
+    expect(screen.queryByTestId('market-fear-marker-row')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('system-score-pointer')).not.toBeInTheDocument();
     expect(screen.queryByTestId('market-fear-scale')).not.toBeInTheDocument();
     expect(screen.queryByText('市場情緒')).not.toBeInTheDocument();
   });

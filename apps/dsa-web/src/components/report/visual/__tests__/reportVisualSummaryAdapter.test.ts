@@ -18,7 +18,7 @@ describe('adaptToVisualReport', () => {
     expect(vm.marketFearIndex?.title).toBe('恐慌指數 VIX');
     expect(vm.marketFearIndex?.asOf).toBe('2025-03-14');
     expect(vm.systemScore.value).toBe(42);
-    expect(vm.systemScore.pointerPosition).toBeCloseTo(24.3, 1);
+    expect('pointerPosition' in vm.systemScore).toBe(false);
     expect(vm.trendPeriods).toHaveLength(5);
     expect(vm.trendDataGap).toBe(false);
   });
@@ -71,7 +71,7 @@ describe('adaptToVisualReport', () => {
     expect(vm.marketFearIndex?.value).toBe(44.27);
     expect(vm.marketFearIndex?.asOf).toBe('2026-06-26');
     expect(vm.marketFearIndex?.bucket).toBe('red');
-    expect(vm.systemScore.pointerPosition).toBeCloseTo(33.0, 1);
+    expect('pointerPosition' in vm.systemScore).toBe(false);
   });
 
   it('reads persisted snake_case market fear snapshots from raw_result', () => {

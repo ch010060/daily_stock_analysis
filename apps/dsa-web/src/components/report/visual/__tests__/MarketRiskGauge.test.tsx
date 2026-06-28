@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { MarketRiskGauge } from '../MarketRiskGauge';
 
@@ -12,7 +12,7 @@ describe('MarketRiskGauge', () => {
     expect(gauge.querySelector('svg')).toBeTruthy();
     expect(gauge.textContent).toContain('18.89');
     expect(gauge.textContent).toContain('平穩');
-    expect(gauge.textContent).toContain('恐慌指數 VIX');
+    expect(gauge.textContent).toContain('VIX');
     expect(gauge.textContent).not.toContain('市場風險 ·');
     expect(screen.getByTestId('market-fear-value').className).toContain('text-success');
   });
@@ -50,7 +50,7 @@ describe('MarketRiskGauge', () => {
     expect(screen.getByLabelText('系統評分說明')).toBeInTheDocument();
   });
 
-  it('renders one dual-pointer card when market index and system score exist', () => {
+  it('renders one compact market index card when market index and system score exist', () => {
     render(
       <MarketRiskGauge
         vixLevel={null}
@@ -73,8 +73,9 @@ describe('MarketRiskGauge', () => {
     );
 
     const gauge = screen.getByTestId('market-risk-gauge');
-    expect(gauge.textContent).toContain('恐慌指數 VIX');
-    expect(gauge.textContent).toContain('VIX 18.41');
+    expect(gauge.textContent).toContain('VIX');
+    expect(screen.getByTestId('market-fear-value')).toHaveTextContent('18.41');
+    expect(gauge.textContent).not.toContain('VIX 18.41');
     expect(gauge.textContent).toContain('日期：2026-06-26');
     expect(gauge.textContent).toContain('系統評分');
     expect(gauge.textContent).toContain('平穩');
@@ -83,10 +84,12 @@ describe('MarketRiskGauge', () => {
     expect(gauge.textContent).toContain('28.7');
     expect(gauge.textContent).toContain('33.5');
     expect(gauge.textContent).toContain('恐慌指數：數值越高代表市場恐慌程度越高');
-    expect(gauge.textContent).toContain('系統評分：分數越高代表市場越樂觀');
+    expect(gauge.textContent).toContain('系統評分：分數越高代表本標的評估越偏多');
+    expect(gauge.textContent).not.toContain('原始標籤');
     expect(screen.getByTestId('market-fear-meter')).toBeInTheDocument();
+    expect(screen.queryByTestId('market-fear-marker-row')).not.toBeInTheDocument();
     expect(screen.getByTestId('market-fear-pointer').querySelector('polygon')).toBeTruthy();
-    expect(screen.getByTestId('system-score-pointer').querySelector('circle')).toBeTruthy();
+    expect(screen.queryByTestId('system-score-pointer')).not.toBeInTheDocument();
   });
 
   it('renders dashboard as a semi-arc meter without duplicated bottom scale', () => {
@@ -111,7 +114,6 @@ describe('MarketRiskGauge', () => {
           label: '系統評分',
           value: 42,
           sentimentLabel: '中性',
-          pointerPosition: 24,
           explanation: '非市場官方指數、非 VIX、非 VIXTWN，目前沒有固定公開公式。',
         }}
       />,
@@ -119,7 +121,10 @@ describe('MarketRiskGauge', () => {
 
     expect(screen.getByTestId('market-fear-meter').querySelectorAll('path')).toHaveLength(4);
     expect(screen.queryByTestId('market-fear-scale')).not.toBeInTheDocument();
-    expect(screen.getByTestId('market-risk-gauge').textContent).toContain('系統評分：分數越高代表市場越樂觀');
+    expect(screen.getByTestId('market-risk-gauge').textContent).toContain('系統評分：分數越高代表本標的評估越偏多');
+    expect(screen.getByTestId('market-risk-gauge').textContent).not.toContain('原始標籤');
+    expect(screen.queryByTestId('market-fear-marker-row')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('system-score-pointer')).not.toBeInTheDocument();
   });
 
   it('renders TW VIXTWN title/date and does not fake missing values', () => {
@@ -145,9 +150,13 @@ describe('MarketRiskGauge', () => {
     );
 
     const gauge = screen.getByTestId('market-risk-gauge');
-    expect(gauge.textContent).toContain('台灣恐慌指數 VIXTWN');
-    expect(gauge.textContent).toContain('VIXTWN 44.27');
+    expect(gauge.textContent).toContain('VIXTWN');
+    expect(within(gauge).getByText('VIXTWN')).not.toHaveClass('truncate');
+    expect(screen.getByTestId('market-fear-value')).toHaveTextContent('44.27');
+    expect(gauge.textContent).not.toContain('VIXTWN 44.27');
     expect(gauge.textContent).toContain('日期：2026-06-26');
+    expect(within(gauge).getByText('日期：')).toBeInTheDocument();
+    expect(within(gauge).getByText('2026-06-26')).toBeInTheDocument();
     expect(gauge.textContent).toContain('系統評分');
     expect(gauge.textContent).toContain('恐慌');
     expect(screen.getByTestId('market-fear-value').className).toContain('text-danger');
@@ -179,11 +188,12 @@ describe('MarketRiskGauge', () => {
     );
 
     const gauge = screen.getByTestId('market-risk-gauge');
-    expect(gauge.textContent).toContain('台灣恐慌指數 VIXTWN');
+    expect(gauge.textContent).toContain('VIXTWN');
     expect(gauge.textContent).toContain('指數資料暫缺');
     expect(gauge.textContent).toContain('系統評分');
     expect(screen.queryByTestId('market-fear-pointer')).not.toBeInTheDocument();
-    expect(screen.getByTestId('system-score-pointer')).toBeInTheDocument();
+    expect(screen.queryByTestId('system-score-pointer')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('market-fear-marker-row')).not.toBeInTheDocument();
   });
 
   it('opens one info tooltip at a time and includes score ranges before provenance', async () => {
@@ -207,13 +217,12 @@ describe('MarketRiskGauge', () => {
           label: '系統評分',
           value: 42,
           sentimentLabel: '中性',
-          pointerPosition: 33,
           explanation: '本系統依分析模型對行情、技術、新聞與報告上下文的綜合判斷產生此分數；非市場官方指數、非 VIX、非 VIXTWN。目前沒有固定公開公式。',
         }}
       />,
     );
 
-    fireEvent.click(screen.getByLabelText('台灣恐慌指數 VIXTWN 說明'));
+    fireEvent.click(screen.getByLabelText('VIXTWN 說明'));
     expect(await screen.findByRole('tooltip')).toHaveTextContent('VIXTWN 台灣市場恐慌指標');
 
     fireEvent.click(screen.getByLabelText('系統評分說明'));

@@ -25,6 +25,8 @@ const ARC_CX = 170;
 const ARC_CY = 150;
 const ARC_R = 116;
 const SEGMENT_COLORS = ['#16A34A', '#2563EB', '#EA580C', '#DC2626'];
+const MARKER_FILL = '#F8FAFC';
+const MARKER_STROKE = '#0F172A';
 
 type Bucket = 'green' | 'blue' | 'orange' | 'red' | 'unknown';
 
@@ -178,7 +180,6 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
     label: '系統評分',
     value: sentimentScore,
     sentimentLabel,
-    pointerPosition: sentimentScore === null ? null : clampPct(100 - sentimentScore),
     explanation: TEXT.systemScoreProvenance,
   };
   const resolvedMarketFear: MarketFearIndexVM | null = marketFearIndex ?? (
@@ -232,9 +233,6 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
         <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className={`font-mono text-2xl font-black ${systemTone}`}>{scoreValue}</span>
           <StatusTag className={systemTagClass(resolvedSystemScore.value)}>{systemStatus}</StatusTag>
-          {resolvedSystemScore.sentimentLabel && (
-            <span className="text-xs text-muted-foreground">原始標籤：{resolvedSystemScore.sentimentLabel}</span>
-          )}
         </div>
       </div>
     );
@@ -247,8 +245,6 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
   const marketStatus = hasMarket ? marketStatusLabel(resolvedMarketFear?.bucket) : '指數資料暫缺';
   const marketPointerPct = resolvedMarketFear?.pointerPosition ?? null;
   const marketPointerX = marketPointerPct !== null ? pctToX(marketPointerPct) : null;
-  const systemPointerPct = resolvedSystemScore.pointerPosition;
-  const systemPointerX = systemPointerPct !== null ? pctToX(systemPointerPct) : null;
   const spxStr = spxChangePct !== null ? pct(spxChangePct) : null;
   const spxColor = spxChangePct !== null && spxChangePct < 0 ? '#DC2626' : '#16A34A';
   const scoreValue = hasSystem ? resolvedSystemScore.value!.toFixed(0) : '—';
@@ -270,57 +266,59 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
   const marketHelp = resolvedMarketFear ? <MarketHelp kind={resolvedMarketFear.kind} valueText={valueText} /> : null;
   const systemHelp = <SystemScoreHelp explanation={resolvedSystemScore.explanation} />;
   const metricSummary = (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <div className="rounded-lg border bg-background/80 p-3">
-        <div className="mb-2 flex items-center gap-1.5">
-          <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">{title}</span>
-          {resolvedMarketFear && (
-            <Tooltip content={marketHelp} focusable contentClassName="max-w-[26rem]">
-              <InfoIcon label={`${title} 說明`} />
-            </Tooltip>
+    <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5">
+      <div className="grid gap-2.5 sm:grid-cols-[minmax(5.75rem,1fr)_minmax(6.25rem,auto)] sm:items-start sm:gap-3">
+        <div className="min-w-0">
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-wider text-muted-foreground">{indexCode}</span>
+            {resolvedMarketFear && (
+              <Tooltip content={marketHelp} focusable contentClassName="max-w-[26rem]">
+                <InfoIcon label={`${indexCode} 說明`} />
+              </Tooltip>
+            )}
+          </div>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className={`font-mono text-xl font-black ${marketValueClass}`} data-testid="market-fear-value">
+              {valueText}
+            </span>
+            <StatusTag className={bucketTagClass(resolvedMarketFear?.bucket)}>{marketStatus}</StatusTag>
+          </div>
+          <div className="mt-1 text-[12px] leading-tight text-muted-foreground">
+            <span className="block">日期：</span>
+            <span className="block font-mono">{resolvedMarketFear?.asOf ?? '—'}</span>
+          </div>
+          {!hasMarket && resolvedMarketFear?.dataGapReason && (
+            <div className="mt-1 text-[11px] text-muted-foreground">{resolvedMarketFear.dataGapReason}</div>
           )}
         </div>
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className={`font-mono text-xl font-black ${marketValueClass}`} data-testid="market-fear-value">
-            {resolvedMarketFear ? `${indexCode} ${valueText}` : '—'}
-          </span>
-          <StatusTag className={bucketTagClass(resolvedMarketFear?.bucket)}>{marketStatus}</StatusTag>
+        <div className="min-w-0 border-t border-border/60 pt-2 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+          <div className="mb-1.5 flex items-center gap-1.5 sm:justify-end">
+            <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">{resolvedSystemScore.label}</span>
+            <Tooltip content={systemHelp} focusable contentClassName="max-w-[26rem]">
+              <InfoIcon label="系統評分說明" />
+            </Tooltip>
+          </div>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 sm:justify-end">
+            <span className={`font-mono text-xl font-black ${systemTone}`}>{scoreValue}</span>
+            <StatusTag className={systemTagClass(resolvedSystemScore.value)}>{systemStatus}</StatusTag>
+          </div>
         </div>
-        <div className="mt-1 text-[12px] text-muted-foreground">日期：{resolvedMarketFear?.asOf ?? '—'}</div>
-        {!hasMarket && resolvedMarketFear?.dataGapReason && (
-          <div className="mt-1 text-[11px] text-muted-foreground">{resolvedMarketFear.dataGapReason}</div>
-        )}
-      </div>
-      <div className="rounded-lg border bg-background/80 p-3">
-        <div className="mb-2 flex items-center gap-1.5">
-          <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">{resolvedSystemScore.label}</span>
-          <Tooltip content={systemHelp} focusable contentClassName="max-w-[26rem]">
-            <InfoIcon label="系統評分說明" />
-          </Tooltip>
-        </div>
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className={`font-mono text-xl font-black ${systemTone}`}>{scoreValue}</span>
-          <StatusTag className={systemTagClass(resolvedSystemScore.value)}>{systemStatus}</StatusTag>
-        </div>
-        {resolvedSystemScore.sentimentLabel && (
-          <div className="mt-1 text-[12px] text-muted-foreground">原始標籤：{resolvedSystemScore.sentimentLabel}</div>
-        )}
       </div>
     </div>
   );
   const legend = (
     <div className="mt-2 grid gap-1.5 text-[12px] font-semibold text-muted-foreground sm:grid-cols-2">
       <span>恐慌指數：數值越高代表市場恐慌程度越高</span>
-      <span>系統評分：分數越高代表市場越樂觀</span>
+      <span>系統評分：分數越高代表本標的評估越偏多</span>
     </div>
   );
 
   if (layout === 'dashboard') {
-    const marketPoint = marketPointerPct !== null ? arcPoint(marketPointerPct, ARC_R - 8) : null;
-    const systemPoint = systemPointerPct !== null ? arcPoint(systemPointerPct, ARC_R - 26) : null;
-    const hub = arcPoint(50, 0);
+    const marketPoint = marketPointerPct !== null ? arcPoint(marketPointerPct, ARC_R + 4) : null;
+    const dashboardLabelX = marketPoint ? Math.min(ARC_W - 26, Math.max(26, marketPoint.x)) : null;
+    const dashboardLabelY = marketPoint ? Math.min(166, marketPoint.y + 34) : null;
 
-    return (
+      return (
       <div data-testid="market-risk-gauge" className={`rounded-lg border bg-card p-3 ${className}`}>
         {spxStr && (
           <div className="mb-2 text-right text-xs font-semibold" style={{ color: spxColor }}>
@@ -330,10 +328,10 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
         {metricSummary}
         <svg
           data-testid="market-fear-meter"
-          viewBox={`0 0 ${ARC_W} 188`}
+          viewBox={`0 0 ${ARC_W} 178`}
           width="100%"
           className="mt-3 overflow-visible"
-          aria-label={`${title} 與系統評分半圓雙指針量表`}
+          aria-label={`${indexCode} 官方恐慌指數半圓量表`}
           role="img"
         >
           {[0, 25, 50, 75].map((start, index) => (
@@ -342,9 +340,9 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
               d={arcPath(start, start + 25)}
               fill="none"
               stroke={SEGMENT_COLORS[index]}
-              strokeWidth="17"
+              strokeWidth="18"
               strokeLinecap="round"
-              opacity="0.82"
+              opacity="0.86"
             />
           ))}
           {splitTicks.map((tick) => {
@@ -355,35 +353,44 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
               </text>
             );
           })}
-          <circle cx={hub.x} cy={hub.y} r="4" fill="#111827" opacity="0.75" />
-          {marketPoint && (
-            <g data-testid="market-fear-pointer" aria-label={`${title} 指標位置：${valueText}`}>
-              <title>{`${title} 指標位置：${valueText}`}</title>
-              <line x1={hub.x} y1={hub.y} x2={marketPoint.x} y2={marketPoint.y} stroke="#111827" strokeWidth="3.5" strokeLinecap="round" />
-              <polygon
-                points={`${marketPoint.x},${marketPoint.y - 9} ${marketPoint.x - 8},${marketPoint.y + 7} ${marketPoint.x + 8},${marketPoint.y + 7}`}
-                fill="#111827"
-              />
-              <text x={marketPoint.x} y={Math.max(18, marketPoint.y - 14)} textAnchor="middle" className="fill-slate-950 text-[13px] font-black">
-                {indexCode}
-              </text>
-            </g>
-          )}
-          {systemPoint && (
-            <g data-testid="system-score-pointer" aria-label={`系統評分指標位置：${scoreValue}`}>
-              <title>{`系統評分指標位置：${scoreValue}`}</title>
-              <line x1={hub.x} y1={hub.y} x2={systemPoint.x} y2={systemPoint.y} stroke="#111827" strokeWidth="2.5" strokeDasharray="5 4" strokeLinecap="round" />
-              <circle cx={systemPoint.x} cy={systemPoint.y} r="7" fill="white" stroke="#111827" strokeWidth="3" />
-              <text x={systemPoint.x} y={Math.min(182, systemPoint.y + 24)} textAnchor="middle" className="fill-slate-950 text-[13px] font-black">
-                系統
-              </text>
-            </g>
-          )}
-        </svg>
-        {legend}
-      </div>
-    );
+            {marketPoint && (
+              <g data-testid="market-fear-pointer" aria-label={`${title} 指標位置：${valueText}`}>
+                <title>{`${title} 指標位置：${valueText}`}</title>
+                <polygon
+                  points={`${marketPoint.x},${marketPoint.y - 10} ${marketPoint.x - 10},${marketPoint.y + 9} ${marketPoint.x + 10},${marketPoint.y + 9}`}
+                  fill={MARKER_FILL}
+                  stroke={MARKER_STROKE}
+                  strokeWidth="2.5"
+                />
+                {dashboardLabelX !== null && dashboardLabelY !== null && (
+                  <g aria-hidden="true">
+                    <line
+                      x1={marketPoint.x}
+                      y1={marketPoint.y + 10}
+                      x2={dashboardLabelX}
+                      y2={dashboardLabelY - 12}
+                      stroke={MARKER_STROKE}
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      opacity="0.38"
+                    />
+                    <g transform={`translate(${dashboardLabelX - 23}, ${dashboardLabelY - 9})`}>
+                    <rect width="46" height="18" rx="9" fill={MARKER_FILL} stroke={MARKER_STROKE} strokeWidth="1.5" />
+                    <text x="23" y="13" textAnchor="middle" className="fill-slate-950 text-[11px] font-black">
+                      {valueText}
+                    </text>
+                    </g>
+                  </g>
+                )}
+              </g>
+            )}
+          </svg>
+          {legend}
+        </div>
+      );
   }
+
+  const reportLabelX = marketPointerX !== null ? Math.min(574, Math.max(26, marketPointerX)) : null;
 
   return (
     <div data-testid="market-risk-gauge" className={`rounded-lg border bg-card p-3 ${className}`}>
@@ -393,44 +400,45 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
         </div>
       )}
       {metricSummary}
+
       <svg
         data-testid="market-fear-meter"
-        viewBox="0 0 600 104"
+        viewBox="0 0 600 82"
         width="100%"
-        className="mt-2 overflow-visible"
-        aria-label={`${title} 與系統評分雙指針量表`}
+        className="mt-3 overflow-visible"
+        aria-label={`${indexCode} 官方恐慌指數量表`}
         role="img"
       >
-        <rect x="0" y="16" width="150" height="16" rx="2" fill="#16A34A" opacity="0.78" />
-        <rect x="150" y="16" width="150" height="16" fill="#2563EB" opacity="0.72" />
-        <rect x="300" y="16" width="150" height="16" fill="#EA580C" opacity="0.76" />
-        <rect x="450" y="16" width="150" height="16" rx="2" fill="#DC2626" opacity="0.72" />
+        <rect x="0" y="30" width="150" height="17" rx="2" fill="#16A34A" opacity="0.78" />
+        <rect x="150" y="30" width="150" height="17" fill="#2563EB" opacity="0.72" />
+        <rect x="300" y="30" width="150" height="17" fill="#EA580C" opacity="0.76" />
+        <rect x="450" y="30" width="150" height="17" rx="2" fill="#DC2626" opacity="0.72" />
         {[150, 300, 450].map((x) => (
-          <line key={x} x1={x} y1="14" x2={x} y2="34" stroke="white" strokeWidth="2" />
+          <line key={x} x1={x} y1="28" x2={x} y2="49" stroke="white" strokeWidth="2" />
         ))}
         {allTicks.map((label, index) => (
-          <text key={label} x={index * 150} y="50" textAnchor={index === 0 ? 'start' : 'middle'} className="fill-muted-foreground text-[15px] font-black">
+          <text key={label} x={index * 150} y="69" textAnchor={index === 0 ? 'start' : 'middle'} className="fill-muted-foreground text-[15px] font-black">
             {label}
           </text>
         ))}
         {marketPointerX !== null && (
           <g data-testid="market-fear-pointer" aria-label={`${title} 指標位置：${valueText}`}>
             <title>{`${title} 指標位置：${valueText}`}</title>
-            <polygon points={`${marketPointerX},36 ${marketPointerX - 11},55 ${marketPointerX + 11},55`} fill="#111827" />
-            <line x1={marketPointerX} y1="32" x2={marketPointerX} y2="58" stroke="#111827" strokeWidth="2.5" />
-            <text x={marketPointerX} y="75" textAnchor="middle" className="fill-slate-950 text-[14px] font-black">
-              {indexCode}
-            </text>
-          </g>
-        )}
-        {systemPointerX !== null && (
-          <g data-testid="system-score-pointer" aria-label={`系統評分指標位置：${scoreValue}`}>
-            <title>{`系統評分指標位置：${scoreValue}`}</title>
-            <line x1={systemPointerX} y1="32" x2={systemPointerX} y2="68" stroke="#111827" strokeWidth="2" strokeDasharray="4 3" />
-            <circle cx={systemPointerX} cy="68" r="7" fill="white" stroke="#111827" strokeWidth="3" />
-            <text x={systemPointerX} y="91" textAnchor="middle" className="fill-slate-950 text-[14px] font-black">
-              系統
-            </text>
+            <line x1={marketPointerX} y1="20" x2={marketPointerX} y2="30" stroke={MARKER_STROKE} strokeWidth="2" strokeLinecap="round" />
+            <polygon
+              points={`${marketPointerX},30 ${marketPointerX - 7},20 ${marketPointerX + 7},20`}
+              fill={MARKER_FILL}
+              stroke={MARKER_STROKE}
+              strokeWidth="2"
+            />
+            {reportLabelX !== null && (
+              <g aria-hidden="true" transform={`translate(${reportLabelX - 23}, 0)`}>
+                <rect width="46" height="18" rx="9" fill={MARKER_FILL} stroke={MARKER_STROKE} strokeWidth="1.5" />
+                <text x="23" y="13" textAnchor="middle" className="fill-slate-950 text-[11px] font-black">
+                  {valueText}
+                </text>
+              </g>
+            )}
           </g>
         )}
       </svg>
