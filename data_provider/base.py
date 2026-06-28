@@ -2129,74 +2129,16 @@ class DataFetcherManager:
 
     def get_chip_distribution(self, stock_code: str):
         """
-        獲取籌碼分佈資料（帶熔斷和多資料來源降級）
-
-        策略：
-        1. 檢查配置開關
-        2. 檢查熔斷器狀態
-        3. 依次嘗試多個資料來源：資料來源優先順序與獲取daily的資料優先順序一致
-        4. 所有資料來源失敗則返回 None（降級兜底）
+        Route B TW/US 分析不再支援籌碼分佈資料。
 
         Args:
             stock_code: 股票程式碼
 
         Returns:
-            ChipDistribution 物件，失敗則返回 None
+            None
         """
-        # Normalize code (strip SH/SZ prefix etc.)
         stock_code = normalize_stock_code(stock_code)
-
-        from .realtime_types import get_chip_circuit_breaker
-        from src.config import get_config
-
-        config = get_config()
-
-        # 如果籌碼分佈功能被禁用，直接返回 None
-        if not config.enable_chip_distribution:
-            logger.debug(f"[籌碼分佈] 功能已禁用，跳過 {stock_code}")
-            return None
-
-        if self._fixture_no_network_mode_enabled():
-            logger.debug(f"[籌碼分佈] fixture/no-network 模式已啟用，跳過 {stock_code}")
-            return None
-
-        circuit_breaker = get_chip_circuit_breaker()
-
-        # 直接遍歷管理器已經按 priority 排好序的資料來源列表
-        for fetcher in self._get_fetchers_snapshot():
-            # 只處理實現了籌碼分佈邏輯的資料來源
-            if not hasattr(fetcher, 'get_chip_distribution'):
-                continue
-            
-            fetcher_name = fetcher.name
-            # 動態生成熔斷器的 key，例如 "TushareFetcher" -> "tushare_chip"
-            source_key = f"{fetcher_name.replace('Fetcher', '').lower()}_chip"
-
-            # 檢查熔斷器狀態
-            if not circuit_breaker.is_available(source_key):
-                logger.debug(f"[熔斷] {fetcher_name} 籌碼介面處於熔斷狀態，嘗試下一個")
-                continue
-
-            try:
-                chip = self._call_fetcher_method(fetcher, 'get_chip_distribution', stock_code)
-                if _is_meaningful_chip_distribution(chip):
-                    circuit_breaker.record_success(source_key)
-                    logger.info(f"[籌碼分佈] {stock_code} 成功獲取 (來源: {fetcher_name})")
-                    return chip
-                else:
-                    if chip is not None:
-                        logger.warning(
-                            "[籌碼分佈] %s 返回欄位不完整或佔位值，繼續嘗試下一個資料來源",
-                            fetcher_name,
-                        )
-                    # 空結果或佔位結果：釋放 HALF_OPEN 探測名額，避免卡死
-                    circuit_breaker.record_inconclusive(source_key)
-            except Exception as e:
-                logger.warning(f"[籌碼分佈] {fetcher_name} 獲取 {stock_code} 失敗: {e}")
-                circuit_breaker.record_failure(source_key, str(e))
-                continue
-
-        logger.warning(f"[籌碼分佈] {stock_code} 所有資料來源均失敗")
+        logger.debug("[籌碼分佈] Route B 已移除籌碼分佈資料來源，跳過 %s", stock_code)
         return None
 
     def get_stock_name(self, stock_code: str, allow_realtime: bool = True) -> Optional[str]:

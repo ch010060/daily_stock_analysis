@@ -35,7 +35,6 @@ _THINKING_TOOL_LABELS: Dict[str, str] = {
     "get_realtime_quote": "行情獲取",
     "get_daily_history": "K線資料獲取",
     "analyze_trend": "技術指標分析",
-    "get_chip_distribution": "籌碼分佈分析",
     "search_stock_news": "新聞搜尋",
     "search_comprehensive_intel": "綜合情報搜尋",
     "get_market_indices": "市場概覽獲取",

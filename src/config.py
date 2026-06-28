@@ -912,8 +912,8 @@ class Config:
     enable_realtime_quote: bool = True
     # 盤中實時技術面：啟用時用實時價計算 MA/多頭排列（Issue #234）；關閉則用昨日收盤
     enable_realtime_technical_indicators: bool = True
-    # 籌碼分佈開關（該介面不穩定，雲端部署建議關閉）
-    enable_chip_distribution: bool = True
+    # 籌碼分佈已從 Route B TW/US 分析路徑移除；保留欄位僅供舊設定相容。
+    enable_chip_distribution: bool = False
     # 東財介面補丁開關
     enable_eastmoney_patch: bool = False
     # 實時行情資料來源優先順序（逗號分隔）
@@ -1754,7 +1754,7 @@ class Config:
             enable_realtime_technical_indicators=os.getenv(
                 'ENABLE_REALTIME_TECHNICAL_INDICATORS', 'true'
             ).lower() == 'true',
-            enable_chip_distribution=os.getenv('ENABLE_CHIP_DISTRIBUTION', 'true').lower() == 'true',
+            enable_chip_distribution=os.getenv('ENABLE_CHIP_DISTRIBUTION', 'false').lower() == 'true',
             enable_value_network_mermaid=os.getenv('ENABLE_VALUE_NETWORK_MERMAID', 'true').lower() == 'true',
             # 東財介面補丁開關
             enable_eastmoney_patch=os.getenv('ENABLE_EASTMONEY_PATCH', 'false').lower() == 'true',

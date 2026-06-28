@@ -310,15 +310,14 @@ class StockAnalysisPipeline:
         current_time: Optional[datetime] = None,
     ) -> Optional[AnalysisResult]:
         """
-        分析單隻股票（增強版：含量比、換手率、籌碼分析、多維度情報）
+        分析單隻股票（增強版：含量比、換手率、多維度情報）
         
         流程：
         1. 獲取實時行情（量比、換手率）- 透過 DataFetcherManager 自動故障切換
-        2. 獲取籌碼分佈 - 透過 DataFetcherManager 帶熔斷保護
-        3. 進行趨勢分析（基於交易理念）
-        4. 多維度情報搜尋（最新訊息+風險排查+業績預期）
-        5. 從資料庫獲取分析上下文
-        6. 呼叫 AI 進行綜合分析
+        2. 進行趨勢分析（基於交易理念）
+        3. 多維度情報搜尋（最新訊息+風險排查+業績預期）
+        4. 從資料庫獲取分析上下文
+        5. 呼叫 AI 進行綜合分析
         
         Args:
             query_id: 查詢鏈路關聯 id
@@ -341,7 +340,7 @@ class StockAnalysisPipeline:
             market_phase_context_dict = market_phase_context.to_dict()
             market_phase_summary = render_market_phase_summary(market_phase_context_dict)
 
-            self._emit_progress(18, f"{code}：正在獲取行情與籌碼資料", stage="data_fetching", stage_label="正在擷取股價與基本資料")
+            self._emit_progress(18, f"{code}：正在獲取行情資料", stage="data_fetching", stage_label="正在擷取股價與基本資料")
             # 獲取股票名稱（先走輕量名稱路徑，後續若 realtime_quote 有 name 再覆蓋）
             stock_name = self.fetcher_manager.get_stock_name(code, allow_realtime=False)
 
@@ -371,17 +370,8 @@ class StockAnalysisPipeline:
             if not stock_name:
                 stock_name = f'股票{code}'
 
-            # Step 2: 獲取籌碼分佈 - 使用統一入口，帶熔斷保護
+            # Route B TW/US analysis no longer fetches chip-distribution data.
             chip_data = None
-            try:
-                chip_data = self.fetcher_manager.get_chip_distribution(code)
-                if chip_data:
-                    logger.info(f"{stock_name}({code}) 籌碼分佈: 獲利比例={chip_data.profit_ratio:.1%}, "
-                              f"90%集中度={chip_data.concentration_90:.2%}")
-                else:
-                    logger.debug(f"{stock_name}({code}) 籌碼分佈獲取失敗或已禁用")
-            except Exception as e:
-                logger.warning(f"{stock_name}({code}) 獲取籌碼分佈失敗: {e}")
 
             # If agent mode is explicitly enabled, or specific agent skills are configured, use the Agent analysis pipeline.
             # NOTE: use config.agent_mode (explicit opt-in) instead of
@@ -754,7 +744,7 @@ class StockAnalysisPipeline:
         """
         增強分析上下文
         
-        將實時行情、籌碼分佈、趨勢分析結果、股票名稱新增到上下文中
+        將實時行情、趨勢分析結果、股票名稱新增到上下文中
         
         Args:
             context: 原始上下文
