@@ -333,7 +333,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
               marketFearIndex={visualSummaryVm.marketFearIndex}
               systemScore={visualSummaryVm.systemScore}
               layout="dashboard"
-              className="home-panel-card home-rail-card !overflow-visible"
+              className="home-panel-card home-rail-card overflow-hidden"
             />
           ) : (
             <Card variant="bordered" padding="md" className="home-panel-card home-rail-card !overflow-visible">
