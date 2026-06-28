@@ -265,9 +265,45 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
 
   const marketHelp = resolvedMarketFear ? <MarketHelp kind={resolvedMarketFear.kind} valueText={valueText} /> : null;
   const systemHelp = <SystemScoreHelp explanation={resolvedSystemScore.explanation} />;
-  const metricSummary = (
-    <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5">
-      <div className="grid gap-2.5 sm:grid-cols-[minmax(5.75rem,1fr)_minmax(6.25rem,auto)] sm:items-start sm:gap-3">
+  const metricSummary = layout === 'dashboard' ? (
+    <div className="min-w-0 rounded-xl border border-border/60 bg-muted/20 px-2.5 py-2.5">
+      <div className="grid min-w-0 grid-cols-2 divide-x divide-border/60">
+        <div className="min-w-0 px-1.5 text-center">
+          <div className="mb-1 flex min-w-0 items-center justify-center gap-1">
+            <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-wider text-muted-foreground">{indexCode}</span>
+            {resolvedMarketFear && (
+              <Tooltip content={marketHelp} focusable contentClassName="max-w-[26rem]">
+                <InfoIcon label={`${indexCode} 說明`} />
+              </Tooltip>
+            )}
+          </div>
+          <div className="flex min-w-0 flex-col items-center gap-1">
+            <span className={`font-mono text-xl font-black leading-none ${marketValueClass}`} data-testid="market-fear-value">
+              {valueText}
+            </span>
+            <StatusTag className={bucketTagClass(resolvedMarketFear?.bucket)}>{marketStatus}</StatusTag>
+          </div>
+          {!hasMarket && resolvedMarketFear?.dataGapReason && (
+            <div className="mt-1 text-[11px] text-muted-foreground">{resolvedMarketFear.dataGapReason}</div>
+          )}
+        </div>
+        <div className="min-w-0 px-1.5 text-center">
+          <div className="mb-1 flex min-w-0 items-center justify-center gap-1">
+            <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-wider text-muted-foreground">{resolvedSystemScore.label}</span>
+            <Tooltip content={systemHelp} focusable contentClassName="max-w-[26rem]">
+              <InfoIcon label="系統評分說明" />
+            </Tooltip>
+          </div>
+          <div className="flex min-w-0 flex-col items-center gap-1">
+            <span className={`font-mono text-xl font-black leading-none ${systemTone}`}>{scoreValue}</span>
+            <StatusTag className={systemTagClass(resolvedSystemScore.value)}>{systemStatus}</StatusTag>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : (
+    <div className="min-w-0 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5">
+      <div className="grid min-w-0 gap-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-3">
         <div className="min-w-0">
           <div className="mb-1.5 flex items-center gap-1.5">
             <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-wider text-muted-foreground">{indexCode}</span>
@@ -291,14 +327,14 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
             <div className="mt-1 text-[11px] text-muted-foreground">{resolvedMarketFear.dataGapReason}</div>
           )}
         </div>
-        <div className="min-w-0 border-t border-border/60 pt-2 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
-          <div className="mb-1.5 flex items-center gap-1.5 sm:justify-end">
+        <div className="min-w-0 border-t border-border/60 pt-2 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+          <div className="mb-1.5 flex items-center gap-1.5 lg:justify-end">
             <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">{resolvedSystemScore.label}</span>
             <Tooltip content={systemHelp} focusable contentClassName="max-w-[26rem]">
               <InfoIcon label="系統評分說明" />
             </Tooltip>
           </div>
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 sm:justify-end">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 lg:justify-end">
             <span className={`font-mono text-xl font-black ${systemTone}`}>{scoreValue}</span>
             <StatusTag className={systemTagClass(resolvedSystemScore.value)}>{systemStatus}</StatusTag>
           </div>
@@ -307,7 +343,7 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
     </div>
   );
   const legend = (
-    <div className="mt-2 grid gap-1.5 text-[12px] font-semibold text-muted-foreground sm:grid-cols-2">
+    <div className="mt-2 grid gap-1.5 text-[12px] font-semibold text-muted-foreground">
       <span>恐慌指數：數值越高代表市場恐慌程度越高</span>
       <span>系統評分：分數越高代表本標的評估越偏多</span>
     </div>
@@ -319,18 +355,13 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
     const dashboardLabelY = marketPoint ? Math.min(166, marketPoint.y + 34) : null;
 
       return (
-      <div data-testid="market-risk-gauge" className={`rounded-lg border bg-card p-3 ${className}`}>
-        {spxStr && (
-          <div className="mb-2 text-right text-xs font-semibold" style={{ color: spxColor }}>
-            S&amp;P 500 {spxStr}
-          </div>
-        )}
+      <div data-testid="market-risk-gauge" className={`min-w-0 rounded-lg border bg-card p-3 ${className}`}>
         {metricSummary}
         <svg
           data-testid="market-fear-meter"
           viewBox={`0 0 ${ARC_W} 178`}
           width="100%"
-          className="mt-3 overflow-visible"
+          className="mt-3 block max-w-full overflow-hidden"
           aria-label={`${indexCode} 官方恐慌指數半圓量表`}
           role="img"
         >
@@ -346,9 +377,9 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
             />
           ))}
           {splitTicks.map((tick) => {
-            const p = arcPoint(tick.pct, ARC_R + 24);
+            const p = arcPoint(tick.pct, ARC_R + 10);
             return (
-              <text key={tick.label} x={p.x} y={p.y} textAnchor="middle" className="fill-muted-foreground text-[14px] font-black">
+              <text key={tick.label} x={p.x} y={p.y} textAnchor="middle" className="fill-muted-foreground text-[22px] font-black">
                 {tick.label}
               </text>
             );
@@ -374,9 +405,9 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
                       strokeLinecap="round"
                       opacity="0.38"
                     />
-                    <g transform={`translate(${dashboardLabelX - 23}, ${dashboardLabelY - 9})`}>
-                    <rect width="46" height="18" rx="9" fill={MARKER_FILL} stroke={MARKER_STROKE} strokeWidth="1.5" />
-                    <text x="23" y="13" textAnchor="middle" className="fill-slate-950 text-[11px] font-black">
+                    <g transform={`translate(${dashboardLabelX - 33}, ${dashboardLabelY - 13})`}>
+                    <rect width="66" height="26" rx="13" fill={MARKER_FILL} stroke={MARKER_STROKE} strokeWidth="1.5" />
+                    <text x="33" y="18" textAnchor="middle" className="fill-slate-950 text-[16px] font-black">
                       {valueText}
                     </text>
                     </g>
@@ -393,7 +424,7 @@ export const MarketRiskGauge: React.FC<MarketRiskGaugeProps> = ({
   const reportLabelX = marketPointerX !== null ? Math.min(574, Math.max(26, marketPointerX)) : null;
 
   return (
-    <div data-testid="market-risk-gauge" className={`rounded-lg border bg-card p-3 ${className}`}>
+    <div data-testid="market-risk-gauge" className={`min-w-0 rounded-lg border bg-card p-3 ${className}`}>
       {spxStr && (
         <div className="mb-2 text-right text-xs font-semibold" style={{ color: spxColor }}>
           S&amp;P 500 {spxStr}
