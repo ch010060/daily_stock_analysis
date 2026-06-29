@@ -107,6 +107,8 @@ describe('FiNewsPage', () => {
       'href',
       'https://finance.yahoo.com/quote/QQQ',
     );
+    expect(screen.getByRole('link', { name: 'QQQ' })).toHaveAttribute('target', '_blank');
+    expect(screen.getByRole('link', { name: 'QQQ' })).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByRole('link', { name: /美股收低，科技股拋售。/ })).toHaveAttribute('target', '_blank');
     expect(screen.getByRole('link', { name: '^GSPC' })).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.queryByText('外部來源連結')).not.toBeInTheDocument();
@@ -119,15 +121,39 @@ describe('FiNewsPage', () => {
 
     await screen.findByTestId('finews-market-sidebar');
     expect(screen.getByText('市場溫度偏低。')).not.toBeVisible();
+    expect(screen.queryByText(/說明/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('查看市場溫度說明'));
 
     expect(screen.getByText('市場溫度偏低。')).toBeVisible();
   });
 
+  it('renders source-like market temperature metrics with progress bars', async () => {
+    renderPage();
+
+    const temperature = await screen.findByTestId('finews-market-temperature');
+    expect(temperature).toHaveTextContent('恐慌貪婪指數');
+    expect(temperature).toHaveTextContent('25');
+    expect(temperature).toHaveTextContent('極度恐慌');
+    expect(screen.getAllByTestId('finews-temperature-track')).toHaveLength(1);
+    expect(screen.getAllByTestId('finews-temperature-progress')[0]).toHaveStyle({ width: '25%' });
+    expect(screen.getByLabelText('查看市場溫度說明')).toHaveTextContent('i');
+  });
+
+  it('uses semantic gain/loss tones for market tape rows', async () => {
+    renderPage();
+
+    const indexLink = await screen.findByRole('link', { name: '^GSPC' });
+    const qqqLink = screen.getByRole('link', { name: 'QQQ' });
+
+    expect(indexLink.closest('[data-tone]')).toHaveAttribute('data-tone', 'loss');
+    expect(qqqLink.closest('[data-tone]')).toHaveAttribute('data-tone', 'gain');
+  });
+
   it('renders the compact newspaper masthead, main column, and market sidebar', async () => {
     renderPage();
 
+    expect(await screen.findByTestId('finews-paper-shell')).toBeInTheDocument();
     expect(await screen.findByTestId('finews-masthead')).toBeInTheDocument();
     expect(screen.getByTestId('finews-newspaper-grid')).toHaveClass('lg:grid-cols-[minmax(0,1.62fr)_minmax(300px,0.86fr)]');
 
