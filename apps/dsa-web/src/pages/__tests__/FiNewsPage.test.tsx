@@ -27,13 +27,13 @@ const snapshot = {
     },
   ],
   sections: {
-    afterMarketSummary: ['美股主要指數盤後偏弱。'],
-    majorNews: ['主要新聞已整理。'],
-    marketTemperature: ['恐慌貪婪指數 25。'],
-    majorIndices: ['標普 500'],
-    majorStocks: ['Nvidia'],
-    treasuryYields: ['美國 10 年期國債'],
-    fx: ['美元 / 人民幣'],
+    afterMarketSummary: ['美股主要指數盤後偏弱。', '科技股承壓，防禦板塊相對抗跌。'],
+    majorNews: ['主要新聞已整理。', 'Yahoo Finance · 2026-06-26', '投資人等待通膨與聯準會訊號。'],
+    marketTemperature: ['恐慌貪婪指數', '25', '極度恐慌', '市場溫度偏低。'],
+    majorIndices: ['標普 500', '^GSPC', '6,000.00', '-0.05%'],
+    majorStocks: ['Nvidia', 'NVDA', '190.10', '+1.20%'],
+    treasuryYields: ['美國 10 年期國債', 'US10Y', '4.20%', '+0.01'],
+    fx: ['美元 / 人民幣', 'USD/CNY', '7.18', '-0.02%'],
   },
 };
 
@@ -53,8 +53,8 @@ describe('FiNewsPage', () => {
     const { container } = renderPage();
 
     expect(await screen.findByRole('heading', { name: '美股日報', level: 1 })).toBeInTheDocument();
-    expect(screen.getByText('FiNews')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /finews\.elsetech\.app/ })).toHaveAttribute(
+    expect(screen.getAllByText('FiNews').length).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: /原始來源/ })).toHaveAttribute(
       'href',
       'https://finews.elsetech.app/',
     );
@@ -62,12 +62,30 @@ describe('FiNewsPage', () => {
     expect(screen.getByText('2026-06-26 21:13:18 UTC')).toBeInTheDocument();
     expect(screen.getByText('2026-06-29T00:00:00+00:00')).toBeInTheDocument();
     expect(screen.getByText('美股主要指數盤後偏弱。')).toBeInTheDocument();
-    expect(screen.getByText('恐慌貪婪指數 25。')).toBeInTheDocument();
+    expect(screen.getByText('恐慌貪婪指數')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /美股收低，科技股拋售。/ })).toHaveAttribute(
       'href',
       'https://example.com/news-one',
     );
     expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('renders the compact newspaper masthead, main column, and market sidebar', async () => {
+    renderPage();
+
+    expect(await screen.findByTestId('finews-masthead')).toBeInTheDocument();
+    expect(screen.getByTestId('finews-newspaper-grid')).toHaveClass('lg:grid-cols-[minmax(0,1.62fr)_minmax(300px,0.86fr)]');
+
+    const mainColumn = screen.getByTestId('finews-main-column');
+    expect(mainColumn).toHaveTextContent('盤後總結');
+    expect(mainColumn).toHaveTextContent('主要新聞');
+
+    const marketSidebar = screen.getByTestId('finews-market-sidebar');
+    expect(marketSidebar).toHaveTextContent('市場溫度');
+    expect(marketSidebar).toHaveTextContent('主要指數');
+    expect(marketSidebar).toHaveTextContent('主要股票');
+    expect(marketSidebar).toHaveTextContent('美債利率');
+    expect(marketSidebar).toHaveTextContent('主要匯率');
   });
 
   it('shows stale and fetch-failed state while keeping cached content visible', async () => {

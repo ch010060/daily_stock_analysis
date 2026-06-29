@@ -107,8 +107,8 @@ def test_parser_degrades_when_optional_sections_are_missing() -> None:
 
 
 def test_zh_cn_content_is_converted_to_zh_tw() -> None:
-    assert to_zh_tw("美股日报：盘后总结，市场温度，主要汇率，恐慌贪婪指数") == (
-        "美股日報：盤後總結，市場溫度，主要匯率，恐慌貪婪指數"
+    assert to_zh_tw("美股日报：盘后总结，市场温度，主要汇率，恐慌贪婪指数，从风险资产到智能手机消费成长") == (
+        "美股日報：盤後總結，市場溫度，主要匯率，恐慌貪婪指數，從風險資產到智慧型手機消費成長"
     )
 
 
