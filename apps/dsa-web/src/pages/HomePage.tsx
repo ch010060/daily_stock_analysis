@@ -14,7 +14,11 @@ import { StockHistoryTrendDrawer, StockBar } from '../components/history';
 import { ReportMarkdownDrawer } from '../components/report/ReportMarkdownDrawer';
 import { ReportSummary } from '../components/report/ReportSummary';
 import { TwDailyReportView } from '../components/report/TwDailyReportView';
-import { parseTwDailyReportMarkdown } from '../components/report/twDailyReportAdapter';
+import {
+  buildTwDailyReportFromSnapshot,
+  extractTwDailySnapshotFromReport,
+  parseTwDailyReportMarkdown,
+} from '../components/report/twDailyReportAdapter';
 import { TaskPanel } from '../components/tasks';
 import { useDashboardLifecycle, useHomeDashboardState } from '../hooks';
 import { useWatchlist } from '../hooks/useWatchlist';
@@ -38,6 +42,7 @@ const HomePage: React.FC = () => {
   const [marketReviewNotice, setMarketReviewNotice] = useState<MarketReviewNotice>(null);
   const [marketReviewError, setMarketReviewError] = useState<ParsedApiError | null>(null);
   const [marketReviewReport, setMarketReviewReport] = useState<string | null>(null);
+  const [marketReviewSnapshot, setMarketReviewSnapshot] = useState<Record<string, unknown> | null>(null);
   const [marketReviewReportCopied, setMarketReviewReportCopied] = useState(false);
   const [selectedMarketReviewMarkdown, setSelectedMarketReviewMarkdown] = useState<string | null>(null);
   const [isLoadingSelectedMarketReviewMarkdown, setIsLoadingSelectedMarketReviewMarkdown] = useState(false);
@@ -231,12 +236,22 @@ const HomePage: React.FC = () => {
       : null;
   const isHistoryTrendUnavailable = !selectedReport || isMarketReviewHistoryReport || !selectedReport.meta.stockCode;
   const liveTwDailyReport = useMemo(
-    () => (marketReviewReport ? parseTwDailyReportMarkdown(marketReviewReport) : null),
-    [marketReviewReport],
+    () => (
+      buildTwDailyReportFromSnapshot(marketReviewSnapshot)
+      ?? (marketReviewReport ? parseTwDailyReportMarkdown(marketReviewReport) : null)
+    ),
+    [marketReviewReport, marketReviewSnapshot],
+  );
+  const selectedTwDailySnapshot = useMemo(
+    () => extractTwDailySnapshotFromReport(selectedReport),
+    [selectedReport],
   );
   const selectedTwDailyReport = useMemo(
-    () => (selectedMarketReviewMarkdown ? parseTwDailyReportMarkdown(selectedMarketReviewMarkdown) : null),
-    [selectedMarketReviewMarkdown],
+    () => (
+      buildTwDailyReportFromSnapshot(selectedTwDailySnapshot)
+      ?? (selectedMarketReviewMarkdown ? parseTwDailyReportMarkdown(selectedMarketReviewMarkdown) : null)
+    ),
+    [selectedMarketReviewMarkdown, selectedTwDailySnapshot],
   );
   const shouldSuppressSelectedMarketReviewDetail = isMarketReviewHistoryReport && Boolean(marketReviewReport);
 
@@ -507,6 +522,7 @@ const HomePage: React.FC = () => {
           const status = await analysisApi.getStatus(taskId);
           if (status.status === 'pending' || status.status === 'processing') {
             setMarketReviewReport(null);
+            setMarketReviewSnapshot(null);
             const progress = typeof status.progress === 'number'
               ? `${status.progress}%`
               : '進行中';
@@ -526,7 +542,11 @@ const HomePage: React.FC = () => {
             const skipReason = typeof status.marketReviewSkipReason === 'string'
               ? status.marketReviewSkipReason.trim()
               : '';
+            const snapshot = status.marketReviewSnapshot && typeof status.marketReviewSnapshot === 'object'
+              ? status.marketReviewSnapshot
+              : null;
             setMarketReviewReport(marketReviewText ? marketReviewText.trim() : null);
+            setMarketReviewSnapshot(snapshot);
             if (!marketReviewText && skipReason) {
               setMarketReviewNotice({
                 variant: 'warning',
@@ -548,6 +568,7 @@ const HomePage: React.FC = () => {
           if (status.status === 'failed') {
             stopMarketReviewPolling();
             setMarketReviewReport(null);
+            setMarketReviewSnapshot(null);
             setMarketReviewError(
               getParsedApiError({
                 response: {
@@ -566,6 +587,7 @@ const HomePage: React.FC = () => {
 
           stopMarketReviewPolling();
           setMarketReviewReport(null);
+          setMarketReviewSnapshot(null);
           setMarketReviewNotice({
             variant: 'danger',
             title: '台股日報狀態異常',

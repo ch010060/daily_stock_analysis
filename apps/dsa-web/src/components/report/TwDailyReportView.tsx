@@ -1,47 +1,118 @@
 import type React from 'react';
 import type { TwDailyReportModel, TwDailyRow, TwDailyTone } from './twDailyReportAdapter';
 
+interface TwDailyReportViewProps {
+  report: TwDailyReportModel;
+  className?: string;
+}
+
 const cx = (...classes: Array<string | undefined | false>) => classes.filter(Boolean).join(' ');
 
-const toneClass: Record<TwDailyTone, string> = {
-  gain: 'text-success',
-  loss: 'text-danger',
-  neutral: 'text-foreground',
-  missing: 'text-muted-text',
+const toneClass = (tone: TwDailyTone): string => {
+  switch (tone) {
+    case 'tw-gain':
+    case 'tw-buy':
+    case 'net-buy':
+      return 'text-danger';
+    case 'tw-loss':
+    case 'tw-sell':
+    case 'net-sell':
+      return 'text-success';
+    case 'risk':
+      return 'text-secondary-text';
+    case 'missing':
+      return 'text-muted-text';
+    case 'neutral':
+    default:
+      return 'text-foreground';
+  }
 };
 
-const MarketRows: React.FC<{ rows: TwDailyRow[]; emptyText: string }> = ({ rows, emptyText }) => {
+const SUMMARY_FILLERS = new Set(['主要敘述已整理至今日重點與右側資料表。']);
+const RISK_FILLERS = new Set(['本次報告未提供額外風險註記。']);
+
+const meaningfulText = (value: string | undefined, fillers: Set<string>) => {
+  const text = value?.trim() ?? '';
+  return text && !fillers.has(text) ? text : '';
+};
+
+const Section: React.FC<{
+  title: string;
+  children: React.ReactNode;
+  compact?: boolean;
+}> = ({ title, children, compact }) => (
+  <section className={cx('border-t border-border/80 pt-4', compact && 'border-t-0 pt-0')}>
+    <h3 className="mb-3 text-xs font-bold tracking-[0.18em] text-muted-text">{title}</h3>
+    {children}
+  </section>
+);
+
+const RowList: React.FC<{ rows: TwDailyRow[]; emptyText: string }> = ({ rows, emptyText }) => {
   if (!rows.length) {
-    return <p className="py-3 text-sm text-muted-text">{emptyText}</p>;
+    return <p className="text-sm text-muted-text">{emptyText}</p>;
   }
 
   return (
     <div className="divide-y divide-border/70">
       {rows.map((row, index) => (
-        <div key={`${row.label}-${row.code ?? index}`} className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,auto)] gap-3 py-2.5">
+        <div
+          key={`${row.code || row.label}-${index}`}
+          data-tone={row.tone}
+          className="grid grid-cols-1 gap-2 py-3 xl:grid-cols-[minmax(0,1fr)_minmax(10rem,max-content)] xl:items-start"
+        >
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground">{row.label}</p>
-            {row.code ? <p className="font-mono text-[11px] text-muted-text">{row.code}</p> : null}
+            <p className="text-sm font-semibold leading-5 text-foreground">{row.label}</p>
+            {row.code ? <p className="whitespace-nowrap font-mono text-[11px] text-muted-text">{row.code}</p> : null}
+            {row.meta ? (
+              <p className="mt-1 text-[11px] leading-4 text-muted-text" title={row.meta}>
+                {row.meta}
+              </p>
+            ) : null}
+            {row.notes?.length ? (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {row.notes.map((note) => (
+                  <span key={note} className="rounded-full border border-border/70 px-2 py-0.5 text-[10px] font-semibold text-muted-text">
+                    {note}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            {row.metrics?.length ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {row.metrics.map((metric) => (
+                  <span
+                    key={`${row.label}-${metric.label}`}
+                    data-tone={metric.tone}
+                    className={cx(
+                      'rounded-full border border-border/70 px-2 py-0.5 text-[11px] font-semibold',
+                      toneClass(metric.tone),
+                    )}
+                  >
+                    {metric.value}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
-          <p className={cx('text-right text-sm font-semibold leading-5', toneClass[row.tone])}>{row.value}</p>
+          <p
+            data-tone={row.tone}
+            className={cx('whitespace-nowrap text-left text-sm font-semibold leading-5 xl:min-w-[10rem] xl:text-right', toneClass(row.tone))}
+          >
+            {row.value}
+          </p>
         </div>
       ))}
     </div>
   );
 };
 
-const ReaderSection: React.FC<{
-  title: string;
-  children: React.ReactNode;
-  className?: string;
-}> = ({ title, children, className }) => (
-  <section className={cx('border-t border-border/80 pt-4', className)}>
-    <h3 className="mb-3 text-xs font-bold tracking-[0.18em] text-muted-text">{title}</h3>
-    {children}
-  </section>
-);
+export const TwDailyReportView: React.FC<TwDailyReportViewProps> = ({ report, className }) => {
+  const summary = meaningfulText(report.summary, SUMMARY_FILLERS);
+  const risks = report.risks
+    .map((risk) => meaningfulText(risk, RISK_FILLERS))
+    .filter((risk): risk is string => Boolean(risk));
 
-export const TwDailyReportView: React.FC<{ report: TwDailyReportModel; className?: string }> = ({ report, className }) => (
+  return (
   <article
     data-testid="tw-daily-reader"
     className={cx(
@@ -59,7 +130,7 @@ export const TwDailyReportView: React.FC<{ report: TwDailyReportModel; className
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs md:text-right">
           <div>
             <dt className="font-semibold text-muted-text">資料日期</dt>
-            <dd className="mt-0.5 font-mono text-foreground">{report.dataDate ?? '未提供'}</dd>
+            <dd className="mt-0.5 whitespace-nowrap font-mono text-foreground">{report.dataDate}</dd>
           </div>
           <div>
             <dt className="font-semibold text-muted-text">資料來源</dt>
@@ -67,77 +138,54 @@ export const TwDailyReportView: React.FC<{ report: TwDailyReportModel; className
           </div>
         </dl>
       </div>
-      {report.dataStatus ? (
-        <p className="mt-3 rounded-lg border border-border/70 bg-background/60 px-3 py-2 text-xs leading-5 text-secondary-text">
-          {report.dataStatus}
-        </p>
-      ) : null}
     </header>
 
-    <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.9fr)]">
+    <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,0.9fr)]">
       <main className="space-y-5">
-        <ReaderSection title="今日重點" className="border-t-0 pt-0">
+        <Section title="今日重點" compact>
           <ul className="space-y-2">
             {report.highlights.map((item) => (
               <li key={item} className="flex gap-2 text-sm leading-6 text-secondary-text">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+                <span aria-hidden="true" className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                 <span>{item}</span>
               </li>
             ))}
           </ul>
-        </ReaderSection>
+        </Section>
 
-        <ReaderSection title={report.title}>
-          {report.summary.length ? (
-            <div className="space-y-2 text-sm leading-7 text-secondary-text">
-              {report.summary.map((item) => <p key={item}>{item}</p>)}
-            </div>
-          ) : (
-            <p className="text-sm leading-7 text-muted-text">主要敘述已整理至今日重點與右側資料表。</p>
-          )}
-        </ReaderSection>
+        {summary ? (
+          <Section title={report.title}>
+            <p className="text-sm leading-7 text-muted-text">{summary}</p>
+          </Section>
+        ) : null}
 
-        <ReaderSection title="法人與資金面">
-          <MarketRows rows={report.institutional} emptyText="法人資料暫不可用" />
-        </ReaderSection>
+        <Section title="法人與資金面">
+          <RowList rows={report.institutional} emptyText="法人資金資料暫不可用。" />
+        </Section>
 
-        <ReaderSection title="風險解讀 / 操作觀察">
-          {report.risks.length ? (
-            <ul className="space-y-2 text-sm leading-6 text-secondary-text">
-              {report.risks.map((item) => <li key={item}>{item}</li>)}
+        {risks.length ? (
+          <Section title="風險解讀 / 操作觀察">
+            <ul className="space-y-2">
+              {risks.map((risk) => (
+                <li key={risk} className="text-sm leading-6 text-muted-text">{risk}</li>
+              ))}
             </ul>
-          ) : (
-            <p className="text-sm text-muted-text">本次報告未提供額外風險註記。</p>
-          )}
-        </ReaderSection>
+          </Section>
+        ) : null}
       </main>
 
-      <aside className="space-y-5 rounded-xl border border-border/80 bg-background/55 p-4">
-        <ReaderSection title="主要指數" className="border-t-0 pt-0">
-          <MarketRows rows={report.indices} emptyText="指數資料暫不可用" />
-        </ReaderSection>
-
-        <ReaderSection title="融資融券">
-          <MarketRows rows={report.margin} emptyText="融資融券資料暫不可用" />
-        </ReaderSection>
-
-        <ReaderSection title="代表標的">
-          <MarketRows rows={report.representatives} emptyText="0050 / 臺積電資料暫不可用" />
-        </ReaderSection>
-
-        <ReaderSection title="資料狀態">
-          <dl className="space-y-2 text-sm">
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-muted-text">來源</dt>
-              <dd className="font-semibold text-foreground">FinMind</dd>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-muted-text">日期</dt>
-              <dd className="font-mono text-foreground">{report.dataDate ?? '未提供'}</dd>
-            </div>
-          </dl>
-        </ReaderSection>
+      <aside className="min-w-0 space-y-5 rounded-xl border border-border/80 bg-background/55 p-4">
+        <Section title="主要指數" compact>
+          <RowList rows={report.indices} emptyText="主要指數資料暫不可用。" />
+        </Section>
+        <Section title="融資融券">
+          <RowList rows={report.margin} emptyText="融資融券資料暫不可用。" />
+        </Section>
+        <Section title="代表標的">
+          <RowList rows={report.representatives} emptyText="代表標的資料暫不可用。" />
+        </Section>
       </aside>
     </div>
   </article>
-);
+  );
+};

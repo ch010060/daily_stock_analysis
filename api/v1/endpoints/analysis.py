@@ -139,6 +139,36 @@ def _build_market_review_runtime(config: Config, source_message: Optional[Any] =
     return _runtime_build_market_review_runtime(config, source_message)
 
 
+def _extract_tw_daily_snapshot(context_snapshot: Any) -> Optional[Dict[str, Any]]:
+    payload = parse_json_field(context_snapshot)
+    if not isinstance(payload, dict):
+        return None
+    snapshots = payload.get("market_light_snapshots")
+    if not isinstance(snapshots, dict):
+        return None
+    tw_snapshot = snapshots.get("tw")
+    if not isinstance(tw_snapshot, dict):
+        return None
+    daily_snapshot = tw_snapshot.get("tw_daily_snapshot")
+    return daily_snapshot if isinstance(daily_snapshot, dict) else None
+
+
+def _load_market_review_snapshot(query_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not query_id:
+        return None
+    try:
+        from src.storage import DatabaseManager
+
+        db = DatabaseManager.get_instance()
+        records = db.get_analysis_history(query_id=query_id, limit=1)
+        if not records:
+            return None
+        return _extract_tw_daily_snapshot(getattr(records[0], "context_snapshot", None))
+    except Exception:
+        logger.debug("讀取台股日報結構化快照失敗: query_id=%s", query_id, exc_info=True)
+        return None
+
+
 def _run_market_review_background(
     send_notification: bool,
     override_region: Optional[str] = None,
@@ -168,7 +198,11 @@ def _run_market_review_background(
                 "result": None,
                 "message": "台股日報已跳過：沒有可持久化的盤勢回顧內容",
             }
-        return {"result": report}
+        result_payload: Dict[str, Any] = {"result": report}
+        snapshot = _load_market_review_snapshot(query_id)
+        if snapshot is not None:
+            result_payload["market_review_snapshot"] = snapshot
+        return result_payload
     finally:
         _release_market_review_lock(lock_token)
 
@@ -892,6 +926,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
     if task:
         result: Optional[AnalysisResultResponse] = None
         market_review_report = None
+        market_review_snapshot = None
         market_review_skip_reason = None
 
         if task.status == TaskStatusEnum.COMPLETED and isinstance(task.result, dict):
@@ -899,7 +934,10 @@ def get_analysis_status(task_id: str) -> TaskStatus:
                 report_text = task.result.get("result")
                 if isinstance(report_text, str) and report_text.strip():
                     market_review_report = report_text
-                elif task.result.get("status") == "skipped":
+                snapshot = task.result.get("market_review_snapshot")
+                if isinstance(snapshot, dict):
+                    market_review_snapshot = snapshot
+                if task.result.get("status") == "skipped" and not market_review_report:
                     skip_message = task.result.get("message")
                     if isinstance(skip_message, str) and skip_message.strip():
                         market_review_skip_reason = skip_message
@@ -921,6 +959,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
             stage_label=getattr(task, "stage_label", None),
             result=result,
             market_review_report=market_review_report,
+            market_review_snapshot=market_review_snapshot,
             market_review_skip_reason=market_review_skip_reason,
             error=task.error,
             stock_name=task.stock_name,
@@ -941,6 +980,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
             raw_result = parse_json_field(record.raw_result)
             if getattr(record, "report_type", None) == "market_review":
                 market_review_report = None
+                market_review_snapshot = _extract_tw_daily_snapshot(getattr(record, "context_snapshot", None))
                 if isinstance(raw_result, dict):
                     report_text = raw_result.get("raw_response") or raw_result.get("market_review_report")
                     if isinstance(report_text, str) and report_text.strip():
@@ -955,6 +995,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
                     progress=100,
                     result=None,
                     market_review_report=market_review_report,
+                    market_review_snapshot=market_review_snapshot,
                     error=None,
                     stock_name=record.name,
                 )

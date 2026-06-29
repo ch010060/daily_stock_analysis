@@ -479,6 +479,33 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             override_region="tw",
         )
 
+    def test_run_market_review_background_includes_snapshot_when_persisted(self) -> None:
+        if analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        runtime_notifier = MagicMock()
+        runtime_search = MagicMock()
+        runtime_analyzer = MagicMock()
+        snapshot = {"kind": "tw_daily_snapshot", "data_date": "2026-06-26"}
+        with patch.object(
+            analysis_endpoint_module,
+            "_build_market_review_runtime",
+            return_value=(runtime_notifier, runtime_analyzer, runtime_search),
+        ), patch.object(
+            analysis_endpoint_module,
+            "_load_market_review_snapshot",
+            return_value=snapshot,
+        ), patch("src.core.market_review.run_market_review", return_value="report"):
+            result = analysis_endpoint_module._run_market_review_background(
+                send_notification=False,
+                override_region="tw",
+                lock_token=None,
+                config=SimpleNamespace(),
+                query_id="market-task-1",
+            )
+
+        self.assertEqual(result, {"result": "report", "market_review_snapshot": snapshot})
+
     def test_get_analysis_status_returns_market_review_report_from_queue(self) -> None:
         if get_analysis_status is None or analysis_endpoint_module is None:
             self.skipTest("analysis endpoint helpers unavailable in this environment")
@@ -490,7 +517,10 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             stock_name="台股日報",
             status=analysis_endpoint_module.TaskStatusEnum.COMPLETED,
             progress=100,
-            result={"result": "市場覆盤報告示例文字"},
+            result={
+                "result": "市場覆盤報告示例文字",
+                "market_review_snapshot": {"kind": "tw_daily_snapshot", "data_date": "2026-06-26"},
+            },
             error=None,
             original_query=None,
             selection_source=None,
@@ -502,6 +532,10 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         self.assertEqual(status.status, "completed")
         self.assertEqual(status.market_review_report, "市場覆盤報告示例文字")
+        self.assertEqual(
+            status.market_review_snapshot,
+            {"kind": "tw_daily_snapshot", "data_date": "2026-06-26"},
+        )
         self.assertIsNone(status.result)
 
     def test_get_analysis_status_surfaces_market_review_skip_reason_from_queue(self) -> None:

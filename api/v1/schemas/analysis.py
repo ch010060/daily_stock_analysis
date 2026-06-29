@@ -273,6 +273,10 @@ class TaskStatus(BaseModel):
         None,
         description="大盤覆盤任務返回的報告文字（僅大盤覆盤任務）",
     )
+    market_review_snapshot: Optional[Any] = Field(
+        None,
+        description="台股日報結構化快照（僅大盤覆盤任務，來源為持久化 context_snapshot）",
+    )
     market_review_skip_reason: Optional[str] = Field(
         None,
         description="台股日報任務已完成但未產生可持久化報告時的跳過原因（僅大盤覆盤任務）",

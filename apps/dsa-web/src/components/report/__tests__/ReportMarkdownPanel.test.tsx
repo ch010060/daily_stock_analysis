@@ -176,6 +176,95 @@ describe('ReportMarkdownPanel', () => {
     expect(screen.queryByTestId('report-markdown-body')).not.toBeInTheDocument();
   });
 
+  it('prefers tw_daily_snapshot over market_review markdown when history detail exposes structured data', async () => {
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue([
+      '# 台股大盤回顧',
+      '',
+      '> 資料日期：2026-06-26',
+      '',
+      '## 指數表現',
+      '',
+      '- 加權報酬指數（TAIEX）：23,000.00 點 🟢 +120.00（+0.52%）',
+      '',
+      '## 法人與資金面',
+      '',
+      '- 外資：買 1,200.0 億，賣 1,000.0 億，淨 ▲ 200.0 億',
+      '',
+      '## 融資融券觀察',
+      '',
+      '- 融資餘額：今日 2,200.0 億，較昨日 ▼ 10.0 億',
+      '',
+      '## 0050 / 臺積電參考',
+      '',
+      '- 元大台灣50（0050）：收盤 180.20（2026-06-26）',
+    ].join('\n'));
+
+    render(
+      <ReportMarkdownPanel
+        recordId={22}
+        stockName="台股日報"
+        stockCode="MARKET"
+        initialDetail={{
+          meta: {
+            id: 22,
+            queryId: 'market-review-q-structured',
+            stockCode: 'MARKET',
+            stockName: '台股日報',
+            reportType: 'market_review',
+            createdAt: '2026-06-26T00:00:00Z',
+          },
+          summary: {
+            analysisSummary: '台股日報摘要',
+            operationAdvice: '檢視資料',
+            trendPrediction: '大盤回顧',
+            sentimentScore: 50,
+          },
+          details: {
+            contextSnapshot: {
+              marketLightSnapshots: {
+                tw: {
+                  twDailySnapshot: {
+                    kind: 'tw_daily_snapshot',
+                    source: 'finmind',
+                    dataDate: '2026-06-26',
+                    indices: [{
+                      symbol: 'TAIEX',
+                      name: '加權報酬指數',
+                      value: 23000,
+                      change: -120,
+                      changePct: -0.52,
+                      dataDate: '2026-06-26',
+                    }],
+                    institutionalFlows: [],
+                    marginShort: [],
+                    representatives: [{
+                      symbol: '006208',
+                      name: '富邦台50',
+                      close: 112.4,
+                      previousClose: 112.8,
+                      change: -0.4,
+                      changePct: -0.35,
+                      volume: 3400000,
+                      turnover: 382160000,
+                      dataDate: '2026-06-26',
+                      missingFields: ['PER', 'PBR', 'dividend_yield'],
+                    }],
+                    dataStatus: { missingFields: [], staleFields: [], partialFailures: [] },
+                  },
+                },
+              },
+            },
+          },
+        }}
+        onRequestClose={() => {}}
+      />
+    );
+
+    expect(await screen.findByTestId('tw-daily-reader')).toBeInTheDocument();
+    expect(screen.getByText('006208')).toBeInTheDocument();
+    expect(screen.queryByTestId('report-markdown-body')).not.toBeInTheDocument();
+  });
+
   it('falls back to the safe markdown body for incomplete market_review markdown', async () => {
     vi.mocked(historyApi.getMarkdown).mockResolvedValue('# 台股大盤回顧\n\n只有舊版文字');
 

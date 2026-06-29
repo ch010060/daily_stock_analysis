@@ -152,6 +152,35 @@ const parseableMarketReviewMarkdown = [
   '- 市場有風險，投資需謹慎。',
 ].join('\n');
 
+const structuredMarketReviewSnapshot = {
+  kind: 'tw_daily_snapshot',
+  source: 'finmind',
+  dataDate: '2026-06-26',
+  indices: [{
+    symbol: 'TAIEX',
+    name: '加權報酬指數',
+    value: 23000,
+    change: -120,
+    changePct: -0.52,
+    dataDate: '2026-06-26',
+  }],
+  institutionalFlows: [],
+  marginShort: [],
+  representatives: [{
+    symbol: '006208',
+    name: '富邦台50',
+    close: 112.4,
+    previousClose: 112.8,
+    change: -0.4,
+    changePct: -0.35,
+    volume: 3400000,
+    turnover: 382160000,
+    dataDate: '2026-06-26',
+    missingFields: ['PER', 'PBR', 'dividend_yield'],
+  }],
+  dataStatus: { missingFields: [], staleFields: [], partialFailures: [] },
+};
+
 describe('HomePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -569,6 +598,7 @@ describe('HomePage', () => {
       taskId: 'task-1',
       status: 'completed',
       marketReviewReport: parseableMarketReviewMarkdown,
+      marketReviewSnapshot: structuredMarketReviewSnapshot,
     });
 
     render(
@@ -584,6 +614,7 @@ describe('HomePage', () => {
     });
     expect(await screen.findByText('台股日報已完成')).toBeInTheDocument();
     expect(await screen.findByTestId('tw-daily-reader')).toBeInTheDocument();
+    expect(screen.getByText('006208')).toBeInTheDocument();
     expect(screen.getByText('主要指數')).toBeInTheDocument();
     expect(screen.getByText('FinMind 台股最後交易日快照')).toBeInTheDocument();
     expect(analysisApi.getStatus).toHaveBeenCalledWith('task-1');

@@ -10,7 +10,11 @@ import { getReportText, normalizeReportLanguage } from '../../utils/reportLangua
 import { Tooltip } from '../common/Tooltip';
 import { MermaidDiagram } from './MermaidDiagram';
 import { TwDailyReportView } from './TwDailyReportView';
-import { parseTwDailyReportMarkdown } from './twDailyReportAdapter';
+import {
+  buildTwDailyReportFromSnapshot,
+  extractTwDailySnapshotFromReport,
+  parseTwDailyReportMarkdown,
+} from './twDailyReportAdapter';
 import { ReportVisualSummary } from './visual/ReportVisualSummary';
 
 type CodeProps = React.ComponentProps<'code'> & ExtraProps;
@@ -262,7 +266,9 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
   const sanitizedContent = sanitizeReportMarkdown(content);
   const sections = splitMarkdownSections(sanitizedContent);
   const isMarketReviewReport = detail?.meta?.reportType === 'market_review' || stockCode === 'MARKET';
-  const twDailyReport = isMarketReviewReport ? parseTwDailyReportMarkdown(sanitizedContent) : null;
+  const twDailyReport = isMarketReviewReport
+    ? buildTwDailyReportFromSnapshot(extractTwDailySnapshotFromReport(detail)) ?? parseTwDailyReportMarkdown(sanitizedContent)
+    : null;
   const isPrintVariant = variant === 'print';
 
   const handleCopyMarkdown = useCallback(async () => {
