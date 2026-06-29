@@ -589,6 +589,58 @@ describe('HomePage', () => {
     expect(analysisApi.getStatus).toHaveBeenCalledWith('task-1');
   });
 
+  it('does not render duplicate Taiwan daily readers when completion arrives while MARKET history is selected', async () => {
+    vi.mocked(historyApi.getStockBarList).mockResolvedValue({
+      total: 0,
+      items: [],
+    });
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({
+          total: 1,
+          page: 1,
+          limit: 10,
+          items: [marketReviewHistoryItem],
+        });
+      }
+      return Promise.resolve({
+        total: 0,
+        page: 1,
+        limit: 20,
+        items: [],
+      });
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(marketReviewHistoryReport);
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue(parseableMarketReviewMarkdown);
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      sendNotification: true,
+      message: '台股日報任務已提交',
+      taskId: 'task-1',
+    });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: 'task-1',
+      status: 'completed',
+      marketReviewReport: parseableMarketReviewMarkdown,
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /MARKET/ }));
+    await screen.findByTestId('tw-daily-reader');
+
+    fireEvent.click(screen.getByRole('button', { name: '台股日報' }));
+
+    expect(await screen.findByText('台股日報已完成')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getAllByTestId('tw-daily-reader')).toHaveLength(1);
+    });
+  });
+
   it('shows an accurate skip notice instead of a false success message when market review is skipped', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 0,

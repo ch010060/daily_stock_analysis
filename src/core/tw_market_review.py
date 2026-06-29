@@ -25,6 +25,21 @@ _MARGIN_NAME_MAP: List[tuple] = [
 ]
 
 
+def _latest_rows_on_or_before(rows: List[Dict[str, Any]], data_date: Optional[str]) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    if not rows:
+        return {}, {}
+    if data_date:
+        usable = [row for row in rows if str(row.get("date") or "") <= data_date]
+    else:
+        usable = list(rows)
+    if not usable:
+        return {}, {}
+    usable.sort(key=lambda row: str(row.get("date") or ""))
+    last = usable[-1]
+    prev = usable[-2] if len(usable) >= 2 else {}
+    return last, prev
+
+
 def build_tw_market_review_context(snapshot: Dict[str, Any]) -> Dict[str, Any]:
     """Extract structured context dict from TaiwanMarketDataFetcher snapshot."""
     taiex = snapshot.get("taiex") or {}
@@ -32,6 +47,7 @@ def build_tw_market_review_context(snapshot: Dict[str, Any]) -> Dict[str, Any]:
     institutional = snapshot.get("institutional_total") or {}
     margin = snapshot.get("margin_total") or {}
     ref_0050 = snapshot.get("ref_0050") or {}
+    ref_006208 = snapshot.get("ref_006208") or {}
     ref_2330 = snapshot.get("ref_2330") or {}
     availability = snapshot.get("availability") or {}
 
@@ -40,12 +56,15 @@ def build_tw_market_review_context(snapshot: Dict[str, Any]) -> Dict[str, Any]:
     institutional_rows = institutional.get("rows") or []
     margin_rows = margin.get("rows") or []
     rows_0050 = ref_0050.get("rows") or []
+    rows_006208 = ref_006208.get("rows") or []
     rows_2330 = ref_2330.get("rows") or []
+    as_of = availability.get("as_of")
 
-    taiex_last = taiex_rows[-1] if taiex_rows else {}
-    taiex_prev = taiex_rows[-2] if len(taiex_rows) >= 2 else {}
-    tpex_last = tpex_rows[-1] if tpex_rows else {}
-    tpex_prev = tpex_rows[-2] if len(tpex_rows) >= 2 else {}
+    taiex_last, taiex_prev = _latest_rows_on_or_before(taiex_rows, as_of)
+    tpex_last, tpex_prev = _latest_rows_on_or_before(tpex_rows, as_of)
+    last_0050, _ = _latest_rows_on_or_before(rows_0050, as_of)
+    last_006208, _ = _latest_rows_on_or_before(rows_006208, as_of)
+    last_2330, _ = _latest_rows_on_or_before(rows_2330, as_of)
 
     institutional_latest: Dict[str, Any] = {}
     if institutional_rows:
@@ -75,12 +94,14 @@ def build_tw_market_review_context(snapshot: Dict[str, Any]) -> Dict[str, Any]:
         "margin_ok": bool(margin.get("ok")),
         "margin_latest": margin_latest,
         "ref_0050_ok": bool(ref_0050.get("ok")),
-        "last_0050": rows_0050[-1] if rows_0050 else {},
+        "last_0050": last_0050,
+        "ref_006208_ok": bool(ref_006208.get("ok")),
+        "last_006208": last_006208,
         "ref_2330_ok": bool(ref_2330.get("ok")),
-        "last_2330": rows_2330[-1] if rows_2330 else {},
+        "last_2330": last_2330,
         "availability": availability,
         "required_ok": bool(availability.get("required_ok")),
-        "as_of": availability.get("as_of", ""),
+        "as_of": as_of or "",
     }
 
 

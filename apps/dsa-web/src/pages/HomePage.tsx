@@ -238,6 +238,7 @@ const HomePage: React.FC = () => {
     () => (selectedMarketReviewMarkdown ? parseTwDailyReportMarkdown(selectedMarketReviewMarkdown) : null),
     [selectedMarketReviewMarkdown],
   );
+  const shouldSuppressSelectedMarketReviewDetail = isMarketReviewHistoryReport && Boolean(marketReviewReport);
 
   useEffect(() => {
     if (!isMarketReviewHistoryReport || selectedReport?.meta.id === undefined) {
@@ -973,6 +974,7 @@ const HomePage: React.FC = () => {
                 <DashboardStateBlock title="載入報告中..." loading />
               </div>
             ) : selectedReport ? (
+              shouldSuppressSelectedMarketReviewDetail ? null : (
               <div className={isHistoryTrendOpen ? 'max-w-6xl space-y-4 pb-8' : 'max-w-4xl space-y-4 pb-8'}>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   {!isMarketReviewHistoryReport ? (
@@ -1110,6 +1112,7 @@ const HomePage: React.FC = () => {
                   />
                 )}
               </div>
+              )
             ) : (
               <div className="flex h-full items-center justify-center">
                 <EmptyState

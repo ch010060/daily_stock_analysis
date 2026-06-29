@@ -111,6 +111,7 @@ def _run_tw_market_review_section():
             "required_ok": availability.get("required_ok", False),
             "as_of": availability.get("as_of"),
             "sources": availability.get("sources", []),
+            "tw_daily_snapshot": snapshot.get("tw_daily_snapshot"),
         }
         return report, mls
     except Exception as exc:
