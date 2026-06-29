@@ -13,6 +13,8 @@ import { StockAutocomplete } from '../components/StockAutocomplete';
 import { StockHistoryTrendDrawer, StockBar } from '../components/history';
 import { ReportMarkdownDrawer } from '../components/report/ReportMarkdownDrawer';
 import { ReportSummary } from '../components/report/ReportSummary';
+import { TwDailyReportView } from '../components/report/TwDailyReportView';
+import { parseTwDailyReportMarkdown } from '../components/report/twDailyReportAdapter';
 import { TaskPanel } from '../components/tasks';
 import { useDashboardLifecycle, useHomeDashboardState } from '../hooks';
 import { useWatchlist } from '../hooks/useWatchlist';
@@ -37,6 +39,9 @@ const HomePage: React.FC = () => {
   const [marketReviewError, setMarketReviewError] = useState<ParsedApiError | null>(null);
   const [marketReviewReport, setMarketReviewReport] = useState<string | null>(null);
   const [marketReviewReportCopied, setMarketReviewReportCopied] = useState(false);
+  const [selectedMarketReviewMarkdown, setSelectedMarketReviewMarkdown] = useState<string | null>(null);
+  const [isLoadingSelectedMarketReviewMarkdown, setIsLoadingSelectedMarketReviewMarkdown] = useState(false);
+  const [selectedMarketReviewMarkdownError, setSelectedMarketReviewMarkdownError] = useState<string | null>(null);
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
   const [strategyMenuOpen, setStrategyMenuOpen] = useState(false);
@@ -224,7 +229,49 @@ const HomePage: React.FC = () => {
           assetType: selectedReport.meta.instrumentType ?? undefined,
         })
       : null;
-  const isHistoryTrendUnavailable = !selectedReport || !selectedReport.meta.stockCode;
+  const isHistoryTrendUnavailable = !selectedReport || isMarketReviewHistoryReport || !selectedReport.meta.stockCode;
+  const liveTwDailyReport = useMemo(
+    () => (marketReviewReport ? parseTwDailyReportMarkdown(marketReviewReport) : null),
+    [marketReviewReport],
+  );
+  const selectedTwDailyReport = useMemo(
+    () => (selectedMarketReviewMarkdown ? parseTwDailyReportMarkdown(selectedMarketReviewMarkdown) : null),
+    [selectedMarketReviewMarkdown],
+  );
+
+  useEffect(() => {
+    if (!isMarketReviewHistoryReport || selectedReport?.meta.id === undefined) {
+      setSelectedMarketReviewMarkdown(null);
+      setSelectedMarketReviewMarkdownError(null);
+      setIsLoadingSelectedMarketReviewMarkdown(false);
+      return undefined;
+    }
+
+    let isMounted = true;
+    setSelectedMarketReviewMarkdown(null);
+    setSelectedMarketReviewMarkdownError(null);
+    setIsLoadingSelectedMarketReviewMarkdown(true);
+    historyApi.getMarkdown(selectedReport.meta.id)
+      .then((content) => {
+        if (isMounted) {
+          setSelectedMarketReviewMarkdown(content);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setSelectedMarketReviewMarkdownError('台股日報內容載入失敗，以下顯示摘要備援。');
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingSelectedMarketReviewMarkdown(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isMarketReviewHistoryReport, selectedReport?.meta.id]);
 
   useEffect(() => {
     if (!isHistoryTrendUnavailable || !isHistoryTrendOpen) {
@@ -891,7 +938,7 @@ const HomePage: React.FC = () => {
             {marketReviewReport ? (
               <div className="mb-3 rounded-xl border border-subtle bg-surface/70 px-3 py-3 text-xs text-secondary-text shadow-sm">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="font-semibold text-foreground">盤勢回顧報告</p>
+                  <p className="font-semibold text-foreground">台股日報</p>
                   <button
                     type="button"
                     className="home-surface-button h-7 rounded-md px-3 py-1 text-xs text-foreground"
@@ -901,12 +948,16 @@ const HomePage: React.FC = () => {
                     {marketReviewReportCopied ? '已複製' : '複製'}
                   </button>
                 </div>
-                <pre
-                  data-testid="market-review-report"
-                  className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-background px-3 py-2 leading-relaxed"
-                >
-                  {marketReviewReport}
-                </pre>
+                {liveTwDailyReport ? (
+                  <TwDailyReportView report={liveTwDailyReport} className="text-sm" />
+                ) : (
+                  <pre
+                    data-testid="market-review-report"
+                    className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-background px-3 py-2 leading-relaxed"
+                  >
+                    {marketReviewReport}
+                  </pre>
+                )}
               </div>
             ) : null}
 
@@ -962,22 +1013,24 @@ const HomePage: React.FC = () => {
                       重新回顧
                     </Button>
                   )}
-                  <Button
-                    variant="home-action-ai"
-                    size="sm"
-                    disabled={selectedReport.meta.id === undefined || isHistoryTrendUnavailable}
-                    className={isHistoryTrendOpen ? 'border-primary/70 bg-primary/15 text-primary shadow-glow-cyan' : undefined}
-                    onClick={() => {
-                      if (isHistoryTrendOpen) {
-                        closeHistoryTrend();
-                        return;
-                      }
-                      void openHistoryTrend();
-                    }}
-                  >
-                    <BarChart3 className="h-4 w-4" />
-                    歷史趨勢
-                  </Button>
+                  {!isMarketReviewHistoryReport ? (
+                    <Button
+                      variant="home-action-ai"
+                      size="sm"
+                      disabled={selectedReport.meta.id === undefined || isHistoryTrendUnavailable}
+                      className={isHistoryTrendOpen ? 'border-primary/70 bg-primary/15 text-primary shadow-glow-cyan' : undefined}
+                      onClick={() => {
+                        if (isHistoryTrendOpen) {
+                          closeHistoryTrend();
+                          return;
+                        }
+                        void openHistoryTrend();
+                      }}
+                    >
+                      <BarChart3 className="h-4 w-4" />
+                      歷史趨勢
+                    </Button>
+                  ) : null}
                   <Button
                     variant="home-action-ai"
                     size="sm"
@@ -1022,6 +1075,28 @@ const HomePage: React.FC = () => {
                     onSelectRecord={(recordId) => void selectHistoryItem(recordId)}
                     onRetry={() => void openHistoryTrend()}
                   />
+                ) : isMarketReviewHistoryReport ? (
+                  <div className="space-y-3">
+                    {selectedMarketReviewMarkdownError ? (
+                      <InlineAlert
+                        variant="warning"
+                        title="台股日報載入不完整"
+                        message={selectedMarketReviewMarkdownError}
+                      />
+                    ) : null}
+                    {isLoadingSelectedMarketReviewMarkdown ? (
+                      <DashboardStateBlock title="載入台股日報中..." loading />
+                    ) : selectedTwDailyReport ? (
+                      <TwDailyReportView report={selectedTwDailyReport} />
+                    ) : (
+                      <pre
+                        data-testid="market-review-report"
+                        className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-background px-3 py-2 leading-relaxed"
+                      >
+                        {selectedMarketReviewMarkdown || selectedReport.summary.analysisSummary}
+                      </pre>
+                    )}
+                  </div>
                 ) : (
                   <ReportSummary
                     data={selectedReport}

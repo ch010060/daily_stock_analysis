@@ -9,6 +9,8 @@ import { markdownToPlainText } from '../../utils/markdown';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Tooltip } from '../common/Tooltip';
 import { MermaidDiagram } from './MermaidDiagram';
+import { TwDailyReportView } from './TwDailyReportView';
+import { parseTwDailyReportMarkdown } from './twDailyReportAdapter';
 import { ReportVisualSummary } from './visual/ReportVisualSummary';
 
 type CodeProps = React.ComponentProps<'code'> & ExtraProps;
@@ -259,6 +261,8 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
   const [pdfError, setPdfError] = useState<string | null>(null);
   const sanitizedContent = sanitizeReportMarkdown(content);
   const sections = splitMarkdownSections(sanitizedContent);
+  const isMarketReviewReport = detail?.meta?.reportType === 'market_review' || stockCode === 'MARKET';
+  const twDailyReport = isMarketReviewReport ? parseTwDailyReportMarkdown(sanitizedContent) : null;
   const isPrintVariant = variant === 'print';
 
   const handleCopyMarkdown = useCallback(async () => {
@@ -467,23 +471,27 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
         </div>
       ) : (
         <>
-        {detail && <ReportVisualSummary report={detail} historyId={recordId} />}
-        <div
-          data-testid="report-markdown-body"
-          className="report-light-surface report-markdown-body report-body-paper break-words"
-        >
-          {sections.map((section, index) => (
-            <section
-              key={`${index}-${section.slice(0, 24)}`}
-              data-testid="report-body-section"
-              className="report-body-section"
-            >
-              <Markdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
-                {section}
-              </Markdown>
-            </section>
-          ))}
-        </div>
+        {detail && !isMarketReviewReport && <ReportVisualSummary report={detail} historyId={recordId} />}
+        {twDailyReport ? (
+          <TwDailyReportView report={twDailyReport} />
+        ) : (
+          <div
+            data-testid="report-markdown-body"
+            className="report-light-surface report-markdown-body report-body-paper break-words"
+          >
+            {sections.map((section, index) => (
+              <section
+                key={`${index}-${section.slice(0, 24)}`}
+                data-testid="report-body-section"
+                className="report-body-section"
+              >
+                <Markdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+                  {section}
+                </Markdown>
+              </section>
+            ))}
+          </div>
+        )}
         </>
       )}
 

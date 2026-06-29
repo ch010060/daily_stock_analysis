@@ -121,6 +121,37 @@ const marketReviewHistoryReport = {
   },
 };
 
+const parseableMarketReviewMarkdown = [
+  '# 台股大盤回顧',
+  '',
+  '> 資料日期：2026-06-26',
+  '',
+  '## 今日盤勢摘要',
+  '',
+  '今日所有必要指標資料完整，可進行完整分析。',
+  '',
+  '## 指數表現',
+  '',
+  '- 加權報酬指數（TAIEX）：23,000.00 點 🟢 +120.00（+0.52%）',
+  '- 櫃買報酬指數（TPEx）：260.00 點 🔴 -1.50（-0.57%）',
+  '',
+  '## 法人與資金面',
+  '',
+  '- 外資：買 1,200.0 億，賣 1,000.0 億，淨 ▲ 200.0 億',
+  '',
+  '## 融資融券觀察',
+  '',
+  '- 融資餘額：今日 2,200.0 億，較昨日 ▼ 10.0 億',
+  '',
+  '## 0050 / 臺積電參考',
+  '',
+  '- 元大台灣50（0050）：收盤 180.20（2026-06-26）',
+  '',
+  '## 風險與注意事項',
+  '',
+  '- 市場有風險，投資需謹慎。',
+].join('\n');
+
 describe('HomePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -379,6 +410,48 @@ describe('HomePage', () => {
     expect(await screen.findByText('大盤覆盤摘要')).toBeInTheDocument();
   });
 
+  it('renders selected market review history without stock-only detail sections', async () => {
+    vi.mocked(historyApi.getStockBarList).mockResolvedValue({
+      total: 0,
+      items: [],
+    });
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({
+          total: 1,
+          page: 1,
+          limit: 10,
+          items: [marketReviewHistoryItem],
+        });
+      }
+      return Promise.resolve({
+        total: 0,
+        page: 1,
+        limit: 20,
+        items: [],
+      });
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(marketReviewHistoryReport);
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue(parseableMarketReviewMarkdown);
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /MARKET/ }));
+
+    expect(await screen.findByTestId('tw-daily-reader')).toBeInTheDocument();
+    expect(screen.getByText('主要指數')).toBeInTheDocument();
+    expect(screen.queryByText('操作建議')).not.toBeInTheDocument();
+    expect(screen.queryByText('趨勢預測')).not.toBeInTheDocument();
+    expect(screen.queryByText('狙擊點位')).not.toBeInTheDocument();
+    expect(screen.queryByText('相關資訊')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('market-risk-gauge')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '歷史趨勢' })).not.toBeInTheDocument();
+  });
+
   it('removes the MARKET stock bar item after deleting market review history', async () => {
     let isMarketReviewDeleted = false;
     vi.mocked(historyApi.getStockBarList).mockResolvedValue({
@@ -495,7 +568,7 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
       taskId: 'task-1',
       status: 'completed',
-      marketReviewReport: '市場覆盤報告示例文字',
+      marketReviewReport: parseableMarketReviewMarkdown,
     });
 
     render(
@@ -510,7 +583,9 @@ describe('HomePage', () => {
       expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
     });
     expect(await screen.findByText('台股日報已完成')).toBeInTheDocument();
-    expect(await screen.findByText('市場覆盤報告示例文字')).toBeInTheDocument();
+    expect(await screen.findByTestId('tw-daily-reader')).toBeInTheDocument();
+    expect(screen.getByText('主要指數')).toBeInTheDocument();
+    expect(screen.getByText('FinMind 台股最後交易日快照')).toBeInTheDocument();
     expect(analysisApi.getStatus).toHaveBeenCalledWith('task-1');
   });
 
@@ -777,6 +852,8 @@ describe('HomePage', () => {
     );
 
     const historyTrendButton = await screen.findByRole('button', { name: '歷史趨勢' });
+    expect(screen.getByText('操作建議')).toBeInTheDocument();
+    expect(screen.getByText('趨勢預測')).toBeInTheDocument();
     fireEvent.click(historyTrendButton);
 
     const range30Button = await screen.findByRole('button', { name: '近30天' });
@@ -960,7 +1037,7 @@ describe('HomePage', () => {
     expect(trigger).toHaveFocus();
   });
 
-  it('disables stock reanalysis and follow-up for market review history reports', async () => {
+  it('hides stock-only actions for market review history reports', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 1,
       page: 1,
@@ -968,6 +1045,7 @@ describe('HomePage', () => {
       items: [marketReviewHistoryItem],
     });
     vi.mocked(historyApi.getDetail).mockResolvedValue(marketReviewHistoryReport);
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue(parseableMarketReviewMarkdown);
 
     render(
       <MemoryRouter>
@@ -975,10 +1053,10 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText('大盤覆盤摘要');
+    await screen.findByTestId('tw-daily-reader');
     expect(screen.queryByRole('button', { name: '重新分析' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '追問 AI' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '歷史趨勢' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '歷史趨勢' })).not.toBeInTheDocument();
 
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalled();
