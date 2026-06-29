@@ -185,6 +185,30 @@ describe('HomePage', () => {
     expect(historyApi.getMarkdown).not.toHaveBeenCalled();
   });
 
+  it('renders a FiNews US daily button beside market overview and navigates locally', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const marketOverviewButton = await screen.findByRole('button', { name: '市場概覽' });
+    const finewsButton = screen.getByRole('button', { name: '美股日報' });
+
+    expect(finewsButton.parentElement).toBe(marketOverviewButton.parentElement);
+
+    fireEvent.click(finewsButton);
+
+    expect(navigateMock).toHaveBeenCalledWith('/finews');
+  });
+
   it('shows a Google Finance link in the main report toolbar when exchange metadata is resolvable', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 1,

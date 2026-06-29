@@ -26,6 +26,7 @@ from api.v1.endpoints import usage
 from api.v1.endpoints import portfolio
 from api.v1.endpoints import health
 from api.v1.endpoints import diagnostics
+from api.v1.endpoints import finews
 
 
 def _env_bool(name: str, *, default: bool = False) -> bool:
@@ -105,6 +106,12 @@ router.include_router(
     diagnostics.router,
     prefix="/diagnostics",
     tags=["Diagnostics"]
+)
+
+router.include_router(
+    finews.router,
+    prefix="/finews",
+    tags=["FiNews"]
 )
 
 if _alphasift_route_enabled():

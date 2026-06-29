@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, Check, SlidersHorizontal, X } from 'lucide-react';
+import { BarChart3, Check, Newspaper, SlidersHorizontal, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
@@ -756,6 +756,16 @@ const HomePage: React.FC = () => {
               >
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 市場概覽
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={() => navigate('/finews')}
+                className="h-10 flex-1 whitespace-nowrap md:flex-none"
+              >
+                <Newspaper className="h-4 w-4" aria-hidden="true" />
+                美股日報
               </Button>
               <button
                 type="button"
