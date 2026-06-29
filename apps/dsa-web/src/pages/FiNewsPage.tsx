@@ -32,6 +32,7 @@ type FinewsMarketRow = {
   symbol?: string;
   value?: string;
   change?: string;
+  url?: string;
 };
 
 const hasSnapshotContent = (snapshot: FinewsSnapshot | null): boolean => {
@@ -81,26 +82,48 @@ const buildNewsStories = (items: string[], externalLinks: FinewsExternalLink[]):
   return stories;
 };
 
-const buildMarketRows = (items: string[]): FinewsMarketRow[] => (
-  chunkItems(items, 4).map((chunk) => ({
+const linkMatchesItem = (link: FinewsExternalLink, item: string): boolean => {
+  const title = link.title.trim().toLowerCase();
+  const normalizedItem = item.trim().toLowerCase();
+  if (!title || !normalizedItem) return false;
+  if (title === normalizedItem || title.includes(normalizedItem) || normalizedItem.includes(title)) return true;
+  try {
+    const parsed = new URL(link.url);
+    const haystack = `${parsed.pathname} ${parsed.search} ${parsed.hash}`.toLowerCase();
+    const escaped = normalizedItem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^a-z0-9^.-])${escaped}([^a-z0-9.-]|$)`).test(haystack);
+  } catch {
+    return false;
+  }
+};
+
+const fallbackSectionLinks = (
+  items: string[],
+  externalLinks: FinewsExternalLink[],
+): FinewsExternalLink[] => (
+  externalLinks.filter((link) => items.some((item) => linkMatchesItem(link, item)))
+);
+
+const buildMarketRows = (items: string[], externalLinks: FinewsExternalLink[]): FinewsMarketRow[] => {
+  const linkByTitle = new Map(externalLinks.map((link) => [link.title, link.url]));
+  return chunkItems(items, 4).map((chunk) => ({
     label: chunk[0] || '',
     symbol: chunk[1],
     value: chunk[2],
     change: chunk[3],
-  })).filter((row) => row.label)
-);
+    url: chunk[1] ? linkByTitle.get(chunk[1]) : undefined,
+  })).filter((row) => row.label);
+};
 
 const sectionItems = (snapshot: FinewsSnapshot | null, key: FinewsSectionKey): string[] => (
   snapshot?.sections?.[key] || []
 );
 
-const formatLinkHost = (url: string): string => {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return 'external';
-  }
-};
+const sectionLinks = (snapshot: FinewsSnapshot | null, key: FinewsSectionKey): FinewsExternalLink[] => (
+  snapshot?.sectionLinks?.[key]?.length
+    ? snapshot.sectionLinks[key]
+    : fallbackSectionLinks(sectionItems(snapshot, key), snapshot?.externalLinks || [])
+);
 
 const FinewsMasthead: React.FC<{
   snapshot: FinewsSnapshot | null;
@@ -172,12 +195,7 @@ const FinewsSummarySection: React.FC<{ items: string[] }> = ({ items }) => (
 
 const FinewsNewsSection: React.FC<{
   stories: FinewsNewsStory[];
-  externalLinks: FinewsExternalLink[];
-}> = ({ stories, externalLinks }) => {
-  const storyUrls = new Set(stories.map((story) => story.url).filter(Boolean));
-  const remainingLinks = externalLinks.filter((link) => !storyUrls.has(link.url));
-
-  return (
+}> = ({ stories }) => (
     <section data-testid="finews-news-section" className="pt-4">
       <h2 className="font-serif text-2xl font-black tracking-[-0.03em] text-[#211811]">主要新聞</h2>
       <div className="mt-3 columns-1 gap-5 md:columns-2">
@@ -205,34 +223,15 @@ const FinewsNewsSection: React.FC<{
         ))}
       </div>
 
-      {remainingLinks.length > 0 ? (
-        <div className="mt-4 break-inside-avoid border-t-2 border-[#211811] pt-3">
-          <h3 className="text-xs font-bold tracking-[0.16em] text-[#7b6249]">外部來源連結</h3>
-          <div className="mt-2 columns-1 gap-4 md:columns-2">
-            {remainingLinks.map((link, index) => (
-              <a
-                key={`${link.url}-${index}`}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mb-1.5 block break-inside-avoid text-xs leading-5 text-[#7a3518] hover:underline"
-              >
-                {link.title}
-                <span className="ml-1 text-[#7b6249]">({formatLinkHost(link.url)})</span>
-              </a>
-            ))}
-          </div>
-        </div>
-      ) : null}
     </section>
-  );
-};
+);
 
 const FinewsMetricSidebar: React.FC<{
   title: string;
   items: string[];
-}> = ({ title, items }) => {
-  const rows = buildMarketRows(items);
+  links: FinewsExternalLink[];
+}> = ({ title, items, links }) => {
+  const rows = buildMarketRows(items, links);
 
   if (rows.length === 0) return null;
 
@@ -245,10 +244,31 @@ const FinewsMetricSidebar: React.FC<{
             <div key={`${title}-${row.label}-${index}`} className="border-t border-[#211811]/25 py-2">
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-xs font-bold text-[#554533]">{row.label}</span>
-                <span className="font-mono text-lg font-black text-[#9d4b24]">{row.symbol || row.value}</span>
+                {row.url ? (
+                  <a
+                    href={row.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-lg font-black text-[#9d4b24] hover:underline"
+                  >
+                    {row.symbol || row.value}
+                  </a>
+                ) : (
+                  <span className="font-mono text-lg font-black text-[#9d4b24]">{row.symbol || row.value}</span>
+                )}
               </div>
               {row.value && row.symbol ? <p className="mt-0.5 text-xs font-semibold text-[#211811]">{row.value}</p> : null}
-              {row.change ? <p className="mt-1 text-xs leading-5 text-[#554533]">{row.change}</p> : null}
+              {row.change ? (
+                <details className="mt-1 text-xs leading-5 text-[#554533]">
+                  <summary
+                    aria-label="查看市場溫度說明"
+                    className="inline-flex h-5 w-5 cursor-pointer list-none items-center justify-center rounded-full border border-[#211811]/35 text-[11px] font-black italic text-[#7a3518] hover:bg-[#211811]/5"
+                  >
+                    <span aria-hidden="true">i</span>
+                  </summary>
+                  <p className="mt-1 border-l border-[#211811]/25 pl-2">{row.change}</p>
+                </details>
+              ) : null}
             </div>
           ))}
         </div>
@@ -264,7 +284,20 @@ const FinewsMetricSidebar: React.FC<{
           <div key={`${title}-${row.label}-${index}`} className="grid grid-cols-[minmax(0,1.15fr)_0.85fr] gap-2 py-1.5">
             <div className="min-w-0">
               <p className="truncate font-bold text-[#211811]">{row.label}</p>
-              {row.symbol ? <p className="truncate font-mono text-[11px] text-[#7b6249]">{row.symbol}</p> : null}
+              {row.symbol ? (
+                row.url ? (
+                  <a
+                    href={row.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate font-mono text-[11px] text-[#7a3518] hover:underline"
+                  >
+                    {row.symbol}
+                  </a>
+                ) : (
+                  <p className="truncate font-mono text-[11px] text-[#7b6249]">{row.symbol}</p>
+                )
+              ) : null}
             </div>
             <div className="text-right">
               {row.value ? <p className="font-mono font-black text-[#211811]">{row.value}</p> : null}
@@ -316,14 +349,14 @@ const FiNewsPage: React.FC = () => {
     return MARKET_SECTION_CONFIG.map((section) => ({
       ...section,
       items: sectionItems(snapshot, section.key),
+      links: sectionLinks(snapshot, section.key),
     })).filter((section) => section.items.length > 0);
   }, [snapshot]);
 
-  const externalLinks = useMemo(() => snapshot?.externalLinks || [], [snapshot?.externalLinks]);
   const majorNewsItems = useMemo(() => sectionItems(snapshot, 'majorNews'), [snapshot]);
   const newsStories = useMemo(
-    () => buildNewsStories(majorNewsItems, externalLinks),
-    [externalLinks, majorNewsItems],
+    () => buildNewsStories(majorNewsItems, sectionLinks(snapshot, 'majorNews')),
+    [majorNewsItems, snapshot],
   );
 
   return (
@@ -382,8 +415,8 @@ const FiNewsPage: React.FC = () => {
                 {sectionItems(snapshot, 'afterMarketSummary').length > 0 ? (
                   <FinewsSummarySection items={sectionItems(snapshot, 'afterMarketSummary')} />
                 ) : null}
-                {newsStories.length > 0 || externalLinks.length > 0 ? (
-                  <FinewsNewsSection stories={newsStories} externalLinks={externalLinks} />
+                {newsStories.length > 0 ? (
+                  <FinewsNewsSection stories={newsStories} />
                 ) : null}
               </div>
 
@@ -396,7 +429,7 @@ const FiNewsPage: React.FC = () => {
                   <p className="text-xs font-bold tracking-[0.16em] text-[#554533]">MARKET TAPE</p>
                 </div>
                 {marketSections.map((section) => (
-                  <FinewsMetricSidebar key={section.key} title={section.title} items={section.items} />
+                  <FinewsMetricSidebar key={section.key} title={section.title} items={section.items} links={section.links} />
                 ))}
               </aside>
             </div>

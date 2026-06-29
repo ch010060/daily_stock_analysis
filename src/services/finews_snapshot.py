@@ -20,6 +20,10 @@ from typing import Any, Callable, Optional
 from urllib.parse import urlparse
 
 import requests
+try:
+    from opencc import OpenCC
+except Exception:  # pragma: no cover - dependency is declared, fallback is for degraded runtimes
+    OpenCC = None  # type: ignore[assignment]
 
 from src.core.zh_tw_localization import localize_route_b_zh_tw_text
 
@@ -28,6 +32,9 @@ logger = logging.getLogger(__name__)
 FINEWS_SOURCE_URL = "https://finews.elsetech.app/"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CACHE_PATH = REPO_ROOT / "data" / "cache" / "finews_latest_snapshot.json"
+PARSER_VERSION = "finews-v2"
+CONVERSION_ENGINE = "opencc-s2twp"
+CONVERSION_VERSION = "2026-06-29-phase21-2r"
 
 FinewsFetcher = Callable[[str, float], str]
 
@@ -61,60 +68,15 @@ SECTION_ALIASES = {
     "fx": {"主要汇率", "主要匯率"},
 }
 
-FINEWS_ZH_TW_TERMS: tuple[tuple[str, str], ...] = (
-    ("美股日报", "美股日報"),
-    ("盘后日报", "盤後日報"),
-    ("盘后总结", "盤後總結"),
-    ("盘后", "盤後"),
-    ("主要新闻", "主要新聞"),
-    ("市场温度", "市場溫度"),
-    ("主要指数", "主要指數"),
-    ("美债利率", "美債利率"),
-    ("主要汇率", "主要匯率"),
-    ("恐慌贪婪指数", "恐慌貪婪指數"),
-    ("纳指", "納指"),
-    ("小盘", "小盤"),
-    ("微涨", "微漲"),
-    ("显示", "顯示"),
-    ("降温", "降溫"),
-    ("链条", "鏈條"),
-    ("融资", "融資"),
-    ("叙事", "敘事"),
-    ("防御", "防禦"),
-    ("医疗", "醫療"),
-    ("宏观", "宏觀"),
-    ("通胀", "通膨"),
-    ("美联储", "聯準會"),
-    ("官员", "官員"),
-    ("债券", "債券"),
-    ("强硬", "強硬"),
-    ("战争", "戰爭"),
-    ("战前", "戰前"),
-    ("风险", "風險"),
-    ("资产", "資產"),
-    ("定价", "定價"),
-    ("扩散", "擴散"),
-    ("消费", "消費"),
-    ("智能手机", "智慧型手機"),
-    ("成长", "成長"),
-    ("沟通", "溝通"),
-    ("地缘", "地緣"),
-    ("贸易", "貿易"),
+FINEWS_ZH_TW_OVERRIDES: tuple[tuple[str, str], ...] = (
+    ("聯儲", "聯準會"),
+    ("美聯儲", "聯準會"),
+    ("通脹", "通膨"),
+    ("智慧手機", "智慧型手機"),
     ("特朗普", "川普"),
-    ("抛售", "拋售"),
-    ("承压", "承壓"),
-    ("纳斯达克", "納斯達克"),
-    ("标普", "標普"),
-    ("道琼斯", "道瓊斯"),
-    ("罗素", "羅素"),
-    ("美国", "美國"),
-    ("国债", "國債"),
-    ("从", "從"),
-    ("与", "與"),
-    ("美元 / 人民币", "美元 / 人民幣"),
-    ("美元 / 欧元", "美元 / 歐元"),
-    ("美元 / 新加坡元", "美元 / 新加坡元"),
 )
+
+_OPENCC_CONVERTER: Any = None
 
 BLOCK_TAGS = {
     "address",
@@ -226,10 +188,13 @@ def to_zh_tw(text: Optional[str]) -> str:
     if not text:
         return ""
     output = text
-    for simplified, traditional in FINEWS_ZH_TW_TERMS:
-        output = output.replace(simplified, traditional)
+    global _OPENCC_CONVERTER
+    if OpenCC is not None:
+        if _OPENCC_CONVERTER is None:
+            _OPENCC_CONVERTER = OpenCC("s2twp")
+        output = _OPENCC_CONVERTER.convert(output)
     output = localize_route_b_zh_tw_text(output)
-    for simplified, traditional in FINEWS_ZH_TW_TERMS:
+    for simplified, traditional in FINEWS_ZH_TW_OVERRIDES:
         output = output.replace(simplified, traditional)
     return output
 
@@ -256,6 +221,39 @@ def _extract_external_links(html_text: str) -> list[dict[str, str]]:
     parser = _ExternalLinkParser()
     parser.feed(html_text)
     return parser.links
+
+
+def _link_matches_item(title: str, url: str, item: str) -> bool:
+    title_norm = title.strip().lower()
+    item_norm = item.strip().lower()
+    if not title_norm or not item_norm:
+        return False
+    if title_norm == item_norm or item_norm in title_norm or title_norm in item_norm:
+        return True
+    parsed = urlparse(url)
+    url_text = " ".join(part for part in [parsed.path, parsed.query, parsed.fragment] if part).lower()
+    token = re.escape(item_norm)
+    return bool(re.search(rf"(^|[^a-z0-9^.-]){token}([^a-z0-9.-]|$)", url_text))
+
+
+def _associate_section_links(
+    sections: dict[str, list[str]],
+    external_links: list[dict[str, str]],
+) -> dict[str, list[dict[str, str]]]:
+    section_links: dict[str, list[dict[str, str]]] = {key: [] for key in SECTION_ORDER}
+    item_sets = {key: {item.strip() for item in items if item.strip()} for key, items in sections.items()}
+
+    for link in external_links:
+        title = (link.get("title") or "").strip()
+        url = (link.get("url") or "").strip()
+        if not title or not _is_safe_external_url(url):
+            continue
+        for key, items in item_sets.items():
+            if any(_link_matches_item(title, url, item) for item in items):
+                section_links[key].append({"title": title, "url": url})
+                break
+
+    return section_links
 
 
 def _extract_json_ld(html_text: str) -> list[dict[str, Any]]:
@@ -353,6 +351,9 @@ def parse_finews_homepage_html(
     report_date, source_updated_at = _metadata_from_json_ld(html_text)
     text_report_date, text_updated_at = _metadata_from_text(lines)
 
+    sections = _extract_sections(lines)
+    external_links = _extract_external_links(html_text)
+
     return {
         "source": "finews",
         "source_url": FINEWS_SOURCE_URL,
@@ -363,9 +364,40 @@ def parse_finews_homepage_html(
         "fetch_error": None,
         "language_original": "zh-CN",
         "language_rendered": "zh-TW",
-        "external_links": _extract_external_links(html_text),
-        "sections": _extract_sections(lines),
+        "parser_version": PARSER_VERSION,
+        "conversion_engine": CONVERSION_ENGINE,
+        "conversion_version": CONVERSION_VERSION,
+        "external_links": external_links,
+        "section_links": _associate_section_links(sections, external_links),
+        "sections": sections,
     }
+
+
+def _convert_cached_value(value: Any, *, key: str = "") -> Any:
+    if isinstance(value, str):
+        return value if key in {"url", "source_url"} else to_zh_tw(value)
+    if isinstance(value, list):
+        return [_convert_cached_value(item, key=key) for item in value]
+    if isinstance(value, dict):
+        return {item_key: _convert_cached_value(item_value, key=item_key) for item_key, item_value in value.items()}
+    return value
+
+
+def _normalize_cached_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized = _convert_cached_value(payload)
+    if not isinstance(normalized, dict):
+        return payload
+    normalized.setdefault("source", "finews")
+    normalized.setdefault("source_url", FINEWS_SOURCE_URL)
+    normalized.setdefault("language_original", "zh-CN")
+    normalized.setdefault("language_rendered", "zh-TW")
+    normalized["parser_version"] = PARSER_VERSION
+    normalized["conversion_engine"] = CONVERSION_ENGINE
+    normalized["conversion_version"] = CONVERSION_VERSION
+    sections = normalized.setdefault("sections", _empty_sections())
+    external_links = normalized.setdefault("external_links", normalized.pop("news_links", []))
+    normalized["section_links"] = _associate_section_links(sections, external_links)
+    return normalized
 
 
 def _default_fetcher(url: str, timeout: float) -> str:
@@ -414,7 +446,11 @@ def _error_snapshot(fetch_error: str, fetched_at: str) -> dict[str, Any]:
         "fetch_error": fetch_error,
         "language_original": "zh-CN",
         "language_rendered": "zh-TW",
+        "parser_version": PARSER_VERSION,
+        "conversion_engine": CONVERSION_ENGINE,
+        "conversion_version": CONVERSION_VERSION,
         "external_links": [],
+        "section_links": {key: [] for key in SECTION_ORDER},
         "sections": _empty_sections(),
     }
 
@@ -440,13 +476,8 @@ def fetch_latest_finews_snapshot(
         error = f"finews_fetch_failed: {type(exc).__name__}"
         cached = _read_cache(cache)
         if cached:
-            cached["stale"] = True
-            cached["fetch_error"] = error
-            cached.setdefault("source", "finews")
-            cached.setdefault("source_url", FINEWS_SOURCE_URL)
-            cached.setdefault("language_original", "zh-CN")
-            cached.setdefault("language_rendered", "zh-TW")
-            cached.setdefault("external_links", cached.pop("news_links", []))
-            cached.setdefault("sections", _empty_sections())
-            return cached
+            normalized = _normalize_cached_snapshot(cached)
+            normalized["stale"] = True
+            normalized["fetch_error"] = error
+            return normalized
         return _error_snapshot(error, timestamp)

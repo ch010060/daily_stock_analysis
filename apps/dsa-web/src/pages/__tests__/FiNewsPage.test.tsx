@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { finewsApi } from '../../api/finews';
@@ -25,13 +25,45 @@ const snapshot = {
       title: '美股收低，科技股拋售。',
       url: 'https://example.com/news-one',
     },
+    {
+      title: '^GSPC',
+      url: 'https://finance.yahoo.com/quote/%5EGSPC',
+    },
+    {
+      title: 'QQQ',
+      url: 'https://finance.yahoo.com/quote/QQQ',
+    },
   ],
+  sectionLinks: {
+    afterMarketSummary: [],
+    majorNews: [
+      {
+        title: '美股收低，科技股拋售。',
+        url: 'https://example.com/news-one',
+      },
+    ],
+    marketTemperature: [],
+    majorIndices: [
+      {
+        title: '^GSPC',
+        url: 'https://finance.yahoo.com/quote/%5EGSPC',
+      },
+    ],
+    majorStocks: [
+      {
+        title: 'QQQ',
+        url: 'https://finance.yahoo.com/quote/QQQ',
+      },
+    ],
+    treasuryYields: [],
+    fx: [],
+  },
   sections: {
     afterMarketSummary: ['美股主要指數盤後偏弱。', '科技股承壓，防禦板塊相對抗跌。'],
-    majorNews: ['主要新聞已整理。', 'Yahoo Finance · 2026-06-26', '投資人等待通膨與聯準會訊號。'],
+    majorNews: ['美股收低，科技股拋售。', 'Yahoo Finance · 2026-06-26', '投資人等待通膨與聯準會訊號。'],
     marketTemperature: ['恐慌貪婪指數', '25', '極度恐慌', '市場溫度偏低。'],
     majorIndices: ['標普 500', '^GSPC', '6,000.00', '-0.05%'],
-    majorStocks: ['Nvidia', 'NVDA', '190.10', '+1.20%'],
+    majorStocks: ['Invesco QQQ Trust', 'QQQ', '520.00', '+0.20%', 'Nvidia', 'NVDA', '190.10', '+1.20%'],
     treasuryYields: ['美國 10 年期國債', 'US10Y', '4.20%', '+0.01'],
     fx: ['美元 / 人民幣', 'USD/CNY', '7.18', '-0.02%'],
   },
@@ -67,7 +99,30 @@ describe('FiNewsPage', () => {
       'href',
       'https://example.com/news-one',
     );
+    expect(screen.getByRole('link', { name: '^GSPC' })).toHaveAttribute(
+      'href',
+      'https://finance.yahoo.com/quote/%5EGSPC',
+    );
+    expect(screen.getByRole('link', { name: 'QQQ' })).toHaveAttribute(
+      'href',
+      'https://finance.yahoo.com/quote/QQQ',
+    );
+    expect(screen.getByRole('link', { name: /美股收低，科技股拋售。/ })).toHaveAttribute('target', '_blank');
+    expect(screen.getByRole('link', { name: '^GSPC' })).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.queryByText('外部來源連結')).not.toBeInTheDocument();
     expect(container.querySelector('iframe')).toBeNull();
+    expect(container.querySelector('[dangerouslySetInnerHTML]')).toBeNull();
+  });
+
+  it('keeps market temperature explanation collapsed behind an info affordance', async () => {
+    renderPage();
+
+    await screen.findByTestId('finews-market-sidebar');
+    expect(screen.getByText('市場溫度偏低。')).not.toBeVisible();
+
+    fireEvent.click(screen.getByLabelText('查看市場溫度說明'));
+
+    expect(screen.getByText('市場溫度偏低。')).toBeVisible();
   });
 
   it('renders the compact newspaper masthead, main column, and market sidebar', async () => {

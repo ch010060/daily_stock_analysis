@@ -17,6 +17,8 @@ export type FinewsExternalLink = {
   url: string;
 };
 
+export type FinewsSectionLinks = Record<FinewsSectionKey, FinewsExternalLink[]>;
+
 export type FinewsSnapshot = {
   source: 'finews';
   sourceUrl: string;
@@ -28,6 +30,7 @@ export type FinewsSnapshot = {
   languageOriginal: 'zh-CN';
   languageRendered: 'zh-TW';
   externalLinks: FinewsExternalLink[];
+  sectionLinks?: FinewsSectionLinks;
   sections: FinewsSections;
 };
 
