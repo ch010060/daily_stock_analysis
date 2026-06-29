@@ -131,12 +131,42 @@ def _compute_market_review_override_region(config: Config) -> Optional[str]:
             open_markets,
         )
     except Exception as exc:
-        logger.warning("市場概覽交易日過濾失敗，按配置繼續執行: %s", exc)
+        logger.warning("台股日報交易日過濾失敗，按配置繼續執行: %s", exc)
         return None
 
 
 def _build_market_review_runtime(config: Config, source_message: Optional[Any] = None) -> tuple[Any, Any, Any]:
     return _runtime_build_market_review_runtime(config, source_message)
+
+
+def _extract_tw_daily_snapshot(context_snapshot: Any) -> Optional[Dict[str, Any]]:
+    payload = parse_json_field(context_snapshot)
+    if not isinstance(payload, dict):
+        return None
+    snapshots = payload.get("market_light_snapshots")
+    if not isinstance(snapshots, dict):
+        return None
+    tw_snapshot = snapshots.get("tw")
+    if not isinstance(tw_snapshot, dict):
+        return None
+    daily_snapshot = tw_snapshot.get("tw_daily_snapshot")
+    return daily_snapshot if isinstance(daily_snapshot, dict) else None
+
+
+def _load_market_review_snapshot(query_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not query_id:
+        return None
+    try:
+        from src.storage import DatabaseManager
+
+        db = DatabaseManager.get_instance()
+        records = db.get_analysis_history(query_id=query_id, limit=1)
+        if not records:
+            return None
+        return _extract_tw_daily_snapshot(getattr(records[0], "context_snapshot", None))
+    except Exception:
+        logger.debug("讀取台股日報結構化快照失敗: query_id=%s", query_id, exc_info=True)
+        return None
 
 
 def _run_market_review_background(
@@ -166,9 +196,13 @@ def _run_market_review_background(
             return {
                 "status": "skipped",
                 "result": None,
-                "message": "市場概覽已跳過：沒有可持久化的盤勢回顧內容",
+                "message": "台股日報已跳過：沒有可持久化的盤勢回顧內容",
             }
-        return {"result": report}
+        result_payload: Dict[str, Any] = {"result": report}
+        snapshot = _load_market_review_snapshot(query_id)
+        if snapshot is not None:
+            result_payload["market_review_snapshot"] = snapshot
+        return result_payload
     finally:
         _release_market_review_lock(lock_token)
 
@@ -537,7 +571,7 @@ def _handle_sync_analysis(
 
 
 # ============================================================
-# POST /market-review - 觸發市場概覽
+# POST /market-review - 觸發台股日報
 # ============================================================
 
 @router.post(
@@ -545,12 +579,12 @@ def _handle_sync_analysis(
     response_model=MarketReviewAccepted,
     status_code=202,
     responses={
-        202: {"description": "市場概覽任務已接受", "model": MarketReviewAccepted},
-        409: {"description": "市場概覽正在執行", "model": ErrorResponse},
+        202: {"description": "台股日報任務已接受", "model": MarketReviewAccepted},
+        409: {"description": "台股日報正在執行", "model": ErrorResponse},
         500: {"description": "提交失敗", "model": ErrorResponse},
     },
-    summary="觸發市場概覽",
-    description="提交一個後臺市場概覽任務，複用 CLI 的盤勢回顧鏈路並儲存報告。介面內部僅提供程序內/單機防重，如多例項（多 Worker/多容器）部署，需結合外部冪等機制避免重複觸發。",
+    summary="觸發台股日報",
+    description="提交一個後臺台股日報任務，複用 CLI 的盤勢回顧鏈路並儲存報告。介面內部僅提供程序內/單機防重，如多例項（多 Worker/多容器）部署，需結合外部冪等機制避免重複觸發。",
 )
 def trigger_market_review(
     request: Optional[MarketReviewRequest] = Body(None),
@@ -563,7 +597,7 @@ def trigger_market_review(
     if override_region == "":
         return MarketReviewAccepted(
             status="accepted",
-            message="今日市場概覽相關市場均為非交易日，已跳過市場概覽",
+            message="今日台股日報相關市場均為非交易日，已跳過台股日報",
             send_notification=request.send_notification,
             trace_id=None,
         )
@@ -574,7 +608,7 @@ def trigger_market_review(
             status_code=409,
             detail={
                 "error": "duplicate_market_review",
-                "message": "市場概覽正在執行中，請稍後再試",
+                "message": "台股日報正在執行中，請稍後再試",
             },
         )
 
@@ -589,8 +623,8 @@ def trigger_market_review(
                 query_id=task_id,
             ),
             stock_code="market_review",
-            stock_name="市場概覽",
-            message="市場概覽任務已提交",
+            stock_name="台股日報",
+            message="台股日報任務已提交",
             task_id=task_id,
         )
     except Exception:
@@ -599,7 +633,7 @@ def trigger_market_review(
 
     return MarketReviewAccepted(
         status="accepted",
-        message="市場概覽任務已提交，完成後會儲存報告並按配置推送通知",
+        message="台股日報任務已提交，完成後會儲存報告並按配置推送通知",
         send_notification=request.send_notification,
         task_id=task.task_id,
         trace_id=_get_task_trace_id(task),
@@ -892,6 +926,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
     if task:
         result: Optional[AnalysisResultResponse] = None
         market_review_report = None
+        market_review_snapshot = None
         market_review_skip_reason = None
 
         if task.status == TaskStatusEnum.COMPLETED and isinstance(task.result, dict):
@@ -899,7 +934,10 @@ def get_analysis_status(task_id: str) -> TaskStatus:
                 report_text = task.result.get("result")
                 if isinstance(report_text, str) and report_text.strip():
                     market_review_report = report_text
-                elif task.result.get("status") == "skipped":
+                snapshot = task.result.get("market_review_snapshot")
+                if isinstance(snapshot, dict):
+                    market_review_snapshot = snapshot
+                if task.result.get("status") == "skipped" and not market_review_report:
                     skip_message = task.result.get("message")
                     if isinstance(skip_message, str) and skip_message.strip():
                         market_review_skip_reason = skip_message
@@ -921,6 +959,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
             stage_label=getattr(task, "stage_label", None),
             result=result,
             market_review_report=market_review_report,
+            market_review_snapshot=market_review_snapshot,
             market_review_skip_reason=market_review_skip_reason,
             error=task.error,
             stock_name=task.stock_name,
@@ -941,6 +980,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
             raw_result = parse_json_field(record.raw_result)
             if getattr(record, "report_type", None) == "market_review":
                 market_review_report = None
+                market_review_snapshot = _extract_tw_daily_snapshot(getattr(record, "context_snapshot", None))
                 if isinstance(raw_result, dict):
                     report_text = raw_result.get("raw_response") or raw_result.get("market_review_report")
                     if isinstance(report_text, str) and report_text.strip():
@@ -955,6 +995,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
                     progress=100,
                     result=None,
                     market_review_report=market_review_report,
+                    market_review_snapshot=market_review_snapshot,
                     error=None,
                     stock_name=record.name,
                 )

@@ -459,7 +459,7 @@ const FiNewsPage: React.FC = () => {
               <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-[var(--finews-risk)]" aria-hidden="true" />
               <div>
                 <p className="font-semibold text-[var(--finews-ink)]">目前沒有可顯示的 FiNews 快照內容</p>
-                <p className="mt-1">請稍後再試；Home page 和市場概覽功能不受影響。</p>
+                <p className="mt-1">請稍後再試；Home page 和台股日報功能不受影響。</p>
               </div>
             </div>
           ) : null}

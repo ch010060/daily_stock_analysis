@@ -13,6 +13,12 @@ import { StockAutocomplete } from '../components/StockAutocomplete';
 import { StockHistoryTrendDrawer, StockBar } from '../components/history';
 import { ReportMarkdownDrawer } from '../components/report/ReportMarkdownDrawer';
 import { ReportSummary } from '../components/report/ReportSummary';
+import { TwDailyReportView } from '../components/report/TwDailyReportView';
+import {
+  buildTwDailyReportFromSnapshot,
+  extractTwDailySnapshotFromReport,
+  parseTwDailyReportMarkdown,
+} from '../components/report/twDailyReportAdapter';
 import { TaskPanel } from '../components/tasks';
 import { useDashboardLifecycle, useHomeDashboardState } from '../hooks';
 import { useWatchlist } from '../hooks/useWatchlist';
@@ -36,7 +42,11 @@ const HomePage: React.FC = () => {
   const [marketReviewNotice, setMarketReviewNotice] = useState<MarketReviewNotice>(null);
   const [marketReviewError, setMarketReviewError] = useState<ParsedApiError | null>(null);
   const [marketReviewReport, setMarketReviewReport] = useState<string | null>(null);
+  const [marketReviewSnapshot, setMarketReviewSnapshot] = useState<Record<string, unknown> | null>(null);
   const [marketReviewReportCopied, setMarketReviewReportCopied] = useState(false);
+  const [selectedMarketReviewMarkdown, setSelectedMarketReviewMarkdown] = useState<string | null>(null);
+  const [isLoadingSelectedMarketReviewMarkdown, setIsLoadingSelectedMarketReviewMarkdown] = useState(false);
+  const [selectedMarketReviewMarkdownError, setSelectedMarketReviewMarkdownError] = useState<string | null>(null);
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
   const [strategyMenuOpen, setStrategyMenuOpen] = useState(false);
@@ -224,7 +234,60 @@ const HomePage: React.FC = () => {
           assetType: selectedReport.meta.instrumentType ?? undefined,
         })
       : null;
-  const isHistoryTrendUnavailable = !selectedReport || !selectedReport.meta.stockCode;
+  const isHistoryTrendUnavailable = !selectedReport || isMarketReviewHistoryReport || !selectedReport.meta.stockCode;
+  const liveTwDailyReport = useMemo(
+    () => (
+      buildTwDailyReportFromSnapshot(marketReviewSnapshot)
+      ?? (marketReviewReport ? parseTwDailyReportMarkdown(marketReviewReport) : null)
+    ),
+    [marketReviewReport, marketReviewSnapshot],
+  );
+  const selectedTwDailySnapshot = useMemo(
+    () => extractTwDailySnapshotFromReport(selectedReport),
+    [selectedReport],
+  );
+  const selectedTwDailyReport = useMemo(
+    () => (
+      buildTwDailyReportFromSnapshot(selectedTwDailySnapshot)
+      ?? (selectedMarketReviewMarkdown ? parseTwDailyReportMarkdown(selectedMarketReviewMarkdown) : null)
+    ),
+    [selectedMarketReviewMarkdown, selectedTwDailySnapshot],
+  );
+  const shouldSuppressSelectedMarketReviewDetail = isMarketReviewHistoryReport && Boolean(marketReviewReport);
+
+  useEffect(() => {
+    if (!isMarketReviewHistoryReport || selectedReport?.meta.id === undefined) {
+      setSelectedMarketReviewMarkdown(null);
+      setSelectedMarketReviewMarkdownError(null);
+      setIsLoadingSelectedMarketReviewMarkdown(false);
+      return undefined;
+    }
+
+    let isMounted = true;
+    setSelectedMarketReviewMarkdown(null);
+    setSelectedMarketReviewMarkdownError(null);
+    setIsLoadingSelectedMarketReviewMarkdown(true);
+    historyApi.getMarkdown(selectedReport.meta.id)
+      .then((content) => {
+        if (isMounted) {
+          setSelectedMarketReviewMarkdown(content);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setSelectedMarketReviewMarkdownError('台股日報內容載入失敗，以下顯示摘要備援。');
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingSelectedMarketReviewMarkdown(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isMarketReviewHistoryReport, selectedReport?.meta.id]);
 
   useEffect(() => {
     if (!isHistoryTrendUnavailable || !isHistoryTrendOpen) {
@@ -446,7 +509,7 @@ const HomePage: React.FC = () => {
           setMarketReviewReport(null);
           setMarketReviewNotice({
             variant: 'danger',
-            title: '市場概覽已超時',
+            title: '台股日報已超時',
             message: '任務長時間未返回最終結果，請在任務列表/歷史中檢視。',
           });
           scrollMarketReviewFeedbackIntoView();
@@ -459,12 +522,13 @@ const HomePage: React.FC = () => {
           const status = await analysisApi.getStatus(taskId);
           if (status.status === 'pending' || status.status === 'processing') {
             setMarketReviewReport(null);
+            setMarketReviewSnapshot(null);
             const progress = typeof status.progress === 'number'
               ? `${status.progress}%`
               : '進行中';
             setMarketReviewNotice({
               variant: 'warning',
-              title: '市場概覽進行中',
+              title: '台股日報進行中',
               message: `任務狀態：${status.status}（${progress}）`,
             });
             return true;
@@ -478,18 +542,22 @@ const HomePage: React.FC = () => {
             const skipReason = typeof status.marketReviewSkipReason === 'string'
               ? status.marketReviewSkipReason.trim()
               : '';
+            const snapshot = status.marketReviewSnapshot && typeof status.marketReviewSnapshot === 'object'
+              ? status.marketReviewSnapshot
+              : null;
             setMarketReviewReport(marketReviewText ? marketReviewText.trim() : null);
+            setMarketReviewSnapshot(snapshot);
             if (!marketReviewText && skipReason) {
               setMarketReviewNotice({
                 variant: 'warning',
-                title: '市場概覽已跳過',
+                title: '台股日報已跳過',
                 message: skipReason,
               });
             } else {
               setMarketReviewNotice({
                 variant: 'success',
-                title: '市場概覽已完成',
-                message: marketReviewText ? '市場概覽任務已完成，結果如下：' : '市場概覽任務已完成，結果已生成並按配置推送。',
+                title: '台股日報已完成',
+                message: marketReviewText ? '台股日報任務已完成，結果如下：' : '台股日報任務已完成，結果已生成並按配置推送。',
               });
             }
             setMarketReviewError(null);
@@ -500,13 +568,14 @@ const HomePage: React.FC = () => {
           if (status.status === 'failed') {
             stopMarketReviewPolling();
             setMarketReviewReport(null);
+            setMarketReviewSnapshot(null);
             setMarketReviewError(
               getParsedApiError({
                 response: {
                   status: 500,
                   data: {
                     error: 'market_review_failed',
-                    message: status.error || '市場概覽執行失敗。',
+                    message: status.error || '台股日報執行失敗。',
                   },
                 },
               }),
@@ -518,9 +587,10 @@ const HomePage: React.FC = () => {
 
           stopMarketReviewPolling();
           setMarketReviewReport(null);
+          setMarketReviewSnapshot(null);
           setMarketReviewNotice({
             variant: 'danger',
-            title: '市場概覽狀態異常',
+            title: '台股日報狀態異常',
             message: `收到未知任務狀態：${status.status}`,
           });
           scrollMarketReviewFeedbackIntoView();
@@ -564,7 +634,7 @@ const HomePage: React.FC = () => {
       const result = await analysisApi.triggerMarketReview({ sendNotification: notify });
       setMarketReviewNotice({
         variant: 'success',
-        title: '市場概覽已提交',
+        title: '台股日報已提交',
         message: result.message,
       });
       scrollMarketReviewFeedbackIntoView();
@@ -607,7 +677,7 @@ const HomePage: React.FC = () => {
     const marketReviewItem: StockBarItem = {
       id: latestMarketReview.id,
       stockCode: 'MARKET',
-      stockName: latestMarketReview.stockName || '市場概覽',
+      stockName: latestMarketReview.stockName || '台股日報',
       reportType: 'market_review',
       sentimentScore: latestMarketReview.sentimentScore,
       operationAdvice: latestMarketReview.operationAdvice,
@@ -755,7 +825,7 @@ const HomePage: React.FC = () => {
                 className="h-10 flex-1 whitespace-nowrap md:flex-none"
               >
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
-                市場概覽
+                台股日報
               </Button>
               <Button
                 type="button"
@@ -891,7 +961,7 @@ const HomePage: React.FC = () => {
             {marketReviewReport ? (
               <div className="mb-3 rounded-xl border border-subtle bg-surface/70 px-3 py-3 text-xs text-secondary-text shadow-sm">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="font-semibold text-foreground">盤勢回顧報告</p>
+                  <p className="font-semibold text-foreground">台股日報</p>
                   <button
                     type="button"
                     className="home-surface-button h-7 rounded-md px-3 py-1 text-xs text-foreground"
@@ -901,12 +971,16 @@ const HomePage: React.FC = () => {
                     {marketReviewReportCopied ? '已複製' : '複製'}
                   </button>
                 </div>
-                <pre
-                  data-testid="market-review-report"
-                  className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-background px-3 py-2 leading-relaxed"
-                >
-                  {marketReviewReport}
-                </pre>
+                {liveTwDailyReport ? (
+                  <TwDailyReportView report={liveTwDailyReport} className="text-sm" />
+                ) : (
+                  <pre
+                    data-testid="market-review-report"
+                    className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-background px-3 py-2 leading-relaxed"
+                  >
+                    {marketReviewReport}
+                  </pre>
+                )}
               </div>
             ) : null}
 
@@ -922,6 +996,7 @@ const HomePage: React.FC = () => {
                 <DashboardStateBlock title="載入報告中..." loading />
               </div>
             ) : selectedReport ? (
+              shouldSuppressSelectedMarketReviewDetail ? null : (
               <div className={isHistoryTrendOpen ? 'max-w-6xl space-y-4 pb-8' : 'max-w-4xl space-y-4 pb-8'}>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   {!isMarketReviewHistoryReport ? (
@@ -962,22 +1037,24 @@ const HomePage: React.FC = () => {
                       重新回顧
                     </Button>
                   )}
-                  <Button
-                    variant="home-action-ai"
-                    size="sm"
-                    disabled={selectedReport.meta.id === undefined || isHistoryTrendUnavailable}
-                    className={isHistoryTrendOpen ? 'border-primary/70 bg-primary/15 text-primary shadow-glow-cyan' : undefined}
-                    onClick={() => {
-                      if (isHistoryTrendOpen) {
-                        closeHistoryTrend();
-                        return;
-                      }
-                      void openHistoryTrend();
-                    }}
-                  >
-                    <BarChart3 className="h-4 w-4" />
-                    歷史趨勢
-                  </Button>
+                  {!isMarketReviewHistoryReport ? (
+                    <Button
+                      variant="home-action-ai"
+                      size="sm"
+                      disabled={selectedReport.meta.id === undefined || isHistoryTrendUnavailable}
+                      className={isHistoryTrendOpen ? 'border-primary/70 bg-primary/15 text-primary shadow-glow-cyan' : undefined}
+                      onClick={() => {
+                        if (isHistoryTrendOpen) {
+                          closeHistoryTrend();
+                          return;
+                        }
+                        void openHistoryTrend();
+                      }}
+                    >
+                      <BarChart3 className="h-4 w-4" />
+                      歷史趨勢
+                    </Button>
+                  ) : null}
                   <Button
                     variant="home-action-ai"
                     size="sm"
@@ -1022,6 +1099,28 @@ const HomePage: React.FC = () => {
                     onSelectRecord={(recordId) => void selectHistoryItem(recordId)}
                     onRetry={() => void openHistoryTrend()}
                   />
+                ) : isMarketReviewHistoryReport ? (
+                  <div className="space-y-3">
+                    {selectedMarketReviewMarkdownError ? (
+                      <InlineAlert
+                        variant="warning"
+                        title="台股日報載入不完整"
+                        message={selectedMarketReviewMarkdownError}
+                      />
+                    ) : null}
+                    {isLoadingSelectedMarketReviewMarkdown ? (
+                      <DashboardStateBlock title="載入台股日報中..." loading />
+                    ) : selectedTwDailyReport ? (
+                      <TwDailyReportView report={selectedTwDailyReport} />
+                    ) : (
+                      <pre
+                        data-testid="market-review-report"
+                        className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-background px-3 py-2 leading-relaxed"
+                      >
+                        {selectedMarketReviewMarkdown || selectedReport.summary.analysisSummary}
+                      </pre>
+                    )}
+                  </div>
                 ) : (
                   <ReportSummary
                     data={selectedReport}
@@ -1035,6 +1134,7 @@ const HomePage: React.FC = () => {
                   />
                 )}
               </div>
+              )
             ) : (
               <div className="flex h-full items-center justify-center">
                 <EmptyState

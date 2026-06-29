@@ -335,6 +335,7 @@ export interface TaskStatus {
   stageLabel?: string | null;
   result?: AnalysisResult;
   marketReviewReport?: string;
+  marketReviewSnapshot?: Record<string, unknown>;
   marketReviewSkipReason?: string;
   error?: string;
   stockName?: string;

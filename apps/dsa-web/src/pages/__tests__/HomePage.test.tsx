@@ -121,6 +121,66 @@ const marketReviewHistoryReport = {
   },
 };
 
+const parseableMarketReviewMarkdown = [
+  '# 台股大盤回顧',
+  '',
+  '> 資料日期：2026-06-26',
+  '',
+  '## 今日盤勢摘要',
+  '',
+  '今日所有必要指標資料完整，可進行完整分析。',
+  '',
+  '## 指數表現',
+  '',
+  '- 加權報酬指數（TAIEX）：23,000.00 點 🟢 +120.00（+0.52%）',
+  '- 櫃買報酬指數（TPEx）：260.00 點 🔴 -1.50（-0.57%）',
+  '',
+  '## 法人與資金面',
+  '',
+  '- 外資：買 1,200.0 億，賣 1,000.0 億，淨 ▲ 200.0 億',
+  '',
+  '## 融資融券觀察',
+  '',
+  '- 融資餘額：今日 2,200.0 億，較昨日 ▼ 10.0 億',
+  '',
+  '## 0050 / 臺積電參考',
+  '',
+  '- 元大台灣50（0050）：收盤 180.20（2026-06-26）',
+  '',
+  '## 風險與注意事項',
+  '',
+  '- 市場有風險，投資需謹慎。',
+].join('\n');
+
+const structuredMarketReviewSnapshot = {
+  kind: 'tw_daily_snapshot',
+  source: 'finmind',
+  dataDate: '2026-06-26',
+  indices: [{
+    symbol: 'TAIEX',
+    name: '加權報酬指數',
+    value: 23000,
+    change: -120,
+    changePct: -0.52,
+    dataDate: '2026-06-26',
+  }],
+  institutionalFlows: [],
+  marginShort: [],
+  representatives: [{
+    symbol: '006208',
+    name: '富邦台50',
+    close: 112.4,
+    previousClose: 112.8,
+    change: -0.4,
+    changePct: -0.35,
+    volume: 3400000,
+    turnover: 382160000,
+    dataDate: '2026-06-26',
+    missingFields: ['PER', 'PBR', 'dividend_yield'],
+  }],
+  dataStatus: { missingFields: [], staleFields: [], partialFailures: [] },
+};
+
 describe('HomePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -185,7 +245,7 @@ describe('HomePage', () => {
     expect(historyApi.getMarkdown).not.toHaveBeenCalled();
   });
 
-  it('renders a FiNews US daily button beside market overview and navigates locally', async () => {
+  it('renders a FiNews US daily button beside Taiwan daily report and navigates locally', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 0,
       page: 1,
@@ -199,10 +259,10 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    const marketOverviewButton = await screen.findByRole('button', { name: '市場概覽' });
+    const taiwanDailyButton = await screen.findByRole('button', { name: '台股日報' });
     const finewsButton = screen.getByRole('button', { name: '美股日報' });
 
-    expect(finewsButton.parentElement).toBe(marketOverviewButton.parentElement);
+    expect(finewsButton.parentElement).toBe(taiwanDailyButton.parentElement);
 
     fireEvent.click(finewsButton);
 
@@ -379,6 +439,48 @@ describe('HomePage', () => {
     expect(await screen.findByText('大盤覆盤摘要')).toBeInTheDocument();
   });
 
+  it('renders selected market review history without stock-only detail sections', async () => {
+    vi.mocked(historyApi.getStockBarList).mockResolvedValue({
+      total: 0,
+      items: [],
+    });
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({
+          total: 1,
+          page: 1,
+          limit: 10,
+          items: [marketReviewHistoryItem],
+        });
+      }
+      return Promise.resolve({
+        total: 0,
+        page: 1,
+        limit: 20,
+        items: [],
+      });
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(marketReviewHistoryReport);
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue(parseableMarketReviewMarkdown);
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /MARKET/ }));
+
+    expect(await screen.findByTestId('tw-daily-reader')).toBeInTheDocument();
+    expect(screen.getByText('主要指數')).toBeInTheDocument();
+    expect(screen.queryByText('操作建議')).not.toBeInTheDocument();
+    expect(screen.queryByText('趨勢預測')).not.toBeInTheDocument();
+    expect(screen.queryByText('狙擊點位')).not.toBeInTheDocument();
+    expect(screen.queryByText('相關資訊')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('market-risk-gauge')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '歷史趨勢' })).not.toBeInTheDocument();
+  });
+
   it('removes the MARKET stock bar item after deleting market review history', async () => {
     let isMarketReviewDeleted = false;
     vi.mocked(historyApi.getStockBarList).mockResolvedValue({
@@ -489,13 +591,14 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
       sendNotification: true,
-      message: '市場概覽任務已提交',
+      message: '台股日報任務已提交',
       taskId: 'task-1',
     });
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
       taskId: 'task-1',
       status: 'completed',
-      marketReviewReport: '市場覆盤報告示例文字',
+      marketReviewReport: parseableMarketReviewMarkdown,
+      marketReviewSnapshot: structuredMarketReviewSnapshot,
     });
 
     render(
@@ -504,14 +607,69 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '市場概覽' }));
+    fireEvent.click(await screen.findByRole('button', { name: '台股日報' }));
 
     await waitFor(() => {
       expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
     });
-    expect(await screen.findByText('市場概覽已完成')).toBeInTheDocument();
-    expect(await screen.findByText('市場覆盤報告示例文字')).toBeInTheDocument();
+    expect(await screen.findByText('台股日報已完成')).toBeInTheDocument();
+    expect(await screen.findByTestId('tw-daily-reader')).toBeInTheDocument();
+    expect(screen.getByText('006208')).toBeInTheDocument();
+    expect(screen.getByText('主要指數')).toBeInTheDocument();
+    expect(screen.getByText('FinMind 台股最後交易日快照')).toBeInTheDocument();
     expect(analysisApi.getStatus).toHaveBeenCalledWith('task-1');
+  });
+
+  it('does not render duplicate Taiwan daily readers when completion arrives while MARKET history is selected', async () => {
+    vi.mocked(historyApi.getStockBarList).mockResolvedValue({
+      total: 0,
+      items: [],
+    });
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({
+          total: 1,
+          page: 1,
+          limit: 10,
+          items: [marketReviewHistoryItem],
+        });
+      }
+      return Promise.resolve({
+        total: 0,
+        page: 1,
+        limit: 20,
+        items: [],
+      });
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(marketReviewHistoryReport);
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue(parseableMarketReviewMarkdown);
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      sendNotification: true,
+      message: '台股日報任務已提交',
+      taskId: 'task-1',
+    });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: 'task-1',
+      status: 'completed',
+      marketReviewReport: parseableMarketReviewMarkdown,
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /MARKET/ }));
+    await screen.findByTestId('tw-daily-reader');
+
+    fireEvent.click(screen.getByRole('button', { name: '台股日報' }));
+
+    expect(await screen.findByText('台股日報已完成')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getAllByTestId('tw-daily-reader')).toHaveLength(1);
+    });
   });
 
   it('shows an accurate skip notice instead of a false success message when market review is skipped', async () => {
@@ -524,13 +682,13 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
       sendNotification: true,
-      message: '市場概覽任務已提交',
+      message: '台股日報任務已提交',
       taskId: 'task-1',
     });
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
       taskId: 'task-1',
       status: 'completed',
-      marketReviewSkipReason: '市場概覽已跳過：沒有可持久化的盤勢回顧內容',
+      marketReviewSkipReason: '台股日報已跳過：沒有可持久化的盤勢回顧內容',
     });
 
     render(
@@ -539,14 +697,14 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '市場概覽' }));
+    fireEvent.click(await screen.findByRole('button', { name: '台股日報' }));
 
     await waitFor(() => {
       expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
     });
-    expect(await screen.findByText('市場概覽已跳過：沒有可持久化的盤勢回顧內容')).toBeInTheDocument();
-    expect(screen.queryByText('市場概覽已完成')).not.toBeInTheDocument();
-    expect(screen.queryByText('市場概覽任務已完成，結果已生成並按配置推送。')).not.toBeInTheDocument();
+    expect(await screen.findByText('台股日報已跳過：沒有可持久化的盤勢回顧內容')).toBeInTheDocument();
+    expect(screen.queryByText('台股日報已完成')).not.toBeInTheDocument();
+    expect(screen.queryByText('台股日報任務已完成，結果已生成並按配置推送。')).not.toBeInTheDocument();
   });
 
   it('scrolls the dashboard to market review feedback after toolbar clicks', async () => {
@@ -560,7 +718,7 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
       sendNotification: true,
-      message: '市場概覽任務已提交',
+      message: '台股日報任務已提交',
       taskId: 'task-1',
     });
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
@@ -588,13 +746,13 @@ describe('HomePage', () => {
     });
     dashboardScroll.scrollTop = 480;
 
-    fireEvent.click(screen.getByRole('button', { name: '市場概覽' }));
+    fireEvent.click(screen.getByRole('button', { name: '台股日報' }));
 
     await waitFor(() => {
       expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
     });
     expect(dashboardScroll.scrollTop).toBe(0);
-    expect(await screen.findByText('市場概覽已完成')).toBeInTheDocument();
+    expect(await screen.findByText('台股日報已完成')).toBeInTheDocument();
   });
 
   it('keeps market review results in the main dashboard scroll area', async () => {
@@ -607,7 +765,7 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
       sendNotification: true,
-      message: '市場概覽任務已提交',
+      message: '台股日報任務已提交',
       taskId: 'task-1',
     });
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
@@ -622,7 +780,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '市場概覽' }));
+    fireEvent.click(await screen.findByRole('button', { name: '台股日報' }));
 
     const dashboardScroll = screen.getByTestId('home-dashboard-scroll');
     const marketReviewReport = await screen.findByTestId('market-review-report');
@@ -777,6 +935,8 @@ describe('HomePage', () => {
     );
 
     const historyTrendButton = await screen.findByRole('button', { name: '歷史趨勢' });
+    expect(screen.getByText('操作建議')).toBeInTheDocument();
+    expect(screen.getByText('趨勢預測')).toBeInTheDocument();
     fireEvent.click(historyTrendButton);
 
     const range30Button = await screen.findByRole('button', { name: '近30天' });
@@ -960,7 +1120,7 @@ describe('HomePage', () => {
     expect(trigger).toHaveFocus();
   });
 
-  it('disables stock reanalysis and follow-up for market review history reports', async () => {
+  it('hides stock-only actions for market review history reports', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 1,
       page: 1,
@@ -968,6 +1128,7 @@ describe('HomePage', () => {
       items: [marketReviewHistoryItem],
     });
     vi.mocked(historyApi.getDetail).mockResolvedValue(marketReviewHistoryReport);
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue(parseableMarketReviewMarkdown);
 
     render(
       <MemoryRouter>
@@ -975,10 +1136,10 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText('大盤覆盤摘要');
+    await screen.findByTestId('tw-daily-reader');
     expect(screen.queryByRole('button', { name: '重新分析' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '追問 AI' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '歷史趨勢' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '歷史趨勢' })).not.toBeInTheDocument();
 
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalled();

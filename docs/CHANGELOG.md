@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [改進] 台股日報 `market_review` 生成時新增 FinMind 結構化快照，包含 006208、0050/006208/2330 價格變化、成交量/成交金額、PER/PBR/殖利率可用性、資料缺口與台股語意方向 metadata，供後續閱讀版面直接消費。
+
+- [改進] 台股日報改為結構化閱讀版面，將既有 FinMind `market_review` 報告分區呈現為今日重點、主要指數、法人資金、融資融券、代表標的與資料狀態，舊版不完整 Markdown 仍保留安全 fallback。
+
+- [改進] Web 將既有 FinMind 台股市場日報入口與狀態文案由「市場概覽」改名為「台股日報」，與「美股日報」形成成對日報入口；內部 `market_review` API/配置識別維持不變。
+
 - [修復] 問股頁 Google Finance helper 在輸入股票代號時即時顯示，且即使瀏覽器阻擋剪貼簿複製，仍會開啟可解析標的的 Google Finance 外部頁。
 
 - [改進] Google Finance 外部參考入口移至個股分析主介面工具列，完整報告內不顯示該入口；連結仍使用 persisted metadata/exchange resolver，未知交易所維持隱藏。

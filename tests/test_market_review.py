@@ -39,10 +39,172 @@ def _build_optional_module_stubs() -> dict[str, ModuleType]:
 
 sys.modules.update(_build_optional_module_stubs())
 import src.core.market_review as market_review_module
+from data_provider.taiwan_market import TaiwanMarketDataFetcher
 from src.config import Config
+from src.core.tw_market_review import build_tw_market_review_context
 from src.storage import AnalysisHistory, DatabaseManager
 
 run_market_review = market_review_module.run_market_review
+
+
+class TaiwanMarketSnapshotEnrichmentTestCase(unittest.TestCase):
+    def test_market_snapshot_includes_representative_price_and_valuation_rows(self) -> None:
+        fetcher = TaiwanMarketDataFetcher()
+
+        snapshot = fetcher.get_tw_market_snapshot("2026-06-01", "2026-06-13")
+
+        tw_daily = snapshot["tw_daily_snapshot"]
+        self.assertEqual(tw_daily["kind"], "tw_daily_snapshot")
+        self.assertEqual(tw_daily["source"], "finmind")
+        self.assertEqual(tw_daily["data_date"], "2026-06-12")
+
+        reps = {row["symbol"]: row for row in tw_daily["representatives"]}
+        self.assertEqual(set(reps), {"0050", "006208", "2330"})
+
+        self.assertEqual(reps["006208"]["name"], "富邦台50")
+        self.assertEqual(reps["006208"]["close"], 117.7)
+        self.assertEqual(reps["006208"]["previous_close"], 118.9)
+        self.assertAlmostEqual(reps["006208"]["change"], -1.2)
+        self.assertAlmostEqual(reps["006208"]["change_pct"], -1.0093, places=4)
+        self.assertEqual(reps["006208"]["volume"], 28000000)
+        self.assertEqual(reps["006208"]["turnover"], 3295600000)
+        self.assertEqual(reps["006208"]["semantic_direction"], "tw_loss")
+        self.assertIn("PER", reps["006208"]["missing_fields"])
+
+        self.assertEqual(reps["2330"]["PER"], 25.1)
+        self.assertEqual(reps["2330"]["PBR"], 6.3)
+        self.assertEqual(reps["2330"]["dividend_yield"], 1.38)
+        self.assertEqual(reps["2330"]["valuation_as_of"], "2026-06-12")
+
+    def test_market_snapshot_representatives_align_to_snapshot_data_date(self) -> None:
+        fetcher = TaiwanMarketDataFetcher()
+        sections = {
+            "availability": {"as_of": "2026-06-26"},
+            "taiex": {
+                "ok": True,
+                "dataset": "TaiwanStockTotalReturnIndex",
+                "data_id": "TAIEX",
+                "source": "fixture",
+                "rows": [
+                    {"date": "2026-06-25", "price": 100.0},
+                    {"date": "2026-06-26", "price": 101.0},
+                ],
+            },
+            "tpex": {
+                "ok": True,
+                "dataset": "TaiwanStockTotalReturnIndex",
+                "data_id": "TPEx",
+                "source": "fixture",
+                "rows": [
+                    {"date": "2026-06-25", "price": 80.0},
+                    {"date": "2026-06-26", "price": 81.0},
+                ],
+            },
+            "institutional_total": {"ok": True, "dataset": "TaiwanStockTotalInstitutionalInvestors", "rows": []},
+            "margin_total": {"ok": True, "dataset": "TaiwanStockTotalMarginPurchaseShortSale", "rows": []},
+            "ref_0050": {
+                "ok": True,
+                "dataset": "TaiwanStockPrice",
+                "data_id": "0050",
+                "source": "fixture",
+                "rows": [
+                    {"date": "2026-06-25", "close": 100.0, "Trading_Volume": 1000, "Trading_money": 100000},
+                    {"date": "2026-06-26", "close": 101.0, "Trading_Volume": 1100, "Trading_money": 111100},
+                    {"date": "2026-06-29", "close": 120.0, "Trading_Volume": 1200, "Trading_money": 144000},
+                ],
+            },
+            "ref_006208": {
+                "ok": True,
+                "dataset": "TaiwanStockPrice",
+                "data_id": "006208",
+                "source": "fixture",
+                "rows": [
+                    {"date": "2026-06-25", "close": 90.0, "Trading_Volume": 900, "Trading_money": 81000},
+                    {"date": "2026-06-26", "close": 91.0, "Trading_Volume": 950, "Trading_money": 86450},
+                    {"date": "2026-06-29", "close": 130.0, "Trading_Volume": 1300, "Trading_money": 169000},
+                ],
+            },
+            "ref_2330": {
+                "ok": True,
+                "dataset": "TaiwanStockPrice",
+                "data_id": "2330",
+                "source": "fixture",
+                "rows": [
+                    {"date": "2026-06-25", "close": 980.0, "Trading_Volume": 10000, "Trading_money": 9800000},
+                    {"date": "2026-06-26", "close": 990.0, "Trading_Volume": 11000, "Trading_money": 10890000},
+                    {"date": "2026-06-29", "close": 1100.0, "Trading_Volume": 12000, "Trading_money": 13200000},
+                ],
+            },
+            "per_0050": {"ok": True, "dataset": "TaiwanStockPER", "data_id": "0050", "rows": []},
+            "per_006208": {"ok": True, "dataset": "TaiwanStockPER", "data_id": "006208", "rows": []},
+            "per_2330": {
+                "ok": True,
+                "dataset": "TaiwanStockPER",
+                "data_id": "2330",
+                "source": "fixture",
+                "rows": [
+                    {"date": "2026-06-26", "PER": 20.0, "PBR": 5.0, "dividend_yield": 2.0},
+                    {"date": "2026-06-29", "PER": 22.0, "PBR": 5.5, "dividend_yield": 1.8},
+                ],
+            },
+        }
+
+        tw_daily = fetcher._build_tw_daily_snapshot(sections)
+        reps = {row["symbol"]: row for row in tw_daily["representatives"]}
+
+        self.assertEqual(reps["0050"]["data_date"], "2026-06-26")
+        self.assertEqual(reps["0050"]["close"], 101.0)
+        self.assertEqual(reps["006208"]["data_date"], "2026-06-26")
+        self.assertEqual(reps["006208"]["close"], 91.0)
+        self.assertEqual(reps["2330"]["data_date"], "2026-06-26")
+        self.assertEqual(reps["2330"]["close"], 990.0)
+        self.assertEqual(reps["2330"]["valuation_as_of"], "2026-06-26")
+        self.assertEqual(reps["2330"]["PER"], 20.0)
+
+        ctx = build_tw_market_review_context(sections)
+        self.assertEqual(ctx["last_0050"]["date"], "2026-06-26")
+        self.assertEqual(ctx["last_006208"]["date"], "2026-06-26")
+        self.assertEqual(ctx["last_2330"]["date"], "2026-06-26")
+
+    def test_market_snapshot_records_semantics_and_partial_failures(self) -> None:
+        class EmptyTpexFetcher(TaiwanMarketDataFetcher):
+            def get_total_return_index(self, index_id, start_date, end_date):
+                if index_id == "TPEx":
+                    return {
+                        "ok": False,
+                        "source": "fixture",
+                        "dataset": "TaiwanStockTotalReturnIndex",
+                        "data_id": "TPEx",
+                        "rows": [],
+                        "columns": [],
+                        "row_count": 0,
+                        "start_date": start_date,
+                        "end_date": end_date,
+                        "error": "boom",
+                        "unavailable_reason": "test_failure",
+                        "cache_meta": {},
+                    }
+                return super().get_total_return_index(index_id, start_date, end_date)
+
+        snapshot = EmptyTpexFetcher().get_tw_market_snapshot("2026-06-01", "2026-06-13")
+
+        self.assertFalse(snapshot["tpex"]["ok"])
+        tw_daily = snapshot["tw_daily_snapshot"]
+        self.assertIn("tpex", tw_daily["data_status"]["partial_failures"])
+        taiex = next(row for row in tw_daily["indices"] if row["symbol"] == "TAIEX")
+        self.assertEqual(taiex["semantic_direction"], "tw_gain")
+        margin = next(row for row in tw_daily["margin_short"] if row["name"] == "MarginPurchaseMoney")
+        self.assertEqual(margin["semantic_type"], "risk_or_leverage")
+
+    def test_tw_market_review_context_keeps_old_markdown_compatibility(self) -> None:
+        snapshot = TaiwanMarketDataFetcher().get_tw_market_snapshot("2026-06-01", "2026-06-13")
+
+        ctx = build_tw_market_review_context(snapshot)
+
+        self.assertTrue(ctx["ref_0050_ok"])
+        self.assertTrue(ctx["ref_006208_ok"])
+        self.assertTrue(ctx["ref_2330_ok"])
+        self.assertEqual(ctx["last_006208"]["close"], 117.7)
 
 
 class MarketReviewLocalizationTestCase(unittest.TestCase):
@@ -307,7 +469,7 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                     ).first()
                     self.assertIsNotNone(row)
                     self.assertEqual(row.code, market_review_module.MARKET_REVIEW_HISTORY_CODE)
-                    self.assertEqual(row.name, "市場概覽")
+                    self.assertEqual(row.name, "台股日報")
                     self.assertEqual(row.report_type, market_review_module.MARKET_REVIEW_REPORT_TYPE)
                     self.assertEqual(row.news_content, "## 今日大盤\n\n覆盤正文")
                     self.assertIn("# 🎯 大盤覆盤", row.raw_result)
@@ -344,7 +506,7 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                         AnalysisHistory.query_id == "market-task-002"
                     ).first()
                     self.assertIsNotNone(row)
-                    self.assertEqual(row.name, "市場概覽")
+                    self.assertEqual(row.name, "台股日報")
                     self.assertNotIn("大盤覆盤", row.name)
                     self.assertNotIn("大盤復盤", row.name)
                     self.assertNotIn("大盤覆盤", row.operation_advice or "")

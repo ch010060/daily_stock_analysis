@@ -29,7 +29,7 @@ const legacyMarketReviewItem: StockBarItem = {
 };
 
 describe('StockBarItemComponent', () => {
-  it('shows the 市場概覽 title for the MARKET pseudo-record even when the persisted name is the legacy 大盤覆盤 wording', () => {
+  it('shows the 台股日報 title for the MARKET pseudo-record even when the persisted name is the legacy 大盤覆盤 wording', () => {
     render(
       <StockBarItemComponent
         item={legacyMarketReviewItem}
@@ -40,10 +40,10 @@ describe('StockBarItemComponent', () => {
       />,
     );
 
-    expect(screen.getByText('市場概覽')).toBeInTheDocument();
+    expect(screen.getByText('台股日報')).toBeInTheDocument();
     expect(screen.queryByText('大盤覆盤')).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /^市場概覽 MARKET 歷史記錄$/ }),
+      screen.getByRole('button', { name: /^台股日報 MARKET 歷史記錄$/ }),
     ).toBeInTheDocument();
   });
 

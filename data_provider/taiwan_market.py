@@ -7,7 +7,7 @@ Provides market-level data for 台股大盤回顧 (TW market review):
   - TAIEX / TPEx total return index
   - Institutional investors total (三大法人)
   - Margin purchase / short-sale total (融資融券)
-  - Reference stock daily prices (0050, 2330)
+  - Reference stock daily prices / PER rows (0050, 006208, 2330)
   - Snapshot composition
 
 Provider chain:
@@ -43,7 +43,14 @@ _FINMIND_BASE = "https://api.finmindtrade.com/api/v4/data"
 _YFINANCE_SYMBOLS = {
     "TAIEX": "^TWII",
     "0050": "0050.TW",
+    "006208": "006208.TW",
     "2330": "2330.TW",
+}
+
+_REPRESENTATIVE_NAMES = {
+    "0050": "元大台灣50",
+    "006208": "富邦台50",
+    "2330": "臺積電",
 }
 
 _RESULT_KEYS = (
@@ -51,6 +58,40 @@ _RESULT_KEYS = (
     "row_count", "start_date", "end_date", "error", "unavailable_reason",
     "cache_meta",
 )
+
+
+def _to_float(value: Any) -> Optional[float]:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _tw_direction(change: Optional[float]) -> str:
+    if change is None:
+        return "neutral"
+    if change > 0:
+        return "tw_gain"
+    if change < 0:
+        return "tw_loss"
+    return "neutral"
+
+
+def _latest_rows_on_or_before(rows: List[Dict[str, Any]], data_date: Optional[str]) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    if not rows:
+        return {}, {}
+    if data_date:
+        usable = [row for row in rows if str(row.get("date") or "") <= data_date]
+    else:
+        usable = list(rows)
+    if not usable:
+        return {}, {}
+    usable.sort(key=lambda row: str(row.get("date") or ""))
+    last = usable[-1]
+    prev = usable[-2] if len(usable) >= 2 else {}
+    return last, prev
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -332,6 +373,7 @@ class TaiwanMarketDataFetcher:
         dataset = "TaiwanStockPrice"
         fixture_map = {
             "0050": "finmind_stock_price_0050.json",
+            "006208": "finmind_stock_price_006208.json",
             "2330": "finmind_stock_price_2330.json",
         }
         fixture_name = fixture_map.get(stock_id, f"finmind_stock_price_{stock_id}.json")
@@ -343,6 +385,15 @@ class TaiwanMarketDataFetcher:
 
         # yfinance fallback for reference stocks
         return self._yfinance_stock_fallback(stock_id, start_date, end_date, dataset)
+
+    def get_reference_stock_per(
+        self, stock_id: str, start_date: str, end_date: str
+    ) -> Dict[str, Any]:
+        """Return PER/PBR/dividend yield for a representative TW stock/ETF."""
+        dataset = "TaiwanStockPER"
+        fixture_name = f"finmind_stock_per_{stock_id}.json"
+        raw = self._finmind_or_fixture(dataset, stock_id, start_date, end_date, fixture_name)
+        return self._wrap_finmind_result(raw, dataset, stock_id, start_date, end_date)
 
     def get_tw_market_snapshot(self, start_date: str, end_date: str) -> Dict[str, Any]:
         """
@@ -359,7 +410,11 @@ class TaiwanMarketDataFetcher:
         margin = self.get_margin_purchase_short_sale_total(start_date, end_date)
         trading_dates = self.get_trading_dates(start_date, end_date)
         ref_0050 = self.get_reference_stock_daily("0050", start_date, end_date)
+        ref_006208 = self.get_reference_stock_daily("006208", start_date, end_date)
         ref_2330 = self.get_reference_stock_daily("2330", start_date, end_date)
+        per_0050 = self.get_reference_stock_per("0050", start_date, end_date)
+        per_006208 = self.get_reference_stock_per("006208", start_date, end_date)
+        per_2330 = self.get_reference_stock_per("2330", start_date, end_date)
 
         required_sections = {
             "trading_dates": trading_dates,
@@ -370,7 +425,11 @@ class TaiwanMarketDataFetcher:
         optional_sections = {
             "tpex": tpex,
             "ref_0050": ref_0050,
+            "ref_006208": ref_006208,
             "ref_2330": ref_2330,
+            "per_0050": per_0050,
+            "per_006208": per_006208,
+            "per_2330": per_2330,
         }
 
         required_ok = all(s["ok"] for s in required_sections.values())
@@ -387,7 +446,7 @@ class TaiwanMarketDataFetcher:
         if taiex["ok"] and taiex["rows"]:
             last_trading_date = taiex["rows"][-1].get("date")
 
-        return {
+        sections = {
             **required_sections,
             **optional_sections,
             "availability": {
@@ -399,6 +458,206 @@ class TaiwanMarketDataFetcher:
                 "as_of": last_trading_date,
             },
         }
+        sections["tw_daily_snapshot"] = self._build_tw_daily_snapshot(sections)
+        return sections
+
+    def _build_tw_daily_snapshot(self, sections: Dict[str, Any]) -> Dict[str, Any]:
+        """Build a persisted structured snapshot while keeping legacy raw sections."""
+        availability = sections.get("availability") or {}
+        data_date = availability.get("as_of")
+        data_status = {
+            "missing_fields": [],
+            "stale_fields": [],
+            "partial_failures": [
+                key for key, value in sections.items()
+                if isinstance(value, dict) and value.get("ok") is False
+            ],
+        }
+
+        datasets = []
+        for key, value in sections.items():
+            if not isinstance(value, dict) or "dataset" not in value:
+                continue
+            rows = value.get("rows") or []
+            datasets.append({
+                "key": key,
+                "dataset": value.get("dataset"),
+                "data_id": value.get("data_id"),
+                "source": value.get("source"),
+                "ok": bool(value.get("ok")),
+                "row_count": value.get("row_count", 0),
+                "as_of": rows[-1].get("date") if rows else None,
+                "unavailable_reason": value.get("unavailable_reason"),
+            })
+
+        return {
+            "kind": "tw_daily_snapshot",
+            "source": "finmind",
+            "data_date": data_date,
+            "datasets": datasets,
+            "indices": self._snapshot_indices(sections),
+            "institutional_flows": self._snapshot_institutional_flows(sections),
+            "margin_short": self._snapshot_margin_short(sections),
+            "representatives": self._snapshot_representatives(sections, data_status),
+            "data_status": data_status,
+        }
+
+    def _snapshot_indices(self, sections: Dict[str, Any]) -> List[Dict[str, Any]]:
+        data_date = (sections.get("availability") or {}).get("as_of")
+        names = {
+            "taiex": ("TAIEX", "加權報酬指數"),
+            "tpex": ("TPEx", "櫃買報酬指數"),
+        }
+        rows_out: List[Dict[str, Any]] = []
+        for key, (symbol, name) in names.items():
+            result = sections.get(key) or {}
+            rows = result.get("rows") or []
+            if not result.get("ok") or not rows:
+                continue
+            last, prev = _latest_rows_on_or_before(rows, data_date)
+            if not last:
+                continue
+            value = _to_float(last.get("price"))
+            prev_value = _to_float(prev.get("price"))
+            change = value - prev_value if value is not None and prev_value is not None else None
+            change_pct = (
+                change / prev_value * 100
+                if change is not None and prev_value not in (None, 0)
+                else None
+            )
+            rows_out.append({
+                "symbol": symbol,
+                "name": name,
+                "value": value,
+                "previous_value": prev_value,
+                "change": change,
+                "change_pct": change_pct,
+                "data_date": last.get("date"),
+                "source_dataset": result.get("dataset"),
+                "source": result.get("source"),
+                "semantic_direction": _tw_direction(change),
+            })
+        return rows_out
+
+    def _snapshot_institutional_flows(self, sections: Dict[str, Any]) -> List[Dict[str, Any]]:
+        result = sections.get("institutional_total") or {}
+        rows = result.get("rows") or []
+        if not result.get("ok") or not rows:
+            return []
+        latest_date = max(row.get("date", "") for row in rows)
+        out = []
+        for row in rows:
+            if row.get("date") != latest_date:
+                continue
+            buy = _to_float(row.get("buy")) or 0.0
+            sell = _to_float(row.get("sell")) or 0.0
+            net = buy - sell
+            out.append({
+                "name": row.get("name"),
+                "buy": buy,
+                "sell": sell,
+                "net": net,
+                "unit": "TWD",
+                "display_divisor": 1e8,
+                "data_date": row.get("date"),
+                "source_dataset": result.get("dataset"),
+                "source": result.get("source"),
+                "semantic_direction": "net_buy" if net > 0 else ("net_sell" if net < 0 else "neutral"),
+            })
+        return out
+
+    def _snapshot_margin_short(self, sections: Dict[str, Any]) -> List[Dict[str, Any]]:
+        result = sections.get("margin_total") or {}
+        rows = result.get("rows") or []
+        if not result.get("ok") or not rows:
+            return []
+        latest_date = max(row.get("date", "") for row in rows)
+        out = []
+        for row in rows:
+            if row.get("date") != latest_date:
+                continue
+            today = _to_float(row.get("TodayBalance"))
+            yesterday = _to_float(row.get("YesBalance"))
+            change = today - yesterday if today is not None and yesterday is not None else None
+            name = row.get("name")
+            out.append({
+                "name": name,
+                "today_balance": today,
+                "yesterday_balance": yesterday,
+                "change": change,
+                "unit": "shares" if name == "ShortSaleVolume" else "TWD",
+                "display_divisor": 1 if name == "ShortSaleVolume" else 1e8,
+                "data_date": row.get("date"),
+                "source_dataset": result.get("dataset"),
+                "source": result.get("source"),
+                "semantic_type": "risk_or_leverage",
+            })
+        return out
+
+    def _snapshot_representatives(
+        self,
+        sections: Dict[str, Any],
+        data_status: Dict[str, List[str]],
+    ) -> List[Dict[str, Any]]:
+        data_date = (sections.get("availability") or {}).get("as_of")
+        out: List[Dict[str, Any]] = []
+        for symbol, name in _REPRESENTATIVE_NAMES.items():
+            price_result = sections.get(f"ref_{symbol}") or {}
+            price_rows = price_result.get("rows") or []
+            if not price_result.get("ok") or not price_rows:
+                continue
+            last, prev = _latest_rows_on_or_before(price_rows, data_date)
+            if not last:
+                continue
+            close = _to_float(last.get("close"))
+            previous_close = _to_float(prev.get("close"))
+            change = (
+                close - previous_close
+                if close is not None and previous_close is not None
+                else _to_float(last.get("spread"))
+            )
+            change_pct = (
+                change / previous_close * 100
+                if change is not None and previous_close not in (None, 0)
+                else None
+            )
+
+            per_result = sections.get(f"per_{symbol}") or {}
+            per_rows = per_result.get("rows") or []
+            per_last = {}
+            if per_result.get("ok") and per_rows:
+                per_last, _ = _latest_rows_on_or_before(per_rows, data_date)
+            missing_fields: List[str] = []
+            valuation = {}
+            for field in ("PER", "PBR", "dividend_yield"):
+                value = _to_float(per_last.get(field))
+                valuation[field] = value
+                if value is None:
+                    missing_fields.append(field)
+                    data_status["missing_fields"].append(f"representatives.{symbol}.{field}")
+
+            out.append({
+                "symbol": symbol,
+                "name": name,
+                "close": close,
+                "previous_close": previous_close,
+                "change": change,
+                "change_pct": change_pct,
+                "volume": last.get("Trading_Volume"),
+                "turnover": last.get("Trading_money"),
+                "trading_turnover": last.get("Trading_turnover"),
+                "data_date": last.get("date"),
+                "source_dataset": price_result.get("dataset"),
+                "source": price_result.get("source"),
+                "PER": valuation["PER"],
+                "PBR": valuation["PBR"],
+                "dividend_yield": valuation["dividend_yield"],
+                "valuation_as_of": per_last.get("date"),
+                "valuation_source_dataset": per_result.get("dataset"),
+                "missing_fields": missing_fields,
+                "semantic_direction": _tw_direction(change),
+            })
+        return out
 
     # ------------------------------------------------------------------
     # yfinance fallback helpers

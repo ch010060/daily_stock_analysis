@@ -1,0 +1,8 @@
+{
+  "status": 200,
+  "msg": "success",
+  "data": [
+    {"date": "2026-06-10", "stock_id": "2330", "PER": 24.5, "PBR": 6.1, "dividend_yield": 1.45},
+    {"date": "2026-06-12", "stock_id": "2330", "PER": 25.1, "PBR": 6.3, "dividend_yield": 1.38}
+  ]
+}

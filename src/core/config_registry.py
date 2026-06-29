@@ -3056,7 +3056,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "MARKET_REVIEW_ENABLED": {
         "title": "Market Review Enabled",
-        "description": "Enable market overview/review in analysis reports.",
+        "description": "Enable Taiwan daily report/review in analysis reports.",
         "category": "system",
         "data_type": "boolean",
         "ui_control": "switch",
