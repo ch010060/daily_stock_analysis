@@ -16,7 +16,7 @@ interface HistoryListItemProps {
 }
 
 const MARKET_REVIEW_HISTORY_CODE = 'MARKET';
-const MARKET_REVIEW_DISPLAY_NAME = '市場概覽';
+const MARKET_REVIEW_DISPLAY_NAME = '台股日報';
 
 const getOperationBadgeLabel = (advice?: string) => {
   const normalized = advice?.trim();

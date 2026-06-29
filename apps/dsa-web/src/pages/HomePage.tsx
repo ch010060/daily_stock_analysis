@@ -446,7 +446,7 @@ const HomePage: React.FC = () => {
           setMarketReviewReport(null);
           setMarketReviewNotice({
             variant: 'danger',
-            title: '市場概覽已超時',
+            title: '台股日報已超時',
             message: '任務長時間未返回最終結果，請在任務列表/歷史中檢視。',
           });
           scrollMarketReviewFeedbackIntoView();
@@ -464,7 +464,7 @@ const HomePage: React.FC = () => {
               : '進行中';
             setMarketReviewNotice({
               variant: 'warning',
-              title: '市場概覽進行中',
+              title: '台股日報進行中',
               message: `任務狀態：${status.status}（${progress}）`,
             });
             return true;
@@ -482,14 +482,14 @@ const HomePage: React.FC = () => {
             if (!marketReviewText && skipReason) {
               setMarketReviewNotice({
                 variant: 'warning',
-                title: '市場概覽已跳過',
+                title: '台股日報已跳過',
                 message: skipReason,
               });
             } else {
               setMarketReviewNotice({
                 variant: 'success',
-                title: '市場概覽已完成',
-                message: marketReviewText ? '市場概覽任務已完成，結果如下：' : '市場概覽任務已完成，結果已生成並按配置推送。',
+                title: '台股日報已完成',
+                message: marketReviewText ? '台股日報任務已完成，結果如下：' : '台股日報任務已完成，結果已生成並按配置推送。',
               });
             }
             setMarketReviewError(null);
@@ -506,7 +506,7 @@ const HomePage: React.FC = () => {
                   status: 500,
                   data: {
                     error: 'market_review_failed',
-                    message: status.error || '市場概覽執行失敗。',
+                    message: status.error || '台股日報執行失敗。',
                   },
                 },
               }),
@@ -520,7 +520,7 @@ const HomePage: React.FC = () => {
           setMarketReviewReport(null);
           setMarketReviewNotice({
             variant: 'danger',
-            title: '市場概覽狀態異常',
+            title: '台股日報狀態異常',
             message: `收到未知任務狀態：${status.status}`,
           });
           scrollMarketReviewFeedbackIntoView();
@@ -564,7 +564,7 @@ const HomePage: React.FC = () => {
       const result = await analysisApi.triggerMarketReview({ sendNotification: notify });
       setMarketReviewNotice({
         variant: 'success',
-        title: '市場概覽已提交',
+        title: '台股日報已提交',
         message: result.message,
       });
       scrollMarketReviewFeedbackIntoView();
@@ -607,7 +607,7 @@ const HomePage: React.FC = () => {
     const marketReviewItem: StockBarItem = {
       id: latestMarketReview.id,
       stockCode: 'MARKET',
-      stockName: latestMarketReview.stockName || '市場概覽',
+      stockName: latestMarketReview.stockName || '台股日報',
       reportType: 'market_review',
       sentimentScore: latestMarketReview.sentimentScore,
       operationAdvice: latestMarketReview.operationAdvice,
@@ -755,7 +755,7 @@ const HomePage: React.FC = () => {
                 className="h-10 flex-1 whitespace-nowrap md:flex-none"
               >
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
-                市場概覽
+                台股日報
               </Button>
               <Button
                 type="button"

@@ -275,7 +275,7 @@ class TaskStatus(BaseModel):
     )
     market_review_skip_reason: Optional[str] = Field(
         None,
-        description="市場概覽任務已完成但未產生可持久化報告時的跳過原因（僅大盤覆盤任務）",
+        description="台股日報任務已完成但未產生可持久化報告時的跳過原因（僅大盤覆盤任務）",
     )
     error: Optional[str] = Field(
         None, 

@@ -185,7 +185,7 @@ describe('HomePage', () => {
     expect(historyApi.getMarkdown).not.toHaveBeenCalled();
   });
 
-  it('renders a FiNews US daily button beside market overview and navigates locally', async () => {
+  it('renders a FiNews US daily button beside Taiwan daily report and navigates locally', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 0,
       page: 1,
@@ -199,10 +199,10 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    const marketOverviewButton = await screen.findByRole('button', { name: '市場概覽' });
+    const taiwanDailyButton = await screen.findByRole('button', { name: '台股日報' });
     const finewsButton = screen.getByRole('button', { name: '美股日報' });
 
-    expect(finewsButton.parentElement).toBe(marketOverviewButton.parentElement);
+    expect(finewsButton.parentElement).toBe(taiwanDailyButton.parentElement);
 
     fireEvent.click(finewsButton);
 
@@ -489,7 +489,7 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
       sendNotification: true,
-      message: '市場概覽任務已提交',
+      message: '台股日報任務已提交',
       taskId: 'task-1',
     });
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
@@ -504,12 +504,12 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '市場概覽' }));
+    fireEvent.click(await screen.findByRole('button', { name: '台股日報' }));
 
     await waitFor(() => {
       expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
     });
-    expect(await screen.findByText('市場概覽已完成')).toBeInTheDocument();
+    expect(await screen.findByText('台股日報已完成')).toBeInTheDocument();
     expect(await screen.findByText('市場覆盤報告示例文字')).toBeInTheDocument();
     expect(analysisApi.getStatus).toHaveBeenCalledWith('task-1');
   });
@@ -524,13 +524,13 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
       sendNotification: true,
-      message: '市場概覽任務已提交',
+      message: '台股日報任務已提交',
       taskId: 'task-1',
     });
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
       taskId: 'task-1',
       status: 'completed',
-      marketReviewSkipReason: '市場概覽已跳過：沒有可持久化的盤勢回顧內容',
+      marketReviewSkipReason: '台股日報已跳過：沒有可持久化的盤勢回顧內容',
     });
 
     render(
@@ -539,14 +539,14 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '市場概覽' }));
+    fireEvent.click(await screen.findByRole('button', { name: '台股日報' }));
 
     await waitFor(() => {
       expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
     });
-    expect(await screen.findByText('市場概覽已跳過：沒有可持久化的盤勢回顧內容')).toBeInTheDocument();
-    expect(screen.queryByText('市場概覽已完成')).not.toBeInTheDocument();
-    expect(screen.queryByText('市場概覽任務已完成，結果已生成並按配置推送。')).not.toBeInTheDocument();
+    expect(await screen.findByText('台股日報已跳過：沒有可持久化的盤勢回顧內容')).toBeInTheDocument();
+    expect(screen.queryByText('台股日報已完成')).not.toBeInTheDocument();
+    expect(screen.queryByText('台股日報任務已完成，結果已生成並按配置推送。')).not.toBeInTheDocument();
   });
 
   it('scrolls the dashboard to market review feedback after toolbar clicks', async () => {
@@ -560,7 +560,7 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
       sendNotification: true,
-      message: '市場概覽任務已提交',
+      message: '台股日報任務已提交',
       taskId: 'task-1',
     });
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
@@ -588,13 +588,13 @@ describe('HomePage', () => {
     });
     dashboardScroll.scrollTop = 480;
 
-    fireEvent.click(screen.getByRole('button', { name: '市場概覽' }));
+    fireEvent.click(screen.getByRole('button', { name: '台股日報' }));
 
     await waitFor(() => {
       expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
     });
     expect(dashboardScroll.scrollTop).toBe(0);
-    expect(await screen.findByText('市場概覽已完成')).toBeInTheDocument();
+    expect(await screen.findByText('台股日報已完成')).toBeInTheDocument();
   });
 
   it('keeps market review results in the main dashboard scroll area', async () => {
@@ -607,7 +607,7 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
       sendNotification: true,
-      message: '市場概覽任務已提交',
+      message: '台股日報任務已提交',
       taskId: 'task-1',
     });
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
@@ -622,7 +622,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '市場概覽' }));
+    fireEvent.click(await screen.findByRole('button', { name: '台股日報' }));
 
     const dashboardScroll = screen.getByTestId('home-dashboard-scroll');
     const marketReviewReport = await screen.findByTestId('market-review-report');

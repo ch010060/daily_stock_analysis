@@ -131,7 +131,7 @@ def _compute_market_review_override_region(config: Config) -> Optional[str]:
             open_markets,
         )
     except Exception as exc:
-        logger.warning("市場概覽交易日過濾失敗，按配置繼續執行: %s", exc)
+        logger.warning("台股日報交易日過濾失敗，按配置繼續執行: %s", exc)
         return None
 
 
@@ -166,7 +166,7 @@ def _run_market_review_background(
             return {
                 "status": "skipped",
                 "result": None,
-                "message": "市場概覽已跳過：沒有可持久化的盤勢回顧內容",
+                "message": "台股日報已跳過：沒有可持久化的盤勢回顧內容",
             }
         return {"result": report}
     finally:
@@ -537,7 +537,7 @@ def _handle_sync_analysis(
 
 
 # ============================================================
-# POST /market-review - 觸發市場概覽
+# POST /market-review - 觸發台股日報
 # ============================================================
 
 @router.post(
@@ -545,12 +545,12 @@ def _handle_sync_analysis(
     response_model=MarketReviewAccepted,
     status_code=202,
     responses={
-        202: {"description": "市場概覽任務已接受", "model": MarketReviewAccepted},
-        409: {"description": "市場概覽正在執行", "model": ErrorResponse},
+        202: {"description": "台股日報任務已接受", "model": MarketReviewAccepted},
+        409: {"description": "台股日報正在執行", "model": ErrorResponse},
         500: {"description": "提交失敗", "model": ErrorResponse},
     },
-    summary="觸發市場概覽",
-    description="提交一個後臺市場概覽任務，複用 CLI 的盤勢回顧鏈路並儲存報告。介面內部僅提供程序內/單機防重，如多例項（多 Worker/多容器）部署，需結合外部冪等機制避免重複觸發。",
+    summary="觸發台股日報",
+    description="提交一個後臺台股日報任務，複用 CLI 的盤勢回顧鏈路並儲存報告。介面內部僅提供程序內/單機防重，如多例項（多 Worker/多容器）部署，需結合外部冪等機制避免重複觸發。",
 )
 def trigger_market_review(
     request: Optional[MarketReviewRequest] = Body(None),
@@ -563,7 +563,7 @@ def trigger_market_review(
     if override_region == "":
         return MarketReviewAccepted(
             status="accepted",
-            message="今日市場概覽相關市場均為非交易日，已跳過市場概覽",
+            message="今日台股日報相關市場均為非交易日，已跳過台股日報",
             send_notification=request.send_notification,
             trace_id=None,
         )
@@ -574,7 +574,7 @@ def trigger_market_review(
             status_code=409,
             detail={
                 "error": "duplicate_market_review",
-                "message": "市場概覽正在執行中，請稍後再試",
+                "message": "台股日報正在執行中，請稍後再試",
             },
         )
 
@@ -589,8 +589,8 @@ def trigger_market_review(
                 query_id=task_id,
             ),
             stock_code="market_review",
-            stock_name="市場概覽",
-            message="市場概覽任務已提交",
+            stock_name="台股日報",
+            message="台股日報任務已提交",
             task_id=task_id,
         )
     except Exception:
@@ -599,7 +599,7 @@ def trigger_market_review(
 
     return MarketReviewAccepted(
         status="accepted",
-        message="市場概覽任務已提交，完成後會儲存報告並按配置推送通知",
+        message="台股日報任務已提交，完成後會儲存報告並按配置推送通知",
         send_notification=request.send_notification,
         task_id=task.task_id,
         trace_id=_get_task_trace_id(task),

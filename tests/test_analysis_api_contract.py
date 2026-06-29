@@ -151,8 +151,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         args, kwargs = task_queue.submit_background_task.call_args
         self.assertTrue(callable(args[0]))
         self.assertEqual(kwargs["stock_code"], "market_review")
-        self.assertEqual(kwargs["stock_name"], "市場概覽")
-        self.assertEqual(kwargs["message"], "市場概覽任務已提交")
+        self.assertEqual(kwargs["stock_name"], "台股日報")
+        self.assertEqual(kwargs["message"], "台股日報任務已提交")
 
     def test_trigger_market_review_rejects_duplicate_submission(self) -> None:
         if trigger_market_review is None or analysis_endpoint_module is None:
@@ -269,7 +269,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertIn("非交易日", response.message)
         legacy_label = "大盤" + "覆盤"
         self.assertNotIn(legacy_label, response.message)
-        self.assertIn("市場概覽", response.message)
+        self.assertIn("台股日報", response.message)
         acquire.assert_not_called()
         task_queue.submit_background_task.assert_not_called()
 
@@ -487,7 +487,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         queue.get_task.return_value = SimpleNamespace(
             task_id="market-task-1",
             stock_code="market_review",
-            stock_name="市場概覽",
+            stock_name="台股日報",
             status=analysis_endpoint_module.TaskStatusEnum.COMPLETED,
             progress=100,
             result={"result": "市場覆盤報告示例文字"},
@@ -512,13 +512,13 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         queue.get_task.return_value = SimpleNamespace(
             task_id="market-task-2",
             stock_code="market_review",
-            stock_name="市場概覽",
+            stock_name="台股日報",
             status=analysis_endpoint_module.TaskStatusEnum.COMPLETED,
             progress=100,
             result={
                 "status": "skipped",
                 "result": None,
-                "message": "市場概覽已跳過：沒有可持久化的盤勢回顧內容",
+                "message": "台股日報已跳過：沒有可持久化的盤勢回顧內容",
             },
             error=None,
             original_query=None,
@@ -531,7 +531,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         self.assertEqual(status.status, "completed")
         self.assertIsNone(status.market_review_report)
-        self.assertEqual(status.market_review_skip_reason, "市場概覽已跳過：沒有可持久化的盤勢回顧內容")
+        self.assertEqual(status.market_review_skip_reason, "台股日報已跳過：沒有可持久化的盤勢回顧內容")
 
     def test_get_analysis_status_normalizes_completed_queue_result_contract(self) -> None:
         if get_analysis_status is None or analysis_endpoint_module is None:
@@ -639,7 +639,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         self.assertEqual(result["status"], "skipped")
         self.assertIsNone(result["result"])
-        self.assertIn("市場概覽", result["message"])
+        self.assertIn("台股日報", result["message"])
         self.assertNotIn("未返回可持久化報告", result["message"])
 
     def test_run_market_review_background_releases_lock_on_runtime_build_failure(self) -> None:
@@ -693,8 +693,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                     config=SimpleNamespace(),
                 ),
                 stock_code="market_review",
-                stock_name="市場概覽",
-                message="市場概覽任務已提交",
+                stock_name="台股日報",
+                message="台股日報任務已提交",
             )
 
         task_info = queue.get_task(task.task_id)
@@ -759,7 +759,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             SimpleNamespace(
                 id=10,
                 code="MARKET",
-                name="市場概覽",
+                name="台股日報",
                 report_type="market_review",
                 raw_result={"raw_response": "# 🎯 盤勢回顧\n\n回顧正文"},
                 news_content="回顧正文",

@@ -307,7 +307,7 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                     ).first()
                     self.assertIsNotNone(row)
                     self.assertEqual(row.code, market_review_module.MARKET_REVIEW_HISTORY_CODE)
-                    self.assertEqual(row.name, "市場概覽")
+                    self.assertEqual(row.name, "台股日報")
                     self.assertEqual(row.report_type, market_review_module.MARKET_REVIEW_REPORT_TYPE)
                     self.assertEqual(row.news_content, "## 今日大盤\n\n覆盤正文")
                     self.assertIn("# 🎯 大盤覆盤", row.raw_result)
@@ -344,7 +344,7 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                         AnalysisHistory.query_id == "market-task-002"
                     ).first()
                     self.assertIsNotNone(row)
-                    self.assertEqual(row.name, "市場概覽")
+                    self.assertEqual(row.name, "台股日報")
                     self.assertNotIn("大盤覆盤", row.name)
                     self.assertNotIn("大盤復盤", row.name)
                     self.assertNotIn("大盤覆盤", row.operation_advice or "")

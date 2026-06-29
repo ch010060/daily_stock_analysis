@@ -6,7 +6,7 @@ import { formatDateTime } from '../../utils/format';
 import { getMarketPhaseSummaryLabel } from '../../utils/marketPhase';
 import { truncateStockName } from '../../utils/stockName';
 
-const MARKET_REVIEW_DISPLAY_NAME = '市場概覽';
+const MARKET_REVIEW_DISPLAY_NAME = '台股日報';
 
 interface StockBarItemProps {
   item: StockBarItemType;

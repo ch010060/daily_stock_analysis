@@ -21,7 +21,7 @@ const createMarketReviewTask = () => ({
   ...createTask(),
   taskId: 'task-market-review',
   stockCode: 'MARKET',
-  stockName: '市場概覽',
+  stockName: '台股日報',
   reportType: 'market_review',
 });
 

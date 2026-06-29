@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [改進] Web 將既有 FinMind 台股市場日報入口與狀態文案由「市場概覽」改名為「台股日報」，與「美股日報」形成成對日報入口；內部 `market_review` API/配置識別維持不變。
+
 - [修復] 問股頁 Google Finance helper 在輸入股票代號時即時顯示，且即使瀏覽器阻擋剪貼簿複製，仍會開啟可解析標的的 Google Finance 外部頁。
 
 - [改進] Google Finance 外部參考入口移至個股分析主介面工具列，完整報告內不顯示該入口；連結仍使用 persisted metadata/exchange resolver，未知交易所維持隱藏。

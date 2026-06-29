@@ -293,9 +293,9 @@ def _persist_market_review_history(
             operation_advice = "View review"
             trend_prediction = "Market review"
         else:
-            stock_name = "市場概覽"
-            operation_advice = "查看市場概覽"
-            trend_prediction = "市場概覽"
+            stock_name = "台股日報"
+            operation_advice = "查看台股日報"
+            trend_prediction = "台股日報"
 
         result = AnalysisResult(
             code=MARKET_REVIEW_HISTORY_CODE,
