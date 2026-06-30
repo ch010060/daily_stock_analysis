@@ -75,6 +75,7 @@ export function searchStocks(
     displayCode: s.item.displayCode,
     nameZh: s.item.nameZh,
     market: s.item.market,
+    exchange: s.item.exchange ?? null,
     matchType: determineMatchType(s.score),
     matchField: determineMatchField(normalizedQuery, s.item),
     score: s.score,

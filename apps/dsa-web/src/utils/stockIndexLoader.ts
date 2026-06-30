@@ -418,6 +418,7 @@ function mergeRequiredRouteBItem(existing: StockIndexItem, required: StockIndexI
     popularity: Math.max(existing.popularity || 0, required.popularity || 0),
     active: existing.active || required.active,
     market: required.market,
+    exchange: existing.exchange ?? required.exchange ?? null,
     assetType: existing.assetType || required.assetType,
   };
 }
@@ -495,6 +496,7 @@ function unpackTuples(tuples: StockIndexTuple[]): StockIndexItem[] {
     pinyinAbbr: tuple[INDEX_FIELD.PINYIN_ABBR],
     aliases: tuple[INDEX_FIELD.ALIASES],
     market: tuple[INDEX_FIELD.MARKET],
+    exchange: tuple[INDEX_FIELD.EXCHANGE] ?? null,
     assetType: tuple[INDEX_FIELD.ASSET_TYPE],
     active: tuple[INDEX_FIELD.ACTIVE],
     popularity: tuple[INDEX_FIELD.POPULARITY],
@@ -518,6 +520,7 @@ export function compressIndex(items: StockIndexItem[]): StockIndexTuple[] {
     item.assetType,
     item.active,
     item.popularity,
+    item.exchange ?? null,
   ]);
 }
 

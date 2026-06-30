@@ -675,6 +675,44 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(us_report.meta.google_finance_exchange, "NYSEARCA")
         self.assertEqual(us_report.meta.exchange_source, "symbol_universe")
 
+    def test_history_detail_resolves_operator_report_symbols_from_local_universe(self) -> None:
+        """Old US history records should use local universe exchange metadata for Google Finance links."""
+        if get_history_detail is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        cases = (
+            ("WDC", "Western Digital Corporation", "NASDAQ"),
+            ("NOK", "Nokia Corporation Sponsored", "NYSE"),
+            ("SNDK", "Sandisk Corporation", "NASDAQ"),
+            ("QCOM", "QUALCOMM Incorporated", "NASDAQ"),
+            ("DELL", "Dell Technologies Inc.", "NYSE"),
+        )
+        for symbol, name, google_exchange in cases:
+            with self.subTest(symbol=symbol):
+                result = AnalysisResult(
+                    code=symbol,
+                    name=name,
+                    sentiment_score=55,
+                    trend_prediction="震盪",
+                    operation_advice="持有",
+                    analysis_summary="測試摘要",
+                )
+                query_id = f"query_google_finance_local_universe_{symbol.lower()}"
+                saved = self.db.save_analysis_history(
+                    result=result,
+                    query_id=query_id,
+                    report_type="simple",
+                    news_content="新聞摘要",
+                    context_snapshot=None,
+                    save_snapshot=False,
+                )
+                self.assertEqual(saved, 1)
+
+                report = get_history_detail(query_id, db_manager=self.db)
+                self.assertEqual(report.meta.market, "US")
+                self.assertEqual(report.meta.google_finance_exchange, google_exchange)
+                self.assertEqual(report.meta.exchange_source, "symbol_universe")
+
     def test_history_detail_uses_yfinance_exchange_metadata_when_universe_missing(self) -> None:
         """US history detail should use persisted yfinance exchange metadata, not ticker mapping."""
         if get_history_detail is None:

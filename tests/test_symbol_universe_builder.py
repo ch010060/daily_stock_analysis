@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import json
 
 from scripts.generate_stock_index import generate_stock_index_from_symbol_universe
-from scripts.build_symbol_universe import providers_for_markets
+from scripts.build_symbol_universe import backfill_us_exchange_metadata, providers_for_markets
 from src.services.symbol_universe import (
     CuratedSeedSymbolProvider,
     DEFAULT_SYMBOL_UNIVERSE_SNAPSHOT_PATH,
@@ -73,12 +73,13 @@ def _record(
     aliases: list[str] | None = None,
     instrument_type: str = "stock",
     provider_source: str = "fixture_source",
+    exchange: str | None = None,
 ) -> SymbolRecord:
     return SymbolRecord(
         canonical_symbol=canonical_symbol,
         raw_symbol=raw_symbol,
         market=market,
-        exchange=None,
+        exchange=exchange,
         instrument_type=instrument_type,
         name=name,
         aliases=aliases or [],
@@ -137,6 +138,32 @@ def test_committed_snapshot_is_local_database_not_seed_only() -> None:
             assert alias in searchable, (raw_symbol, alias)
 
 
+def test_committed_us_snapshot_has_broad_exchange_coverage() -> None:
+    cache = SymbolUniverseCache.from_json_snapshot(DEFAULT_SYMBOL_UNIVERSE_SNAPSHOT_PATH)
+    us_records = [record for record in cache.records if record.market == "US"]
+    missing_exchange = [record.raw_symbol for record in us_records if not record.exchange]
+    coverage_ratio = (len(us_records) - len(missing_exchange)) / len(us_records)
+
+    assert coverage_ratio >= 0.99
+    assert len(missing_exchange) <= 25
+    for raw_symbol in (
+        "LLY",
+        "GLW",
+        "WDC",
+        "NOK",
+        "SNDK",
+        "QCOM",
+        "AVGO",
+        "DELL",
+        "SPY",
+        "INTC",
+        "NOW",
+    ):
+        record = cache.get_by_raw_symbol(raw_symbol)
+        assert record is not None, raw_symbol
+        assert record.exchange, raw_symbol
+
+
 def test_symbol_universe_builder_rebuilds_snapshot_from_sources(tmp_path) -> None:
     snapshot_path = tmp_path / "symbol_universe.json"
     builder = SymbolUniverseBuilder(
@@ -185,6 +212,7 @@ def test_us_directory_provider_excludes_single_name_derivative_etfs(tmp_path) ->
             [
                 "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue|NASDAQ Symbol",
                 "KEPT|Kept Broad Market ETF|P|KEPT|Y|100|N|KEPT",
+                "NOK|Nokia Corporation Sponsored American Depositary Shares|N|NOK|N|100|N|NOK",
                 "DROP|Drop 2X Inverse Sample Daily ETF|P|DROP|Y|100|N|DROP",
                 "File Creation Time: fixture",
             ]
@@ -200,6 +228,7 @@ def test_us_directory_provider_excludes_single_name_derivative_etfs(tmp_path) ->
 
     assert "GOOD" in records
     assert "KEPT" in records
+    assert records["NOK"].exchange == "NYSE"
     assert "BADL" not in records
     assert "BADO" not in records
     assert "DROP" not in records
@@ -243,6 +272,54 @@ def test_us_symbol_universe_refresh_uses_exchange_aware_directory_source() -> No
 
     assert "nasdaq_trader_symbol_directory" in sources
     assert "nasdaq_screener_stock_directory" in sources
+
+
+def test_us_exchange_backfill_targets_existing_records_and_preserves_values() -> None:
+    existing = SymbolUniverseCache(
+        [
+            _record("US:LLY", "LLY", "US", "Eli Lilly"),
+            _record("US:KEEP", "KEEP", "US", "Keep Existing", exchange="NYSE"),
+            _record("US:MISS", "MISS", "US", "Still Missing"),
+            _record("TW:2330", "2330", "TW", "台積電", exchange="TWSE"),
+        ]
+    )
+    directory = StaticSymbolUniverseProvider(
+        "listing_directory",
+        [
+            _record(
+                "US:LLY",
+                "LLY",
+                "US",
+                "Eli Lilly and Company",
+                exchange="NYSE",
+                provider_source="listing_directory",
+            ),
+            _record(
+                "US:KEEP",
+                "KEEP",
+                "US",
+                "Keep Existing",
+                exchange="NASDAQ",
+                provider_source="listing_directory",
+            ),
+            _record(
+                "US:ONLY",
+                "ONLY",
+                "US",
+                "Provider Only",
+                exchange="NASDAQ",
+                provider_source="listing_directory",
+            ),
+        ],
+    )
+
+    result = backfill_us_exchange_metadata(existing, providers=[directory])
+
+    assert result.get_by_raw_symbol("LLY").exchange == "NYSE"
+    assert result.get_by_raw_symbol("KEEP").exchange == "NYSE"
+    assert result.get_by_raw_symbol("MISS").exchange is None
+    assert result.get_by_raw_symbol("2330").exchange == "TWSE"
+    assert result.get_by_raw_symbol("ONLY") is None
 
 
 def test_twse_company_profile_provider_adds_official_english_aliases() -> None:
@@ -306,6 +383,8 @@ def test_generated_frontend_stock_index_uses_same_tw_us_universe() -> None:
     assert any(item["displayCode"] == "00981A" for item in index)
     assert any(item["displayCode"] == "006208" for item in index)
     assert any(item["displayCode"] == "MSFT" and item["nameZh"] == "Microsoft" for item in index)
+    assert any(item["displayCode"] == "LLY" and item["exchange"] == "NYSE" for item in index)
+    assert any(item["displayCode"] == "GLW" and item["exchange"] == "NYSE" for item in index)
     assert any(item["displayCode"] == "QQQ" for item in index)
     assert any(item["displayCode"] == "VOO" for item in index)
     for raw_symbol in (*EXPANDED_TW_TARGETS, *EXPANDED_US_TARGETS):
@@ -330,6 +409,8 @@ def test_bundled_public_stock_index_contains_only_tw_us_snapshot_rows() -> None:
     assert any(row[1] == "00981A" for row in rows)
     assert any(row[1] == "006208" for row in rows)
     assert any(row[1] == "MSFT" and row[2] == "Microsoft" for row in rows)
+    assert any(row[1] == "LLY" and row[10] == "NYSE" for row in rows)
+    assert any(row[1] == "GLW" and row[10] == "NYSE" for row in rows)
     assert any(row[1] == "QQQ" and row[7] == "etf" for row in rows)
     assert any(row[1] == "VOO" and row[7] == "etf" for row in rows)
     for raw_symbol in (*EXPANDED_TW_TARGETS, *EXPANDED_US_TARGETS):

@@ -25,6 +25,7 @@ describe('stockIndexLoader', () => {
       pinyinAbbr: 'aapl',
       aliases: ['Apple Inc'],
       market: 'US',
+      exchange: 'NASDAQ',
       assetType: 'stock',
       active: true,
       popularity: 98,
@@ -88,7 +89,7 @@ describe('stockIndexLoader', () => {
 
     test('loads compressed tuple format and still appends required Route B instruments', async () => {
       const compressedData = [
-        ['AAPL', 'AAPL', 'Apple', 'apple', 'aapl', ['Apple Inc'], 'US', 'stock', true, 98],
+        ['AAPL', 'AAPL', 'Apple', 'apple', 'aapl', ['Apple Inc'], 'US', 'stock', true, 98, 'NASDAQ'],
       ];
 
       mockFetch.mockResolvedValueOnce({
@@ -100,7 +101,7 @@ describe('stockIndexLoader', () => {
 
       expect(result.loaded).toBe(true);
       expect(result.data).toEqual(expect.arrayContaining([
-        expect.objectContaining({ canonicalCode: 'AAPL', market: 'US' }),
+        expect.objectContaining({ canonicalCode: 'AAPL', market: 'US', exchange: 'NASDAQ' }),
         expect.objectContaining({ canonicalCode: '8299', market: 'TW' }),
         expect.objectContaining({ canonicalCode: '006208', market: 'TW', assetType: 'etf' }),
         expect.objectContaining({ canonicalCode: '00981A', market: 'TW', assetType: 'etf' }),
@@ -210,6 +211,7 @@ describe('stockIndexLoader', () => {
         'stock',
         true,
         98,
+        'NASDAQ',
       ]);
     });
 
