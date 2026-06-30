@@ -27,6 +27,8 @@ export interface StockIndexItem {
   aliases?: string[];
   /** Market */
   market: Market;
+  /** Exchange metadata from local symbol universe */
+  exchange?: string | null;
   /** Asset type */
   assetType: AssetType;
   /** Is active */
@@ -47,6 +49,8 @@ export interface StockSuggestion {
   nameZh: string;
   /** Market */
   market: Market;
+  /** Exchange metadata from local symbol universe */
+  exchange?: string | null;
   /** Match type */
   matchType: 'exact' | 'prefix' | 'contains' | 'fuzzy';
   /** Match field */
@@ -69,6 +73,7 @@ export type StockIndexTuple = [
   AssetType,
   boolean, // active
   number | undefined, // popularity
+  (string | null)?, // exchange
 ];
 
 /**

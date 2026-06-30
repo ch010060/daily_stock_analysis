@@ -76,6 +76,7 @@ def _index_item(record: SymbolRecord) -> dict[str, Any]:
         "assetType": _frontend_asset_type(record),
         "active": record.is_active,
         "popularity": _popularity(record),
+        "exchange": record.exchange,
     }
 
 
@@ -103,6 +104,7 @@ def compress_index(index: list[dict[str, Any]]) -> list[list[Any]]:
             item["assetType"],
             item["active"],
             item.get("popularity", 0),
+            item.get("exchange"),
         ]
         for item in index
     ]

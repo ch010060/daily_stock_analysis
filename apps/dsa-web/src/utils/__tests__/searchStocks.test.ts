@@ -12,6 +12,7 @@ const stock = (
   market: 'TW' | 'US',
   aliases: string[] = [],
   popularity = 90,
+  exchange: string | null = null,
 ): StockIndexItem => ({
   canonicalCode,
   displayCode: canonicalCode,
@@ -20,6 +21,7 @@ const stock = (
   pinyinAbbr: canonicalCode.toLowerCase(),
   aliases,
   market,
+  exchange,
   assetType: 'stock',
   active: true,
   popularity,
@@ -223,6 +225,18 @@ const mockIndex: StockIndexItem[] = [
 ];
 
 describe('searchStocks', () => {
+  test('preserves exchange metadata in US stock suggestions', () => {
+    const results = searchStocks('LLY', [
+      stock('LLY', 'Eli Lilly', 'US', ['Eli Lilly and Company'], 90, 'NYSE'),
+    ]);
+
+    expect(results[0]).toMatchObject({
+      canonicalCode: 'LLY',
+      market: 'US',
+      exchange: 'NYSE',
+    });
+  });
+
   test.each([
     ['2330', '2330', 'code', 'exact'],
     ['台積電', '2330', 'name', 'exact'],
