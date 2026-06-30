@@ -87,6 +87,21 @@ const klineRows = [
   { date: '2026-06-29', open: 503, high: 511, low: 502, close: 509, volume: 23000000 },
 ];
 
+const routeSmokeTargets = [
+  { name: 'home', path: '/', text: /台股日報|開始分析/ },
+  { name: 'chat', path: '/chat', text: /問股/ },
+  { name: 'portfolio', path: '/portfolio', text: /持股管理/ },
+  { name: 'screening', path: '/screening', text: /AlphaSift 選股發現/ },
+  { name: 'backtest', path: '/backtest', text: /執行回測|暫無結果/ },
+  { name: 'alerts', path: '/alerts', text: /警告中心/ },
+  { name: 'usage', path: '/usage', text: /用量|Token|呼叫/ },
+  { name: 'finews', path: '/finews', text: /美股日報/ },
+  { name: 'settings', path: '/settings', text: /系統設定/ },
+  { name: 'print-report', path: '/reports/101/print?pdf=1', text: /Microsoft Corporation|行動版報告/ },
+  { name: 'login-boundary', path: '/login', text: /台股日報|開始分析/ },
+  { name: 'not-found', path: '/not-a-real-route', text: /頁面未找到/ },
+];
+
 async function setupDsaApiMocks(page: Page): Promise<void> {
   await page.addInitScript(() => {
     class MockEventSource extends EventTarget {
@@ -139,7 +154,91 @@ async function setupDsaApiMocks(page: Page): Promise<void> {
       await route.fulfill({
         json: {
           is_complete: true,
+          ready_for_smoke: true,
+          required_missing_keys: [],
           checks: [],
+        },
+      });
+      return;
+    }
+
+    if (path === '/api/v1/system/config') {
+      const configItems = [
+        ['BASE_URL', 'https://fixture.local', 'base', '基礎網址'],
+        ['DATA_PROVIDER', 'finmind', 'data_source', '資料來源'],
+        ['DEFAULT_MODEL', 'gpt-mobile-fixture', 'ai_model', '預設模型'],
+        ['NOTIFY_ENABLED', 'false', 'notification', '通知開關'],
+        ['SYSTEM_LOCALE', 'zh_TW', 'system', '系統語系'],
+        ['AGENT_ENABLED', 'true', 'agent', 'Agent 開關'],
+        ['BACKTEST_WINDOW_DAYS', '5', 'backtest', '回測視窗'],
+      ];
+
+      await route.fulfill({
+        json: {
+          config_version: 'mobile-rwd-fixture',
+          mask_token: '******',
+          updated_at: '2026-06-29T09:00:00Z',
+          items: configItems.map(([key, value, category, title], index) => ({
+            key,
+            value,
+            raw_value_exists: true,
+            is_masked: false,
+            schema: {
+              key,
+              title,
+              description: `${title}行動版測試欄位`,
+              category,
+              data_type: key === 'BACKTEST_WINDOW_DAYS' ? 'integer' : 'string',
+              ui_control: key === 'NOTIFY_ENABLED' || key === 'AGENT_ENABLED' ? 'switch' : 'text',
+              is_sensitive: false,
+              is_required: false,
+              is_editable: true,
+              options: [],
+              validation: {},
+              display_order: index + 1,
+            },
+          })),
+        },
+      });
+      return;
+    }
+
+    if (path === '/api/v1/system/config/schema') {
+      const categories = [
+        ['base', '基礎設定'],
+        ['data_source', '資料來源'],
+        ['ai_model', 'AI 模型'],
+        ['notification', '通知'],
+        ['system', '系統'],
+        ['agent', 'Agent'],
+        ['backtest', '回測'],
+      ].map(([category, title], index) => ({
+        category,
+        title,
+        description: `${title}設定`,
+        display_order: index + 1,
+        fields: [
+          {
+            key: `${category.toUpperCase()}_MOBILE_FIXTURE`,
+            title,
+            description: `${title}行動版測試欄位`,
+            category,
+            data_type: 'string',
+            ui_control: 'text',
+            is_sensitive: false,
+            is_required: false,
+            is_editable: true,
+            options: [],
+            validation: {},
+            display_order: 1,
+          },
+        ],
+      }));
+
+      await route.fulfill({
+        json: {
+          schema_version: 'mobile-rwd-fixture',
+          categories,
         },
       });
       return;
@@ -150,6 +249,11 @@ async function setupDsaApiMocks(page: Page): Promise<void> {
       return;
     }
 
+    if (path === '/api/v1/agent/chat/sessions') {
+      await route.fulfill({ json: { sessions: [] } });
+      return;
+    }
+
     if (path === '/api/v1/analysis/tasks') {
       await route.fulfill({ json: { total: 0, pending: 0, processing: 0, tasks: [] } });
       return;
@@ -157,6 +261,142 @@ async function setupDsaApiMocks(page: Page): Promise<void> {
 
     if (path === '/api/v1/stocks/watchlist') {
       await route.fulfill({ json: { stock_codes: [] } });
+      return;
+    }
+
+    if (path === '/api/v1/alphasift/status') {
+      await route.fulfill({ json: { enabled: false, installed: false, status: 'disabled' } });
+      return;
+    }
+
+    if (path === '/api/v1/alphasift/strategies') {
+      await route.fulfill({ json: { strategies: [] } });
+      return;
+    }
+
+    if (path === '/api/v1/backtest/results') {
+      await route.fulfill({ json: { total: 0, page: 1, limit: 20, items: [] } });
+      return;
+    }
+
+    if (path === '/api/v1/backtest/performance' || path.startsWith('/api/v1/backtest/performance/')) {
+      await route.fulfill({
+        json: {
+          scope: 'all',
+          eval_window_days: 5,
+          engine_version: 'fixture',
+          computed_at: '2026-06-29T09:00:00Z',
+          total_evaluations: 0,
+          completed_count: 0,
+          insufficient_count: 0,
+          long_count: 0,
+          cash_count: 0,
+          win_count: 0,
+          loss_count: 0,
+          neutral_count: 0,
+          advice_breakdown: {},
+          diagnostics: {},
+        },
+      });
+      return;
+    }
+
+    if (path === '/api/v1/usage/dashboard') {
+      await route.fulfill({
+        json: {
+          period: requestUrl.searchParams.get('period') ?? 'month',
+          from_date: '2026-06-01',
+          to_date: '2026-06-29',
+          total_calls: 2,
+          total_prompt_tokens: 1200,
+          total_completion_tokens: 800,
+          total_tokens: 2000,
+          by_call_type: [
+            { call_type: 'analysis', calls: 1, prompt_tokens: 800, completion_tokens: 500, total_tokens: 1300 },
+          ],
+          by_model: [
+            {
+              model: 'gpt-mobile-fixture-long-model-name-for-wrapping',
+              calls: 1,
+              prompt_tokens: 800,
+              completion_tokens: 500,
+              total_tokens: 1300,
+              max_total_tokens: 1300,
+            },
+          ],
+          recent_calls: [],
+        },
+      });
+      return;
+    }
+
+    if (path === '/api/v1/portfolio/accounts') {
+      await route.fulfill({ json: { accounts: [] } });
+      return;
+    }
+
+    if (path === '/api/v1/portfolio/snapshot') {
+      await route.fulfill({
+        json: {
+          as_of: '2026-06-29',
+          cost_method: 'fifo',
+          currency: 'TWD',
+          account_count: 0,
+          total_cash: 0,
+          total_market_value: 0,
+          total_equity: 0,
+          realized_pnl: 0,
+          unrealized_pnl: 0,
+          fee_total: 0,
+          tax_total: 0,
+          fx_stale: false,
+          converted_total_available: true,
+          aggregate_is_stale: false,
+          fx_missing: false,
+          fx_warnings: [],
+          fx_rates_used: [],
+          accounts: [],
+          totals_by_currency: {},
+        },
+      });
+      return;
+    }
+
+    if (path === '/api/v1/portfolio/risk') {
+      await route.fulfill({
+        json: {
+          as_of: '2026-06-29',
+          account_id: null,
+          cost_method: 'fifo',
+          currency: 'TWD',
+          thresholds: {},
+          concentration: { total_market_value: 0, top_weight_pct: 0, alert: false, top_positions: [] },
+          sector_concentration: {
+            total_market_value: 0,
+            top_weight_pct: 0,
+            alert: false,
+            top_sectors: [],
+            coverage: {},
+            errors: [],
+          },
+          drawdown: { series_points: 0, max_drawdown_pct: 0, current_drawdown_pct: 0, alert: false, fx_stale: false },
+          stop_loss: { near_alert: false, triggered_count: 0, near_count: 0, items: [] },
+        },
+      });
+      return;
+    }
+
+    if (
+      path === '/api/v1/portfolio/trades'
+      || path === '/api/v1/portfolio/cash-ledger'
+      || path === '/api/v1/portfolio/corporate-actions'
+    ) {
+      await route.fulfill({ json: { items: [], total: 0, page: 1, page_size: 20 } });
+      return;
+    }
+
+    if (path === '/api/v1/portfolio/imports/csv/brokers') {
+      await route.fulfill({ json: { brokers: [] } });
       return;
     }
 
@@ -463,6 +703,43 @@ test.describe('mobile RWD baseline', () => {
       await page.goto('/finews');
       await expect(page.getByRole('heading', { name: '美股日報' })).toBeVisible();
       await expectNoHorizontalOverflow(page);
+  });
+
+  for (const viewport of MOBILE_VIEWPORTS) {
+    for (const routeTarget of routeSmokeTargets) {
+      test(`${routeTarget.name} route is usable without mobile document overflow at ${viewport.name}`, async ({ page }) => {
+        const consoleErrors: string[] = [];
+        const pageErrors: string[] = [];
+
+        page.on('console', (message) => {
+          if (message.type() === 'error') {
+            consoleErrors.push(message.text());
+          }
+        });
+        page.on('pageerror', (error) => {
+          pageErrors.push(error.message);
+        });
+
+        await page.setViewportSize({ width: viewport.width, height: viewport.height });
+        await page.goto(routeTarget.path);
+
+        await expect(page.locator('body')).toContainText(routeTarget.text);
+        await expectNoHorizontalOverflow(page);
+        expect(pageErrors, pageErrors.join('\n')).toEqual([]);
+        expect(consoleErrors, consoleErrors.join('\n')).toEqual([]);
+      });
+    }
+  }
+
+  test('settings categories remain usable on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/settings');
+
+    for (const category of ['基礎設定', '資料來源', 'AI 模型', '通知', '系統', 'Agent', '回測']) {
+      await page.getByRole('button', { name: new RegExp(category) }).first().click();
+      await expect(page.locator('body')).toContainText(category);
+      await expectNoHorizontalOverflow(page);
+    }
   });
 
   for (const viewport of MOBILE_VIEWPORTS) {
