@@ -39,17 +39,28 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
   const stockName = isMarketReview ? MARKET_REVIEW_DISPLAY_NAME : (item.stockName || item.stockCode);
   const operationLabel = getOperationBadgeLabel(item.operationAdvice);
   const phaseLabel = getMarketPhaseSummaryLabel(item.marketPhaseSummary, undefined)?.replace('市場階段: ', '').replace('市場階段：', '').replace('市場階段: ', '').replace('市場階段：', '');
+  const handleActivate = () => onClick(item.id);
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleActivate();
+    }
+  };
 
   return (
-    <button
-      type="button"
-      onClick={() => onClick(item.id)}
-      aria-label={`${stockName} ${item.stockCode} 歷史記錄`}
-      className={`home-history-item w-full min-w-0 flex-1 text-left p-2.5 group/item ${
+    <div
+      className={`home-history-item relative w-full min-w-0 flex-1 text-left p-2.5 group/item ${
         isViewing ? 'home-history-item-selected' : ''
       }`}
     >
-      <div className="relative z-10 flex items-center gap-2.5">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={handleActivate}
+        onKeyDown={handleKeyDown}
+        aria-label={`${stockName} ${item.stockCode} 歷史記錄`}
+        className="relative z-10 flex min-w-0 items-center gap-2.5 pr-8 focus:outline-none focus-visible:ring-4 focus-visible:ring-cyan/15"
+      >
         {isMarketReview ? (
           <div className="w-1 h-8 rounded-full flex-shrink-0 bg-amber-400" style={{ boxShadow: '0 0 10px rgba(251,191,36,0.4)' }} />
         ) : sentimentColor ? (
@@ -98,23 +109,6 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
                   {operationLabel} {item.sentimentScore}
                 </Badge>
               ) : null}
-              {onDelete && (
-                <Button
-                  variant="ghost"
-                  size="xsm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(item.stockCode);
-                  }}
-                  disabled={isDeleting}
-                  className="opacity-0 group-hover/item:opacity-100 transition-opacity h-6 w-6 p-0 flex items-center justify-center"
-                  aria-label={`刪除 ${item.stockName || item.stockCode} 歷史記錄`}
-                >
-                  <svg className="h-3.5 w-3.5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </Button>
-              )}
             </div>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2" data-testid="history-card-meta">
@@ -148,6 +142,23 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
           </div>
         </div>
       </div>
-    </button>
+      {onDelete && (
+        <Button
+          variant="ghost"
+          size="xsm"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(item.stockCode);
+          }}
+          disabled={isDeleting}
+          className="absolute right-2.5 top-2.5 z-20 h-6 w-6 p-0 flex items-center justify-center opacity-0 transition-opacity group-hover/item:opacity-100 focus:opacity-100"
+          aria-label={`刪除 ${item.stockName || item.stockCode} 歷史記錄`}
+        >
+          <svg className="h-3.5 w-3.5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </Button>
+      )}
+    </div>
   );
 };
