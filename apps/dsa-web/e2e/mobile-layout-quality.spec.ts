@@ -10,6 +10,15 @@ const MOBILE_VIEWPORTS = [
   { name: 'mobile-landscape', width: 667, height: 375 },
 ];
 
+const CHAT_SPACE_VIEWPORTS = [
+  { name: 'mobile-360', width: 360, height: 740 },
+  { name: 'mobile-landscape', width: 667, height: 375 },
+  { name: 'tablet-portrait', width: 768, height: 1024 },
+  { name: 'tablet-landscape', width: 1024, height: 768 },
+  { name: 'desktop-short', width: 1366, height: 640 },
+  { name: 'desktop-very-short', width: 1440, height: 600 },
+];
+
 const stockReport = {
   meta: {
     id: 101,
@@ -202,7 +211,17 @@ async function setupQualityApiMocks(page: Page): Promise<void> {
     }
 
     if (path === '/api/v1/agent/skills') {
-      await route.fulfill({ json: { skills: [], default_skill_id: '' } });
+      await route.fulfill({
+        json: {
+          skills: [
+            { id: 'bull_trend', name: '趨勢分析', description: '預設多頭趨勢' },
+            { id: 'ma_golden_cross', name: '均線金叉', description: '均線交叉' },
+            { id: 'chan_theory', name: '纏論', description: '結構分析' },
+            { id: 'wave_theory', name: '波浪理論', description: '波浪分析' },
+          ],
+          default_skill_id: 'bull_trend',
+        },
+      });
       return;
     }
 
@@ -923,4 +942,38 @@ test.describe('mobile layout quality audit', () => {
       await capture(page, 'settings_populated_360.png');
     });
   });
+
+  for (const viewport of CHAT_SPACE_VIEWPORTS) {
+    test(`chat keeps low-frequency controls collapsed at ${viewport.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto('/chat');
+
+      const workspace = page.getByTestId('chat-workspace');
+      const messageScroll = page.getByTestId('chat-message-scroll');
+      const strategyTrigger = page.getByTestId('chat-strategy-toggle');
+
+      await expect(workspace).toBeVisible();
+      await expect(strategyTrigger).toHaveAttribute('aria-expanded', 'false');
+      await expect(page.getByTestId('chat-strategy-panel')).toBeHidden();
+      await expect(page.getByTestId('chat-context-compression-toolbar')).toBeVisible();
+      await expect(page.getByTestId('chat-context-compression-row')).toHaveCount(0);
+
+      const ratio = await messageScroll.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.height / window.innerHeight;
+      });
+      expect(ratio).toBeGreaterThanOrEqual(viewport.height <= 390 ? 0.27 : 0.4);
+
+      await strategyTrigger.click();
+      await expect(strategyTrigger).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.getByTestId('chat-strategy-panel')).toBeVisible();
+      await expect(page.getByRole('checkbox', { name: '趨勢分析' })).toBeChecked();
+      await expectNoHorizontalOverflow(page);
+
+      await strategyTrigger.click();
+      await expect(strategyTrigger).toHaveAttribute('aria-expanded', 'false');
+      await expect(page.getByTestId('chat-strategy-panel')).toBeHidden();
+      await expectNoHorizontalOverflow(page);
+    });
+  }
 });

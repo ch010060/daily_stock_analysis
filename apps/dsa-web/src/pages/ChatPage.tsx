@@ -45,6 +45,7 @@ const QUICK_QUESTIONS = [
 
 const MAX_SELECTED_SKILLS = 3;
 const CONTEXT_COMPRESSION_CONFIG_KEY = 'AGENT_CONTEXT_COMPRESSION_ENABLED';
+const CHAT_TEXTAREA_MAX_HEIGHT = 128;
 
 const getMessageSkillNames = (msg: Message): string[] => {
   if (msg.skillNames?.length) return msg.skillNames;
@@ -62,6 +63,7 @@ const ChatPage: React.FC = () => {
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [showSkillDesc, setShowSkillDesc] = useState<string | null>(null);
+  const [skillPanelOpen, setSkillPanelOpen] = useState(false);
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -354,6 +356,9 @@ const ChatPage: React.FC = () => {
     (skillIds: string[]) => skillIds.map((id) => skills.find((s) => s.id === id)?.name || id),
     [skills],
   );
+  const selectedSkillSummary = selectedSkillIds.length > 0
+    ? getSkillNames(selectedSkillIds).join('、')
+    : '通用分析';
 
   const normalizeSelectedSkillIds = useCallback((skillIds: string[]) => {
     const normalized: string[] = [];
@@ -805,7 +810,7 @@ const ChatPage: React.FC = () => {
 
       {/* Main chat area */}
       <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="mb-4 flex-shrink-0 space-y-3">
+        <header className="mb-2 flex-shrink-0 space-y-2 md:mb-3">
           <div className="flex items-start justify-between gap-4">
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <button
@@ -842,8 +847,38 @@ const ChatPage: React.FC = () => {
               </svg>
               問股
             </h1>
-            {messages.length > 0 && (
-              <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
+            <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
+              <div
+                data-testid="chat-context-compression-toolbar"
+                className="inline-flex min-h-8 items-center gap-2 rounded-full border border-white/6 bg-surface/25 px-3 py-1 text-xs"
+              >
+                <label
+                  className={cn(
+                    'inline-flex items-center gap-1.5',
+                    contextCompressionLoaded && !contextCompressionSaving
+                      ? 'cursor-pointer text-foreground'
+                      : 'cursor-not-allowed text-muted-text',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={contextCompressionEnabled}
+                    disabled={!contextCompressionLoaded || contextCompressionSaving}
+                    onChange={(event) => void updateContextCompressionEnabled(event.target.checked)}
+                    className="chat-skill-checkbox"
+                  />
+                  <span className="font-medium">上下文壓縮</span>
+                </label>
+                <span className="text-muted-text">
+                  {contextCompressionSaving
+                    ? '儲存中...'
+                    : contextCompressionEnabled
+                      ? '已啟用'
+                      : '未啟用'}
+                </span>
+              </div>
+              {messages.length > 0 && (
+                <>
                 <Tooltip content="匯出會話為 Markdown 檔案">
                   <span className="inline-flex">
                     <Button
@@ -934,10 +969,11 @@ const ChatPage: React.FC = () => {
                     </Button>
                   </span>
                 </Tooltip>
+                </>
+              )}
               </div>
-            )}
           </div>
-          <p className="text-secondary-text text-sm">
+          <p className="hidden text-secondary-text text-sm md:block [@media(max-height:700px)]:hidden">
             向 AI 詢問個股分析，獲取基於技能視角的交易建議與實時決策報告。
           </p>
           {sendToast ? (
@@ -1138,8 +1174,8 @@ const ChatPage: React.FC = () => {
           )}
 
           {/* Input area */}
-          <div className="border-t border-white/6 bg-card/88 p-4 md:p-6 relative z-20">
-            <div className="space-y-3">
+          <div className="border-t border-white/6 bg-card/88 p-3 md:p-4 relative z-20">
+            <div className="space-y-2">
               {chatError ? <ApiErrorAlert error={chatError} /> : null}
               {isFollowUpContextLoading ? (
                 <InlineAlert
@@ -1149,33 +1185,6 @@ const ChatPage: React.FC = () => {
                   className="rounded-xl px-3 py-2 text-xs shadow-none"
                 />
               ) : null}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/6 bg-surface/25 px-3 py-2">
-                <label
-                  className={cn(
-                    'inline-flex items-center gap-2 text-sm',
-                    contextCompressionLoaded && !contextCompressionSaving
-                      ? 'cursor-pointer text-foreground'
-                      : 'cursor-not-allowed text-muted-text',
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={contextCompressionEnabled}
-                    disabled={!contextCompressionLoaded || contextCompressionSaving}
-                    onChange={(event) => void updateContextCompressionEnabled(event.target.checked)}
-                    className="chat-skill-checkbox"
-                  />
-                  <span className="font-medium">上下文壓縮</span>
-                  <span className="text-xs text-muted-text">節省長會話 token</span>
-                </label>
-                <span className="text-xs text-muted-text">
-                  {contextCompressionSaving
-                    ? '儲存中...'
-                    : contextCompressionEnabled
-                      ? '已啟用'
-                      : '未啟用'}
-                </span>
-              </div>
               {contextCompressionError ? (
                 <InlineAlert
                   variant="danger"
@@ -1185,58 +1194,85 @@ const ChatPage: React.FC = () => {
                 />
               ) : null}
             {skills.length > 0 && (
-              <div className="flex flex-wrap items-start gap-x-5 gap-y-2">
-                <span className="text-xs text-muted-text font-medium uppercase tracking-wider flex-shrink-0 mt-1">
-                  策略
-                </span>
-                <label className="flex items-center gap-1.5 text-sm cursor-pointer group mt-0.5">
-                  <input
-                    type="checkbox"
-                    name="general-analysis"
-                    value=""
-                    checked={selectedSkillIds.length === 0}
-                    onChange={() => setSelectedSkillIds([])}
-                    className="chat-skill-checkbox"
-                  />
-                  <span
-                    className={`transition-colors text-sm ${selectedSkillIds.length === 0 ? 'text-foreground font-medium' : 'text-secondary-text group-hover:text-foreground'}`}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/6 bg-surface/25 px-3 py-2">
+                  <div className="min-w-0">
+                    <span className="mr-2 text-xs font-medium uppercase tracking-wider text-muted-text">
+                      策略
+                    </span>
+                    <span className="text-sm font-medium text-foreground">
+                      {selectedSkillSummary}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="chat-strategy-toggle"
+                    aria-expanded={skillPanelOpen}
+                    aria-controls="chat-strategy-panel"
+                    onClick={() => setSkillPanelOpen((open) => !open)}
+                    className="inline-flex min-h-8 items-center rounded-lg border border-white/8 bg-card/70 px-3 text-xs font-medium text-secondary-text transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan/15"
                   >
-                    通用分析
-                  </span>
-                </label>
-                {skills.map((s) => {
-                  const checked = selectedSkillIdSet.has(s.id);
-                  const disabled = !checked && skillLimitReached;
-                  return (
-                    <label
-                      key={s.id}
-                      className={`flex items-center gap-1.5 cursor-pointer group relative mt-0.5 ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-                      onMouseEnter={() => setShowSkillDesc(s.id)}
-                      onMouseLeave={() => setShowSkillDesc(null)}
-                    >
-                      <input
-                        type="checkbox"
-                        name="skills"
-                        value={s.id}
-                        checked={checked}
-                        disabled={disabled}
-                        onChange={() => toggleSkillSelection(s.id)}
-                        className="chat-skill-checkbox"
-                      />
-                      <span
-                        className={`transition-colors text-sm ${checked ? 'text-foreground font-medium' : 'text-secondary-text group-hover:text-foreground'}`}
-                      >
-                        {s.name}
-                      </span>
-                      {showSkillDesc === s.id && s.description && (
-                        <div className="skill-desc-tooltip">
-                          <p className="skill-title">{s.name}</p>
-                          <p>{s.description}</p>
-                        </div>
-                      )}
-                    </label>
-                  );
-                })}
+                    {skillPanelOpen ? '收合策略' : '修改策略'}
+                  </button>
+                </div>
+                {skillPanelOpen && (
+                  <div
+                    id="chat-strategy-panel"
+                    data-testid="chat-strategy-panel"
+                    className="max-h-[min(16rem,45dvh)] overflow-y-auto rounded-xl border border-white/6 bg-surface/20 px-3 py-2"
+                  >
+                    <div className="flex flex-wrap items-start gap-x-5 gap-y-2">
+                      <label className="flex items-center gap-1.5 text-sm cursor-pointer group mt-0.5">
+                        <input
+                          type="checkbox"
+                          name="general-analysis"
+                          value=""
+                          checked={selectedSkillIds.length === 0}
+                          onChange={() => setSelectedSkillIds([])}
+                          className="chat-skill-checkbox"
+                        />
+                        <span
+                          className={`transition-colors text-sm ${selectedSkillIds.length === 0 ? 'text-foreground font-medium' : 'text-secondary-text group-hover:text-foreground'}`}
+                        >
+                          通用分析
+                        </span>
+                      </label>
+                      {skills.map((s) => {
+                        const checked = selectedSkillIdSet.has(s.id);
+                        const disabled = !checked && skillLimitReached;
+                        return (
+                          <label
+                            key={s.id}
+                            className={`flex items-center gap-1.5 cursor-pointer group relative mt-0.5 ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            onMouseEnter={() => setShowSkillDesc(s.id)}
+                            onMouseLeave={() => setShowSkillDesc(null)}
+                          >
+                            <input
+                              type="checkbox"
+                              name="skills"
+                              value={s.id}
+                              checked={checked}
+                              disabled={disabled}
+                              onChange={() => toggleSkillSelection(s.id)}
+                              className="chat-skill-checkbox"
+                            />
+                            <span
+                              className={`transition-colors text-sm ${checked ? 'text-foreground font-medium' : 'text-secondary-text group-hover:text-foreground'}`}
+                            >
+                              {s.name}
+                            </span>
+                            {showSkillDesc === s.id && s.description && (
+                              <div className="skill-desc-tooltip">
+                                <p className="skill-title">{s.name}</p>
+                                <p>{s.description}</p>
+                              </div>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1274,12 +1310,12 @@ const ChatPage: React.FC = () => {
                   placeholder="例如：分析 2330 / AAPL (Enter 傳送, Shift+Enter 換行)"
                   disabled={loading}
                   rows={1}
-                  className="input-surface input-focus-glow flex-1 min-h-[44px] max-h-[200px] rounded-xl border bg-transparent px-4 py-2.5 text-sm transition-all focus:outline-none resize-none disabled:cursor-not-allowed disabled:opacity-60"
+                  className="input-surface input-focus-glow flex-1 min-h-[44px] max-h-32 rounded-xl border bg-transparent px-4 py-2.5 text-sm transition-all focus:outline-none resize-none disabled:cursor-not-allowed disabled:opacity-60"
                   style={{ height: 'auto' }}
                   onInput={(e) => {
                     const t = e.target as HTMLTextAreaElement;
                     t.style.height = 'auto';
-                    t.style.height = `${Math.min(t.scrollHeight, 200)}px`;
+                    t.style.height = `${Math.min(t.scrollHeight, CHAT_TEXTAREA_MAX_HEIGHT)}px`;
                   }}
                 />
                 <Button
