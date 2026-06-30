@@ -675,6 +675,83 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(us_report.meta.google_finance_exchange, "NYSEARCA")
         self.assertEqual(us_report.meta.exchange_source, "symbol_universe")
 
+    def test_history_detail_uses_yfinance_exchange_metadata_when_universe_missing(self) -> None:
+        """US history detail should use persisted yfinance exchange metadata, not ticker mapping."""
+        if get_history_detail is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        cases = (
+            ("WDC", "NasdaqGS", "NASDAQ"),
+            ("NOK", "NYQ", "NYSE"),
+            ("SNDK", "NASDAQ", "NASDAQ"),
+            ("QCOM", "NasdaqGS", "NASDAQ"),
+        )
+        resolver = SimpleNamespace(resolve=lambda *_args, **_kwargs: SimpleNamespace(selected=None))
+        with patch("api.v1.endpoints.history.get_default_symbol_resolver", return_value=resolver):
+            for symbol, yfinance_exchange, google_exchange in cases:
+                with self.subTest(symbol=symbol):
+                    result = AnalysisResult(
+                        code=symbol,
+                        name=symbol,
+                        sentiment_score=55,
+                        trend_prediction="震盪",
+                        operation_advice="持有",
+                        analysis_summary="測試摘要",
+                    )
+                    query_id = f"query_google_finance_yfinance_{symbol.lower()}"
+                    saved = self.db.save_analysis_history(
+                        result=result,
+                        query_id=query_id,
+                        report_type="simple",
+                        news_content="新聞摘要",
+                        context_snapshot={
+                            "market_fear_index_snapshot": {"market": "us"},
+                            "realtime_quote_raw": {
+                                "source": "yfinance",
+                                "exchange": yfinance_exchange,
+                            },
+                        },
+                        save_snapshot=True,
+                    )
+                    self.assertEqual(saved, 1)
+                    report = get_history_detail(query_id, db_manager=self.db)
+                    self.assertEqual(report.meta.market, "US")
+                    self.assertEqual(report.meta.exchange, yfinance_exchange)
+                    self.assertEqual(report.meta.google_finance_exchange, google_exchange)
+                    self.assertEqual(report.meta.exchange_source, "yfinance")
+
+    def test_history_detail_does_not_guess_unverified_yfinance_exchange(self) -> None:
+        """SPCX stays unresolved until yfinance supplies a supported exchange namespace."""
+        if get_history_detail is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        resolver = SimpleNamespace(resolve=lambda *_args, **_kwargs: SimpleNamespace(selected=None))
+        with patch("api.v1.endpoints.history.get_default_symbol_resolver", return_value=resolver):
+            result = AnalysisResult(
+                code="SPCX",
+                name="SPCX",
+                sentiment_score=55,
+                trend_prediction="震盪",
+                operation_advice="持有",
+                analysis_summary="測試摘要",
+            )
+            saved = self.db.save_analysis_history(
+                result=result,
+                query_id="query_google_finance_yfinance_spcx",
+                report_type="simple",
+                news_content="新聞摘要",
+                context_snapshot={
+                    "market_fear_index_snapshot": {"market": "us"},
+                    "realtime_quote_raw": {"source": "yfinance", "exchange": None},
+                },
+                save_snapshot=True,
+            )
+            self.assertEqual(saved, 1)
+            report = get_history_detail("query_google_finance_yfinance_spcx", db_manager=self.db)
+            self.assertEqual(report.meta.market, "US")
+            self.assertIsNone(report.meta.google_finance_exchange)
+            self.assertEqual(report.meta.exchange_source, "unknown")
+
     @patch("src.auth.is_auth_enabled", return_value=False)
     def test_history_detail_ignores_non_dict_realtime_quote_raw(self, mock_auth) -> None:
         """GET /api/v1/history/{id} should tolerate truthy non-dict realtime_quote_raw."""

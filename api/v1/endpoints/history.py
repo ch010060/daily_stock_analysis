@@ -76,7 +76,35 @@ router = APIRouter()
 KlineRange = Literal["1d", "5d", "1w", "1m", "3m", "1y"]
 
 
-def _resolve_google_finance_report_metadata(stock_code: str, raw_result: dict) -> dict[str, str | None]:
+def _resolve_yfinance_exchange(context_snapshot: object, raw_result: dict) -> str | None:
+    for source in (context_snapshot, raw_result):
+        if not isinstance(source, dict):
+            continue
+        quote = source.get("realtime_quote_raw")
+        if not isinstance(quote, dict):
+            continue
+        source_tokens = {
+            str(quote.get("source") or "").strip().lower(),
+            str(quote.get("exchange_source") or "").strip().lower(),
+        }
+        if "yfinance" not in source_tokens:
+            continue
+        exchange = (
+            quote.get("exchange")
+            or quote.get("full_exchange_name")
+            or quote.get("fullExchangeName")
+            or quote.get("exchangeName")
+        )
+        if exchange:
+            return str(exchange)
+    return None
+
+
+def _resolve_google_finance_report_metadata(
+    stock_code: str,
+    raw_result: dict,
+    context_snapshot: object = None,
+) -> dict[str, str | None]:
     """Resolve external-reference metadata from local symbol metadata only."""
 
     try:
@@ -95,16 +123,23 @@ def _resolve_google_finance_report_metadata(stock_code: str, raw_result: dict) -
         ) or {}
 
     market = None
-    market_fear_snapshot = raw_result.get("market_fear_index_snapshot")
-    if isinstance(market_fear_snapshot, dict):
-        market = market_fear_snapshot.get("market")
+    for source in (raw_result, context_snapshot):
+        if not isinstance(source, dict):
+            continue
+        market_fear_snapshot = source.get("market_fear_index_snapshot")
+        if isinstance(market_fear_snapshot, dict):
+            market = market_fear_snapshot.get("market")
+            if market:
+                break
+
+    yfinance_exchange = _resolve_yfinance_exchange(context_snapshot, raw_result)
 
     return build_google_finance_reference_metadata(
         symbol=stock_code,
         market=str(market or "").upper(),
-        exchange=None,
+        exchange=yfinance_exchange,
         instrument_type=raw_result.get("instrument_type"),
-        exchange_source="unknown",
+        exchange_source="yfinance" if yfinance_exchange else "unknown",
     ) or {}
 
 
@@ -438,6 +473,7 @@ def get_history_detail(
         google_finance_meta = _resolve_google_finance_report_metadata(
             result.get("stock_code", ""),
             raw_result,
+            context_snapshot,
         )
 
         # 構建響應模型
