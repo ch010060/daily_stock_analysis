@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises';
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { expectNoHorizontalOverflow } from './helpers/layout';
 
-const SCREENSHOT_DIR = '/private/tmp/phase23_1b_mobile_layout_quality';
+const SCREENSHOT_DIR = '/private/tmp/phase23_1c_populated_mobile';
 
 const MOBILE_VIEWPORTS = [
   { name: 'mobile-360', width: 360, height: 740 },
@@ -58,6 +58,41 @@ const klineRows = [
   { date: '2026-06-29', open: 503, high: 511, low: 502, close: 509, volume: 23000000 },
 ];
 
+const denseReportMarkdown = [
+  '# Microsoft Corporation 高密度行動版報告：雲端、AI、企業授權與資本支出交叉檢查',
+  '',
+  '## 核心摘要',
+  '',
+  '這份 fixture 用來驗證行動版報告抽屜與列印路由在長標題、長網址、表格、程式碼區塊與 Mermaid 區塊同時存在時仍保持可讀。',
+  '',
+  '## 多欄資料表',
+  '',
+  '| 指標 | 本期 | 前期 | 變化 | 長網址來源 | 備註 |',
+  '| --- | ---: | ---: | ---: | --- | --- |',
+  '| Azure 商用雲成長率 | 31.2% | 29.8% | +1.4ppt | https://example.com/reports/2026/mobile/markdown/table/very/long/url/that/must/not/stretch/the/document/root | 長文字欄位應該在 local scroll 容器內，而不是撐寬整個頁面。 |',
+  '| Office E5 滲透率 | 42.5% | 40.1% | +2.4ppt | https://example.com/reports/2026/mobile/usage/model-name/gpt-mobile-fixture-long-model-name-for-wrapping | 檢查表格 local overflow。 |',
+  '',
+  '## 長網址與清單',
+  '',
+  '- 第一點包含很長的 URL：https://example.com/a/mobile/report/url/that/should/stay/inside/local/markdown/scroll/instead/of/forcing/page/overflow?symbol=MSFT&model=gpt-mobile-fixture-long-model-name-for-wrapping',
+  '- 第二點包含很長的代號與供應商名稱：MICROSOFT-CORPORATION-CLOUD-AI-CAPEX-LONG-LABEL-NASDAQ。',
+  '- 第三點確保抽屜底部控制項仍可點擊且不被 sticky/fixed 元素遮擋。',
+  '',
+  '## 程式碼區塊',
+  '',
+  '```json',
+  '{"model":"gpt-mobile-fixture-long-model-name-for-wrapping","url":"https://example.com/a/mobile/report/url/that/should/scroll/locally/not-expand-document","symbols":["MSFT","NVDA","SPY","006208"]}',
+  '```',
+  '',
+  '## Mermaid fallback/source block',
+  '',
+  '```mermaid',
+  'flowchart LR',
+  '  A[Long Supplier Label For Mobile Overflow Audit] --> B[Microsoft Corporation]',
+  '  B --> C[Enterprise Customer Segment With Long Label]',
+  '```',
+].join('\n');
+
 const qualityRoutes = [
   { name: 'home', path: '/', text: /台股日報|開始分析/, screenshot: 'home_header_360.png' },
   { name: 'chat', path: '/chat', text: /問股/, screenshot: 'chat_360.png' },
@@ -73,6 +108,7 @@ const qualityRoutes = [
 
 async function setupQualityApiMocks(page: Page): Promise<void> {
   await page.addInitScript(() => {
+    window.localStorage.setItem('dsa_chat_session_id', 'session-1');
     class MockEventSource extends EventTarget {
       static readonly CONNECTING = 0;
       static readonly OPEN = 1;
@@ -171,7 +207,41 @@ async function setupQualityApiMocks(page: Page): Promise<void> {
     }
 
     if (path === '/api/v1/agent/chat/sessions') {
-      await route.fulfill({ json: { sessions: [] } });
+      await route.fulfill({
+        json: {
+          sessions: [
+            {
+              session_id: 'session-1',
+              title: 'NVDA 長問題與模型名稱行動版測試',
+              message_count: 2,
+              created_at: '2026-06-29T08:30:00Z',
+              last_active: '2026-06-29T08:35:00Z',
+            },
+          ],
+        },
+      });
+      return;
+    }
+
+    if (path === '/api/v1/agent/chat/sessions/session-1') {
+      await route.fulfill({
+        json: {
+          messages: [
+            {
+              id: 'chat-user-1',
+              role: 'user',
+              content: '請用繁體中文分析 NVDA、MSFT、SPY 與 006208 在行動版長問題下的版面表現，並包含一個很長的 URL：https://example.com/chat/mobile/message/with/a/very/long/url/that/must/not-overflow-the-composer-or-message-bubble',
+              created_at: '2026-06-29T08:30:00Z',
+            },
+            {
+              id: 'chat-assistant-1',
+              role: 'assistant',
+              content: ['行動版回覆測試：', '', '- 第一點：訊息泡泡必須留在 viewport 內。', '- 第二點：`gpt-mobile-fixture-long-model-name-for-wrapping` 不應造成頁面水平捲動。', '', '```ts', 'const symbol = "NVDA-LONG-MOBILE-FIXTURE";', '```'].join('\n'),
+              created_at: '2026-06-29T08:35:00Z',
+            },
+          ],
+        },
+      });
       return;
     }
 
@@ -239,21 +309,7 @@ async function setupQualityApiMocks(page: Page): Promise<void> {
     }
 
     if (path === '/api/v1/history/101/markdown') {
-      await route.fulfill({
-        json: {
-          content: [
-            '# Microsoft Corporation 行動版報告',
-            '',
-            '## 核心摘要',
-            '',
-            '這是 Playwright 行動版版面測試用報告。',
-            '',
-            '| 指標 | 數值 |',
-            '| --- | --- |',
-            '| 長文字測試 | https://example.com/a/mobile/report/url/that/should/stay/inside/local/markdown/scroll |',
-          ].join('\n'),
-        },
-      });
+      await route.fulfill({ json: { content: denseReportMarkdown } });
       return;
     }
 
@@ -286,7 +342,14 @@ async function setupQualityApiMocks(page: Page): Promise<void> {
     }
 
     if (path === '/api/v1/portfolio/accounts') {
-      await route.fulfill({ json: { accounts: [] } });
+      await route.fulfill({
+        json: {
+          accounts: [
+            { id: 1, name: '長線美股退休帳戶', broker: 'Demo US', market: 'us', base_currency: 'USD', is_active: true, owner_id: null, created_at: '2026-06-01T00:00:00Z', updated_at: '2026-06-29T00:00:00Z' },
+            { id: 2, name: '台股 ETF 收益帳戶', broker: 'Demo TW', market: 'tw', base_currency: 'TWD', is_active: true, owner_id: null, created_at: '2026-06-01T00:00:00Z', updated_at: '2026-06-29T00:00:00Z' },
+          ],
+        },
+      });
       return;
     }
 
@@ -296,22 +359,69 @@ async function setupQualityApiMocks(page: Page): Promise<void> {
           as_of: '2026-06-29',
           cost_method: 'fifo',
           currency: 'TWD',
-          account_count: 0,
-          total_cash: 0,
-          total_market_value: 0,
-          total_equity: 0,
-          realized_pnl: 0,
-          unrealized_pnl: 0,
-          fee_total: 0,
-          tax_total: 0,
+          account_count: 2,
+          total_cash: 820000,
+          total_market_value: 2450000,
+          total_equity: 3270000,
+          realized_pnl: 120000,
+          unrealized_pnl: 230000,
+          fee_total: 1800,
+          tax_total: 2200,
           fx_stale: false,
           converted_total_available: true,
           aggregate_is_stale: false,
           fx_missing: false,
-          fx_warnings: [],
-          fx_rates_used: [],
-          accounts: [],
-          totals_by_currency: {},
+          fx_warnings: ['fixture long FX warning label should wrap without page overflow'],
+          fx_rates_used: [{ pair: 'USD/TWD', rate: 32.1, as_of: '2026-06-29' }],
+          totals_by_currency: {
+            TWD: { currency: 'TWD', account_count: 1, total_cash: 420000, total_market_value: 950000, total_equity: 1370000, realized_pnl: 50000, unrealized_pnl: 80000, fee_total: 800, tax_total: 1200 },
+            USD: { currency: 'USD', account_count: 1, total_cash: 12500, total_market_value: 46800, total_equity: 59300, realized_pnl: 2200, unrealized_pnl: 4700, fee_total: 30, tax_total: 15 },
+          },
+          accounts: [
+            {
+              account_id: 1,
+              account_name: '長線美股退休帳戶',
+              owner_id: null,
+              broker: 'Demo US',
+              market: 'us',
+              base_currency: 'USD',
+              as_of: '2026-06-29',
+              cost_method: 'fifo',
+              total_cash: 12500,
+              total_market_value: 46800,
+              total_equity: 59300,
+              realized_pnl: 2200,
+              unrealized_pnl: 4700,
+              fee_total: 30,
+              tax_total: 15,
+              fx_stale: false,
+              positions: [
+                { symbol: 'MSFT', name: 'Microsoft Corporation Extremely Long Holding Name For Mobile Wrapping', market: 'us', currency: 'USD', quantity: 12.5, avg_cost: 410.2, total_cost: 5127.5, last_price: 505.2, market_value: 6315, market_value_base: 202711.5, unrealized_pnl_base: 38118.75, unrealized_pnl_pct: 23.16, valuation_currency: 'USD', price_source: 'history_close', price_provider: 'fixture', price_date: '2026-06-29', price_stale: false, price_available: true },
+                { symbol: 'NVDA', name: 'Nvidia Corporation AI Infrastructure Long Label', market: 'us', currency: 'USD', quantity: 18, avg_cost: 118.5, total_cost: 2133, last_price: 145.3, market_value: 2615.4, market_value_base: 83954.34, unrealized_pnl_base: 15480.12, unrealized_pnl_pct: 22.62, valuation_currency: 'USD', price_source: 'history_close', price_provider: 'fixture', price_date: '2026-06-29', price_stale: false, price_available: true },
+              ],
+            },
+            {
+              account_id: 2,
+              account_name: '台股 ETF 收益帳戶',
+              owner_id: null,
+              broker: 'Demo TW',
+              market: 'tw',
+              base_currency: 'TWD',
+              as_of: '2026-06-29',
+              cost_method: 'fifo',
+              total_cash: 420000,
+              total_market_value: 950000,
+              total_equity: 1370000,
+              realized_pnl: 50000,
+              unrealized_pnl: 80000,
+              fee_total: 800,
+              tax_total: 1200,
+              fx_stale: false,
+              positions: [
+                { symbol: '006208', name: '富邦台灣采吉50基金長名稱行動版測試', market: 'tw', currency: 'TWD', quantity: 3000, avg_cost: 112.3, total_cost: 336900, last_price: 128.4, market_value: 385200, market_value_base: 385200, unrealized_pnl_base: 48300, unrealized_pnl_pct: 14.34, valuation_currency: 'TWD', price_source: 'history_close', price_provider: 'fixture', price_date: '2026-06-29', price_stale: false, price_available: true },
+              ],
+            },
+          ],
         },
       });
       return;
@@ -325,21 +435,73 @@ async function setupQualityApiMocks(page: Page): Promise<void> {
           cost_method: 'fifo',
           currency: 'TWD',
           thresholds: {},
-          concentration: { total_market_value: 0, top_weight_pct: 0, alert: false, top_positions: [] },
-          sector_concentration: { total_market_value: 0, top_weight_pct: 0, alert: false, top_sectors: [], coverage: {}, errors: [] },
-          drawdown: { series_points: 0, max_drawdown_pct: 0, current_drawdown_pct: 0, alert: false, fx_stale: false },
-          stop_loss: { near_alert: false, triggered_count: 0, near_count: 0, items: [] },
+          concentration: {
+            total_market_value: 2450000,
+            top_weight_pct: 37.2,
+            alert: false,
+            top_positions: [
+              { symbol: 'MSFT', name: 'Microsoft Corporation Extremely Long Holding Name For Mobile Wrapping', weight_pct: 37.2, total_market_value: 202711.5 },
+              { symbol: '006208', name: '富邦台灣采吉50基金長名稱行動版測試', weight_pct: 22.1, total_market_value: 385200 },
+            ],
+          },
+          sector_concentration: {
+            total_market_value: 2450000,
+            top_weight_pct: 48.5,
+            alert: false,
+            top_sectors: [{ sector: 'Information Technology With Long Label', weight_pct: 48.5, total_market_value: 1188250 }],
+            coverage: {},
+            errors: [],
+          },
+          drawdown: { series_points: 30, max_drawdown_pct: -8.4, current_drawdown_pct: -2.1, alert: false, fx_stale: false },
+          stop_loss: { near_alert: true, triggered_count: 0, near_count: 1, items: [{ symbol: 'NVDA', current_price: 145.3, stop_loss: 138.0 }] },
         },
       });
       return;
     }
 
-    if (
-      path === '/api/v1/portfolio/trades'
-      || path === '/api/v1/portfolio/cash-ledger'
-      || path === '/api/v1/portfolio/corporate-actions'
-      || path === '/api/v1/backtest/results'
-    ) {
+    if (path === '/api/v1/portfolio/trades') {
+      await route.fulfill({
+        json: {
+          items: [
+            { id: 501, account_id: 1, trade_date: '2026-06-20', side: 'buy', symbol: 'MSFT-LONG-MOBILE-FIXTURE', market: 'us', currency: 'USD', quantity: 12.5, price: 410.2, fee: 1.2, tax: 0, note: 'fixture populated trade row with long note' },
+          ],
+          total: 1,
+          page: 1,
+          page_size: 20,
+        },
+      });
+      return;
+    }
+
+    if (path === '/api/v1/portfolio/cash-ledger') {
+      await route.fulfill({
+        json: {
+          items: [
+            { id: 601, account_id: 1, event_date: '2026-06-21', direction: 'in', amount: 12500, currency: 'USD', note: 'fixture cash ledger long note for mobile wrapping' },
+          ],
+          total: 1,
+          page: 1,
+          page_size: 20,
+        },
+      });
+      return;
+    }
+
+    if (path === '/api/v1/portfolio/corporate-actions') {
+      await route.fulfill({
+        json: {
+          items: [
+            { id: 701, account_id: 2, effective_date: '2026-06-22', action_type: 'cash_dividend', symbol: '006208-LONG-MOBILE-FIXTURE', market: 'tw', currency: 'TWD', cash_dividend_per_share: 1.25, split_ratio: null, note: 'fixture corporate action long note' },
+          ],
+          total: 1,
+          page: 1,
+          page_size: 20,
+        },
+      });
+      return;
+    }
+
+    if (path === '/api/v1/backtest/results') {
       await route.fulfill({ json: { items: [], total: 0, page: 1, page_size: 20 } });
       return;
     }
@@ -402,7 +564,18 @@ async function setupQualityApiMocks(page: Page): Promise<void> {
               max_total_tokens: 1300,
             },
           ],
-          recent_calls: [],
+          recent_calls: [
+            {
+              id: 901,
+              called_at: '2026-06-29T09:30:00Z',
+              call_type: 'analysis',
+              model: 'gpt-mobile-fixture-long-model-name-for-wrapping-and-table-scroll-validation',
+              stock_code: 'MSFT-LONG-MOBILE-FIXTURE',
+              prompt_tokens: 800,
+              completion_tokens: 500,
+              total_tokens: 1300,
+            },
+          ],
         },
       });
       return;
@@ -696,5 +869,58 @@ test.describe('mobile layout quality audit', () => {
       await expectNoStickyOcclusion(page, tab);
       await assertLayoutQuality(page);
     }
+  });
+
+  test('populated dense content remains contained at 360px', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+
+    await test.step('dense report drawer', async () => {
+      await page.goto('/');
+      await page.getByRole('button', { name: '完整分析報告' }).click();
+      await expect(page.locator('body')).toContainText('高密度行動版報告');
+      await expect(page.getByTestId('kline-chart-block')).toBeVisible();
+      await expectNoStickyOcclusion(page, page.getByRole('button', { name: /關閉/ }).first());
+      await assertLayoutQuality(page);
+      await capture(page, 'report_drawer_dense_360.png');
+    });
+
+    await test.step('dense print route', async () => {
+      await page.goto('/reports/101/print?pdf=1');
+      await expect(page.locator('body')).toContainText('高密度行動版報告');
+      await assertLayoutQuality(page);
+      await capture(page, 'report_print_dense_360.png');
+    });
+
+    await test.step('populated portfolio', async () => {
+      await page.goto('/portfolio');
+      await expect(page.locator('body')).toContainText(/長線美股退休帳戶|Microsoft Corporation/);
+      await expect(page.locator('body')).toContainText(/USD|TWD|006208/);
+      await assertLayoutQuality(page);
+      await capture(page, 'portfolio_populated_360.png');
+    });
+
+    await test.step('populated chat', async () => {
+      await page.goto('/chat');
+      await expect(page.locator('body')).toContainText('NVDA');
+      await expect(page.locator('body')).toContainText('gpt-mobile-fixture-long-model-name-for-wrapping');
+      await assertLayoutQuality(page);
+      await capture(page, 'chat_populated_360.png');
+    });
+
+    await test.step('usage long model names', async () => {
+      await page.goto('/usage');
+      await expect(page.locator('body')).toContainText('gpt-mobile-fixture-long-model-name-for-wrapping');
+      await assertLayoutQuality(page);
+      await capture(page, 'usage_long_models_360.png');
+    });
+
+    await test.step('settings populated categories', async () => {
+      await page.goto('/settings');
+      await page.getByRole('button', { name: /AI 模型/ }).click();
+      await expect(page.locator('body')).toContainText('DEFAULT_MODEL');
+      await expect(page.locator('body')).toContainText('預設模型行動版品質測試欄位');
+      await assertLayoutQuality(page);
+      await capture(page, 'settings_populated_360.png');
+    });
   });
 });
