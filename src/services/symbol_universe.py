@@ -833,8 +833,6 @@ def _is_supported_us_symbol(symbol: str, security_name: str, test_issue: object)
         return False
     lowered = security_name.casefold()
     unsupported_terms = (
-        "american depositary",
-        "depositary shares",
         "preferred stock",
         "warrant",
         "rights",

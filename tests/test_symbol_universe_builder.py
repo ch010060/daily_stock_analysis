@@ -185,6 +185,7 @@ def test_us_directory_provider_excludes_single_name_derivative_etfs(tmp_path) ->
             [
                 "ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue|NASDAQ Symbol",
                 "KEPT|Kept Broad Market ETF|P|KEPT|Y|100|N|KEPT",
+                "NOK|Nokia Corporation Sponsored American Depositary Shares|N|NOK|N|100|N|NOK",
                 "DROP|Drop 2X Inverse Sample Daily ETF|P|DROP|Y|100|N|DROP",
                 "File Creation Time: fixture",
             ]
@@ -200,6 +201,7 @@ def test_us_directory_provider_excludes_single_name_derivative_etfs(tmp_path) ->
 
     assert "GOOD" in records
     assert "KEPT" in records
+    assert records["NOK"].exchange == "NYSE"
     assert "BADL" not in records
     assert "BADO" not in records
     assert "DROP" not in records

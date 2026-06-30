@@ -2,8 +2,9 @@
   "metadata": {
     "schema_version": 1,
     "source": "symbol_universe_builder",
-    "generated_at": "2026-06-23T02:24:29.871080+00:00",
+    "generated_at": "2026-06-30T12:41:10.252326+00:00",
     "provider_sources": [
+      "nasdaq_trader_symbol_directory",
       "json_snapshot",
       "twse_company_profile",
       "tpex_company_profile",
@@ -11,9 +12,9 @@
     ],
     "market_count": {
       "TW": 3083,
-      "US": 4332
+      "US": 4333
     },
-    "record_count": 7415
+    "record_count": 7416
   },
   "records": [
     {
@@ -84903,15 +84904,15 @@
       "canonical_symbol": "US:QCOM",
       "raw_symbol": "QCOM",
       "market": "US",
-      "exchange": null,
+      "exchange": "NASDAQ",
       "instrument_type": "stock",
       "name": "QUALCOMM",
       "aliases": [
         "QUALCOMM Incorporated"
       ],
-      "provider_source": "nasdaq_screener_stock_directory",
+      "provider_source": "nasdaq_trader_symbol_directory",
       "is_active": true,
-      "last_updated": "2026-06-22T09:14:31.447788+00:00"
+      "last_updated": "2026-06-30T12:27:23.084970+00:00"
     },
     {
       "canonical_symbol": "US:QCRH",
@@ -90199,15 +90200,15 @@
       "canonical_symbol": "US:SNDK",
       "raw_symbol": "SNDK",
       "market": "US",
-      "exchange": null,
+      "exchange": "NASDAQ",
       "instrument_type": "stock",
       "name": "Sandisk",
       "aliases": [
         "Sandisk Corporation"
       ],
-      "provider_source": "nasdaq_screener_stock_directory",
+      "provider_source": "nasdaq_trader_symbol_directory",
       "is_active": true,
-      "last_updated": "2026-06-22T09:14:31.451399+00:00"
+      "last_updated": "2026-06-30T12:27:23.088996+00:00"
     },
     {
       "canonical_symbol": "US:SNDR",
@@ -97744,15 +97745,15 @@
       "canonical_symbol": "US:WDC",
       "raw_symbol": "WDC",
       "market": "US",
-      "exchange": null,
+      "exchange": "NASDAQ",
       "instrument_type": "stock",
       "name": "Western Digital",
       "aliases": [
         "Western Digital Corporation"
       ],
-      "provider_source": "nasdaq_screener_stock_directory",
+      "provider_source": "nasdaq_trader_symbol_directory",
       "is_active": true,
-      "last_updated": "2026-06-22T09:14:31.456552+00:00"
+      "last_updated": "2026-06-30T12:27:23.094461+00:00"
     },
     {
       "canonical_symbol": "US:WDFC",
@@ -100022,6 +100023,18 @@
       "provider_source": "curated_seed",
       "is_active": true,
       "last_updated": "2026-06-22"
+    },
+    {
+      "canonical_symbol": "US:NOK",
+      "raw_symbol": "NOK",
+      "market": "US",
+      "exchange": "NYSE",
+      "instrument_type": "stock",
+      "name": "Nokia Corporation Sponsored American Depositary Shares",
+      "aliases": [],
+      "provider_source": "nasdaq_trader_symbol_directory",
+      "is_active": true,
+      "last_updated": "2026-06-30T12:27:24.583629+00:00"
     }
   ]
 }
