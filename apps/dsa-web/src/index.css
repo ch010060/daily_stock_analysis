@@ -1470,8 +1470,8 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  height: 1.625rem;
-  padding: 0.6rem 0.6rem;
+  min-height: 2rem;
+  padding: 0.35rem 0.6rem;
   cursor: pointer;
   font-size: 0.8rem;
   color: var(--home-action-ai-text);
