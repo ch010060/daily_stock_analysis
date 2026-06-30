@@ -685,6 +685,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             ("NOK", "Nokia Corporation Sponsored", "NYSE"),
             ("SNDK", "Sandisk Corporation", "NASDAQ"),
             ("QCOM", "QUALCOMM Incorporated", "NASDAQ"),
+            ("DELL", "Dell Technologies Inc.", "NYSE"),
         )
         for symbol, name, google_exchange in cases:
             with self.subTest(symbol=symbol):

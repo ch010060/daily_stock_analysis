@@ -2,7 +2,7 @@
   "metadata": {
     "schema_version": 1,
     "source": "symbol_universe_builder",
-    "generated_at": "2026-06-30T12:41:10.252326+00:00",
+    "generated_at": "2026-06-30T12:55:13.398164+00:00",
     "provider_sources": [
       "nasdaq_trader_symbol_directory",
       "json_snapshot",
@@ -56291,15 +56291,15 @@
       "canonical_symbol": "US:DELL",
       "raw_symbol": "DELL",
       "market": "US",
-      "exchange": null,
+      "exchange": "NYSE",
       "instrument_type": "stock",
       "name": "Dell Technologies",
       "aliases": [
         "Dell Technologies Inc."
       ],
-      "provider_source": "nasdaq_screener_stock_directory",
+      "provider_source": "nasdaq_trader_symbol_directory",
       "is_active": true,
-      "last_updated": "2026-06-22T09:14:31.427287+00:00"
+      "last_updated": "2026-06-30T12:55:13.342526+00:00"
     },
     {
       "canonical_symbol": "US:DERM",
