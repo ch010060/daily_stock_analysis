@@ -285,7 +285,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
                         {rule.enabled ? '停用' : '啟用'}
                       </Button>
                       <Button
-                        size="xsm"
+                        size="sm"
                         variant="danger-subtle"
                         aria-label={`刪除 ${rule.name}`}
                         onClick={() => setPendingDelete(rule)}
