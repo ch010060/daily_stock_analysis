@@ -450,9 +450,9 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
   };
 
   return (
-    <Card title="建立警告規則" subtitle="Web 警告中心" variant="bordered" padding="md">
-      <form className="space-y-4" noValidate onSubmit={(event) => void handleSubmit(event)}>
-        <div className="grid gap-4 md:grid-cols-2">
+    <Card title="建立警告規則" subtitle="Web 警告中心" variant="bordered" padding="md" className="min-w-0 max-w-full">
+      <form className="min-w-0 max-w-full space-y-4" noValidate onSubmit={(event) => void handleSubmit(event)}>
+        <div className="grid min-w-0 gap-4 md:grid-cols-2">
           <Input
             label="規則名稱"
             value={name}
@@ -489,7 +489,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         </div>
 
         {alertType === 'price_cross' ? (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid min-w-0 gap-4 md:grid-cols-2">
             <Select
               label="方向"
               value={priceDirection}
@@ -510,7 +510,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         ) : null}
 
         {alertType === 'price_change_percent' ? (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid min-w-0 gap-4 md:grid-cols-2">
             <Select
               label="方向"
               value={changeDirection}
@@ -543,7 +543,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         ) : null}
 
         {alertType === 'ma_price_cross' ? (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid min-w-0 gap-4 md:grid-cols-2">
             <Select
               label="穿越方向"
               value={thresholdDirection}
@@ -565,7 +565,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         ) : null}
 
         {alertType === 'rsi_threshold' ? (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid min-w-0 gap-4 md:grid-cols-3">
             <Select
               label="閾值方向"
               value={thresholdDirection}
@@ -597,7 +597,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         ) : null}
 
         {alertType === 'macd_cross' ? (
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid min-w-0 gap-4 md:grid-cols-4">
             <Select
               label="交叉方向"
               value={crossDirection}
@@ -639,7 +639,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         ) : null}
 
         {alertType === 'kdj_cross' ? (
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid min-w-0 gap-4 md:grid-cols-4">
             <Select
               label="交叉方向"
               value={crossDirection}
@@ -681,7 +681,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         ) : null}
 
         {alertType === 'cci_threshold' ? (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid min-w-0 gap-4 md:grid-cols-3">
             <Select
               label="閾值方向"
               value={thresholdDirection}
@@ -723,7 +723,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         {alertType === 'market_light_status' ? (
           <div className="space-y-2">
             <div className="text-sm font-medium text-foreground">觸發狀態</div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
               {MARKET_LIGHT_STATUS_OPTIONS.map((option) => (
                 <Checkbox
                   key={option.value}

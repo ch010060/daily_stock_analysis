@@ -259,7 +259,7 @@ const AlertsPage: React.FC = () => {
   };
 
   return (
-    <AppPage className="space-y-5">
+    <AppPage className="min-w-0 max-w-full space-y-5">
       <PageHeader
         eyebrow="Alert Center"
         title="警告中心"
@@ -281,11 +281,11 @@ const AlertsPage: React.FC = () => {
       ) : null}
       {rulesError ? <ApiErrorAlert error={rulesError} onDismiss={() => setRulesError(null)} /> : null}
 
-      <div className="grid items-stretch gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
+      <div className="grid min-w-0 max-w-full items-stretch gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
         <AlertRuleForm onSubmit={handleCreateRule} isSubmitting={createLoading} />
-        <div className="flex h-full min-h-0 flex-col gap-4">
+        <div className="flex h-full min-h-0 min-w-0 max-w-full flex-col gap-4">
           <AlertRuleList
-            className="flex h-full min-h-0 flex-col"
+            className="flex h-full min-h-0 min-w-0 max-w-full flex-col"
             rules={rules}
             total={rulesTotal}
             page={rulesPage}
@@ -321,7 +321,7 @@ const AlertsPage: React.FC = () => {
       <AlertTriggerHistory triggers={triggers} isLoading={triggersLoading} />
 
       {notificationsError ? <ApiErrorAlert error={notificationsError} onDismiss={() => setNotificationsError(null)} /> : null}
-      <Card title="通知嘗試記錄" subtitle="通知結果" variant="bordered" padding="md">
+      <Card title="通知嘗試記錄" subtitle="通知結果" variant="bordered" padding="md" className="min-w-0 max-w-full">
         {notificationsLoading ? <Loading label="正在載入通知嘗試記錄" /> : null}
         {!notificationsLoading && notifications.length === 0 ? (
           <EmptyState

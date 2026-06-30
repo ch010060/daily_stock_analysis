@@ -180,8 +180,14 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
   );
 
   return (
-    <Card title="警告規則" subtitle={`${total} 條規則`} variant="bordered" padding="md" className={className}>
-      <div className="mb-4 grid gap-3 md:grid-cols-2">
+    <Card
+      title="警告規則"
+      subtitle={`${total} 條規則`}
+      variant="bordered"
+      padding="md"
+      className={`min-w-0 max-w-full ${className ?? ''}`}
+    >
+      <div className="mb-4 grid min-w-0 gap-3 md:grid-cols-2">
         <Select
           label="啟停狀態"
           value={enabledFilter}
@@ -209,7 +215,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
           />
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-x-auto">
+        <div className="min-h-0 min-w-0 max-w-full flex-1 overflow-x-auto">
           <table className="w-full min-w-[960px] text-left text-sm">
             <thead className="border-b border-border/60 text-xs uppercase text-muted-text">
               <tr>

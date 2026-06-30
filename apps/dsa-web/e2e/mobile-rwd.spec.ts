@@ -248,6 +248,68 @@ async function setupDsaApiMocks(page: Page): Promise<void> {
       return;
     }
 
+    if (path === '/api/v1/alerts/rules') {
+      await route.fulfill({
+        json: {
+          total: 1,
+          page: 1,
+          page_size: 20,
+          items: [
+            {
+              id: 301,
+              name: '台積電突破壓力',
+              target_scope: 'single_symbol',
+              target: '2330',
+              alert_type: 'price_cross',
+              parameters: { direction: 'above', price: 800 },
+              severity: 'warning',
+              enabled: true,
+              source: 'fixture',
+              cooldown_policy: null,
+              notification_policy: null,
+              last_triggered_at: null,
+              cooldown_until: null,
+              cooldown_active: false,
+              created_at: '2026-06-29T09:00:00Z',
+              updated_at: '2026-06-29T09:30:00Z',
+            },
+          ],
+        },
+      });
+      return;
+    }
+
+    if (path === '/api/v1/alerts/triggers') {
+      await route.fulfill({
+        json: {
+          total: 1,
+          page: 1,
+          page_size: 20,
+          items: [
+            {
+              id: 401,
+              rule_id: 301,
+              target: '2330',
+              observed_value: 805,
+              threshold: 800,
+              reason: 'Fixture trigger',
+              data_source: 'fixture',
+              data_timestamp: '2026-06-29T09:00:00Z',
+              triggered_at: '2026-06-29T09:35:00Z',
+              status: 'triggered',
+              diagnostics: null,
+            },
+          ],
+        },
+      });
+      return;
+    }
+
+    if (path === '/api/v1/alerts/notifications') {
+      await route.fulfill({ json: { total: 0, page: 1, page_size: 20, items: [] } });
+      return;
+    }
+
     if (path === '/api/v1/finews/latest') {
       await route.fulfill({
         json: {
@@ -398,8 +460,20 @@ test.describe('mobile RWD baseline', () => {
     await expect(page.getByRole('button', { name: '美股日報' })).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
-    await page.goto('/finews');
-    await expect(page.getByRole('heading', { name: '美股日報' })).toBeVisible();
-    await expectNoHorizontalOverflow(page);
+      await page.goto('/finews');
+      await expect(page.getByRole('heading', { name: '美股日報' })).toBeVisible();
+      await expectNoHorizontalOverflow(page);
   });
+
+  for (const viewport of MOBILE_VIEWPORTS) {
+    test(`alerts page has no document overflow at ${viewport.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto('/alerts');
+
+      await expect(page.getByRole('heading', { name: '警告中心' })).toBeVisible();
+      await expect(page.getByRole('button', { name: '建立規則' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: '警告規則', exact: true })).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+    });
+  }
 });

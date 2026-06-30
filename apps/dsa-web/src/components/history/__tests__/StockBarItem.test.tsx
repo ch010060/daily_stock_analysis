@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { StockBarItemComponent } from '../StockBarItem';
 import type { StockBarItem } from '../../../types/analysis';
@@ -61,7 +61,8 @@ describe('StockBarItemComponent', () => {
     const meta = screen.getByTestId('history-card-meta');
 
     expect(within(actions).getByText('觀望 62')).toBeInTheDocument();
-    expect(within(actions).getByRole('button', { name: /刪除 台積電股份有限公司 歷史記錄/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /刪除 台積電股份有限公司 歷史記錄/ })).toBeInTheDocument();
+    expect(within(actions).queryByRole('button', { name: /刪除 台積電股份有限公司 歷史記錄/ })).not.toBeInTheDocument();
     expect(within(actions).queryByText('CN · 非交易日')).not.toBeInTheDocument();
     expect(within(meta).getByText('CN · 非交易日')).toBeVisible();
 
@@ -71,5 +72,53 @@ describe('StockBarItemComponent', () => {
         name: /^台積電股份有限公司 2330 歷史記錄$/,
       }),
     ).toBeInTheDocument();
+  });
+
+  it('does not nest the delete button inside the row activation control', () => {
+    render(
+      <StockBarItemComponent
+        item={issue1600Item}
+        isViewing={false}
+        onClick={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const row = screen.getByRole('button', {
+      name: /^台積電股份有限公司 2330 歷史記錄$/,
+    });
+
+    expect(row.querySelector('button')).toBeNull();
+  });
+
+  it('keeps row activation and delete action separate for mouse and keyboard users', () => {
+    const onClick = vi.fn();
+    const onDelete = vi.fn();
+    render(
+      <StockBarItemComponent
+        item={issue1600Item}
+        isViewing={false}
+        onClick={onClick}
+        onDelete={onDelete}
+      />,
+    );
+
+    const row = screen.getByRole('button', {
+      name: /^台積電股份有限公司 2330 歷史記錄$/,
+    });
+    const deleteButton = screen.getByRole('button', {
+      name: /刪除 台積電股份有限公司 歷史記錄/,
+    });
+
+    fireEvent.click(row);
+    expect(onClick).toHaveBeenCalledWith(issue1600Item.id);
+
+    fireEvent.click(deleteButton);
+    expect(onDelete).toHaveBeenCalledWith(issue1600Item.stockCode);
+    expect(onClick).toHaveBeenCalledTimes(1);
+
+    fireEvent.keyDown(row, { key: 'Enter' });
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(onClick).toHaveBeenCalledTimes(3);
   });
 });
