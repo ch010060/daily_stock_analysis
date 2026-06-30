@@ -124,6 +124,7 @@ export function KlineChartBlock({ historyId, instrumentType }: KlineChartBlockPr
     if (!vm || vm.points.length === 0 || !containerRef.current) return;
 
     chartRef.current?.remove();
+    const chartWidth = Math.max(1, containerRef.current.clientWidth);
     const chart = createChart(containerRef.current, {
       height: 260,
       layout: {
@@ -137,7 +138,7 @@ export function KlineChartBlock({ historyId, instrumentType }: KlineChartBlockPr
       rightPriceScale: { borderColor: '#d8dee9' },
       timeScale: { borderColor: '#d8dee9', timeVisible: vm.granularity === 'intraday' },
       crosshair: { mode: CrosshairMode.Normal },
-      width: Math.max(containerRef.current.clientWidth, 320),
+      width: chartWidth,
     });
     chartRef.current = chart;
 
@@ -205,7 +206,7 @@ export function KlineChartBlock({ historyId, instrumentType }: KlineChartBlockPr
 
     const resize = () => {
       if (containerRef.current) {
-        chart.applyOptions({ width: Math.max(containerRef.current.clientWidth, 320) });
+        chart.applyOptions({ width: Math.max(1, containerRef.current.clientWidth) });
       }
     };
     window.addEventListener('resize', resize);
@@ -243,7 +244,7 @@ export function KlineChartBlock({ historyId, instrumentType }: KlineChartBlockPr
   );
 
   return (
-    <section data-testid="kline-chart-block" className="rounded-lg border bg-white p-4">
+    <section data-testid="kline-chart-block" className="min-w-0 max-w-full overflow-hidden rounded-lg border bg-white p-4">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-foreground">價格走勢 · K 線圖</h3>
@@ -281,7 +282,7 @@ export function KlineChartBlock({ historyId, instrumentType }: KlineChartBlockPr
             )}
           </div>
 
-          <div className="h-[260px] w-full" ref={containerRef} data-testid="kline-chart-canvas-host">
+          <div className="h-[260px] min-w-0 max-w-full overflow-hidden" ref={containerRef} data-testid="kline-chart-canvas-host">
             {!vm && !error && <div className="flex h-full items-center justify-center text-xs text-muted-foreground">載入 K-line...</div>}
             {error && <div className="flex h-full items-center justify-center text-xs text-danger">K-line 載入失敗</div>}
           </div>

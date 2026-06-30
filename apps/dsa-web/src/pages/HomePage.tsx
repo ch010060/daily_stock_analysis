@@ -733,12 +733,13 @@ const HomePage: React.FC = () => {
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="md:hidden -ml-1 flex-shrink-0 rounded-lg p-1.5 text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
+                className="md:hidden -ml-1 inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
                 aria-label="歷史記錄"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
+                <span className="text-xs font-semibold">歷史</span>
               </button>
               <div className="relative min-w-0 flex-1">
                 <StockAutocomplete
