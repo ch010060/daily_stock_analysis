@@ -217,6 +217,10 @@ beforeEach(() => {
   mockResolveSymbol.mockResolvedValue({ query: '', status: 'not_found', selected: null, candidates: [], message: null });
 });
 
+const openStrategyPanel = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: /修改策略|展開策略/ }));
+};
+
 describe('ChatPage', () => {
   it('renders a fixed workspace shell with independent session and message viewports', async () => {
     render(
@@ -426,8 +430,39 @@ describe('ChatPage', () => {
       </MemoryRouter>
     );
 
+    await openStrategyPanel();
     expect(await screen.findByRole('checkbox', { name: '趨勢分析' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: '通用分析' })).not.toBeChecked();
+  });
+
+  it('collapses strategy choices by default and reveals them on demand', async () => {
+    render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>
+    );
+
+    const trigger = await screen.findByRole('button', { name: /修改策略|展開策略/ });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('checkbox', { name: '趨勢分析' })).not.toBeInTheDocument();
+
+    fireEvent.click(trigger);
+
+    expect(await screen.findByRole('checkbox', { name: '趨勢分析' })).toBeChecked();
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('renders context compression as a compact toolbar control', async () => {
+    render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>
+    );
+
+    const compressionToggle = await screen.findByRole('checkbox', { name: /上下文壓縮/ });
+
+    expect(compressionToggle.closest('[data-testid="chat-context-compression-toolbar"]')).not.toBeNull();
+    expect(screen.queryByTestId('chat-context-compression-row')).not.toBeInTheDocument();
   });
 
   it('sends multiple selected skills in order', async () => {
@@ -445,6 +480,7 @@ describe('ChatPage', () => {
       </MemoryRouter>
     );
 
+    await openStrategyPanel();
     fireEvent.click(await screen.findByRole('checkbox', { name: '均線金叉' }));
     fireEvent.change(screen.getByPlaceholderText(/分析 2330/), {
       target: { value: '分析 2330' },
@@ -472,6 +508,7 @@ describe('ChatPage', () => {
       </MemoryRouter>
     );
 
+    await openStrategyPanel();
     fireEvent.click(await screen.findByRole('checkbox', { name: '趨勢分析' }));
     expect(screen.getByRole('checkbox', { name: '通用分析' })).toBeChecked();
 
@@ -509,6 +546,7 @@ describe('ChatPage', () => {
       </MemoryRouter>
     );
 
+    await openStrategyPanel();
     fireEvent.click(await screen.findByRole('checkbox', { name: '均線金叉' }));
     fireEvent.click(screen.getByRole('checkbox', { name: '纏論' }));
 
@@ -535,6 +573,7 @@ describe('ChatPage', () => {
       </MemoryRouter>
     );
 
+    await openStrategyPanel();
     fireEvent.click(await screen.findByRole('checkbox', { name: '均線金叉' }));
     fireEvent.click(screen.getByRole('button', { name: '用纏論分析台積電 2330' }));
 
