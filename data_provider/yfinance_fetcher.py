@@ -774,6 +774,7 @@ class YfinanceFetcher(BaseFetcher):
             logger.debug(f"[Yfinance] 獲取美股 {symbol} 實時行情 (provider={provider_symbol})")
 
             ticker = yf.Ticker(provider_symbol)
+            ticker_info: Dict[str, Any] = {}
 
             # 嘗試獲取 fast_info（更快，但欄位較少）
             try:
@@ -822,10 +823,13 @@ class YfinanceFetcher(BaseFetcher):
 
             # 獲取股票名稱
             try:
-                info_name = ticker.info.get('shortName', '') or ticker.info.get('longName', '') or ''
+                ticker_info = ticker.info or {}
+                info_name = ticker_info.get('shortName', '') or ticker_info.get('longName', '') or ''
                 name = info_name if is_meaningful_stock_name(info_name, symbol) else STOCK_NAME_MAP.get(symbol, '')
             except Exception:
                 name = STOCK_NAME_MAP.get(symbol, '')
+            exchange = ticker_info.get("exchange") or None
+            full_exchange_name = ticker_info.get("fullExchangeName") or ticker_info.get("exchangeName") or None
 
             quote = UnifiedRealtimeQuote(
                 code=symbol,
@@ -847,6 +851,9 @@ class YfinanceFetcher(BaseFetcher):
                 pb_ratio=None,
                 total_mv=market_cap,
                 circ_mv=None,
+                exchange=exchange,
+                full_exchange_name=full_exchange_name,
+                exchange_source="yfinance" if exchange or full_exchange_name else None,
             )
 
             logger.info(f"[Yfinance] 獲取美股 {symbol} 實時行情成功: 價格={price}")

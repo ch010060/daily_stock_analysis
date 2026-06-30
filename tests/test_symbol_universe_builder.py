@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import json
 
 from scripts.generate_stock_index import generate_stock_index_from_symbol_universe
+from scripts.build_symbol_universe import providers_for_markets
 from src.services.symbol_universe import (
     CuratedSeedSymbolProvider,
     DEFAULT_SYMBOL_UNIVERSE_SNAPSHOT_PATH,
@@ -235,6 +236,13 @@ def test_us_screener_provider_uses_country_filtered_rows() -> None:
     assert records["GOOD"].provider_source == "nasdaq_screener_stock_directory"
     assert "DROP" not in records
     assert "YUMC" not in records
+
+
+def test_us_symbol_universe_refresh_uses_exchange_aware_directory_source() -> None:
+    sources = [provider.source_name for provider in providers_for_markets({"US"})]
+
+    assert "nasdaq_trader_symbol_directory" in sources
+    assert "nasdaq_screener_stock_directory" in sources
 
 
 def test_twse_company_profile_provider_adds_official_english_aliases() -> None:

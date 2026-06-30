@@ -22,6 +22,7 @@ from src.services.symbol_universe import (  # noqa: E402
     DEFAULT_RUNTIME_SYMBOL_UNIVERSE_CACHE_PATH,
     DEFAULT_SYMBOL_UNIVERSE_SNAPSHOT_PATH,
     FinMindTaiwanStockInfoHttpProvider,
+    NasdaqTraderSymbolDirectoryProvider,
     NasdaqScreenerSymbolProvider,
     SymbolUniverseBuilder,
     SymbolUniverseProvider,
@@ -49,6 +50,7 @@ def providers_for_markets(markets: set[str]) -> list[SymbolUniverseProvider]:
         providers.append(TpexCompanyProfileProvider())
         providers.append(FinMindTaiwanStockInfoHttpProvider())
     if "US" in markets:
+        providers.append(NasdaqTraderSymbolDirectoryProvider())
         providers.append(NasdaqScreenerSymbolProvider())
     return providers
 
