@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 美股個股完整報告新增估值河流圖支援：以 yfinance 財報年度實際 EPS/BVPS（`income_stmt`/`balance_sheet`，非反推）建構階梯狀倍數視覺參考帶，並新增「實際 EPS」/「預估 EPS」（`trailingEps`/`forwardEps`）點時參考數值；台股同步新增「實際 EPS」欄位（來自 `TaiwanStockFinancialStatements` 最新一季 EPS，與既有反推 EPS 明確區分標示）；ETF/指數維持不支援估值河流圖。所有數值皆為後端決定性運算，LLM 不參與。
+
 - [新功能] 台股個股完整報告新增「估值河流圖」（`valuation_river_snapshot`）：以 FinMind `TaiwanStockPER`/`TaiwanStockPrice` 反推歷史隱含 EPS，畫出固定倍數（14x/18x/22x/26x/30x/34x/38x，26x 為中性分界）視覺參考帶與實際收盤價疊圖；完全由後端決定性運算，LLM 不參與、不產生目標價/公允價值/買賣建議；美股、ETF、指數與非股票標的顯示明確的 unavailable 卡片，不繪製假造歷史河流圖；不影響既有 `valuation_snapshot`/`fundamental_snapshot`/四大師視角補充/評分/趨勢/操作建議欄位。
 
 - [改進] 「四大師視角補充」功能預設值由關閉改為開啟（`ENABLE_FOUR_MASTERS_COMMENTARY` 預設 `true`，與 `value_network_mermaid` 一致採 opt-out 模式；設為 `false` 可關閉）。

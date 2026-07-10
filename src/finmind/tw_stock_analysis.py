@@ -356,7 +356,53 @@ def fetch_tw_valuation_river_rows(
 
     return per_rows, price_rows
 
-    return valuation_raw, fundamental_raw
+
+# Phase 26.2: actual/reported EPS lookback. TaiwanStockFinancialStatements is
+# quarterly, so ~200 days comfortably covers the latest 1-2 published quarters
+# without over-fetching.
+ACTUAL_EPS_LOOKBACK_DAYS = 200
+
+
+def fetch_tw_actual_eps_row(
+    stock_id: str,
+    *,
+    end_date: str,
+    days: int = ACTUAL_EPS_LOOKBACK_DAYS,
+    fetcher: Optional[FinMindDatasetFetcher] = None,
+) -> Optional[Dict[str, Any]]:
+    """Fetch the latest reported (actual) quarterly EPS row for a TW stock.
+
+    Reuses the same `TaiwanStockFinancialStatements` dataset already relied on
+    by `build_tw_valuation_fundamental_snapshot` (no new data provider), but
+    narrowly extracts just the `type == "EPS"` line item — this is genuine
+    reported EPS (每股盈餘) from the company's financial statements, distinct
+    from the PER-implied EPS the valuation river derives.
+
+    Returns `{"date": ..., "eps": float}` for the most recent quarter, or
+    `None` if unavailable. Never raises.
+    """
+    fetcher = fetcher or FinMindDatasetFetcher()
+    end_dt = date.fromisoformat(end_date)
+    start_date = (end_dt - timedelta(days=days)).isoformat()
+
+    try:
+        result = fetcher.fetch(
+            "TaiwanStockFinancialStatements", data_id=stock_id, start_date=start_date, end_date=end_date,
+        )
+    except Exception as exc:
+        logger.warning("TW actual EPS fetch failed for %s: %s", stock_id, exc)
+        return None
+
+    if not result.get("ok"):
+        return None
+
+    rows = result.get("rows") or []
+    eps_rows = [r for r in rows if r.get("type") == "EPS" and r.get("date") and r.get("value") is not None]
+    if not eps_rows:
+        return None
+
+    latest = max(eps_rows, key=lambda r: r["date"])
+    return {"date": latest["date"], "eps": latest["value"]}
 
 
 def _extract_kv_statements(result: Dict[str, Any], section_name: str) -> Dict[str, Any]:

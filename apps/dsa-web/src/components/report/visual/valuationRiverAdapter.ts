@@ -7,10 +7,21 @@
 // emits those, and this adapter does not invent them either.
 
 export type ValuationRiverZoneVM = "undervalued" | "neutral" | "overvalued" | "unknown";
+// Phase 26.2: an EPS number must always travel with what kind it is — never
+// present an "implied" (PER-back-derived) or "reported-annual" EPS as if it
+// were actual/reported TTM EPS, and never present a forward/estimate as
+// actual.
+export type ValuationRiverEpsKindVM = "implied" | "reported" | "unavailable";
 
 export interface ValuationRiverBandVM {
   multiple: number;
   value: number;
+}
+
+export interface ValuationRiverEpsStatVM {
+  value: number;
+  period: string;
+  source: string;
 }
 
 export interface ValuationRiverPointVM {
@@ -24,14 +35,23 @@ export interface ValuationRiverPointVM {
 export interface ValuationRiverCurrentVM {
   close: number | null;
   per: number | null;
+  pbr: number | null;
   impliedEps: number | null;
+  impliedBvps: number | null;
   zone: ValuationRiverZoneVM;
+  // Point-in-time reference stats, independent of whichever basis the
+  // plotted bands use — null when that concept has no source for this
+  // symbol/market rather than being silently omitted.
+  epsActual: ValuationRiverEpsStatVM | null;
+  epsForward: ValuationRiverEpsStatVM | null;
 }
 
 export interface ValuationRiverChartVM {
   enabled: true;
   symbol: string;
   currency: string;
+  method: string;
+  epsKind: ValuationRiverEpsKindVM;
   startDate: string | null;
   endDate: string | null;
   tradingDays: number;
@@ -41,6 +61,7 @@ export interface ValuationRiverChartVM {
   current: ValuationRiverCurrentVM;
   isPartial: boolean;
   warnings: string[];
+  codes: string[];
   methodologyNote: string;
 }
 
@@ -48,6 +69,12 @@ export interface ValuationRiverUnavailableVM {
   enabled: false;
   market: string | null;
   reason: string;
+  // Even when the historical river itself couldn't be built, a real
+  // point-in-time EPS/forward-EPS value may still exist (e.g. a US stock
+  // with a working yfinance `.info` call but too few annual anchors) — show
+  // it rather than hiding real data behind the unavailable state.
+  epsActual: ValuationRiverEpsStatVM | null;
+  epsForward: ValuationRiverEpsStatVM | null;
 }
 
 export type ValuationRiverVM = ValuationRiverChartVM | ValuationRiverUnavailableVM;
@@ -94,6 +121,28 @@ function adaptWarnings(value: unknown): string[] {
     .filter((item): item is string => Boolean(item));
 }
 
+function coerceEpsKind(value: unknown): ValuationRiverEpsKindVM {
+  const text = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return text === "implied" || text === "reported" ? text : "unavailable";
+}
+
+function adaptEpsStat(raw: unknown): ValuationRiverEpsStatVM | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const row = raw as Record<string, unknown>;
+  const value = toFiniteNumber(row.value);
+  if (value === null) return null;
+  const period = typeof row.period === "string" ? row.period : "unavailable";
+  const source = typeof row.source === "string" ? row.source : "unavailable";
+  return { value, period, source };
+}
+
+function adaptCodes(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .slice(0, MAX_WARNINGS);
+}
+
 function adaptBandMultiples(value: unknown): number[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -136,10 +185,17 @@ function adaptPoint(raw: unknown, bandMultiples: number[]): ValuationRiverPointV
  * card) rather than needing a separate "missing" branch upstream.
  */
 export function adaptValuationRiverSnapshot(rawValue: unknown): ValuationRiverVM {
-  const fallback = (market: unknown, reason: string): ValuationRiverUnavailableVM => ({
+  const fallback = (
+    market: unknown,
+    reason: string,
+    epsActual: ValuationRiverEpsStatVM | null = null,
+    epsForward: ValuationRiverEpsStatVM | null = null,
+  ): ValuationRiverUnavailableVM => ({
     enabled: false,
     market: typeof market === "string" ? market : null,
     reason,
+    epsActual,
+    epsForward,
   });
 
   if (typeof rawValue !== "object" || rawValue === null || Array.isArray(rawValue)) {
@@ -147,12 +203,17 @@ export function adaptValuationRiverSnapshot(rawValue: unknown): ValuationRiverVM
   }
   const raw = rawValue as Record<string, unknown>;
 
+  const rawCurrent = pick(raw, ["current"]);
+  const rawCurrentObj = typeof rawCurrent === "object" && rawCurrent !== null ? (rawCurrent as Record<string, unknown>) : {};
+  const fallbackEpsActual = adaptEpsStat(pick(rawCurrentObj, ["epsActual", "eps_actual"]));
+  const fallbackEpsForward = adaptEpsStat(pick(rawCurrentObj, ["epsForward", "eps_forward"]));
+
   if (raw.enabled !== true) {
     const qualityRaw = pick(raw, ["quality"]);
     const quality = typeof qualityRaw === "object" && qualityRaw !== null ? (qualityRaw as Record<string, unknown>) : {};
     const warnings = adaptWarnings(pick(quality, ["warnings"]));
     const reason = warnings[0] || "此標的暫不支援歷史估值河流圖";
-    return fallback(pick(raw, ["market"]), reason);
+    return fallback(pick(raw, ["market"]), reason, fallbackEpsActual, fallbackEpsForward);
   }
 
   const symbol = typeof raw.symbol === "string" ? raw.symbol : "";
@@ -168,7 +229,7 @@ export function adaptValuationRiverSnapshot(rawValue: unknown): ValuationRiverVM
     : [];
 
   if (points.length === 0) {
-    return fallback(pick(raw, ["market"]), "河流圖資料筆數不足，暫不顯示");
+    return fallback(pick(raw, ["market"]), "河流圖資料筆數不足，暫不顯示", fallbackEpsActual, fallbackEpsForward);
   }
 
   const rangeRaw = pick(raw, ["range"]);
@@ -179,8 +240,12 @@ export function adaptValuationRiverSnapshot(rawValue: unknown): ValuationRiverVM
   const current: ValuationRiverCurrentVM = {
     close: toFiniteNumber(pick(currentObj, ["close"])),
     per: toFiniteNumber(pick(currentObj, ["per"])),
+    pbr: toFiniteNumber(pick(currentObj, ["pbr"])),
     impliedEps: toFiniteNumber(pick(currentObj, ["impliedEps", "implied_eps"])),
+    impliedBvps: toFiniteNumber(pick(currentObj, ["impliedBvps", "implied_bvps"])),
     zone: coerceZone(pick(currentObj, ["zone"])),
+    epsActual: adaptEpsStat(pick(currentObj, ["epsActual", "eps_actual"])),
+    epsForward: adaptEpsStat(pick(currentObj, ["epsForward", "eps_forward"])),
   };
 
   const qualityRaw = pick(raw, ["quality"]);
@@ -191,6 +256,8 @@ export function adaptValuationRiverSnapshot(rawValue: unknown): ValuationRiverVM
     enabled: true,
     symbol,
     currency,
+    method: typeof raw.method === "string" ? raw.method : "unavailable",
+    epsKind: coerceEpsKind(pick(raw, ["epsKind", "eps_kind"])),
     startDate: typeof pick(range, ["startDate", "start_date"]) === "string" ? (pick(range, ["startDate", "start_date"]) as string) : null,
     endDate: typeof pick(range, ["endDate", "end_date"]) === "string" ? (pick(range, ["endDate", "end_date"]) as string) : null,
     tradingDays: toFiniteNumber(pick(range, ["tradingDays", "trading_days"])) ?? points.length,
@@ -200,6 +267,7 @@ export function adaptValuationRiverSnapshot(rawValue: unknown): ValuationRiverVM
     current,
     isPartial: status === "partial",
     warnings: adaptWarnings(pick(quality, ["warnings"])),
+    codes: adaptCodes(pick(quality, ["codes"])),
     methodologyNote:
       sanitizeText(pick(quality, ["methodologyNote", "methodology_note"])) ||
       "倍數帶為固定視覺參考基準，非估值結論、目標價或買賣建議。",

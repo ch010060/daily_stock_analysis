@@ -379,3 +379,122 @@ class YfinanceFundamentalAdapter:
         )
         result["status"] = "partial" if has_content else "not_supported"
         return result
+
+
+def fetch_us_valuation_river_series(stock_code: str) -> Dict[str, Any]:
+    """Phase 26.2: fetch a real, deterministic valuation-river input series for
+    a US stock via yfinance — annual reported EPS/BVPS (from the same
+    ``income_stmt``/``balance_sheet`` financial-statement calls already used
+    by ``get_fundamental_bundle``) plus ~5 years of daily close price.
+
+    yfinance does not expose a historical daily PE/PB ratio series, and its
+    quarterly statements only cover ~5 quarters (too thin for more than one
+    rolling TTM point) — but ``income_stmt``/``balance_sheet`` (annual) return
+    4-5 real fiscal-year EPS/book-value points, each genuinely time-varying.
+    Forward-filling those onto daily price produces an honest step-function
+    history instead of reusing one current ratio across the whole range.
+
+    Returns a dict with ``annual_eps_rows``, ``annual_bvps_rows``,
+    ``price_rows`` (each a possibly-empty list of row dicts), plus
+    point-in-time ``eps_actual_ttm``, ``eps_forward``, ``currency``. Never
+    raises; gated by the same DSA_FIXTURE_MODE / DSA_ALLOW_EXTERNAL_NETWORK
+    convention as every other live-network fetch in this repo (yfinance has
+    no such flag itself).
+    """
+    empty: Dict[str, Any] = {
+        "annual_eps_rows": [],
+        "annual_bvps_rows": [],
+        "price_rows": [],
+        "eps_actual_ttm": None,
+        "eps_forward": None,
+        "currency": None,
+    }
+
+    from .base import _env_bool
+
+    if _env_bool("DSA_FIXTURE_MODE", False) or not _env_bool("DSA_ALLOW_EXTERNAL_NETWORK", False):
+        return empty
+
+    try:
+        import yfinance as yf
+    except Exception:
+        return empty
+
+    symbol = _convert_to_yf_symbol(stock_code)
+    if not symbol:
+        return empty
+
+    result = {k: (list(v) if isinstance(v, list) else v) for k, v in empty.items()}
+
+    try:
+        ticker = yf.Ticker(symbol)
+
+        info: Dict[str, Any] = {}
+        try:
+            info = ticker.get_info() if hasattr(ticker, "get_info") else (ticker.info or {})
+            if not isinstance(info, dict):
+                info = {}
+        except Exception:
+            info = {}
+
+        result["eps_actual_ttm"] = _safe_float(info.get("trailingEps"))
+        result["eps_forward"] = _safe_float(info.get("forwardEps"))
+        result["currency"] = str(info.get("currency") or "").upper() or None
+
+        try:
+            income_df = ticker.income_stmt
+        except Exception:
+            income_df = None
+        eps_row = _pick_row(income_df, ("Diluted EPS", "Basic EPS"))
+        if eps_row is not None:
+            for col, value in eps_row.items():
+                v = _safe_float(value)
+                if v is None:
+                    continue
+                try:
+                    fiscal_date = pd.Timestamp(col).date().isoformat()
+                except Exception:
+                    continue
+                result["annual_eps_rows"].append({"date": fiscal_date, "eps": v})
+
+        try:
+            balance_df = ticker.balance_sheet
+        except Exception:
+            balance_df = None
+        equity_row = _pick_row(balance_df, ("Stockholders Equity",))
+        shares_row = _pick_row(balance_df, ("Ordinary Shares Number", "Share Issued"))
+        if equity_row is not None and shares_row is not None:
+            for col in equity_row.index:
+                if col not in shares_row.index:
+                    continue
+                equity = _safe_float(equity_row.get(col))
+                shares = _safe_float(shares_row.get(col))
+                if equity is None or shares in (None, 0):
+                    continue
+                try:
+                    fiscal_date = pd.Timestamp(col).date().isoformat()
+                except Exception:
+                    continue
+                result["annual_bvps_rows"].append({"date": fiscal_date, "bvps": round(equity / shares, 4)})
+
+        try:
+            hist = ticker.history(period="5y", auto_adjust=True)
+        except Exception:
+            hist = None
+        if hist is not None and not hist.empty and "Close" in hist.columns:
+            for ts, close_value in hist["Close"].items():
+                close = _safe_float(close_value)
+                if close is None:
+                    continue
+                try:
+                    price_date = pd.Timestamp(ts).date().isoformat()
+                except Exception:
+                    continue
+                result["price_rows"].append({"date": price_date, "close": close})
+    except Exception as exc:
+        logger.warning("US valuation river fetch failed for %s: %s", stock_code, exc)
+
+    result["annual_eps_rows"].sort(key=lambda r: r["date"])
+    result["annual_bvps_rows"].sort(key=lambda r: r["date"])
+    result["price_rows"].sort(key=lambda r: r["date"])
+    return result

@@ -1,13 +1,24 @@
 import type React from 'react';
 import { useMemo, useRef, useState } from 'react';
 import { adaptValuationRiverSnapshot } from './valuationRiverAdapter';
-import type { ValuationRiverChartVM, ValuationRiverZoneVM } from './valuationRiverAdapter';
+import type {
+  ValuationRiverChartVM,
+  ValuationRiverEpsKindVM,
+  ValuationRiverEpsStatVM,
+  ValuationRiverZoneVM,
+} from './valuationRiverAdapter';
 
-// Phase 26.1: production valuation river chart for TW stock full reports.
-// Commentary/action-free — every number here is backend-deterministic
-// (see src/services/valuation_river_snapshot.py); this component never
-// renders a buy/sell action, fair value, or target price, only the fixed
-// visual reference bands + the actual close price line.
+// Phase 26.1/26.2: production valuation river chart for TW + US stock full
+// reports. Commentary/action-free — every number here is backend-
+// deterministic (see src/services/valuation_river_snapshot.py); this
+// component never renders a buy/sell action, fair value, or target price,
+// only the fixed visual reference bands + the actual close price line.
+//
+// Phase 26.2 adds explicit EPS/BVPS labeling: an "implied" (TW,
+// PER-back-derived) or "reported" (US, real financial-statement) EPS must
+// never be shown to the user as if it were the other, and a real actual/
+// forward EPS point-in-time stat is surfaced separately from whichever
+// basis the plotted bands use.
 
 interface ValuationRiverChartProps {
   rawSnapshot: unknown;
@@ -27,6 +38,36 @@ const ZONE_BADGE_CLASS: Record<ValuationRiverZoneVM, string> = {
   unknown: 'text-muted-foreground border-border bg-muted/30',
 };
 
+const BASIS_EPS_LABEL: Record<ValuationRiverEpsKindVM, string> = {
+  implied: '反推 EPS',
+  reported: '財報年度 EPS',
+  unavailable: 'EPS',
+};
+
+const BASIS_BVPS_LABEL: Record<ValuationRiverEpsKindVM, string> = {
+  implied: '反推 BVPS',
+  reported: '實際 BVPS',
+  unavailable: 'BVPS',
+};
+
+const EPS_PERIOD_LABEL: Record<string, string> = {
+  ttm: 'TTM',
+  quarterly: '單季',
+  annual: '年度',
+  point_in_time: '即時',
+};
+
+const METHOD_SUBTITLE: Record<string, string> = {
+  per_implied_eps_river: '以 PER 反推隱含 EPS，畫出固定倍數視覺參考帶——非估值結論或目標價',
+  us_reported_eps_annual_river: '以財報年度實際 EPS 建構台階狀倍數視覺參考帶——非估值結論或目標價',
+};
+
+function formatEpsStat(stat: ValuationRiverEpsStatVM | null): string {
+  if (!stat) return '—';
+  const periodLabel = EPS_PERIOD_LABEL[stat.period] ?? stat.period;
+  return `${stat.value.toFixed(2)}（${periodLabel}）`;
+}
+
 // Fixed hex palette for SVG stroke/fill (Tailwind CSS-variable utilities do
 // not reliably apply to raw SVG attributes) — mirrors the hardcoded-hex
 // convention already used in MarketRiskGauge.tsx for this same reason.
@@ -42,7 +83,16 @@ const W = 720;
 const H = 300;
 const MARGIN = { top: 12, right: 46, bottom: 24, left: 4 };
 
-function ValuationRiverUnavailableCard({ reason }: { reason: string }) {
+function ValuationRiverUnavailableCard({
+  reason,
+  epsActual,
+  epsForward,
+}: {
+  reason: string;
+  epsActual: ValuationRiverEpsStatVM | null;
+  epsForward: ValuationRiverEpsStatVM | null;
+}) {
+  const hasEpsStats = epsActual !== null || epsForward !== null;
   return (
     <div
       data-testid="valuation-river-unavailable"
@@ -52,6 +102,18 @@ function ValuationRiverUnavailableCard({ reason }: { reason: string }) {
         估值河流圖
       </div>
       <p>{reason}</p>
+      {hasEpsStats && (
+        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t pt-2 text-[11px]">
+          <div>
+            <div className="text-muted-foreground">實際 EPS</div>
+            <div className="font-mono font-semibold text-foreground">{formatEpsStat(epsActual)}</div>
+          </div>
+          <div>
+            <div className="text-muted-foreground">預估 EPS</div>
+            <div className="font-mono font-semibold text-foreground">{formatEpsStat(epsForward)}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -167,7 +229,7 @@ function ValuationRiverChartInner({ vm }: { vm: ValuationRiverChartVM }) {
             估值河流圖
           </div>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            以 PER 反推隱含 EPS，畫出固定倍數視覺參考帶——非估值結論或目標價
+            {METHOD_SUBTITLE[vm.method] ?? '固定倍數視覺參考帶——非估值結論或目標價'}
           </p>
         </div>
         <span
@@ -265,6 +327,11 @@ function ValuationRiverChartInner({ vm }: { vm: ValuationRiverChartVM }) {
               收盤 <span className="font-bold">{hovered.close.toLocaleString()}</span>
             </div>
             {hovered.per !== null && <div className="whitespace-nowrap font-mono">PER {hovered.per.toFixed(2)}x</div>}
+            {hovered.impliedEps !== null && (
+              <div className="whitespace-nowrap font-mono">
+                {BASIS_EPS_LABEL[vm.epsKind]} {hovered.impliedEps.toFixed(2)}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -309,6 +376,32 @@ function ValuationRiverChartInner({ vm }: { vm: ValuationRiverChartVM }) {
         </div>
       </div>
 
+      <div
+        className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t pt-2 text-[11px] sm:grid-cols-4"
+        data-testid="valuation-river-eps-stats"
+      >
+        <div>
+          <div className="text-muted-foreground">{BASIS_EPS_LABEL[vm.epsKind]}</div>
+          <div className="font-mono font-semibold text-foreground">
+            {vm.current.impliedEps !== null ? vm.current.impliedEps.toFixed(2) : '—'}
+          </div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">{BASIS_BVPS_LABEL[vm.epsKind]}</div>
+          <div className="font-mono font-semibold text-foreground">
+            {vm.current.impliedBvps !== null ? vm.current.impliedBvps.toFixed(2) : '—'}
+          </div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">實際 EPS</div>
+          <div className="font-mono font-semibold text-foreground">{formatEpsStat(vm.current.epsActual)}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">預估 EPS</div>
+          <div className="font-mono font-semibold text-foreground">{formatEpsStat(vm.current.epsForward)}</div>
+        </div>
+      </div>
+
       {vm.isPartial && vm.warnings.length > 0 && (
         <p className="mt-2 rounded bg-warning/10 px-2 py-1 text-[10.5px] text-warning">
           {vm.warnings[0]}
@@ -322,6 +415,8 @@ function ValuationRiverChartInner({ vm }: { vm: ValuationRiverChartVM }) {
 
 export const ValuationRiverChart: React.FC<ValuationRiverChartProps> = ({ rawSnapshot }) => {
   const vm = adaptValuationRiverSnapshot(rawSnapshot);
-  if (!vm.enabled) return <ValuationRiverUnavailableCard reason={vm.reason} />;
+  if (!vm.enabled) {
+    return <ValuationRiverUnavailableCard reason={vm.reason} epsActual={vm.epsActual} epsForward={vm.epsForward} />;
+  }
   return <ValuationRiverChartInner vm={vm} />;
 };

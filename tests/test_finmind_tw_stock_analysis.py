@@ -30,6 +30,7 @@ from src.finmind.tw_stock_analysis import (
     _extract_valuation,
     _generate_analysis_prompts,
     build_tw_valuation_fundamental_snapshot,
+    fetch_tw_actual_eps_row,
     fetch_tw_valuation_river_rows,
     normalize_tw_symbol,
 )
@@ -518,6 +519,41 @@ class TestFetchTwValuationRiverRows(unittest.TestCase):
         )
         self.assertEqual(per_rows, [])
         self.assertGreater(len(price_rows), 0)
+
+
+class TestFetchTwActualEpsRow(unittest.TestCase):
+    """Phase 26.2: fetch_tw_actual_eps_row extracts the latest reported
+    (actual) quarterly EPS from TaiwanStockFinancialStatements — the same
+    dataset build_tw_valuation_fundamental_snapshot already relies on, just
+    narrowly filtered to type=="EPS" rows."""
+
+    def test_happy_path_returns_latest_quarter(self):
+        fetcher = MockFetcher()
+        row = fetch_tw_actual_eps_row("2330", end_date="2026-06-14", fetcher=fetcher)
+        self.assertIsNotNone(row)
+        self.assertEqual(row["date"], "2026-03-31")
+        self.assertEqual(row["eps"], 13.45)
+
+    def test_unavailable_dataset_returns_none(self):
+        fetcher = MockFetcher(unavailable=["TaiwanStockFinancialStatements"])
+        row = fetch_tw_actual_eps_row("2330", end_date="2026-06-14", fetcher=fetcher)
+        self.assertIsNone(row)
+
+    def test_fetcher_exception_never_raises(self):
+        class _RaisingFetcher:
+            def fetch(self, *args, **kwargs):
+                raise RuntimeError("network down")
+
+        row = fetch_tw_actual_eps_row("2330", end_date="2026-06-14", fetcher=_RaisingFetcher())
+        self.assertIsNone(row)
+
+    def test_no_eps_type_rows_returns_none(self):
+        class _NoEpsFetcher:
+            def fetch(self, *args, **kwargs):
+                return {"ok": True, "rows": [{"date": "2026-03-31", "type": "Revenue", "value": 100.0}]}
+
+        row = fetch_tw_actual_eps_row("2330", end_date="2026-06-14", fetcher=_NoEpsFetcher())
+        self.assertIsNone(row)
 
 
 if __name__ == "__main__":

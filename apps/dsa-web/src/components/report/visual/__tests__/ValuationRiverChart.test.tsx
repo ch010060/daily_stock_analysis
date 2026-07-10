@@ -78,4 +78,68 @@ describe('ValuationRiverChart', () => {
     expect(screen.getByText(/僅 10 個交易日聯集資料/)).toBeInTheDocument();
   });
 
+  it('labels TW as 反推 EPS/反推 BVPS and shows actual/forward eps stats', () => {
+    const payload = validSnapshot() as Record<string, unknown>;
+    payload.method = 'per_implied_eps_river';
+    payload.epsKind = 'implied';
+    (payload.current as Record<string, unknown>).pbr = 6.0;
+    (payload.current as Record<string, unknown>).impliedBvps = 176.01;
+    (payload.current as Record<string, unknown>).epsActual = { value: 22.08, period: 'quarterly', source: 'finmind' };
+    (payload.current as Record<string, unknown>).epsForward = null;
+
+    render(<ValuationRiverChart rawSnapshot={payload} />);
+    const stats = screen.getByTestId('valuation-river-eps-stats');
+    expect(stats).toHaveTextContent('反推 EPS');
+    expect(stats).toHaveTextContent('反推 BVPS');
+    expect(stats).toHaveTextContent('實際 EPS');
+    expect(stats).toHaveTextContent('22.08');
+    expect(stats).toHaveTextContent('預估 EPS');
+  });
+
+  it('labels US as 財報年度 EPS/實際 BVPS, never presenting implied EPS as actual', () => {
+    const payload = validSnapshot() as Record<string, unknown>;
+    payload.market = 'us';
+    payload.method = 'us_reported_eps_annual_river';
+    payload.epsKind = 'reported';
+    (payload.current as Record<string, unknown>).epsActual = { value: 8.35, period: 'ttm', source: 'yfinance' };
+    (payload.current as Record<string, unknown>).epsForward = { value: 9.61, period: 'point_in_time', source: 'yfinance' };
+
+    render(<ValuationRiverChart rawSnapshot={payload} />);
+    expect(screen.getByText(/財報年度實際 EPS 建構台階狀倍數視覺參考帶/)).toBeInTheDocument();
+    const stats = screen.getByTestId('valuation-river-eps-stats');
+    expect(stats).toHaveTextContent('財報年度 EPS');
+    expect(stats).toHaveTextContent('實際 BVPS');
+    expect(stats).toHaveTextContent('8.35');
+    expect(stats).toHaveTextContent('9.61');
+  });
+
+  it('renders a clean "—" placeholder when actual/forward EPS is unavailable, never crashing', () => {
+    const payload = validSnapshot();
+    render(<ValuationRiverChart rawSnapshot={payload} />);
+    const stats = screen.getByTestId('valuation-river-eps-stats');
+    // validSnapshot() carries no epsActual/epsForward — must degrade to '—', not throw
+    expect(stats.textContent).toContain('—');
+  });
+
+  it('shows real actual/forward EPS in the unavailable fallback card when the river itself could not be built', () => {
+    render(
+      <ValuationRiverChart
+        rawSnapshot={{
+          enabled: false,
+          market: 'us',
+          quality: { warnings: ['yfinance 年度財報 EPS 資料點過少'] },
+          current: {
+            epsActual: { value: 8.35, period: 'ttm', source: 'yfinance' },
+            epsForward: { value: 9.61, period: 'point_in_time', source: 'yfinance' },
+          },
+        }}
+      />
+    );
+    const card = screen.getByTestId('valuation-river-unavailable');
+    expect(card).toHaveTextContent('實際 EPS');
+    expect(card).toHaveTextContent('8.35');
+    expect(card).toHaveTextContent('預估 EPS');
+    expect(card).toHaveTextContent('9.61');
+  });
+
 });

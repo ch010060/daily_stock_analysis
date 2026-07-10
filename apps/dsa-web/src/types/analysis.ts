@@ -635,6 +635,19 @@ export interface FundamentalSnapshot extends DataSnapshot {
 // parity" (same convention as fourMastersCommentaryAdapter.ts).
 export type ValuationRiverZone = "undervalued" | "neutral" | "overvalued" | "unknown";
 export type ValuationRiverQualityStatus = "ok" | "partial" | "unsupported";
+// Phase 26.2: an EPS number must always travel with what kind it is — an
+// "implied" (PER-back-derived) or "reported" (from real financial
+// statements) EPS must never be presented to the user as if it were the
+// other.
+export type ValuationRiverEpsKind = "implied" | "reported" | "unavailable";
+export type ValuationRiverEpsSource = "finmind" | "yfinance" | "derived" | "unavailable";
+export type ValuationRiverEpsPeriod = "point_in_time" | "annual" | "ttm" | "quarterly" | "unavailable";
+
+export interface ValuationRiverEpsStat {
+  value: number;
+  period: string;
+  source: string;
+}
 
 export interface ValuationRiverPoint {
   date: string;
@@ -653,11 +666,17 @@ export interface ValuationRiverCurrent {
   impliedEps?: number | null;
   impliedBvps?: number | null;
   zone: ValuationRiverZone;
+  // Point-in-time reference stats, independent of whichever basis the
+  // plotted bands use (implied for TW, reported-annual for US). Null when
+  // that concept genuinely has no source in this repo's data paths.
+  epsActual?: ValuationRiverEpsStat | null;
+  epsForward?: ValuationRiverEpsStat | null;
 }
 
 export interface ValuationRiverQuality {
   status: ValuationRiverQualityStatus;
   warnings?: string[];
+  codes?: string[];
   dataGapFields?: string[];
   methodologyNote?: string;
 }
@@ -670,6 +689,9 @@ export interface ValuationRiverSnapshot {
   source?: string;
   method?: string;
   basis?: string;
+  epsKind?: ValuationRiverEpsKind;
+  epsSource?: ValuationRiverEpsSource;
+  epsPeriod?: ValuationRiverEpsPeriod;
   bandMultiples?: number[];
   neutralMultiple?: number;
   asOf?: string | null;

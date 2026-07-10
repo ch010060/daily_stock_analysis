@@ -3209,17 +3209,75 @@ class TestAttachValuationRiverSnapshot(unittest.TestCase):
         self.assertFalse(result.valuation_river_snapshot["enabled"])
         self.assertEqual(result.valuation_river_snapshot["quality"]["status"], "unsupported")
 
-    def test_us_stock_returns_unsupported_no_fake_history(self) -> None:
+    def test_us_stock_with_no_yfinance_data_returns_unsupported_no_fake_history(self) -> None:
         pipeline = self._make_pipeline()
         result = SimpleNamespace(instrument_type="stock", valuation_river_snapshot=None)
+        empty_series = {
+            "annual_eps_rows": [], "annual_bvps_rows": [], "price_rows": [],
+            "eps_actual_ttm": None, "eps_forward": None, "currency": None,
+        }
 
-        with patch('src.core.pipeline.get_market_for_stock', return_value="us"):
+        with patch('src.core.pipeline.get_market_for_stock', return_value="us"), \
+             patch(
+                 'data_provider.yfinance_fundamental_adapter.fetch_us_valuation_river_series',
+                 return_value=empty_series,
+             ):
             pipeline._attach_valuation_river_snapshot(result, "AAPL")
 
         self.assertIsNotNone(result.valuation_river_snapshot)
         self.assertFalse(result.valuation_river_snapshot["enabled"])
         self.assertEqual(result.valuation_river_snapshot["market"], "us")
         self.assertEqual(result.valuation_river_snapshot["points"], [])
+
+    def test_us_stock_builds_river_from_annual_financials(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_river_snapshot=None)
+        series = {
+            "annual_eps_rows": [
+                {"date": "2024-09-30", "eps": 6.08},
+                {"date": "2025-09-30", "eps": 7.46},
+            ],
+            "annual_bvps_rows": [
+                {"date": "2024-09-30", "bvps": 3.77},
+                {"date": "2025-09-30", "bvps": 4.99},
+            ],
+            "price_rows": [{"date": f"2025-10-{d:02d}", "close": 200.0 + d} for d in range(1, 20)],
+            "eps_actual_ttm": 8.35,
+            "eps_forward": 9.60895,
+            "currency": "USD",
+        }
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="us"), \
+             patch(
+                 'data_provider.yfinance_fundamental_adapter.fetch_us_valuation_river_series',
+                 return_value=series,
+             ):
+            pipeline._attach_valuation_river_snapshot(result, "AAPL")
+
+        snap = result.valuation_river_snapshot
+        self.assertTrue(snap["enabled"])
+        self.assertEqual(snap["market"], "us")
+        self.assertEqual(snap["source"], "yfinance")
+        self.assertEqual(snap["method"], "us_reported_eps_annual_river")
+        self.assertEqual(snap["eps_kind"], "reported")
+        self.assertEqual(len(snap["points"]), 19)
+        self.assertEqual(snap["current"]["eps_actual"]["value"], 8.35)
+        self.assertEqual(snap["current"]["eps_forward"]["value"], 9.60895)
+
+    def test_us_fetch_exception_degrades_to_unsupported(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_river_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="us"), \
+             patch(
+                 'data_provider.yfinance_fundamental_adapter.fetch_us_valuation_river_series',
+                 side_effect=RuntimeError("yfinance down"),
+             ):
+            pipeline._attach_valuation_river_snapshot(result, "AAPL")
+
+        self.assertIsNotNone(result.valuation_river_snapshot)
+        self.assertFalse(result.valuation_river_snapshot["enabled"])
+        self.assertEqual(result.valuation_river_snapshot["market"], "us")
 
     def test_tw_stock_builds_river_from_fetched_rows(self) -> None:
         pipeline = self._make_pipeline()
@@ -3233,7 +3291,8 @@ class TestAttachValuationRiverSnapshot(unittest.TestCase):
              patch(
                  'src.finmind.tw_stock_analysis.fetch_tw_valuation_river_rows',
                  return_value=(per_rows, price_rows),
-             ):
+             ), \
+             patch('src.finmind.tw_stock_analysis.fetch_tw_actual_eps_row', return_value=None):
             pipeline._attach_valuation_river_snapshot(result, "2330")
 
         snap = result.valuation_river_snapshot
@@ -3242,6 +3301,33 @@ class TestAttachValuationRiverSnapshot(unittest.TestCase):
         self.assertEqual(snap["source"], "finmind")
         self.assertEqual(len(snap["points"]), 24)
         self.assertEqual(snap["quality"]["status"], "ok")
+
+    def test_tw_actual_eps_row_surfaced_in_current_stat(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_river_snapshot=None)
+        per_rows = [{"date": f"2026-01-{d:02d}", "PER": 20.0 + d, "PBR": 6.0} for d in range(1, 25)]
+        price_rows = [{"date": f"2026-01-{d:02d}", "close": 1000.0 + d * 10} for d in range(1, 25)]
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
+             patch('src.finmind.tw_stock_analysis.normalize_tw_symbol', return_value=("2330", None)), \
+             patch('src.services.history_loader.get_frozen_target_date', return_value=date(2026, 1, 24)), \
+             patch(
+                 'src.finmind.tw_stock_analysis.fetch_tw_valuation_river_rows',
+                 return_value=(per_rows, price_rows),
+             ), \
+             patch(
+                 'src.finmind.tw_stock_analysis.fetch_tw_actual_eps_row',
+                 return_value={"date": "2026-01-24", "eps": 22.08},
+             ):
+            pipeline._attach_valuation_river_snapshot(result, "2330")
+
+        snap = result.valuation_river_snapshot
+        self.assertTrue(snap["enabled"])
+        self.assertEqual(
+            snap["current"]["eps_actual"],
+            {"value": 22.08, "period": "quarterly", "source": "finmind"},
+        )
+        self.assertIsNone(snap["current"]["eps_forward"])
 
     def test_unresolvable_tw_symbol_returns_unsupported(self) -> None:
         pipeline = self._make_pipeline()
@@ -3280,7 +3366,8 @@ class TestAttachValuationRiverSnapshot(unittest.TestCase):
         with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
              patch('src.finmind.tw_stock_analysis.normalize_tw_symbol', return_value=("2330", None)), \
              patch('src.services.history_loader.get_frozen_target_date', return_value=date(2026, 1, 24)), \
-             patch('src.finmind.tw_stock_analysis.fetch_tw_valuation_river_rows', return_value=([], [])):
+             patch('src.finmind.tw_stock_analysis.fetch_tw_valuation_river_rows', return_value=([], [])), \
+             patch('src.finmind.tw_stock_analysis.fetch_tw_actual_eps_row', return_value=None):
             pipeline._attach_valuation_river_snapshot(result, "2330")
 
         self.assertIs(result.valuation_snapshot, sentinel_valuation)
