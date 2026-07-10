@@ -286,6 +286,38 @@ class BuildUsValuationRiverSnapshotTestCase(unittest.TestCase):
         # current.eps_actual (TTM) must differ from the annual anchor used for bands
         self.assertNotEqual(snap["current"]["eps_actual"]["value"], snap["current"]["implied_eps"])
 
+    def test_multi_year_price_history_uses_distinct_eps_anchors_per_period(self) -> None:
+        """Phase 26.3 regression: a price history spanning multiple fiscal
+        years must pick up each fiscal year's own EPS anchor, never collapse
+        to one repeated value across the whole range — that would be exactly
+        the fabricated-history pattern the hard rules forbid."""
+        annual_eps = [
+            _annual_eps_row("2022-09-30", 6.11),
+            _annual_eps_row("2023-09-30", 6.13),
+            _annual_eps_row("2024-09-30", 6.08),
+            _annual_eps_row("2025-09-30", 7.46),
+        ]
+        # one price point per fiscal-year window (just after each anchor date,
+        # before the next one is published), spanning the full range
+        price_rows = [
+            _us_price_row("2022-10-15", close=140.0),  # just after FY2022 anchor (6.11)
+            _us_price_row("2023-10-15", close=180.0),  # just after FY2023 anchor (6.13)
+            _us_price_row("2024-10-15", close=170.0),  # just after FY2024 anchor (6.08)
+            _us_price_row("2025-10-15", close=255.0),  # just after FY2025 anchor (7.46)
+        ]
+
+        snap = build_us_valuation_river_snapshot("AAPL", annual_eps, [], price_rows)
+
+        self.assertTrue(snap["enabled"])
+        anchors_by_date = {p["date"]: p["implied_eps"] for p in snap["points"]}
+        self.assertEqual(anchors_by_date["2022-10-15"], 6.11)
+        self.assertEqual(anchors_by_date["2023-10-15"], 6.13)
+        self.assertEqual(anchors_by_date["2024-10-15"], 6.08)
+        self.assertEqual(anchors_by_date["2025-10-15"], 7.46)
+        # the whole point: each fiscal year crossed gets its OWN distinct EPS
+        # anchor, never one value reused across the whole range
+        self.assertEqual(len({p["implied_eps"] for p in snap["points"]}), 4)
+
     def test_insufficient_annual_anchors_returns_unsupported_with_point_in_time_stats(self) -> None:
         self.assertLess(1, MIN_US_ANNUAL_ANCHORS)
         annual_eps = [_annual_eps_row("2025-09-30", 7.46)]  # only 1 anchor, below MIN_US_ANNUAL_ANCHORS
