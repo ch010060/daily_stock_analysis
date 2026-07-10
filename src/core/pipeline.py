@@ -655,6 +655,7 @@ class StockAnalysisPipeline:
                 result.query_id = query_id
                 result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
                 self._attach_valuation_fundamental_snapshot(result, code, fundamental_context)
+                self._attach_valuation_river_snapshot(result, code)
                 self._attach_exposure_and_market_risk_snapshot(result, code, fundamental_context)
                 self._attach_market_fear_index_snapshot(result, code)
                 self._attach_multi_period_trend_snapshot(result, code)
@@ -1075,6 +1076,68 @@ class StockAnalysisPipeline:
         except Exception as exc:
             logger.warning("[valuation_fundamental_snapshot] skipped for %s: %s", code, exc)
 
+    def _attach_valuation_river_snapshot(self, result: Any, code: str) -> None:
+        """
+        Phase 26.1: attach deterministic `valuation_river_snapshot`.
+
+        TW-stock-only MVP. Fetches FinMind `TaiwanStockPER` + `TaiwanStockPrice`
+        over a ~1-year window and derives a historical PER/PBR-implied
+        EPS/BVPS river — no LLM involvement, no new data provider, no
+        fair-value/target-price output. US, ETF, index, and unknown
+        instrument types get an explicit `enabled: false` unavailable
+        snapshot rather than a fake historical river. Never raises; any
+        failure degrades to the unavailable snapshot.
+        """
+        from src.services.valuation_river_snapshot import (
+            build_tw_valuation_river_snapshot,
+            build_valuation_river_snapshot_unsupported,
+        )
+
+        instrument_type = getattr(result, "instrument_type", "unknown")
+        try:
+            market = get_market_for_stock(normalize_stock_code(code))
+        except Exception:
+            market = "unknown"
+
+        if instrument_type != "stock":
+            result.valuation_river_snapshot = build_valuation_river_snapshot_unsupported(
+                market, code, f"僅支援股票標的的估值河流圖（instrument_type={instrument_type}）"
+            )
+            return
+
+        if market != "tw":
+            result.valuation_river_snapshot = build_valuation_river_snapshot_unsupported(
+                market, code, "US 股票歷史估值河流圖資料尚未支援（僅有單一時點快照）"
+            )
+            return
+
+        try:
+            from src.finmind.tw_stock_analysis import (
+                fetch_tw_valuation_river_rows,
+                normalize_tw_symbol,
+            )
+
+            stock_id, err = normalize_tw_symbol(code)
+            if err or not stock_id:
+                result.valuation_river_snapshot = build_valuation_river_snapshot_unsupported(
+                    "tw", code, "無法解析為有效台股代碼"
+                )
+                return
+
+            from src.services.history_loader import get_frozen_target_date
+
+            frozen = get_frozen_target_date()
+            end_date = (frozen if frozen else get_market_now("tw").date()).isoformat()
+            per_rows, price_rows = fetch_tw_valuation_river_rows(stock_id, end_date=end_date)
+            result.valuation_river_snapshot = build_tw_valuation_river_snapshot(
+                stock_id, per_rows, price_rows,
+            )
+        except Exception as exc:
+            logger.warning("[valuation_river_snapshot] skipped for %s: %s", code, exc)
+            result.valuation_river_snapshot = build_valuation_river_snapshot_unsupported(
+                "tw", code, "河流圖資料組裝時發生錯誤"
+            )
+
     def _attach_exposure_and_market_risk_snapshot(
         self,
         result: Any,
@@ -1389,6 +1452,7 @@ class StockAnalysisPipeline:
                 result.query_id = query_id
                 result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
                 self._attach_valuation_fundamental_snapshot(result, code, fundamental_context)
+                self._attach_valuation_river_snapshot(result, code)
                 self._attach_exposure_and_market_risk_snapshot(result, code, fundamental_context)
                 self._attach_market_fear_index_snapshot(result, code)
                 self._attach_multi_period_trend_snapshot(result, code)

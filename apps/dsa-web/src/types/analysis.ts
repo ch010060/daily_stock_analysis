@@ -627,6 +627,58 @@ export interface FundamentalSnapshot extends DataSnapshot {
   grossMargin?: number | null;
 }
 
+// Phase 26.1: TW-stock valuation river (historical PER/PBR-implied EPS/BVPS
+// bands). This is the shape after the API layer's deep camelCase pass
+// (`toCamelCase(..., { deep: true })` — see api/utils.ts) — every nested key,
+// including inside `points[]`, is camelCased. The adapter additionally
+// tolerates the raw snake_case backend shape for defensive "raw payload
+// parity" (same convention as fourMastersCommentaryAdapter.ts).
+export type ValuationRiverZone = "undervalued" | "neutral" | "overvalued" | "unknown";
+export type ValuationRiverQualityStatus = "ok" | "partial" | "unsupported";
+
+export interface ValuationRiverPoint {
+  date: string;
+  close: number | null;
+  per?: number | null;
+  pbr?: number | null;
+  impliedEps?: number | null;
+  impliedBvps?: number | null;
+  bands?: Record<string, number>;
+}
+
+export interface ValuationRiverCurrent {
+  close: number | null;
+  per?: number | null;
+  pbr?: number | null;
+  impliedEps?: number | null;
+  impliedBvps?: number | null;
+  zone: ValuationRiverZone;
+}
+
+export interface ValuationRiverQuality {
+  status: ValuationRiverQualityStatus;
+  warnings?: string[];
+  dataGapFields?: string[];
+  methodologyNote?: string;
+}
+
+export interface ValuationRiverSnapshot {
+  enabled: boolean;
+  market?: string | null;
+  symbol?: string;
+  currency?: string | null;
+  source?: string;
+  method?: string;
+  basis?: string;
+  bandMultiples?: number[];
+  neutralMultiple?: number;
+  asOf?: string | null;
+  range?: { startDate: string | null; endDate: string | null; tradingDays: number };
+  points?: ValuationRiverPoint[];
+  current?: ValuationRiverCurrent;
+  quality?: ValuationRiverQuality;
+}
+
 /** Typed overlay for AnalysisReport.details.rawResult in history detail responses */
 export interface VisualReportRawResult {
   instrumentType?: InstrumentType;
@@ -651,6 +703,10 @@ export interface VisualReportRawResult {
   multiPeriodTrendSnapshot?: MultiPeriodTrendSnapshot | null;
   valuationSnapshot?: ValuationSnapshot | null;
   fundamentalSnapshot?: FundamentalSnapshot | null;
+  // Phase 26.1: TW-stock historical valuation river (PER/PBR-implied EPS/BVPS
+  // bands); commentary-free, backend-deterministic. US/ETF/index carry an
+  // explicit enabled:false snapshot rather than a missing key.
+  valuationRiverSnapshot?: ValuationRiverSnapshot | null;
   exposureSnapshot?: DataSnapshot | null;
   valueNetworkMermaid?: string | null;
   // Phase 25.7: optional four-masters commentary supplement (commentary-only;

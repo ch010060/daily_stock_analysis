@@ -309,6 +309,56 @@ def build_tw_valuation_fundamental_snapshot(
     return valuation_raw, fundamental_raw
 
 
+# Phase 26.1 default lookback for the valuation river: ~1 year of trading
+# days, wide enough for the river to read as history rather than a snapshot,
+# narrow enough to stay a single bounded FinMind fetch per report.
+VALUATION_RIVER_LOOKBACK_DAYS = 400
+
+
+def fetch_tw_valuation_river_rows(
+    stock_id: str,
+    *,
+    end_date: str,
+    days: int = VALUATION_RIVER_LOOKBACK_DAYS,
+    fetcher: Optional[FinMindDatasetFetcher] = None,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Fetch raw `TaiwanStockPER` + `TaiwanStockPrice` rows for the Phase 26.1
+    valuation river. Unlike `build_tw_valuation_fundamental_snapshot` (which
+    only keeps the latest PER/PBR row), this keeps the full row list so the
+    caller can join the two series by date and derive a historical river.
+
+    Returns `(per_rows, price_rows)`, each a list of raw FinMind row dicts
+    (or an empty list on fetch failure/unavailability). Never raises.
+    """
+    fetcher = fetcher or FinMindDatasetFetcher()
+    end_dt = date.fromisoformat(end_date)
+    start_date = (end_dt - timedelta(days=days)).isoformat()
+
+    per_rows: List[Dict[str, Any]] = []
+    try:
+        per_result = fetcher.fetch(
+            "TaiwanStockPER", data_id=stock_id, start_date=start_date, end_date=end_date,
+        )
+        if per_result.get("ok"):
+            per_rows = per_result.get("rows") or []
+    except Exception as exc:
+        logger.warning("TW valuation river PER fetch failed for %s: %s", stock_id, exc)
+
+    price_rows: List[Dict[str, Any]] = []
+    try:
+        price_result = fetcher.fetch(
+            "TaiwanStockPrice", data_id=stock_id, start_date=start_date, end_date=end_date,
+        )
+        if price_result.get("ok"):
+            price_rows = price_result.get("rows") or []
+    except Exception as exc:
+        logger.warning("TW valuation river price fetch failed for %s: %s", stock_id, exc)
+
+    return per_rows, price_rows
+
+    return valuation_raw, fundamental_raw
+
+
 def _extract_kv_statements(result: Dict[str, Any], section_name: str) -> Dict[str, Any]:
     """Extract key-value financial statement rows (type/value/origin_name schema)."""
     rows = result.get("rows", [])

@@ -1,10 +1,11 @@
 import type React from 'react';
-import type { AnalysisReport } from '../../../types/analysis';
+import type { AnalysisReport, VisualReportRawResult } from '../../../types/analysis';
 import { adaptToVisualReport } from './reportVisualSummaryAdapter';
 import { MarketRiskGauge } from './MarketRiskGauge';
 import { MultiPeriodTrendBars } from './MultiPeriodTrendBars';
 import { TechnicalSnapshotCards } from './TechnicalSnapshotCards';
 import { FinancialResultCards } from './FinancialResultCards';
+import { ValuationRiverChart } from './ValuationRiverChart';
 import { ActionPlanCards } from './ActionPlanCards';
 import { KlineChartBlock } from './KlineChartBlock';
 
@@ -78,6 +79,7 @@ export const ReportVisualSummary: React.FC<ReportVisualSummaryProps> = ({ report
   const decisionColor = decisionColorClass(vm.sentimentScore);
   const priceColor = vm.changePct !== null && vm.changePct < 0 ? 'text-danger' : 'text-success';
   const keyTrigger = deriveKeyTrigger(vm.idealBuy, vm.secondaryBuy, vm.stopLoss, vm.takeProfit);
+  const rawResult = report.details?.rawResult as VisualReportRawResult | undefined;
 
   return (
     <div
@@ -197,6 +199,9 @@ export const ReportVisualSummary: React.FC<ReportVisualSummaryProps> = ({ report
 
         {/* Financial result cards (investor-facing) */}
         <FinancialResultCards valuation={vm.valuationCard} fundamental={vm.fundamentalCard} />
+
+        {/* Valuation river (Phase 26.1: TW-only deterministic PER/PBR bands) */}
+        <ValuationRiverChart rawSnapshot={rawResult?.valuationRiverSnapshot} />
 
         {/* Action plan */}
         <ActionPlanCards

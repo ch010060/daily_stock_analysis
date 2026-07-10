@@ -3176,6 +3176,117 @@ class TestAttachValuationFundamentalSnapshot(unittest.TestCase):
         self.assertIsNone(result.fundamental_snapshot)
 
 
+class TestAttachValuationRiverSnapshot(unittest.TestCase):
+    """Phase 26.1: unit tests for pipeline._attach_valuation_river_snapshot.
+
+    Mirrors TestAttachValuationFundamentalSnapshot's direct-invocation
+    pattern. No live network — `fetch_tw_valuation_river_rows` is always
+    mocked with plain row dicts.
+    """
+
+    def _make_pipeline(self) -> "StockAnalysisPipeline":  # noqa: F821
+        with patch('src.core.pipeline.get_config') as mock_config, \
+             patch('src.core.pipeline.get_db'), \
+             patch('src.core.pipeline.DataFetcherManager'), \
+             patch('src.core.pipeline.GeminiAnalyzer'), \
+             patch('src.core.pipeline.NotificationService'), \
+             patch('src.core.pipeline.SearchService'):
+            mock_cfg = MagicMock()
+            mock_cfg.max_workers = 2
+            mock_cfg.agent_mode = False
+            mock_config.return_value = mock_cfg
+
+            from src.core.pipeline import StockAnalysisPipeline
+            return StockAnalysisPipeline(config=mock_cfg)
+
+    def test_non_stock_instrument_type_returns_unsupported(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="etf", valuation_river_snapshot=None)
+
+        pipeline._attach_valuation_river_snapshot(result, "0050")
+
+        self.assertIsNotNone(result.valuation_river_snapshot)
+        self.assertFalse(result.valuation_river_snapshot["enabled"])
+        self.assertEqual(result.valuation_river_snapshot["quality"]["status"], "unsupported")
+
+    def test_us_stock_returns_unsupported_no_fake_history(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_river_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="us"):
+            pipeline._attach_valuation_river_snapshot(result, "AAPL")
+
+        self.assertIsNotNone(result.valuation_river_snapshot)
+        self.assertFalse(result.valuation_river_snapshot["enabled"])
+        self.assertEqual(result.valuation_river_snapshot["market"], "us")
+        self.assertEqual(result.valuation_river_snapshot["points"], [])
+
+    def test_tw_stock_builds_river_from_fetched_rows(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_river_snapshot=None)
+        per_rows = [{"date": f"2026-01-{d:02d}", "PER": 20.0 + d, "PBR": 6.0} for d in range(1, 25)]
+        price_rows = [{"date": f"2026-01-{d:02d}", "close": 1000.0 + d * 10} for d in range(1, 25)]
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
+             patch('src.finmind.tw_stock_analysis.normalize_tw_symbol', return_value=("2330", None)), \
+             patch('src.services.history_loader.get_frozen_target_date', return_value=date(2026, 1, 24)), \
+             patch(
+                 'src.finmind.tw_stock_analysis.fetch_tw_valuation_river_rows',
+                 return_value=(per_rows, price_rows),
+             ):
+            pipeline._attach_valuation_river_snapshot(result, "2330")
+
+        snap = result.valuation_river_snapshot
+        self.assertTrue(snap["enabled"])
+        self.assertEqual(snap["market"], "tw")
+        self.assertEqual(snap["source"], "finmind")
+        self.assertEqual(len(snap["points"]), 24)
+        self.assertEqual(snap["quality"]["status"], "ok")
+
+    def test_unresolvable_tw_symbol_returns_unsupported(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_river_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
+             patch('src.finmind.tw_stock_analysis.normalize_tw_symbol', return_value=(None, "rejected")):
+            pipeline._attach_valuation_river_snapshot(result, "US:AAPL")
+
+        self.assertFalse(result.valuation_river_snapshot["enabled"])
+
+    def test_exception_degrades_to_unsupported_not_crash(self) -> None:
+        pipeline = self._make_pipeline()
+        result = SimpleNamespace(instrument_type="stock", valuation_river_snapshot=None)
+
+        with patch('src.core.pipeline.get_market_for_stock', side_effect=RuntimeError("boom")):
+            pipeline._attach_valuation_river_snapshot(result, "2330")
+
+        # get_market_for_stock raising degrades market to "unknown" inside the
+        # method's own try/except, which still yields a well-formed unsupported
+        # snapshot rather than propagating the exception.
+        self.assertIsNotNone(result.valuation_river_snapshot)
+        self.assertFalse(result.valuation_river_snapshot["enabled"])
+
+    def test_does_not_mutate_existing_valuation_or_fundamental_snapshot(self) -> None:
+        pipeline = self._make_pipeline()
+        sentinel_valuation = {"pe_ttm": 99.0, "source": "finmind"}
+        sentinel_fundamental = {"revenue_yoy": 5.0, "source": "finmind"}
+        result = SimpleNamespace(
+            instrument_type="stock",
+            valuation_snapshot=sentinel_valuation,
+            fundamental_snapshot=sentinel_fundamental,
+            valuation_river_snapshot=None,
+        )
+
+        with patch('src.core.pipeline.get_market_for_stock', return_value="tw"), \
+             patch('src.finmind.tw_stock_analysis.normalize_tw_symbol', return_value=("2330", None)), \
+             patch('src.services.history_loader.get_frozen_target_date', return_value=date(2026, 1, 24)), \
+             patch('src.finmind.tw_stock_analysis.fetch_tw_valuation_river_rows', return_value=([], [])):
+            pipeline._attach_valuation_river_snapshot(result, "2330")
+
+        self.assertIs(result.valuation_snapshot, sentinel_valuation)
+        self.assertIs(result.fundamental_snapshot, sentinel_fundamental)
+
+
 class TestAttachExposureAndMarketRiskSnapshot(unittest.TestCase):
     """Phase 19B.3 / 19B.3A: unit tests for
     pipeline._attach_exposure_and_market_risk_snapshot.
