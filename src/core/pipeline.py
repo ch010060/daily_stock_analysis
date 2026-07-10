@@ -655,6 +655,7 @@ class StockAnalysisPipeline:
                 result.query_id = query_id
                 result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
                 self._attach_valuation_fundamental_snapshot(result, code, fundamental_context)
+                self._attach_valuation_river_snapshot(result, code)
                 self._attach_exposure_and_market_risk_snapshot(result, code, fundamental_context)
                 self._attach_market_fear_index_snapshot(result, code)
                 self._attach_multi_period_trend_snapshot(result, code)
@@ -1075,6 +1076,103 @@ class StockAnalysisPipeline:
         except Exception as exc:
             logger.warning("[valuation_fundamental_snapshot] skipped for %s: %s", code, exc)
 
+    def _attach_valuation_river_snapshot(self, result: Any, code: str) -> None:
+        """
+        Phase 26.1/26.2: attach deterministic `valuation_river_snapshot`.
+
+        TW: fetches FinMind `TaiwanStockPER` + `TaiwanStockPrice` over a
+        ~1-year window and derives a historical PER/PBR-implied EPS/BVPS
+        river, plus the latest reported (actual) quarterly EPS from
+        `TaiwanStockFinancialStatements`.
+
+        US (Phase 26.2): yfinance has no historical daily PE/PB ratio series,
+        so instead fetches ~4-5 real annual fiscal-year EPS/book-value points
+        (`income_stmt`/`balance_sheet`) and forward-fills them onto daily
+        close price — a genuine step-function history, never a single
+        current ratio reused across the whole range — plus point-in-time
+        `trailingEps`/`forwardEps` as separate labeled reference stats.
+
+        ETF, index, and unknown instrument types (and unknown markets) get
+        an explicit `enabled: false` unavailable snapshot rather than a fake
+        historical river. No LLM involvement anywhere in this method; never
+        raises — any failure degrades to the unavailable snapshot.
+        """
+        from src.services.valuation_river_snapshot import (
+            build_tw_valuation_river_snapshot,
+            build_us_valuation_river_snapshot,
+            build_valuation_river_snapshot_unsupported,
+        )
+
+        instrument_type = getattr(result, "instrument_type", "unknown")
+        try:
+            market = get_market_for_stock(normalize_stock_code(code))
+        except Exception:
+            market = "unknown"
+
+        if instrument_type != "stock":
+            result.valuation_river_snapshot = build_valuation_river_snapshot_unsupported(
+                market, code, f"僅支援股票標的的估值河流圖（instrument_type={instrument_type}）"
+            )
+            return
+
+        if market == "tw":
+            try:
+                from src.finmind.tw_stock_analysis import (
+                    fetch_tw_actual_eps_row,
+                    fetch_tw_valuation_river_rows,
+                    normalize_tw_symbol,
+                )
+
+                stock_id, err = normalize_tw_symbol(code)
+                if err or not stock_id:
+                    result.valuation_river_snapshot = build_valuation_river_snapshot_unsupported(
+                        "tw", code, "無法解析為有效台股代碼"
+                    )
+                    return
+
+                from src.services.history_loader import get_frozen_target_date
+
+                frozen = get_frozen_target_date()
+                end_date = (frozen if frozen else get_market_now("tw").date()).isoformat()
+                per_rows, price_rows = fetch_tw_valuation_river_rows(stock_id, end_date=end_date)
+                actual_eps_row = fetch_tw_actual_eps_row(stock_id, end_date=end_date)
+                result.valuation_river_snapshot = build_tw_valuation_river_snapshot(
+                    stock_id, per_rows, price_rows, actual_eps_row=actual_eps_row,
+                )
+            except Exception as exc:
+                logger.warning("[valuation_river_snapshot] TW skipped for %s: %s", code, exc)
+                result.valuation_river_snapshot = build_valuation_river_snapshot_unsupported(
+                    "tw", code, "河流圖資料組裝時發生錯誤"
+                )
+            return
+
+        if market == "us":
+            try:
+                from data_provider.yfinance_fundamental_adapter import (
+                    fetch_us_valuation_river_series,
+                )
+
+                series = fetch_us_valuation_river_series(code)
+                result.valuation_river_snapshot = build_us_valuation_river_snapshot(
+                    code,
+                    series["annual_eps_rows"],
+                    series["annual_bvps_rows"],
+                    series["price_rows"],
+                    eps_actual_ttm=series["eps_actual_ttm"],
+                    eps_forward=series["eps_forward"],
+                    currency=series["currency"],
+                )
+            except Exception as exc:
+                logger.warning("[valuation_river_snapshot] US skipped for %s: %s", code, exc)
+                result.valuation_river_snapshot = build_valuation_river_snapshot_unsupported(
+                    "us", code, "河流圖資料組裝時發生錯誤"
+                )
+            return
+
+        result.valuation_river_snapshot = build_valuation_river_snapshot_unsupported(
+            market, code, f"未知市場（market={market}）暫不支援估值河流圖"
+        )
+
     def _attach_exposure_and_market_risk_snapshot(
         self,
         result: Any,
@@ -1389,6 +1487,7 @@ class StockAnalysisPipeline:
                 result.query_id = query_id
                 result.instrument_type = resolve_report_instrument_type(normalize_stock_code(code))
                 self._attach_valuation_fundamental_snapshot(result, code, fundamental_context)
+                self._attach_valuation_river_snapshot(result, code)
                 self._attach_exposure_and_market_risk_snapshot(result, code, fundamental_context)
                 self._attach_market_fear_index_snapshot(result, code)
                 self._attach_multi_period_trend_snapshot(result, code)

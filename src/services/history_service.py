@@ -855,6 +855,7 @@ class HistoryService:
                 instrument_type=raw_result.get("instrument_type", "unknown"),
                 valuation_snapshot=raw_result.get("valuation_snapshot"),
                 fundamental_snapshot=raw_result.get("fundamental_snapshot"),
+                valuation_river_snapshot=raw_result.get("valuation_river_snapshot"),
                 exposure_snapshot=raw_result.get("exposure_snapshot"),
                 market_risk_snapshot=raw_result.get("market_risk_snapshot"),
                 multi_period_trend_snapshot=raw_result.get("multi_period_trend_snapshot"),

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 美股個股完整報告新增估值河流圖支援：以 yfinance 財報年度實際 EPS/BVPS（`income_stmt`/`balance_sheet`，非反推）建構階梯狀倍數視覺參考帶，並新增「實際 EPS」/「預估 EPS」（`trailingEps`/`forwardEps`）點時參考數值；台股同步新增「實際 EPS」欄位（來自 `TaiwanStockFinancialStatements` 最新一季 EPS，與既有反推 EPS 明確區分標示）；ETF/指數維持不支援估值河流圖。所有數值皆為後端決定性運算，LLM 不參與。
+
+- [新功能] 台股個股完整報告新增「估值河流圖」（`valuation_river_snapshot`）：以 FinMind `TaiwanStockPER`/`TaiwanStockPrice` 反推歷史隱含 EPS，畫出固定倍數（14x/18x/22x/26x/30x/34x/38x，26x 為中性分界）視覺參考帶與實際收盤價疊圖；完全由後端決定性運算，LLM 不參與、不產生目標價/公允價值/買賣建議；美股、ETF、指數與非股票標的顯示明確的 unavailable 卡片，不繪製假造歷史河流圖；不影響既有 `valuation_snapshot`/`fundamental_snapshot`/四大師視角補充/評分/趨勢/操作建議欄位。
+
 - [改進] 「四大師視角補充」功能預設值由關閉改為開啟（`ENABLE_FOUR_MASTERS_COMMENTARY` 預設 `true`，與 `value_network_mermaid` 一致採 opt-out 模式；設為 `false` 可關閉）。
 
 - [新功能] Web 完整分析報告新增結構化「四大師視角補充」UI（`FourMastersCommentarySection`）：當歷史紀錄的 `raw_result.four_masters_commentary` 存在且通過前端驗證時，於報告內容區顯示巴菲特/蒙格/段永平/李錄四張卡片與綜合觀察卡，桌面為 2x2 網格、行動裝置單欄堆疊；會抑制對應的 Markdown 版重複段落，避免同一內容出現兩次；不新增任何買賣操作按鈕、不採信 LLM 夾帶的行動類欄位，畸形或缺失資料時安全降級為不顯示；沿用既有報告卡片視覺語言，未修改原始評分/趨勢/操作建議欄位。

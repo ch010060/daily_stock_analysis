@@ -1925,6 +1925,90 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertIsNone(rebuilt.market_risk_snapshot)
         self.assertIsNone(rebuilt.market_fear_index_snapshot)
 
+    def test_rebuild_analysis_result_carries_us_valuation_river_snapshot(self) -> None:
+        """Phase 26.3: a real US valuation_river_snapshot (reported-annual-EPS
+        basis) survives a genuine DB round trip through
+        HistoryService._rebuild_analysis_result — not just a mocked dict, an
+        actual persisted record queried back and rebuilt."""
+        record_id = self._save_history("query_us_valuation_river_001")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            raw_result = {
+                "code": "AAPL",
+                "name": "Apple Inc.",
+                "instrument_type": "stock",
+                "valuation_river_snapshot": {
+                    "enabled": True,
+                    "market": "us",
+                    "symbol": "AAPL",
+                    "currency": "USD",
+                    "source": "yfinance",
+                    "method": "us_reported_eps_annual_river",
+                    "basis": "reported_eps",
+                    "eps_kind": "reported",
+                    "eps_source": "yfinance",
+                    "eps_period": "annual",
+                    "band_multiples": [14, 18, 22, 26, 30, 34, 38],
+                    "neutral_multiple": 26,
+                    "as_of": "2026-07-09",
+                    "range": {"start_date": "2022-09-30", "end_date": "2026-07-09", "trading_days": 945},
+                    "points": [
+                        {"date": "2022-10-03", "close": 140.0, "implied_eps": 6.11, "bands": {"per_26": 158.86}},
+                        {"date": "2023-10-02", "close": 175.0, "implied_eps": 6.13, "bands": {"per_26": 159.38}},
+                        {"date": "2024-10-01", "close": 225.0, "implied_eps": 6.08, "bands": {"per_26": 158.08}},
+                        {"date": "2025-10-01", "close": 255.0, "implied_eps": 7.46, "bands": {"per_26": 193.96}},
+                    ],
+                    "current": {
+                        "close": 316.22, "per": 42.3887, "pbr": 63.358,
+                        "implied_eps": 7.46, "implied_bvps": 4.991, "zone": "overvalued",
+                        "eps_actual": {"value": 8.25, "period": "ttm", "source": "yfinance"},
+                        "eps_forward": {"value": 9.60895, "period": "point_in_time", "source": "yfinance"},
+                    },
+                    "quality": {
+                        "status": "ok", "warnings": [], "codes": [], "data_gap_fields": [],
+                        "methodology_note": "note",
+                    },
+                },
+            }
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        snap = rebuilt.valuation_river_snapshot
+        self.assertTrue(snap["enabled"])
+        self.assertEqual(snap["market"], "us")
+        self.assertEqual(snap["method"], "us_reported_eps_annual_river")
+        self.assertEqual(snap["eps_kind"], "reported")
+        # the whole point of the annual-anchor design: distinct fiscal-year
+        # EPS values, not one value repeated across every point
+        eps_values = {p["implied_eps"] for p in snap["points"]}
+        self.assertEqual(eps_values, {6.11, 6.13, 6.08, 7.46})
+        self.assertEqual(snap["current"]["eps_actual"], {"value": 8.25, "period": "ttm", "source": "yfinance"})
+        self.assertEqual(snap["current"]["eps_forward"], {"value": 9.60895, "period": "point_in_time", "source": "yfinance"})
+        blob = str(snap)
+        for forbidden in ("target_price", "fair_value", "recommendation", "buy_signal", "sell_signal"):
+            self.assertNotIn(forbidden, blob)
+
+    def test_rebuild_analysis_result_defaults_valuation_river_snapshot_to_none(self) -> None:
+        """Legacy history records without valuation_river_snapshot (pre-Phase-26.1)
+        rebuild as None, not a crash — same backward compatibility contract as
+        every other snapshot field."""
+        record_id = self._save_history("query_us_valuation_river_002")
+
+        with self.db.get_session() as session:
+            record = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            self.assertIsNotNone(record)
+
+            service = HistoryService(self.db)
+            raw_result = {"code": "2330", "name": "台積電"}
+            rebuilt = service._rebuild_analysis_result(raw_result, record)
+
+        self.assertIsNotNone(rebuilt)
+        self.assertIsNone(rebuilt.valuation_river_snapshot)
+
     def test_generate_single_stock_markdown_renders_exposure_and_market_risk_for_etf(self) -> None:
         """Phase 19B.3: markdown renders the new sections for etf/index only,
         positioned after the 19B.2 valuation/fundamental section."""
