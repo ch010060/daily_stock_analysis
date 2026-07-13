@@ -298,6 +298,44 @@ def build_strategy_state_input(
     supports = tuple(normalize_price_levels(trend.get("support_levels"), descending=True))
     resistances = tuple(normalize_price_levels(trend.get("resistance_levels"), descending=False))
 
+    def _active_structure_prices(key: str, *, descending: bool) -> Tuple[float, ...]:
+        prices = []
+        for level in trend.get(key) or ():
+            if not isinstance(level, dict) or level.get("status") != "active":
+                continue
+            price = _num(level.get("price"))
+            if price is not None:
+                prices.append(price)
+            if len(prices) >= 3:
+                break
+        return tuple(normalize_price_levels(prices, descending=descending))
+
+    structure_supports = _active_structure_prices(
+        "market_structure_support_levels", descending=True
+    )
+    structure_resistances = _active_structure_prices(
+        "market_structure_resistance_levels", descending=False
+    )
+
+    def _structure_provenance(key: str) -> Tuple[dict, ...]:
+        allowed = {
+            "price", "kind", "confirmed_at", "first_seen_at", "last_seen_at",
+            "touch_count", "prominence", "source_window", "status",
+        }
+        result = []
+        for level in trend.get(key) or ():
+            if not isinstance(level, dict):
+                continue
+            price = _num(level.get("price"))
+            if price is None or level.get("status") not in {
+                "active", "broken", "stale", "out_of_side",
+            }:
+                continue
+            sanitized = {name: level[name] for name in allowed if name in level}
+            sanitized["price"] = price
+            result.append(sanitized)
+        return tuple(result)
+
     valuation_zone = None
     valuation_band_high = None
     river = valuation_river_snapshot if isinstance(valuation_river_snapshot, dict) else None
@@ -333,6 +371,14 @@ def build_strategy_state_input(
         thesis_status=None,
         deterministic_risk_flags=(),
         data_quality_status="available" if close is not None else "missing",
+        market_structure_support_levels=structure_supports,
+        market_structure_resistance_levels=structure_resistances,
+        market_structure_support_provenance=_structure_provenance(
+            "market_structure_support_levels"
+        ),
+        market_structure_resistance_provenance=_structure_provenance(
+            "market_structure_resistance_levels"
+        ),
     )
 
 

@@ -265,6 +265,22 @@ class PullbackIntoZoneTestCase(unittest.TestCase):
         self.assertIsNotNone(snap.buy_zone)
         self.assertEqual(snap.buy_zone.basis, ("support:92.0",))
 
+    def test_market_structure_support_precedes_legacy_and_retains_provenance_at_ma_collision(self) -> None:
+        inp = _input(
+            close=100.0,
+            ma20=92.0,
+            ma60=80.0,
+            market_structure_support_levels=(92.0,),
+            market_structure_resistance_levels=(130.0,),
+            deterministic_support_levels=(91.0,),
+            deterministic_resistance_levels=(140.0,),
+        )
+
+        snap = evaluate_strategy_state(inp, previous=None)
+
+        self.assertIsNotNone(snap.buy_zone)
+        self.assertEqual(snap.buy_zone.basis, ("market_structure_support:92.0",))
+
     def test_legacy_missing_support_array_uses_long_ma_fallback(self) -> None:
         inp = _input(
             close=100.0,

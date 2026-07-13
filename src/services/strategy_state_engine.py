@@ -193,6 +193,10 @@ class StrategyStateInput:
     deterministic_risk_flags: Tuple[str, ...] = ()
 
     data_quality_status: str = "available"
+    market_structure_support_levels: Tuple[float, ...] = ()
+    market_structure_resistance_levels: Tuple[float, ...] = ()
+    market_structure_support_provenance: Tuple[dict, ...] = ()
+    market_structure_resistance_provenance: Tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -371,6 +375,13 @@ def _nearest_support_below(input_data: StrategyStateInput) -> Optional[Tuple[flo
     they are the production anchor-drift vector.
     """
     close = input_data.close
+    structure = [
+        (value, f"market_structure_support:{_round(value)}")
+        for value in input_data.market_structure_support_levels
+        if value is not None and 0 < value < close
+    ]
+    if structure:
+        return max(structure, key=lambda item: item[0])
     serialized_mas = tuple(
         value for value in (input_data.ma5, input_data.ma10, input_data.ma20) if value is not None
     )
@@ -401,6 +412,9 @@ def _nearest_support_below(input_data: StrategyStateInput) -> Optional[Tuple[flo
 
 
 def _nearest_resistance_above(input_data: StrategyStateInput, ref: float) -> Optional[float]:
+    structure = [r for r in input_data.market_structure_resistance_levels if r > ref]
+    if structure:
+        return min(structure)
     ups = [r for r in input_data.deterministic_resistance_levels if r is not None and r > ref]
     return min(ups) if ups else None
 

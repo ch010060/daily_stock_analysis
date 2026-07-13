@@ -23,6 +23,8 @@ from typing import Dict, Any, List
 from enum import Enum
 
 import pandas as pd
+
+from src.services.market_structure_levels import calculate_market_structure_levels
 import numpy as np
 
 from src.config import get_config
@@ -140,6 +142,8 @@ class TrendAnalysisResult:
     support_ma10: bool = False       # MA10 是否構成支撐
     resistance_levels: List[float] = field(default_factory=list)
     support_levels: List[float] = field(default_factory=list)
+    market_structure_support_levels: List[Dict[str, Any]] = field(default_factory=list)
+    market_structure_resistance_levels: List[Dict[str, Any]] = field(default_factory=list)
 
     # MACD 指標
     macd_dif: float = 0.0          # DIF 快線
@@ -184,6 +188,8 @@ class TrendAnalysisResult:
             # numeric-only fields; legacy consumers that ignore them remain compatible.
             'support_levels': normalize_price_levels(self.support_levels, descending=True),
             'resistance_levels': normalize_price_levels(self.resistance_levels, descending=False),
+            'market_structure_support_levels': self.market_structure_support_levels,
+            'market_structure_resistance_levels': self.market_structure_resistance_levels,
             'buy_signal': self.buy_signal.value,
             'signal_score': self.signal_score,
             'signal_reasons': self.signal_reasons,
@@ -282,6 +288,9 @@ class StockTrendAnalyzer:
 
         # 4. 支撐壓力分析
         self._analyze_support_resistance(df, result)
+        structure = calculate_market_structure_levels(df)
+        result.market_structure_support_levels = structure["support_levels"]
+        result.market_structure_resistance_levels = structure["resistance_levels"]
 
         # 5. MACD 分析
         self._analyze_macd(df, result)

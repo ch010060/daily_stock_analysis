@@ -199,3 +199,23 @@ class TrendAnalysisSerializationTestCase(unittest.TestCase):
 
         self.assertEqual(payload["support_levels"], [10.0, 9.5, 9.0])
         self.assertEqual(payload["resistance_levels"], [12.0])
+
+    def test_market_structure_provenance_survives_to_dict(self) -> None:
+        result = _make_result()
+        result.market_structure_support_levels = [{
+            "price": 8.5,
+            "kind": "support",
+            "confirmed_at": "2026-07-01",
+            "first_seen_at": "2026-06-20",
+            "last_seen_at": "2026-06-28",
+            "touch_count": 2,
+            "prominence": 1.25,
+            "source_window": 120,
+            "status": "active",
+        }]
+        result.market_structure_resistance_levels = []
+
+        payload = result.to_dict()
+
+        self.assertEqual(payload["market_structure_support_levels"], result.market_structure_support_levels)
+        self.assertEqual(payload["market_structure_resistance_levels"], [])

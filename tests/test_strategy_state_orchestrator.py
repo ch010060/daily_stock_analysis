@@ -246,6 +246,42 @@ class InputConstructionTestCase(unittest.TestCase):
         self.assertEqual(inp.deterministic_support_levels, (95.00000001, 90.0))
         self.assertEqual(inp.deterministic_resistance_levels, (110.0, 120.0))
 
+    def test_market_structure_levels_are_active_only_and_keep_priority_channel(self) -> None:
+        trend = {
+            "current_price": 100.0,
+            "support_levels": [90.0],
+            "resistance_levels": [130.0],
+            "market_structure_support_levels": [
+                {"price": 95.0, "status": "active"},
+                {"price": 96.0, "status": "broken"},
+                {"price": float("nan"), "status": "active"},
+            ],
+            "market_structure_resistance_levels": [
+                {"price": 120.0, "status": "active"},
+                {"price": 110.0, "status": "active"},
+                {"price": 105.0, "status": "stale"},
+            ],
+        }
+
+        inp = build_strategy_state_input(
+            symbol="X", market="us", instrument_type="stock",
+            as_of=date(2026, 7, 9), trend_dict=trend, change_pct=1.0,
+            valuation_river_snapshot=None, capital_flow_bias=None,
+        )
+
+        self.assertEqual(inp.market_structure_support_levels, (95.0,))
+        self.assertEqual(inp.market_structure_resistance_levels, (110.0, 120.0))
+        self.assertEqual(
+            [level["status"] for level in inp.market_structure_support_provenance],
+            ["active", "broken"],
+        )
+        self.assertEqual(
+            [level["status"] for level in inp.market_structure_resistance_provenance],
+            ["active", "active", "stale"],
+        )
+        self.assertEqual(inp.deterministic_support_levels, (90.0,))
+        self.assertEqual(inp.deterministic_resistance_levels, (130.0,))
+
     def test_missing_trend_degrades_to_missing_quality(self) -> None:
         inp = build_strategy_state_input(
             symbol="X", market="us", instrument_type="stock",
