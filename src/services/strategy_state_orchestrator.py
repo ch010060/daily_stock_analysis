@@ -38,8 +38,7 @@ Phase 27.2R data contract (required vs optional vs deferred):
   deterministic resistance levels. Their absence degrades zone precision
   (e.g. TECHNICAL_ONLY basis, or WATCHLIST instead of ACCUMULATE_ZONE) but
   the engine still returns a valid, authoritative state — never UNSUPPORTED.
-- CONSUMED BY THE FROZEN ENGINE (strategy_state_engine.py, Phase 27.1
-  checkpoint, unmodified): close, data_quality_status, instrument_type,
+- CONSUMED BY THE ENGINE: close, data_quality_status, instrument_type,
   as_of, ma5/ma10/ma20/ma60, deterministic_support_levels,
   deterministic_resistance_levels, valuation_band_low/high, thesis_status,
   deterministic_risk_flags.
@@ -49,16 +48,16 @@ Phase 27.2R data contract (required vs optional vs deferred):
   edited in this phase): previous_close, daily_change_pct, multi_period_trend,
   volume_ratio, capital_flow_bias, valuation_zone. These are populated where a
   real deterministic source already exists (previous_close, daily_change_pct,
-  volume_ratio, capital_flow_bias, valuation_zone) purely for future Phase
-  27.3 rules and diagnostic display — never for LLM-inferred content, never
+  volume_ratio, capital_flow_bias, valuation_zone) for diagnostic display and
+  future evidence-backed rules — never for LLM-inferred content, never
   gating supported/unsupported classification. ``multi_period_trend`` has no
   deterministic source yet and is always None.
 - thesis_status / deterministic_risk_flags are consumed by the engine but
   this orchestrator never supplies non-empty values (Option B of the Phase
   27.2R field audit): no trustworthy deterministic source exists yet for
   thesis invalidation or hard risk flags beyond what the engine already
-  derives internally from its own invalidation-breach tracking. Deferred to
-  Phase 27.3; never inferred from LLM prose.
+  derives internally from its own invalidation-breach tracking. Still
+  deferred after Phase 27.3R; never inferred from LLM prose.
 
 Everything here is only reachable when ``ENABLE_STRATEGY_STATE_AUTHORITY``
 is on (default off — flag-off production behavior is unchanged).
@@ -67,6 +66,7 @@ is on (default off — flag-off production behavior is unchanged).
 from __future__ import annotations
 
 import logging
+import math
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -77,6 +77,7 @@ from src.services.strategy_state_engine import (
     StrategyStateSnapshot,
     evaluate_strategy_state,
 )
+from src.stock_analyzer import normalize_price_levels
 
 logger = logging.getLogger(__name__)
 
@@ -279,10 +280,10 @@ def build_strategy_state_input(
 
     def _num(value: Any) -> Optional[float]:
         try:
-            if value is None:
+            if value is None or isinstance(value, bool):
                 return None
             result = float(value)
-            return result if result == result and result > 0 else None
+            return result if math.isfinite(result) and result > 0 else None
         except (TypeError, ValueError):
             return None
 
@@ -294,12 +295,8 @@ def build_strategy_state_input(
         except (TypeError, ValueError, ZeroDivisionError):
             previous_close = None
 
-    supports = tuple(
-        v for v in (_num(s) for s in (trend.get("support_levels") or [])) if v is not None
-    )
-    resistances = tuple(
-        v for v in (_num(r) for r in (trend.get("resistance_levels") or [])) if v is not None
-    )
+    supports = tuple(normalize_price_levels(trend.get("support_levels"), descending=True))
+    resistances = tuple(normalize_price_levels(trend.get("resistance_levels"), descending=False))
 
     valuation_zone = None
     valuation_band_high = None

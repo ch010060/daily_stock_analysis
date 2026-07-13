@@ -228,6 +228,24 @@ class InputConstructionTestCase(unittest.TestCase):
         self.assertIsNone(inp.thesis_status)
         self.assertEqual(inp.deterministic_risk_flags, ())
 
+    def test_level_arrays_are_finite_sorted_and_deduplicated(self) -> None:
+        trend = {
+            "current_price": 100.0,
+            "ma20": 90.0,
+            "ma60": 80.0,
+            "support_levels": [90.0, float("nan"), 95.0, 95.00000001, float("inf"), -1.0, True],
+            "resistance_levels": [120.0, 110.0, 110.00000001, float("-inf"), "bad"],
+        }
+
+        inp = build_strategy_state_input(
+            symbol="X", market="us", instrument_type="stock",
+            as_of=date(2026, 7, 9), trend_dict=trend, change_pct=1.0,
+            valuation_river_snapshot=None, capital_flow_bias=None,
+        )
+
+        self.assertEqual(inp.deterministic_support_levels, (95.00000001, 90.0))
+        self.assertEqual(inp.deterministic_resistance_levels, (110.0, 120.0))
+
     def test_missing_trend_degrades_to_missing_quality(self) -> None:
         inp = build_strategy_state_input(
             symbol="X", market="us", instrument_type="stock",
@@ -441,6 +459,33 @@ class PersistenceRoundTripTestCase(_TempDbTestCase):
         rebuilt = HistoryService(self.db)._rebuild_analysis_result(raw, records[0])
         self.assertIsNone(rebuilt.strategy_state_snapshot)
         self.assertIsNone(rebuilt.strategy_authority_diagnostics)
+
+    def test_serialized_levels_drive_and_persist_strategy_zone(self) -> None:
+        from src.stock_analyzer import TrendAnalysisResult
+
+        trend = TrendAnalysisResult(
+            code="2454",
+            current_price=100.0,
+            ma5=99.0,
+            ma10=98.0,
+            ma20=90.0,
+            ma60=80.0,
+            support_levels=[92.0, 99.0, 98.0],
+            resistance_levels=[130.0],
+        )
+        input_data = build_strategy_state_input(
+            symbol="2454", market="tw", instrument_type="stock",
+            as_of=date(2026, 7, 9), trend_dict=trend.to_dict(), change_pct=1.0,
+            valuation_river_snapshot=None, capital_flow_bias=None,
+        )
+        result = _llm_result()
+        snapshot = attach_strategy_state(result, input_data, None)
+
+        self.assertEqual(snapshot.buy_zone.basis, ("support:92.0",))
+        self._save("q_roundtrip_levels", result.strategy_state_snapshot)
+        restored = load_previous_strategy_snapshot(self.db, "2454")
+        self.assertIsNotNone(restored)
+        self.assertEqual(restored.buy_zone.basis, ("support:92.0",))
 
 
 class PreviousSnapshotRetrievalTestCase(_TempDbTestCase):

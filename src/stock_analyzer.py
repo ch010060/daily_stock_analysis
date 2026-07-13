@@ -17,6 +17,7 @@
 """
 
 import logging
+import math
 from dataclasses import dataclass, field
 from typing import Dict, Any, List
 from enum import Enum
@@ -27,6 +28,34 @@ import numpy as np
 from src.config import get_config
 
 logger = logging.getLogger(__name__)
+
+LEVEL_DEDUP_REL_TOLERANCE = 1e-6
+LEVEL_DEDUP_ABS_TOLERANCE = 1e-8
+
+
+def normalize_price_levels(values: Any, *, descending: bool) -> List[float]:
+    """Return finite positive levels in stable order, deduplicated by tolerance."""
+    cleaned = []
+    for value in values or ():
+        if isinstance(value, bool):
+            continue
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(number) and number > 0:
+            cleaned.append(number)
+    cleaned.sort(reverse=descending)
+    deduplicated = []
+    for number in cleaned:
+        if not deduplicated or not math.isclose(
+            number,
+            deduplicated[-1],
+            rel_tol=LEVEL_DEDUP_REL_TOLERANCE,
+            abs_tol=LEVEL_DEDUP_ABS_TOLERANCE,
+        ):
+            deduplicated.append(number)
+    return deduplicated
 
 
 class TrendStatus(Enum):
@@ -151,6 +180,10 @@ class TrendAnalysisResult:
             'volume_trend': self.volume_trend,
             'support_ma5': self.support_ma5,
             'support_ma10': self.support_ma10,
+            # Highest support / lowest resistance first. Values are additive,
+            # numeric-only fields; legacy consumers that ignore them remain compatible.
+            'support_levels': normalize_price_levels(self.support_levels, descending=True),
+            'resistance_levels': normalize_price_levels(self.resistance_levels, descending=False),
             'buy_signal': self.buy_signal.value,
             'signal_score': self.signal_score,
             'signal_reasons': self.signal_reasons,

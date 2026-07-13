@@ -177,3 +177,25 @@ class StockAnalyzerBiasTestCase(unittest.TestCase):
         # else: risks.append 嚴禁追高 - so we get 嚴禁追高
         # Because 5.0 is not < 5.0, not > 5.0 when effective=base=5. So we hit the else.
         self._assert_contains(result.risk_factors, "嚴禁追高")
+
+
+class TrendAnalysisSerializationTestCase(unittest.TestCase):
+    def test_support_and_resistance_levels_are_sanitized_and_deterministic(self) -> None:
+        result = _make_result()
+        result.support_levels = [90.0, 100.0, 100.00000001, float("nan"), float("inf"), -1.0, True, "bad"]
+        result.resistance_levels = [120.0, 110.0, 110.00000001, None, float("-inf"), 0.0]
+
+        payload = result.to_dict()
+
+        self.assertEqual(payload["support_levels"], [100.00000001, 90.0])
+        self.assertEqual(payload["resistance_levels"], [110.0, 120.0])
+
+    def test_calculated_levels_survive_to_dict(self) -> None:
+        result = _make_result()
+        result.support_levels = [result.ma5, result.ma10, result.ma20]
+        result.resistance_levels = [12.0]
+
+        payload = result.to_dict()
+
+        self.assertEqual(payload["support_levels"], [10.0, 9.5, 9.0])
+        self.assertEqual(payload["resistance_levels"], [12.0])

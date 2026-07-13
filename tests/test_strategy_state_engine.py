@@ -16,9 +16,12 @@ from src.services.strategy_state_engine import (
     DEFAULT_POLICY,
     NO_DETERMINISTIC_ZONE_BASIS,
     RULE_CONFIRMED_SUPPORT_BREAK,
+    RULE_CONFIRMED_SUPPORT_RECLAIM,
     RULE_HYSTERESIS_HOLD,
     RULE_INSUFFICIENT_DATA,
     RULE_RISK_REWARD_OVEREXTENDED,
+    RULE_SUPPORT_RECLAIM_PENDING,
+    RULE_TERMINAL_STATE_PERSISTED,
     RULE_THESIS_INVALIDATED,
     RULE_UNSUPPORTED_INSTRUMENT,
     RULE_VALID_BUY_ZONE_ENTERED,
@@ -146,8 +149,51 @@ class LargeDropTestCase(unittest.TestCase):
         day2 = evaluate_strategy_state(
             _input(as_of=date(2026, 7, 10), close=below_invalidation), previous=day1
         )
-        self.assertEqual(day2.state, StrategyState.INVALIDATED)
+        self.assertEqual(day2.state, StrategyState.REDUCE_RISK)
         self.assertEqual(day2.transition_rule_id, RULE_CONFIRMED_SUPPORT_BREAK)
+        self.assertIsNone(day2.buy_zone)
+
+    def test_one_day_reclaim_does_not_reactivate(self) -> None:
+        prev = _wait_snapshot(zone_low=3900.0, zone_high=3980.0)
+        day1 = evaluate_strategy_state(
+            _input(as_of=date(2026, 7, 9), close=3700.0), previous=prev
+        )
+        reduced = evaluate_strategy_state(
+            _input(as_of=date(2026, 7, 10), close=3700.0), previous=day1
+        )
+        bounced = evaluate_strategy_state(
+            _input(as_of=date(2026, 7, 13), close=3850.0), previous=reduced
+        )
+
+        self.assertEqual(bounced.state, StrategyState.REDUCE_RISK)
+        self.assertEqual(bounced.transition_rule_id, RULE_SUPPORT_RECLAIM_PENDING)
+        self.assertEqual(bounced.reclaim_confirm_count, 1)
+        self.assertIsNone(bounced.buy_zone)
+
+    def test_confirmed_reclaim_exits_to_watchlist_without_old_zone(self) -> None:
+        prev = _wait_snapshot(zone_low=3900.0, zone_high=3980.0)
+        day1 = evaluate_strategy_state(_input(as_of=date(2026, 7, 9), close=3700.0), previous=prev)
+        reduced = evaluate_strategy_state(_input(as_of=date(2026, 7, 10), close=3700.0), previous=day1)
+        reclaim1 = evaluate_strategy_state(_input(as_of=date(2026, 7, 13), close=3850.0), previous=reduced)
+        reclaim2 = evaluate_strategy_state(_input(as_of=date(2026, 7, 14), close=3860.0), previous=reclaim1)
+
+        self.assertEqual(reclaim2.state, StrategyState.WATCHLIST)
+        self.assertEqual(reclaim2.transition_rule_id, RULE_CONFIRMED_SUPPORT_RECLAIM)
+        self.assertNotEqual(reclaim2.state, StrategyState.ACCUMULATE_ZONE)
+        self.assertIsNone(reclaim2.buy_zone)
+        self.assertIsNone(reclaim2.invalidation_level)
+        self.assertEqual(reclaim2.reclaim_confirm_count, 0)
+
+    def test_reclaim_counter_resets_below_breached_level(self) -> None:
+        prev = _wait_snapshot(zone_low=3900.0, zone_high=3980.0)
+        day1 = evaluate_strategy_state(_input(as_of=date(2026, 7, 9), close=3700.0), previous=prev)
+        reduced = evaluate_strategy_state(_input(as_of=date(2026, 7, 10), close=3700.0), previous=day1)
+        reclaim1 = evaluate_strategy_state(_input(as_of=date(2026, 7, 13), close=3850.0), previous=reduced)
+        failed = evaluate_strategy_state(_input(as_of=date(2026, 7, 14), close=3700.0), previous=reclaim1)
+
+        self.assertEqual(failed.state, StrategyState.REDUCE_RISK)
+        self.assertEqual(failed.reclaim_confirm_count, 0)
+        self.assertEqual(failed.transition_rule_id, RULE_CONFIRMED_SUPPORT_BREAK)
 
     def test_thesis_invalidated_bypasses_hysteresis(self) -> None:
         prev = _wait_snapshot()
@@ -155,6 +201,19 @@ class LargeDropTestCase(unittest.TestCase):
         snap = evaluate_strategy_state(inp, previous=prev)
         self.assertEqual(snap.state, StrategyState.INVALIDATED)
         self.assertEqual(snap.transition_rule_id, RULE_THESIS_INVALIDATED)
+
+    def test_terminal_invalidation_is_absorbing_without_reinstatement_contract(self) -> None:
+        terminal = evaluate_strategy_state(
+            _input(thesis_status="invalidated", as_of=date(2026, 7, 8)),
+            previous=_wait_snapshot(),
+        )
+        persisted = evaluate_strategy_state(
+            _input(thesis_status=None, as_of=date(2026, 7, 9)),
+            previous=terminal,
+        )
+
+        self.assertEqual(persisted.state, StrategyState.INVALIDATED)
+        self.assertEqual(persisted.transition_rule_id, RULE_TERMINAL_STATE_PERSISTED)
 
 
 class PullbackIntoZoneTestCase(unittest.TestCase):
@@ -173,6 +232,54 @@ class PullbackIntoZoneTestCase(unittest.TestCase):
         self.assertEqual(snap.buy_zone.created_at, date(2026, 7, 1))
         self.assertEqual(snap.buy_zone.revision, 0)
         self.assertEqual(snap.decision_type, "buy")
+
+    def test_short_ma_values_in_explicit_array_do_not_bypass_anchor_guard(self) -> None:
+        inp = _input(
+            close=100.0,
+            ma5=99.0,
+            ma10=98.0,
+            ma20=90.0,
+            ma60=80.0,
+            deterministic_support_levels=(99.0, 98.0, 90.0),
+            deterministic_resistance_levels=(130.0,),
+        )
+
+        snap = evaluate_strategy_state(inp, previous=None)
+
+        self.assertIsNotNone(snap.buy_zone)
+        self.assertEqual(snap.buy_zone.basis, ("ma60",))
+
+    def test_distinct_explicit_support_remains_preferred_over_ma_fallback(self) -> None:
+        inp = _input(
+            close=100.0,
+            ma5=99.0,
+            ma10=98.0,
+            ma20=90.0,
+            ma60=80.0,
+            deterministic_support_levels=(92.0, 99.0, 98.0),
+            deterministic_resistance_levels=(130.0,),
+        )
+
+        snap = evaluate_strategy_state(inp, previous=None)
+
+        self.assertIsNotNone(snap.buy_zone)
+        self.assertEqual(snap.buy_zone.basis, ("support:92.0",))
+
+    def test_legacy_missing_support_array_uses_long_ma_fallback(self) -> None:
+        inp = _input(
+            close=100.0,
+            ma5=99.0,
+            ma10=98.0,
+            ma20=90.0,
+            ma60=80.0,
+            deterministic_support_levels=(),
+            deterministic_resistance_levels=(130.0,),
+        )
+
+        snap = evaluate_strategy_state(inp, previous=None)
+
+        self.assertIsNotNone(snap.buy_zone)
+        self.assertEqual(snap.buy_zone.basis, ("ma60",))
 
 
 class SameInputDeterminismTestCase(unittest.TestCase):
@@ -322,6 +429,14 @@ class SerializationTestCase(unittest.TestCase):
         for forbidden in ("target_price", "fair_value", "recommendation", "buy_signal", "sell_signal"):
             self.assertNotIn(forbidden, blob)
 
+    def test_legacy_snapshot_without_reclaim_counter_defaults_to_zero(self) -> None:
+        payload = evaluate_strategy_state(_input(), previous=_wait_snapshot()).to_dict()
+        payload.pop("reclaim_confirm_count")
+
+        restored = StrategyStateSnapshot.from_dict(payload)
+
+        self.assertEqual(restored.reclaim_confirm_count, 0)
+
 
 class FixedMappingTestCase(unittest.TestCase):
     def test_every_state_has_exactly_one_mapping(self) -> None:
@@ -333,6 +448,7 @@ class FixedMappingTestCase(unittest.TestCase):
         with self.assertRaises(Exception):
             DEFAULT_POLICY.minimum_risk_reward = 1.0  # type: ignore[misc]
         self.assertEqual(DEFAULT_POLICY, StrategyPolicy())
+        self.assertEqual(DEFAULT_POLICY.reclaim_confirmation_days, 2)
 
 
 class IsolationGuardTestCase(unittest.TestCase):

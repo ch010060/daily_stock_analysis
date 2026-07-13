@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Phase 27.1 — deterministic individual-stock strategy state engine (pure, isolated).
+Deterministic individual-stock strategy state engine (pure policy core).
 
 Motivation (Phase 27 audit, see
 openspec/changes/phase27-strategy-inertia/worklogs/PHASE_27_INDIVIDUAL_STOCK_STRATEGY_INERTIA_AUDIT.md):
@@ -11,18 +11,24 @@ nearest short MA, re-entry bars that fall with the falling MAs, and the
 "wait for pullback, then turn bearish when the pullback arrives" contradiction
 (2454 2026-07-07 → 07-09, live production instance).
 
-This module is the first isolated slice of the fix: a pure function that owns
+This module began as the isolated Phase 27.1 slice and now owns
 strategy state, actionability, operation advice, decision type, buy zone,
 invalidation level, and transition rule — deterministically.
 
-Hard boundaries (Phase 27.1):
-- NOT integrated into the production pipeline. Nothing imports this module
-  from src/core/pipeline.py, src/analyzer.py, API endpoints, or the frontend.
+Hard boundaries:
+- Production reaches this module only through ``strategy_state_orchestrator``;
+  the policy core remains unaware of pipeline, persistence, and UI concerns.
 - No database access, no ORM, no provider calls, no LLM calls, no environment
   reads, no filesystem access, no wall-clock reads — every timestamp comes
   from the caller-supplied ``as_of``/previous-snapshot fields.
 - Same input + same previous snapshot must produce a byte-equivalent logical
   output (pure function, zero randomness).
+
+Phase 27.3R semantics:
+- confirmed price/support breaks are temporary ``REDUCE_RISK`` states;
+- ``INVALIDATED`` is terminal and requires deterministic thesis evidence;
+- two consecutive market observations reclaiming the breached level return
+  to ``WATCHLIST`` without reactivating the old buy zone.
 
 Explicitly forbidden inputs (the whole point is to break the narrative loop):
 LLM support/resistance claims, LLM sentiment score, LLM trend prediction,
@@ -43,6 +49,7 @@ Insufficient-data policy (documented for Test 9):
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import date
 from enum import Enum
@@ -78,7 +85,10 @@ RULE_WAIT_FOR_PULLBACK = "RULE_WAIT_FOR_PULLBACK"
 RULE_RISK_REWARD_OVEREXTENDED = "RULE_RISK_REWARD_OVEREXTENDED"
 RULE_HOLD_EXISTING_ONLY = "RULE_HOLD_EXISTING_ONLY"
 RULE_CONFIRMED_SUPPORT_BREAK = "RULE_CONFIRMED_SUPPORT_BREAK"
+RULE_SUPPORT_RECLAIM_PENDING = "RULE_SUPPORT_RECLAIM_PENDING"
+RULE_CONFIRMED_SUPPORT_RECLAIM = "RULE_CONFIRMED_SUPPORT_RECLAIM"
 RULE_THESIS_INVALIDATED = "RULE_THESIS_INVALIDATED"
+RULE_TERMINAL_STATE_PERSISTED = "RULE_TERMINAL_STATE_PERSISTED"
 RULE_RISK_FLAG_REDUCE = "RULE_RISK_FLAG_REDUCE"
 RULE_HYSTERESIS_HOLD = "RULE_HYSTERESIS_HOLD"
 RULE_STATE_UNCHANGED = "RULE_STATE_UNCHANGED"
@@ -98,7 +108,10 @@ CRITICAL_RULES = frozenset({
 # contract (the audited 2454 07-07→07-09 contradiction is exactly a delayed/
 # denied zone entry). Oscillation is still damped because every SUBSEQUENT
 # non-critical flip after the entry remains suppressed by the window.
-HYSTERESIS_EXEMPT_RULES = CRITICAL_RULES | {RULE_VALID_BUY_ZONE_ENTERED}
+HYSTERESIS_EXEMPT_RULES = CRITICAL_RULES | {
+    RULE_VALID_BUY_ZONE_ENTERED,
+    RULE_CONFIRMED_SUPPORT_RECLAIM,
+}
 
 # Issue / limitation codes
 BUY_ZONE_CURRENT_PRICE_ANCHOR_REJECTED = "BUY_ZONE_CURRENT_PRICE_ANCHOR_REJECTED"
@@ -122,6 +135,8 @@ REDUCE_RISK_FLAGS = frozenset({
 })
 
 _SHORT_MA_BASES = frozenset({"ma5", "ma10"})
+_LEVEL_MATCH_REL_TOLERANCE = 1e-6
+_LEVEL_MATCH_ABS_TOLERANCE = 1e-8
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +150,7 @@ class StrategyPolicy:
     minimum_risk_reward: float = 2.0
     hysteresis_days: int = 3
     invalidation_confirmation_days: int = 2
+    reclaim_confirmation_days: int = 2
 
 
 DEFAULT_POLICY = StrategyPolicy()
@@ -236,6 +252,7 @@ class StrategyStateSnapshot:
     days_in_state: int
     transition_count_in_window: int
     invalidation_confirm_count: int
+    reclaim_confirm_count: int = 0
 
     reasons: Tuple[str, ...] = ()
     data_limitations: Tuple[str, ...] = ()
@@ -260,6 +277,7 @@ class StrategyStateSnapshot:
             "days_in_state": self.days_in_state,
             "transition_count_in_window": self.transition_count_in_window,
             "invalidation_confirm_count": self.invalidation_confirm_count,
+            "reclaim_confirm_count": self.reclaim_confirm_count,
             "reasons": list(self.reasons),
             "data_limitations": list(self.data_limitations),
         }
@@ -287,6 +305,7 @@ class StrategyStateSnapshot:
             days_in_state=int(d["days_in_state"]),
             transition_count_in_window=int(d["transition_count_in_window"]),
             invalidation_confirm_count=int(d["invalidation_confirm_count"]),
+            reclaim_confirm_count=int(d.get("reclaim_confirm_count", 0)),
             reasons=tuple(d.get("reasons") or ()),
             data_limitations=tuple(d.get("data_limitations") or ()),
         )
@@ -352,10 +371,25 @@ def _nearest_support_below(input_data: StrategyStateInput) -> Optional[Tuple[flo
     they are the production anchor-drift vector.
     """
     close = input_data.close
+    serialized_mas = tuple(
+        value for value in (input_data.ma5, input_data.ma10, input_data.ma20) if value is not None
+    )
     candidates = [
         (s, f"support:{_round(s)}")
         for s in input_data.deterministic_support_levels
-        if s is not None and 0 < s < close
+        if (
+            s is not None
+            and 0 < s < close
+            and not any(
+                math.isclose(
+                    s,
+                    short_ma,
+                    rel_tol=_LEVEL_MATCH_REL_TOLERANCE,
+                    abs_tol=_LEVEL_MATCH_ABS_TOLERANCE,
+                )
+                for short_ma in serialized_mas
+            )
+        )
     ]
     if candidates:
         best = max(candidates, key=lambda item: item[0])
@@ -508,6 +542,7 @@ def _make_snapshot(
     reasons: Tuple[str, ...],
     limitations: Tuple[str, ...],
     policy: StrategyPolicy,
+    reclaim_confirm_count: int = 0,
 ) -> StrategyStateSnapshot:
     prev_state = previous.state if previous else None
     transitioned = prev_state is not None and state != prev_state
@@ -545,6 +580,7 @@ def _make_snapshot(
         days_in_state=max(0, (input_data.as_of - state_entered_at).days),
         transition_count_in_window=window_count,
         invalidation_confirm_count=invalidation_confirm_count,
+        reclaim_confirm_count=reclaim_confirm_count,
         reasons=reasons,
         data_limitations=limitations,
     )
@@ -592,6 +628,22 @@ def evaluate_strategy_state(
             reasons=("thesis_status=invalidated",), limitations=(), policy=policy,
         )
 
+    # Terminal invalidation is absorbing until a future deterministic
+    # reinstatement contract is explicitly designed. Legacy technical
+    # INVALIDATED snapshots are handled by the reclaim path below.
+    if (
+        previous is not None
+        and previous.state == StrategyState.INVALIDATED
+        and previous.transition_rule_id != RULE_CONFIRMED_SUPPORT_BREAK
+    ):
+        return _make_snapshot(
+            input_data, previous, StrategyState.INVALIDATED, RULE_TERMINAL_STATE_PERSISTED,
+            buy_zone=None, invalidation_level=previous.invalidation_level,
+            invalidation_confirm_count=previous.invalidation_confirm_count,
+            reclaim_confirm_count=0,
+            reasons=("terminal_invalidation_persisted",), limitations=(), policy=policy,
+        )
+
     # -- 4. Deterministic risk flags (critical) -----------------------------
     fired_flags = tuple(f for f in input_data.deterministic_risk_flags if f in REDUCE_RISK_FLAGS)
     if fired_flags:
@@ -605,6 +657,59 @@ def evaluate_strategy_state(
 
     close = float(input_data.close)
 
+    # A technical breakdown is temporary risk control, not terminal thesis
+    # failure. Reclaim is counted in consecutive market observations and
+    # exits only to WATCHLIST; the old zone is never reactivated.
+    technical_risk_state = (
+        previous is not None
+        and previous.invalidation_level is not None
+        and (
+            previous.state == StrategyState.REDUCE_RISK
+            and previous.transition_rule_id in {
+                RULE_CONFIRMED_SUPPORT_BREAK,
+                RULE_SUPPORT_RECLAIM_PENDING,
+            }
+            or previous.state == StrategyState.INVALIDATED
+            and previous.transition_rule_id == RULE_CONFIRMED_SUPPORT_BREAK
+        )
+    )
+    if technical_risk_state:
+        inv_level = previous.invalidation_level
+        if close >= inv_level:
+            reclaim_count = previous.reclaim_confirm_count + 1
+            if reclaim_count >= policy.reclaim_confirmation_days:
+                return _make_snapshot(
+                    input_data, previous, StrategyState.WATCHLIST,
+                    RULE_CONFIRMED_SUPPORT_RECLAIM,
+                    buy_zone=None, invalidation_level=None,
+                    invalidation_confirm_count=0, reclaim_confirm_count=0,
+                    reasons=(
+                        f"close_reclaimed_invalidation_for_{reclaim_count}_days",
+                    ),
+                    limitations=(), policy=policy,
+                )
+            return _make_snapshot(
+                input_data, previous, StrategyState.REDUCE_RISK,
+                RULE_SUPPORT_RECLAIM_PENDING,
+                buy_zone=None, invalidation_level=inv_level,
+                invalidation_confirm_count=previous.invalidation_confirm_count,
+                reclaim_confirm_count=reclaim_count,
+                reasons=("invalidation_reclaim_pending_confirmation",),
+                limitations=(), policy=policy,
+            )
+        return _make_snapshot(
+            input_data, previous, StrategyState.REDUCE_RISK,
+            RULE_CONFIRMED_SUPPORT_BREAK,
+            buy_zone=None, invalidation_level=inv_level,
+            invalidation_confirm_count=max(
+                previous.invalidation_confirm_count,
+                policy.invalidation_confirmation_days,
+            ),
+            reclaim_confirm_count=0,
+            reasons=("technical_break_remains_below_invalidation",),
+            limitations=(), policy=policy,
+        )
+
     # -- 5. Invalidation-level breach tracking (critical when confirmed) ---
     prev_zone = previous.buy_zone if previous else None
     inv_level = previous.invalidation_level if previous else None
@@ -614,9 +719,10 @@ def evaluate_strategy_state(
             confirm_count += 1
             if confirm_count >= policy.invalidation_confirmation_days:
                 return _make_snapshot(
-                    input_data, previous, StrategyState.INVALIDATED, RULE_CONFIRMED_SUPPORT_BREAK,
+                    input_data, previous, StrategyState.REDUCE_RISK, RULE_CONFIRMED_SUPPORT_BREAK,
                     buy_zone=None, invalidation_level=inv_level,
                     invalidation_confirm_count=confirm_count,
+                    reclaim_confirm_count=0,
                     reasons=(
                         f"close_below_invalidation_for_{confirm_count}_days",
                     ),
