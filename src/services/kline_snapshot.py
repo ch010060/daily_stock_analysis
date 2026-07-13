@@ -7,7 +7,7 @@ import math
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from data_provider.base import canonical_stock_code, normalize_stock_code
+from data_provider.base import _env_bool, canonical_stock_code, normalize_stock_code
 from src.market_context import detect_market
 
 
@@ -263,6 +263,16 @@ def _intraday_gap_payload(
     }
 
 
+def _external_network_allowed() -> bool:
+    """Phase 27.2R offline guard: DSA_ALLOW_EXTERNAL_NETWORK=false (or fixture
+    mode) must prevent ALL provider calls, including this intraday kline
+    persistence fallback — previously it bypassed the flag entirely and hit
+    yfinance during save_analysis_history even in isolated/offline runs."""
+    if _env_bool("DSA_FIXTURE_MODE", False):
+        return False
+    return _env_bool("DSA_ALLOW_EXTERNAL_NETWORK", False)
+
+
 def _build_intraday_kline(
     record: Any,
     raw: Dict[str, Any],
@@ -273,6 +283,12 @@ def _build_intraday_kline(
 ) -> Dict[str, Any]:
     period, interval = INTRADAY_RANGE_CONFIG[range_value]
     yf_symbol = _yfinance_intraday_symbol(symbol, market)
+    if not _external_network_allowed():
+        # Controlled non-network result: no yfinance import, no provider call.
+        return _intraday_gap_payload(
+            record, yf_symbol, market, instrument_type, range_value, interval,
+            "external_network_disabled",
+        )
     try:
         frame, currency = _fetch_yfinance_intraday_frame(yf_symbol, period, interval)
     except Exception as exc:
