@@ -17,6 +17,8 @@ from src.services.strategy_state_engine import (
     NO_DETERMINISTIC_ZONE_BASIS,
     RULE_CONFIRMED_SUPPORT_BREAK,
     RULE_CONFIRMED_SUPPORT_RECLAIM,
+    RULE_DO_NOT_CHASE_CLEARED,
+    RULE_DO_NOT_CHASE_REVALIDATED,
     RULE_HYSTERESIS_HOLD,
     RULE_INSUFFICIENT_DATA,
     RULE_RISK_REWARD_OVEREXTENDED,
@@ -115,6 +117,144 @@ class LargeRallyTestCase(unittest.TestCase):
         )
         snap = evaluate_strategy_state(inp, previous=None)
         self.assertEqual(snap.state, StrategyState.DO_NOT_CHASE)
+
+
+class DoNotChaseLifecycleTestCase(unittest.TestCase):
+    def _entry(self, *, as_of=date(2026, 7, 1)) -> StrategyStateSnapshot:
+        return evaluate_strategy_state(
+            _input(
+                as_of=as_of,
+                close=110.0,
+                previous_close=100.0,
+                ma5=None,
+                ma10=None,
+                ma20=None,
+                ma60=None,
+                deterministic_support_levels=(90.0,),
+                deterministic_resistance_levels=(112.0,),
+            ),
+            previous=None,
+        )
+
+    def _next(self, previous, *, as_of, close, resistance=130.0):
+        return evaluate_strategy_state(
+            _input(
+                as_of=as_of,
+                close=close,
+                ma5=None,
+                ma10=None,
+                ma20=None,
+                ma60=None,
+                deterministic_support_levels=(90.0,),
+                deterministic_resistance_levels=(resistance,),
+            ),
+            previous=previous,
+        )
+
+    def test_current_trigger_is_revalidated_instead_of_blindly_persisted(self) -> None:
+        entry = self._entry()
+
+        retained = self._next(
+            entry,
+            as_of=date(2026, 7, 2),
+            close=110.0,
+            resistance=112.0,
+        )
+
+        self.assertEqual(retained.state, StrategyState.DO_NOT_CHASE)
+        self.assertEqual(retained.transition_rule_id, RULE_DO_NOT_CHASE_REVALIDATED)
+        self.assertTrue(any(reason.startswith("rr_at_price=") for reason in retained.reasons))
+
+    def test_trigger_clear_exits_to_wait_when_zone_remains_below_price(self) -> None:
+        exited = self._next(self._entry(), as_of=date(2026, 7, 5), close=100.0)
+
+        self.assertEqual(exited.state, StrategyState.WAIT_FOR_PULLBACK)
+
+    def test_trigger_clear_exits_to_watchlist_without_actionable_zone(self) -> None:
+        entry = evaluate_strategy_state(
+            _input(
+                as_of=date(2026, 7, 1),
+                close=110.0,
+                ma5=None,
+                ma10=None,
+                ma20=None,
+                ma60=None,
+                deterministic_support_levels=(90.0,),
+                deterministic_resistance_levels=(112.0,),
+                valuation_band_low=50.0,
+                valuation_band_high=60.0,
+            ),
+            previous=None,
+        )
+        exited = evaluate_strategy_state(
+            _input(
+                as_of=date(2026, 7, 5),
+                close=100.0,
+                ma5=None,
+                ma10=None,
+                ma20=None,
+                ma60=None,
+                deterministic_support_levels=(90.0,),
+                deterministic_resistance_levels=(130.0,),
+                valuation_band_low=50.0,
+                valuation_band_high=60.0,
+            ),
+            previous=entry,
+        )
+
+        self.assertEqual(exited.state, StrategyState.WATCHLIST)
+
+    def test_price_entering_valid_zone_exits_directly_to_accumulate(self) -> None:
+        entered = self._next(self._entry(), as_of=date(2026, 7, 2), close=90.0)
+
+        self.assertEqual(entered.state, StrategyState.ACCUMULATE_ZONE)
+        self.assertEqual(entered.transition_rule_id, RULE_VALID_BUY_ZONE_ENTERED)
+
+    def test_confirmed_break_supersedes_no_chase(self) -> None:
+        entry = self._entry()
+        pending = self._next(entry, as_of=date(2026, 7, 2), close=85.0)
+        broken = self._next(pending, as_of=date(2026, 7, 3), close=85.0)
+
+        self.assertEqual(pending.state, StrategyState.DO_NOT_CHASE)
+        self.assertEqual(broken.state, StrategyState.REDUCE_RISK)
+        self.assertEqual(broken.transition_rule_id, RULE_CONFIRMED_SUPPORT_BREAK)
+
+    def test_one_day_rr_boundary_cross_does_not_oscillate(self) -> None:
+        snapshots = [self._entry()]
+        for as_of, close, resistance in (
+            (date(2026, 7, 2), 100.0, 130.0),
+            (date(2026, 7, 3), 110.0, 112.0),
+            (date(2026, 7, 4), 100.0, 130.0),
+            (date(2026, 7, 5), 110.0, 112.0),
+        ):
+            snapshots.append(
+                self._next(snapshots[-1], as_of=as_of, close=close, resistance=resistance)
+            )
+
+        self.assertLessEqual(sum(snapshot.transition_triggered for snapshot in snapshots), 1)
+
+    def test_cleared_trigger_does_not_remain_do_not_chase(self) -> None:
+        current = self._entry()
+        for day in (5, 6, 7):
+            current = self._next(current, as_of=date(2026, 7, day), close=100.0)
+
+        self.assertNotEqual(current.state, StrategyState.DO_NOT_CHASE)
+
+    def test_legacy_snapshot_without_lifecycle_metadata_rechecks_current_evidence(self) -> None:
+        payload = self._entry().to_dict()
+        legacy = StrategyStateSnapshot.from_dict(payload)
+
+        exited = self._next(legacy, as_of=date(2026, 7, 5), close=100.0)
+
+        self.assertEqual(exited.state, StrategyState.WAIT_FOR_PULLBACK)
+
+    def test_below_zone_without_confirmed_break_does_not_blindly_retain_do_not_chase(self) -> None:
+        entry = self._entry()
+
+        exited = self._next(entry, as_of=date(2026, 7, 5), close=87.0)
+
+        self.assertEqual(exited.state, StrategyState.WATCHLIST)
+        self.assertEqual(exited.transition_rule_id, RULE_DO_NOT_CHASE_CLEARED)
 
 
 class LargeDropTestCase(unittest.TestCase):

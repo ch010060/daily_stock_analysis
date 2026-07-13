@@ -83,6 +83,8 @@ RULE_INITIAL_WATCHLIST = "RULE_INITIAL_WATCHLIST"
 RULE_VALID_BUY_ZONE_ENTERED = "RULE_VALID_BUY_ZONE_ENTERED"
 RULE_WAIT_FOR_PULLBACK = "RULE_WAIT_FOR_PULLBACK"
 RULE_RISK_REWARD_OVEREXTENDED = "RULE_RISK_REWARD_OVEREXTENDED"
+RULE_DO_NOT_CHASE_REVALIDATED = "RULE_DO_NOT_CHASE_REVALIDATED"
+RULE_DO_NOT_CHASE_CLEARED = "RULE_DO_NOT_CHASE_CLEARED"
 RULE_HOLD_EXISTING_ONLY = "RULE_HOLD_EXISTING_ONLY"
 RULE_CONFIRMED_SUPPORT_BREAK = "RULE_CONFIRMED_SUPPORT_BREAK"
 RULE_SUPPORT_RECLAIM_PENDING = "RULE_SUPPORT_RECLAIM_PENDING"
@@ -782,10 +784,13 @@ def evaluate_strategy_state(
         else:
             proposed, rule = StrategyState.WAIT_FOR_PULLBACK, RULE_WAIT_FOR_PULLBACK
     elif zone is not None:
-        # Below the zone with an unconfirmed breach: hold the prior state
-        # (pending confirmation) instead of flapping.
-        proposed = previous.state if previous else StrategyState.WATCHLIST
-        rule = RULE_STATE_UNCHANGED if previous else RULE_INITIAL_WATCHLIST
+        # Below the zone with an unconfirmed breach: retain ordinary states,
+        # but a no-chase constraint has cleared and must be reevaluated.
+        if previous is not None and previous.state == StrategyState.DO_NOT_CHASE:
+            proposed, rule = StrategyState.WATCHLIST, RULE_DO_NOT_CHASE_CLEARED
+        else:
+            proposed = previous.state if previous else StrategyState.WATCHLIST
+            rule = RULE_STATE_UNCHANGED if previous else RULE_INITIAL_WATCHLIST
     else:
         # No valid zone: observe honestly; check chase condition if possible.
         anchor = _nearest_support_below(input_data)
@@ -815,7 +820,12 @@ def evaluate_strategy_state(
         )
 
     if previous is not None and proposed == previous.state:
-        rule = RULE_STATE_UNCHANGED
+        rule = (
+            RULE_DO_NOT_CHASE_REVALIDATED
+            if proposed == StrategyState.DO_NOT_CHASE
+            and rule == RULE_RISK_REWARD_OVEREXTENDED
+            else RULE_STATE_UNCHANGED
+        )
 
     return _make_snapshot(
         input_data, previous, proposed, rule,
