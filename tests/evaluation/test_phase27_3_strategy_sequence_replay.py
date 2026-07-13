@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import replace
 from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -23,6 +24,7 @@ from src.evaluation.strategy_sequence_replay import (
     load_panel_fixture,
     replay_inputs,
     select_policy,
+    summarize_state_runs,
     validate_holdout_candidate,
     validate_artifact_path,
     validate_phase27_3s_fixture,
@@ -119,6 +121,34 @@ def test_builder_preserves_actual_production_serialization_semantics() -> None:
     assert input_data.deterministic_resistance_levels
     assert input_data.ma20 is not None
     assert input_data.ma60 is not None
+
+
+@pytest.mark.unit
+def test_builder_arm_a_removes_only_additive_market_structure_channels() -> None:
+    start = date(2025, 1, 2)
+    bars = []
+    for index in range(40):
+        low, high, close = 98.0, 102.0, 100.0
+        if index in (8, 16):
+            low, close = (90.0, 94.0) if index == 8 else (90.3, 94.5)
+        if index in (11, 22):
+            high, close = (110.0, 106.0) if index == 11 else (110.4, 106.5)
+        bars.append(MarketBar(start + timedelta(days=index), close, high, low, close, 1_000_000))
+
+    arm_a = build_replay_input("X", "us", bars, bars[-1].as_of, use_market_structure_levels=False)
+    arm_b = build_replay_input("X", "us", bars, bars[-1].as_of, use_market_structure_levels=True)
+
+    assert arm_a.market_structure_support_levels == ()
+    assert arm_a.market_structure_resistance_levels == ()
+    assert arm_b.market_structure_support_levels
+    assert arm_b.market_structure_resistance_levels
+    assert arm_a == replace(
+        arm_b,
+        market_structure_support_levels=(),
+        market_structure_resistance_levels=(),
+        market_structure_support_provenance=(),
+        market_structure_resistance_provenance=(),
+    )
 
 
 @pytest.mark.unit
@@ -343,6 +373,36 @@ def test_breakdown_episode_summary_uses_same_symbol_windows_and_censors_tail() -
     assert summary["total"]["sustained_censored"] == 1
 
 
+@pytest.mark.unit
+def test_state_run_summary_separates_entries_occupancy_duration_and_censoring() -> None:
+    states = [
+        StrategyState.WATCHLIST,
+        StrategyState.DO_NOT_CHASE,
+        StrategyState.DO_NOT_CHASE,
+        StrategyState.DO_NOT_CHASE,
+        StrategyState.WATCHLIST,
+        StrategyState.DO_NOT_CHASE,
+    ]
+    records = []
+    for index, state in enumerate(states):
+        rule = "RULE_WAIT_FOR_PULLBACK" if index == 4 else "RULE_STATE_UNCHANGED"
+        records.append(ReplayRecord.minimal(
+            close=100.0,
+            daily_change_pct=0.0,
+            snapshot=_snapshot(date(2025, 1, 2) + timedelta(days=index), state, rule=rule),
+        ))
+
+    summary = summarize_state_runs({"X": records}, StrategyState.DO_NOT_CHASE)
+
+    assert summary["entries"] == 2
+    assert summary["transitions_into_state"] == 2
+    assert summary["observations"] == 4
+    assert summary["duration_median"] == 2.0
+    assert summary["duration_max"] == 3
+    assert summary["exit_rule_distribution"] == {"RULE_WAIT_FOR_PULLBACK": 1}
+    assert summary["right_censored_runs"] == 1
+
+
 @pytest.mark.integration
 def test_agent_and_non_agent_authority_sequence_parity() -> None:
     from src.services.strategy_state_orchestrator import attach_strategy_state
@@ -367,6 +427,8 @@ def test_agent_and_non_agent_authority_sequence_parity() -> None:
             volume_ratio_5d=1.0,
             support_levels=[3880.0, 4054.0, 4100.0],
             resistance_levels=[4700.0],
+            market_structure_support_levels=[{"price": 3880.0, "status": "active"}],
+            market_structure_resistance_levels=[{"price": 4700.0, "status": "active"}],
         )
         outputs = []
         for operation, decision, prediction in (
@@ -403,6 +465,8 @@ def test_agent_and_non_agent_authority_sequence_parity() -> None:
                 "sniper_points": result.dashboard["battle_plan"]["sniper_points"],
             })
         assert outputs[0] == outputs[1]
+        assert outputs[0]["input"].market_structure_support_levels == (3880.0,)
+        assert outputs[0]["input"].market_structure_resistance_levels == (4700.0,)
         previous = StrategyStateSnapshot.from_dict(outputs[0]["snapshot"])
 
 
@@ -525,3 +589,29 @@ def test_phase27_3s_new_holdout(tmp_path: Path) -> None:
     assert payload["metrics"]["same_sequence_nondeterminism_rate"] == 0
     assert payload["semantics"]["technical_breaks_to_invalidated"] == 0
     assert payload["episodes"]["total"]["direct_reduce_to_accumulate"] == 0
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    os.environ.get("RUN_PHASE27_3T_DEV_EVAL") != "1",
+    reason="set RUN_PHASE27_3T_DEV_EVAL=1 for the seen-fixture A/B replay",
+)
+def test_phase27_3t_development_ab(tmp_path: Path) -> None:
+    from src.evaluation.strategy_sequence_replay import run_phase27_3t_development_ab
+
+    artifact = run_phase27_3t_development_ab(
+        FIXTURE,
+        PHASE27_3S_FIXTURE,
+        PHASE27_3S_MANIFEST,
+        tmp_path,
+    )
+    payload = json.loads(artifact.read_text(encoding="utf-8"))
+
+    assert payload["threshold_selection_performed"] is False
+    assert payload["phase27_3s_a_consumed"] is False
+    assert payload["policy"] == DEFAULT_POLICY.__dict__
+    assert set(payload["arms"]) == {"A_current", "B_market_structure"}
+    assert payload["arms"]["A_current"]["same_sequence_nondeterminism_rate"] == 0
+    assert payload["arms"]["B_market_structure"]["same_sequence_nondeterminism_rate"] == 0
+    assert payload["arms"]["B_market_structure"]["provenance"]["independent_support_inputs"] > 0
+    assert set(payload["panels"]) == {"phase27_3", "phase27_3s"}

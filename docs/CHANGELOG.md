@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [改進] Phase 27.3T 新增純函式、無前視的確認擺動樞紐與波動約束群聚支撐/壓力來源，透過 additive 欄位保留完整來源資訊並維持舊 S/R/MA fallback；已見 Phase 27.3/27.3S A/B 顯示獨立支撐覆蓋提升至 87.19%，但 DO_NOT_CHASE 進入次數 88→75 的同時佔用反增 1,231→1,768，確認持續/退出語義仍阻斷產品化，因此未取用 Phase 27.3S-A、未改閾值或狀態轉移。
+
 - [測試] Phase 27.3S 依凍結計畫完成全新 TW/US holdout 基線重播（968 次評估、無調參）；結果因 TW 無確認跌破且兩市場均缺快速修復事件而判定 underpowered，另有 DO_NOT_CHASE 佔比 64.57% 與 4 個結果診斷格超過凍結惡化門檻，故不批准 Phase 27.4 或新閾值，並另行預註冊未執行的擴充驗證集。
 
 - [修復] Phase 27.3R 補回 `TrendAnalysisResult` 已計算但先前未序列化的決定性支撐/壓力陣列（有限正數、固定排序、容差去重，並保留短均線錨定防護與舊版 MA fallback），同時將確認技術跌破由永久 `INVALIDATED` 改為暫時 `REDUCE_RISK`；新增連續 2 個交易觀察站回失效位後先回 `WATCHLIST` 的集中式重啟規則，禁止單日反彈直接恢復累積。生產閾值與功能旗標預設值不變。

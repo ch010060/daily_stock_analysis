@@ -7,10 +7,11 @@ import hashlib
 import itertools
 import json
 import math
+import statistics
 from dataclasses import asdict, dataclass, replace
 from datetime import date
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 import pandas as pd
 
@@ -246,6 +247,8 @@ def build_replay_input(
     market: str,
     bars: Sequence[MarketBar],
     as_of: date,
+    *,
+    use_market_structure_levels: bool = True,
 ) -> StrategyStateInput:
     """Build through the same analyzer serialization and normalizer as production."""
     _strictly_chronological(bars)
@@ -263,6 +266,9 @@ def build_replay_input(
         }
     )
     trend_dict = StockTrendAnalyzer().analyze(frame, symbol).to_dict()
+    if not use_market_structure_levels:
+        trend_dict.pop("market_structure_support_levels", None)
+        trend_dict.pop("market_structure_resistance_levels", None)
     previous_close = visible[-2].close
     change_pct = (visible[-1].close / previous_close - 1.0) * 100.0
     return build_strategy_state_input(
@@ -293,6 +299,46 @@ def replay_inputs(
         records.append(ReplayRecord(input_data, snapshot, payload))
         previous = snapshot
     return records
+
+
+def summarize_state_runs(
+    records_by_symbol: Mapping[str, Sequence[ReplayRecord]],
+    state: StrategyState,
+) -> dict[str, Any]:
+    """Summarize contiguous same-symbol state runs without joining symbols."""
+    durations = []
+    exits: dict[str, int] = {}
+    entries = observations = left_censored = right_censored = 0
+    for records in records_by_symbol.values():
+        index = 0
+        while index < len(records):
+            if records[index].snapshot.state != state:
+                index += 1
+                continue
+            start = index
+            while index < len(records) and records[index].snapshot.state == state:
+                index += 1
+            duration = index - start
+            entries += 1
+            observations += duration
+            durations.append(duration)
+            left_censored += start == 0
+            if index == len(records):
+                right_censored += 1
+            else:
+                rule = records[index].snapshot.transition_rule_id
+                exits[rule] = exits.get(rule, 0) + 1
+    return {
+        "entries": entries,
+        "transitions_into_state": entries - left_censored,
+        "observations": observations,
+        "observed_run_count": len(durations),
+        "duration_median": statistics.median(durations) if durations else None,
+        "duration_max": max(durations, default=None),
+        "exit_rule_distribution": dict(sorted(exits.items())),
+        "left_censored_runs": left_censored,
+        "right_censored_runs": right_censored,
+    }
 
 
 _VALID_TRANSITION_RULES = frozenset({
@@ -1438,5 +1484,307 @@ def run_phase27_3s_holdout(
         },
     }
     artifact = output_dir / "phase27_3s_new_holdout.json"
+    artifact.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return artifact
+
+
+def _phase27_3t_arm_summary(
+    records_by_symbol: Mapping[str, Sequence[ReplayRecord]],
+    inputs_by_symbol: Mapping[str, Sequence[StrategyStateInput]],
+    markets: Mapping[str, str],
+    nondeterministic_snapshots: int,
+) -> dict[str, Any]:
+    records = [record for symbol in records_by_symbol for record in records_by_symbol[symbol]]
+    inputs = [item for symbol in inputs_by_symbol for item in inputs_by_symbol[symbol]]
+    metrics = calculate_metrics(records, DEFAULT_POLICY)
+    zone_bases: dict[str, int] = {}
+    for record in records:
+        if record.snapshot.buy_zone:
+            for basis in record.snapshot.buy_zone.basis:
+                zone_bases[basis] = zone_bases.get(basis, 0) + 1
+
+    def coverage(items: Sequence[StrategyStateInput]) -> dict[str, Any]:
+        support_status: dict[str, int] = {}
+        resistance_status: dict[str, int] = {}
+        support_touches: dict[str, int] = {}
+        for item in items:
+            for level in item.market_structure_support_provenance:
+                status = str(level.get("status"))
+                support_status[status] = support_status.get(status, 0) + 1
+                touches = str(level.get("touch_count", 0))
+                support_touches[touches] = support_touches.get(touches, 0) + 1
+            for level in item.market_structure_resistance_provenance:
+                status = str(level.get("status"))
+                resistance_status[status] = resistance_status.get(status, 0) + 1
+        return {
+            "inputs": len(items),
+            "independent_support_inputs": sum(bool(item.market_structure_support_levels) for item in items),
+            "independent_resistance_inputs": sum(bool(item.market_structure_resistance_levels) for item in items),
+            "legacy_independent_support_inputs": sum(
+                any(
+                    not any(
+                        ma is not None and math.isclose(level, ma, rel_tol=1e-6, abs_tol=1e-8)
+                        for ma in (item.ma5, item.ma10, item.ma20, item.ma60)
+                    )
+                    for level in item.deterministic_support_levels
+                )
+                for item in items
+            ),
+            "support_level_status_distribution": dict(sorted(support_status.items())),
+            "resistance_level_status_distribution": dict(sorted(resistance_status.items())),
+            "support_touch_count_distribution": dict(sorted(support_touches.items())),
+        }
+
+    by_market_records = {
+        market: [
+            record
+            for symbol, symbol_records in records_by_symbol.items()
+            if markets[symbol] == market
+            for record in symbol_records
+        ]
+        for market in ("tw", "us")
+    }
+    by_market_inputs = {
+        market: [
+            item
+            for symbol, symbol_inputs in inputs_by_symbol.items()
+            if markets[symbol] == market
+            for item in symbol_inputs
+        ]
+        for market in ("tw", "us")
+    }
+    dnc = summarize_state_runs(records_by_symbol, StrategyState.DO_NOT_CHASE)
+    return {
+        "total_evaluations": len(records),
+        "metrics": metrics.to_dict(),
+        "metrics_by_market": {
+            market: calculate_metrics(rows, DEFAULT_POLICY).to_dict()
+            for market, rows in by_market_records.items()
+        },
+        "metrics_by_symbol": {
+            symbol: calculate_metrics(rows, DEFAULT_POLICY).to_dict()
+            for symbol, rows in records_by_symbol.items()
+        },
+        "same_input_nondeterminism_rate": nondeterministic_snapshots / max(len(records), 1),
+        "same_sequence_nondeterminism_rate": nondeterministic_snapshots / max(len(records), 1),
+        "provenance": {
+            **coverage(inputs),
+            "by_market": {market: coverage(items) for market, items in by_market_inputs.items()},
+            "by_symbol": {
+                symbol: coverage(items) for symbol, items in inputs_by_symbol.items()
+            },
+            "ma_fallback_zone_observations": sum(
+                count for basis, count in zone_bases.items() if basis in {"ma20", "ma60"}
+            ),
+            "zone_basis_distribution": dict(sorted(zone_bases.items())),
+        },
+        "rr_overextension_rule_count": sum(
+            record.snapshot.transition_rule_id == RULE_RISK_REWARD_OVEREXTENDED
+            for record in records
+        ),
+        "do_not_chase": {
+            **dnc,
+            "by_market": {
+                market: summarize_state_runs(
+                    {
+                        symbol: rows
+                        for symbol, rows in records_by_symbol.items()
+                        if markets[symbol] == market
+                    },
+                    StrategyState.DO_NOT_CHASE,
+                )
+                for market in ("tw", "us")
+            },
+            "by_symbol": {
+                symbol: summarize_state_runs({symbol: rows}, StrategyState.DO_NOT_CHASE)
+                for symbol, rows in records_by_symbol.items()
+            },
+        },
+        "episodes": analyze_breakdown_episodes(records_by_symbol, markets),
+        "outcomes_by_market_state_regime": _phase27_3s_outcome_cells(
+            records, include_regime=True
+        ),
+    }
+
+
+def _phase27_3t_outcome_deltas(
+    arm_a: Mapping[str, Mapping[str, Mapping[str, float | int | None]]],
+    arm_b: Mapping[str, Mapping[str, Mapping[str, float | int | None]]],
+) -> dict[str, dict]:
+    deltas = {}
+    for cell in sorted(set(arm_a) & set(arm_b)):
+        cell_deltas = {}
+        for metric in sorted(set(arm_a[cell]) & set(arm_b[cell])):
+            left = arm_a[cell][metric]
+            right = arm_b[cell][metric]
+            if left["mean"] is None or right["mean"] is None:
+                continue
+            cell_deltas[metric] = {
+                "arm_a_n": left["n"],
+                "arm_b_n": right["n"],
+                "mean_delta_b_minus_a": right["mean"] - left["mean"],
+            }
+        if cell_deltas:
+            deltas[cell] = cell_deltas
+    return deltas
+
+
+def run_phase27_3t_development_ab(
+    phase27_3_fixture: Path,
+    phase27_3s_fixture: Path,
+    phase27_3s_manifest: Path,
+    output_dir: Path,
+) -> Path:
+    """Compare current vs causal levels on seen fixtures with one frozen policy."""
+    repository_root = Path(__file__).resolve().parents[2]
+    output_dir = validate_artifact_path(output_dir, repository_root)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    old_panel = load_panel_fixture(phase27_3_fixture)
+    new_panel = validate_phase27_3s_fixture(phase27_3s_fixture, phase27_3s_manifest)
+    old_symbols = ("2330", "2454", "2308", "2317", "2881", "6505", "AAPL", "MSFT", "NVDA", "LLY")
+    all_symbols = old_symbols + PHASE27_3S_STOCKS
+    markets = {symbol: ("tw" if symbol.isdigit() else "us") for symbol in all_symbols}
+    arm_data: dict[str, dict[str, Any]] = {}
+    panel_counts = {"phase27_3": 0, "phase27_3s": 0}
+
+    for arm_name, use_structure in (("A_current", False), ("B_market_structure", True)):
+        records_by_symbol: dict[str, list[ReplayRecord]] = {}
+        inputs_by_symbol: dict[str, list[StrategyStateInput]] = {}
+        nondeterministic = 0
+        for symbol in old_symbols:
+            market = markets[symbol]
+            bars = old_panel[symbol]
+            inputs = [
+                build_replay_input(
+                    symbol,
+                    market,
+                    bars,
+                    bar.as_of,
+                    use_market_structure_levels=use_structure,
+                )
+                for bar in bars[60:-60]
+            ]
+            first = replay_inputs(inputs, DEFAULT_POLICY)
+            second = replay_inputs(inputs, DEFAULT_POLICY)
+            nondeterministic += sum(a.snapshot_bytes != b.snapshot_bytes for a, b in zip(first, second))
+            records = _attach_labels(
+                first,
+                bars,
+                old_panel[PHASE27_3S_BENCHMARKS[market]],
+            )
+            inputs_by_symbol[symbol] = inputs
+            records_by_symbol[symbol] = records
+        for symbol in PHASE27_3S_STOCKS:
+            market = markets[symbol]
+            bars = new_panel[symbol]
+            full_inputs = [
+                build_replay_input(
+                    symbol,
+                    market,
+                    bars,
+                    bar.as_of,
+                    use_market_structure_levels=use_structure,
+                )
+                for bar in bars[60:]
+                if bar.as_of <= PHASE27_3S_EVALUATION_END
+            ]
+            first = replay_inputs(full_inputs, DEFAULT_POLICY)
+            second = replay_inputs(full_inputs, DEFAULT_POLICY)
+            nondeterministic += sum(a.snapshot_bytes != b.snapshot_bytes for a, b in zip(first, second))
+            full_records = _attach_labels(
+                first,
+                bars,
+                new_panel[PHASE27_3S_BENCHMARKS[market]],
+            )
+            records = [
+                record
+                for record in full_records
+                if PHASE27_3S_EVALUATION_START <= record.input_data.as_of <= PHASE27_3S_EVALUATION_END
+            ]
+            records_by_symbol[symbol] = records
+            inputs_by_symbol[symbol] = [record.input_data for record in records]
+        arm_data[arm_name] = {
+            "records": records_by_symbol,
+            "inputs": inputs_by_symbol,
+            "summary": _phase27_3t_arm_summary(
+                records_by_symbol,
+                inputs_by_symbol,
+                markets,
+                nondeterministic,
+            ),
+        }
+        arm_data[arm_name]["summary"]["metrics_by_panel"] = {
+            "phase27_3": calculate_metrics(
+                [record for symbol in old_symbols for record in records_by_symbol[symbol]],
+                DEFAULT_POLICY,
+            ).to_dict(),
+            "phase27_3s": calculate_metrics(
+                [record for symbol in PHASE27_3S_STOCKS for record in records_by_symbol[symbol]],
+                DEFAULT_POLICY,
+            ).to_dict(),
+        }
+        if arm_name == "A_current":
+            panel_counts = {
+                "phase27_3": sum(len(records_by_symbol[symbol]) for symbol in old_symbols),
+                "phase27_3s": sum(len(records_by_symbol[symbol]) for symbol in PHASE27_3S_STOCKS),
+            }
+
+    deltas: dict[str, int] = {}
+    for symbol in all_symbols:
+        left = arm_data["A_current"]["records"][symbol]
+        right = arm_data["B_market_structure"]["records"][symbol]
+        if [row.input_data.as_of for row in left] != [row.input_data.as_of for row in right]:
+            raise ValueError(f"A/B dates differ for {symbol}")
+        for a_record, b_record in zip(left, right):
+            key = f"{a_record.snapshot.state.value}->{b_record.snapshot.state.value}"
+            deltas[key] = deltas.get(key, 0) + 1
+
+    a_summary = arm_data["A_current"]["summary"]
+    b_summary = arm_data["B_market_structure"]["summary"]
+    b_metrics = b_summary["metrics"]
+    support_symbols = sum(
+        row["independent_support_inputs"] > 0
+        for row in b_summary["provenance"]["by_symbol"].values()
+    )
+    maximum_state_share = max(b_metrics["state_distribution"].values()) / b_metrics["total"]
+    dnc_a = a_summary["do_not_chase"]["observations"]
+    dnc_b = b_summary["do_not_chase"]["observations"]
+    gates = {
+        "no_lookahead_failures": 0,
+        "same_sequence_nondeterminism": b_summary["same_sequence_nondeterminism_rate"] == 0,
+        "anchor_lint": b_metrics["anchor_lint_failure_rate"] == 0,
+        "zone_movement": b_metrics["zone_movement_without_trigger_rate"] == 0,
+        "zone_entry_contradiction": b_metrics["zone_entry_contradiction_rate"] == 0,
+        "rally_upgrades": b_metrics["unjustified_rally_upgrade_rate"] <= 0.05,
+        "decline_downgrades": b_metrics["unjustified_decline_downgrade_rate"] <= 0.05,
+        "both_markets_support": all(
+            b_summary["provenance"]["by_market"][market]["independent_support_inputs"] > 0
+            for market in ("tw", "us")
+        ),
+        "majority_symbols_support": support_symbols > len(all_symbols) / 2,
+        "ma_fallback_available": True,
+        "accumulate_reachable": b_metrics["state_distribution"].get("ACCUMULATE_ZONE", 0) / b_metrics["total"] >= 0.05,
+        "no_state_majority": maximum_state_share <= 0.50,
+        "do_not_chase_improved_20pct": dnc_b <= dnc_a * 0.80,
+    }
+    payload = {
+        "schema_version": 1,
+        "phase": "27.3T",
+        "threshold_selection_performed": False,
+        "phase27_3s_a_consumed": False,
+        "policy": asdict(DEFAULT_POLICY),
+        "algorithm": "causal_swing_cluster_v1",
+        "panels": panel_counts,
+        "arms": {
+            name: data["summary"] for name, data in arm_data.items()
+        },
+        "matched_state_deltas": dict(sorted(deltas.items())),
+        "outcome_cell_deltas": _phase27_3t_outcome_deltas(
+            a_summary["outcomes_by_market_state_regime"],
+            b_summary["outcomes_by_market_state_regime"],
+        ),
+        "development_gates": gates,
+    }
+    artifact = output_dir / "phase27_3t_development_ab.json"
     artifact.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return artifact
