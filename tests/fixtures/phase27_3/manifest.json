@@ -1,0 +1,40 @@
+{
+  "adjustment_mode": "auto_adjust=True",
+  "captured_at_utc": "2026-07-13T01:48:58.933184+00:00",
+  "panel_sha256": "653be6ab4f892b4911e4a8d4fe170ef67e29203d0199344d3aa216d46d08a39e",
+  "phase": "27.3",
+  "requested_range": {
+    "end_exclusive": "2025-09-02",
+    "start": "2024-08-01"
+  },
+  "rows": {
+    "0050": 265,
+    "2308": 264,
+    "2317": 264,
+    "2330": 264,
+    "2454": 264,
+    "2881": 264,
+    "6505": 264,
+    "AAPL": 271,
+    "LLY": 271,
+    "MSFT": 271,
+    "NVDA": 271,
+    "SPY": 271
+  },
+  "sanitization": "selected OHLCV columns only; no credentials or provider payload metadata",
+  "source": "Yahoo Finance via yfinance",
+  "source_tickers": {
+    "0050": "0050.TW",
+    "2308": "2308.TW",
+    "2317": "2317.TW",
+    "2330": "2330.TW",
+    "2454": "2454.TW",
+    "2881": "2881.TW",
+    "6505": "6505.TW",
+    "AAPL": "AAPL",
+    "LLY": "LLY",
+    "MSFT": "MSFT",
+    "NVDA": "NVDA",
+    "SPY": "SPY"
+  }
+}
