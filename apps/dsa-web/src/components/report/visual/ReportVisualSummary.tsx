@@ -6,6 +6,7 @@ import { MultiPeriodTrendBars } from './MultiPeriodTrendBars';
 import { TechnicalSnapshotCards } from './TechnicalSnapshotCards';
 import { FinancialResultCards } from './FinancialResultCards';
 import { ValuationRiverChart } from './ValuationRiverChart';
+import { StrategyStateCard } from './StrategyStateCard';
 import { ActionPlanCards } from './ActionPlanCards';
 import { KlineChartBlock } from './KlineChartBlock';
 
@@ -202,6 +203,10 @@ export const ReportVisualSummary: React.FC<ReportVisualSummaryProps> = ({ report
 
         {/* Valuation river (Phase 26.1: TW-only deterministic PER/PBR bands) */}
         <ValuationRiverChart rawSnapshot={rawResult?.valuationRiverSnapshot} />
+
+        {/* Strategy state (Phase 27.2: authoritative deterministic engine;
+            renders nothing for legacy/non-authoritative reports) */}
+        <StrategyStateCard rawSnapshot={rawResult?.strategyStateSnapshot} />
 
         {/* Action plan */}
         <ActionPlanCards

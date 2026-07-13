@@ -884,6 +884,8 @@ def stabilize_decision_with_structure(
     result: "AnalysisResult",
     trend_result: Any = None,
     fundamental_context: Optional[Dict[str, Any]] = None,
+    *,
+    deterministic_priority: bool = False,
 ) -> None:
     """
     Calibrate aggressive buy/sell advice with price levels and capital flow.
@@ -892,6 +894,12 @@ def stabilize_decision_with_structure(
     public `decision_type` enum stable while allowing richer neutral wording
     such as 震盪/洗盤觀察 when support, resistance, and fund flow do not confirm
     an immediate buy/sell action.
+
+    ``deterministic_priority`` (Phase 27.2, flag-gated by the caller): when
+    True, deterministic trend_result support/resistance values take priority
+    over the LLM-claimed dashboard values (which the Phase 27 audit showed to
+    be circular — the guard was validating the LLM's conclusion against the
+    LLM's own claims). Default False preserves legacy behavior byte-for-byte.
     """
     if not result:
         return
@@ -912,14 +920,24 @@ def stabilize_decision_with_structure(
             price_position.get("current_price"),
             trend_dict.get("current_price"),
         )
-        support = _first_numeric_value(
-            price_position.get("support_level"),
-            _first_list_value(trend_dict.get("support_levels")),
-        )
-        resistance = _first_numeric_value(
-            price_position.get("resistance_level"),
-            _first_list_value(trend_dict.get("resistance_levels")),
-        )
+        if deterministic_priority:
+            support = _first_numeric_value(
+                _first_list_value(trend_dict.get("support_levels")),
+                price_position.get("support_level"),
+            )
+            resistance = _first_numeric_value(
+                _first_list_value(trend_dict.get("resistance_levels")),
+                price_position.get("resistance_level"),
+            )
+        else:
+            support = _first_numeric_value(
+                price_position.get("support_level"),
+                _first_list_value(trend_dict.get("support_levels")),
+            )
+            resistance = _first_numeric_value(
+                price_position.get("resistance_level"),
+                _first_list_value(trend_dict.get("resistance_levels")),
+            )
         decision_type = infer_decision_type_from_advice(
             getattr(result, "decision_type", ""),
             default=getattr(result, "decision_type", "hold") or "hold",
@@ -1572,6 +1590,11 @@ class AnalysisResult:
     # Phase 26.1：TW 股票估值河流圖快照（PER/PBR 反推 EPS/BVPS 的歷史倍數帶），
     # 由後端決定性組裝（FinMind），非 LLM 推論；US/ETF/指數為明確 unavailable 狀態
     valuation_river_snapshot: Optional[Dict[str, Any]] = None
+    # Phase 27.2：決定性策略狀態快照（純函式狀態機輸出，擁有最終行動權威），
+    # 僅在 ENABLE_STRATEGY_STATE_AUTHORITY=true 時由 pipeline 附加；非 LLM 推論
+    strategy_state_snapshot: Optional[Dict[str, Any]] = None
+    # Phase 27.2：權威移交診斷（LLM 原始行動欄位 + 衝突碼），僅供診斷，不驅動渲染
+    strategy_authority_diagnostics: Optional[Dict[str, Any]] = None
     # Phase 19B.3：ETF/指數專屬曝險/市場風險快照，由後端決定性組裝，非 LLM 推論
     exposure_snapshot: Optional[Dict[str, Any]] = None
     market_risk_snapshot: Optional[Dict[str, Any]] = None
@@ -1637,6 +1660,8 @@ class AnalysisResult:
             'valuation_snapshot': self.valuation_snapshot,
             'fundamental_snapshot': self.fundamental_snapshot,
             'valuation_river_snapshot': self.valuation_river_snapshot,
+            'strategy_state_snapshot': self.strategy_state_snapshot,
+            'strategy_authority_diagnostics': self.strategy_authority_diagnostics,
             'exposure_snapshot': self.exposure_snapshot,
             'market_risk_snapshot': self.market_risk_snapshot,
             'multi_period_trend_snapshot': self.multi_period_trend_snapshot,

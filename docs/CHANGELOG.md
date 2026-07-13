@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 新增可選的決定性策略狀態權威（`ENABLE_STRATEGY_STATE_AUTHORITY`，預設關閉）：開啟後個股報告的最終 `operation_advice`/`decision_type`/買區由純函式策略狀態機決定（8 狀態、跨日持久化、遲滯防跳動），LLM 原始行動欄位降級為診斷 metadata 並記錄機器可讀衝突碼；前次決定性狀態以緊湊區塊注入 prompt 維持敘事連續性（兩條分析路徑一致）；Web 完整報告新增「策略狀態（決定性引擎）」區塊（僅在權威快照存在時渲染，舊報告完全不變）。個股標的路由於引擎呼叫前完成（ETF/指數不產生任何策略狀態欄位）；必要決定性資料（現價/交易日/資料品質）缺失時視為資料源執行失敗，分析任務直接失敗且不落庫，不再以「不支援」佔位完成報告；缺valuation不影響支援判定（技術面單獨可支撐時仍為有效狀態）。關閉（預設）時所有現有行為完全不變。
+
+- [修復] 修正 K 線快照持久化（`persist_report_kline_snapshots` 的分時區間補建）未受 `DSA_ALLOW_EXTERNAL_NETWORK=false`／`DSA_FIXTURE_MODE=true` 閘控、仍會嘗試呼叫 yfinance 的問題；離線/測試模式下改為受控的無資料落差快照，不再發出網路請求；`DSA_ALLOW_EXTERNAL_NETWORK=true` 的既有生產行為不變。
+
 - [新功能] 美股個股完整報告新增估值河流圖支援：以 yfinance 財報年度實際 EPS/BVPS（`income_stmt`/`balance_sheet`，非反推）建構階梯狀倍數視覺參考帶，並新增「實際 EPS」/「預估 EPS」（`trailingEps`/`forwardEps`）點時參考數值；台股同步新增「實際 EPS」欄位（來自 `TaiwanStockFinancialStatements` 最新一季 EPS，與既有反推 EPS 明確區分標示）；ETF/指數維持不支援估值河流圖。所有數值皆為後端決定性運算，LLM 不參與。
 
 - [新功能] 台股個股完整報告新增「估值河流圖」（`valuation_river_snapshot`）：以 FinMind `TaiwanStockPER`/`TaiwanStockPrice` 反推歷史隱含 EPS，畫出固定倍數（14x/18x/22x/26x/30x/34x/38x，26x 為中性分界）視覺參考帶與實際收盤價疊圖；完全由後端決定性運算，LLM 不參與、不產生目標價/公允價值/買賣建議；美股、ETF、指數與非股票標的顯示明確的 unavailable 卡片，不繪製假造歷史河流圖；不影響既有 `valuation_snapshot`/`fundamental_snapshot`/四大師視角補充/評分/趨勢/操作建議欄位。

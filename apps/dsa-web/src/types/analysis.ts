@@ -729,6 +729,10 @@ export interface VisualReportRawResult {
   // bands); commentary-free, backend-deterministic. US/ETF/index carry an
   // explicit enabled:false snapshot rather than a missing key.
   valuationRiverSnapshot?: ValuationRiverSnapshot | null;
+  // Phase 27.2: authoritative deterministic strategy-state snapshot
+  // (feature-flagged backend engine); validated by strategyStateAdapter
+  // before render — legacy reports simply lack this key.
+  strategyStateSnapshot?: Record<string, unknown> | null;
   exposureSnapshot?: DataSnapshot | null;
   valueNetworkMermaid?: string | null;
   // Phase 25.7: optional four-masters commentary supplement (commentary-only;

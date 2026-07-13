@@ -936,6 +936,13 @@ class Config:
     # 僅為評論，不輸出行動、不覆蓋原始 operation_advice / trend_prediction / 買賣區間。
     enable_four_masters_commentary: bool = True
 
+    # === Phase 27.2 決定性策略狀態權威（預設關閉）===
+    # 開啟後：純函式策略狀態機接管個股報告最終行動欄位（operation_advice/decision_type/買區），
+    # LLM 原值降級為診斷 metadata；快照經 raw_result 持久化並跨日讀回；
+    # 前次決定性狀態以緊湊區塊注入 prompt（不含 prose/內部 ID/原始序列）。
+    # 關閉（預設）時：現有 production 行為完全不變。
+    enable_strategy_state_authority: bool = False
+
     # === 基本面聚合開關與降級保護 ===
     # 全域性總開關；關閉時返回 not_supported 並保持主流程無變化
     enable_fundamental_pipeline: bool = True
@@ -1762,6 +1769,7 @@ class Config:
             enable_chip_distribution=os.getenv('ENABLE_CHIP_DISTRIBUTION', 'false').lower() == 'true',
             enable_value_network_mermaid=os.getenv('ENABLE_VALUE_NETWORK_MERMAID', 'true').lower() == 'true',
             enable_four_masters_commentary=os.getenv('ENABLE_FOUR_MASTERS_COMMENTARY', 'true').lower() == 'true',
+            enable_strategy_state_authority=os.getenv('ENABLE_STRATEGY_STATE_AUTHORITY', 'false').lower() == 'true',
             # 東財介面補丁開關
             enable_eastmoney_patch=os.getenv('ENABLE_EASTMONEY_PATCH', 'false').lower() == 'true',
             # 實時行情資料來源優先順序：

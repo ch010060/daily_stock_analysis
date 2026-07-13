@@ -599,6 +599,16 @@ class StockAnalysisPipeline:
                 code=code,
                 query_id=query_id,
             )
+            # Phase 27.2 (flag-gated): load previous deterministic strategy
+            # snapshot and append the compact prior-decision block to the same
+            # prompt channel both paths share (analysis_context_pack_summary).
+            previous_strategy_snapshot = None
+            if getattr(self.config, "enable_strategy_state_authority", False):
+                analysis_context_pack_summary, previous_strategy_snapshot = (
+                    self._augment_summary_with_previous_strategy_state(
+                        analysis_context_pack_summary, code, query_id
+                    )
+                )
             llm_progress_state = {"last_progress": 64}
 
             def _on_llm_stream(chars_received: int) -> None:
@@ -677,7 +687,10 @@ class StockAnalysisPipeline:
             # Step 7.7: price_position fallback
             if result:
                 fill_price_position_if_needed(result, trend_result, realtime_quote)
-                stabilize_decision_with_structure(result, trend_result, fundamental_context)
+                stabilize_decision_with_structure(
+                    result, trend_result, fundamental_context,
+                    deterministic_priority=getattr(self.config, "enable_strategy_state_authority", False),
+                )
                 adjustments = apply_phase_decision_guardrails(
                     result,
                     market_phase_summary=market_phase_summary,
@@ -689,6 +702,14 @@ class StockAnalysisPipeline:
                     logger.info("[phase_decision_guardrail] Applied adjustments for %s: %s", code, adjustments)
                 if isinstance(fundamental_context, dict):
                     result.fundamental_context = fundamental_context
+                # Phase 27.2: deterministic strategy authority is applied LAST
+                # so no legacy guard can overwrite the engine state.
+                self._attach_strategy_state_snapshot(
+                    result, code,
+                    trend_result=trend_result,
+                    fundamental_context=fundamental_context,
+                    previous_snapshot=previous_strategy_snapshot,
+                )
 
             # Step 8: 儲存分析歷史記錄
             if result and result.success:
@@ -1173,6 +1194,127 @@ class StockAnalysisPipeline:
             market, code, f"未知市場（market={market}）暫不支援估值河流圖"
         )
 
+    def _augment_summary_with_previous_strategy_state(
+        self, summary: Optional[str], code: str, query_id: Optional[str]
+    ):
+        """Phase 27.2 (flag-gated by callers): load the previous deterministic
+        strategy snapshot and append the compact prior-decision block to the
+        shared prompt-summary channel. Returns (summary, previous_snapshot).
+        Never raises; failures degrade to the unmodified summary + None."""
+        try:
+            from src.services.strategy_state_orchestrator import (
+                build_previous_state_prompt_block,
+                load_previous_strategy_snapshot,
+            )
+
+            previous = load_previous_strategy_snapshot(
+                self.db, code, exclude_query_id=query_id
+            )
+            block = build_previous_state_prompt_block(previous)
+            if block:
+                summary = f"{summary}\n\n{block}" if summary else block
+            return summary, previous
+        except Exception as exc:
+            logger.warning("[strategy_state] previous-state prompt augmentation skipped for %s: %s", code, exc)
+            return summary, None
+
+    def _attach_strategy_state_snapshot(
+        self,
+        result: Any,
+        code: str,
+        *,
+        trend_result: Any = None,
+        fundamental_context: Optional[Dict[str, Any]] = None,
+        previous_snapshot: Any = None,
+    ) -> None:
+        """Phase 27.2/27.2R: attach the deterministic strategy-state snapshot
+        and transfer final action authority (flag-gated; default off = no-op).
+
+        Runs strictly AFTER the LLM call, after all deterministic snapshot
+        attaches, and after the legacy stabilization guard — so no legacy
+        logic can overwrite the engine state. Shared verbatim by both the
+        direct and Agent analysis paths (parity by construction).
+
+        Phase 27.2R contract:
+        - Instrument routing happens BEFORE the stock engine is ever called:
+          non-stock instruments (ETF/index/unknown) get no
+          strategy_state_snapshot key at all — never an UNSUPPORTED one.
+        - For an in-scope stock, missing REQUIRED deterministic data
+          (BLOCKING_READINESS_DEFECTS) is a provider/data execution failure,
+          not a valid product state: this raises StrategyDataUnavailableError,
+          which is intentionally NOT caught here — it propagates to
+          analyze_stock's outer handler, which fails the whole task (no
+          history persisted, no LLM fallback surfaced) per the project's
+          existing "return None on exception" single-stock failure
+          convention. Any other unexpected (non-readiness) error is still
+          caught and logged so a bug in this module degrades rather than
+          taking down an otherwise-successful report.
+        """
+        if not getattr(self.config, "enable_strategy_state_authority", False):
+            return
+        if result is None:
+            return
+
+        from src.services.strategy_state_orchestrator import (
+            StrategyDataUnavailableError,
+            attach_strategy_state,
+            build_strategy_state_input,
+            validate_strategy_state_input_readiness,
+        )
+
+        instrument_type = getattr(result, "instrument_type", "unknown")
+        if instrument_type != "stock":
+            return
+
+        try:
+            from src.analyzer import _capital_flow_bias_with_status
+            from src.services.history_loader import get_frozen_target_date
+
+            try:
+                market = get_market_for_stock(normalize_stock_code(code))
+            except Exception:
+                market = "unknown"
+            frozen = get_frozen_target_date()
+            as_of = frozen if frozen else get_market_now(
+                market if market in ("tw", "us") else "tw"
+            ).date()
+
+            trend_dict = None
+            if trend_result is not None:
+                trend_dict = (
+                    trend_result.to_dict() if hasattr(trend_result, "to_dict")
+                    else (trend_result if isinstance(trend_result, dict) else None)
+                )
+            capital_flow_bias, _flow_reason = _capital_flow_bias_with_status(fundamental_context)
+
+            input_data = build_strategy_state_input(
+                symbol=code,
+                market=market,
+                instrument_type=instrument_type,
+                as_of=as_of,
+                trend_dict=trend_dict,
+                change_pct=getattr(result, "change_pct", None),
+                valuation_river_snapshot=getattr(result, "valuation_river_snapshot", None),
+                capital_flow_bias=capital_flow_bias,
+            )
+            blocked, defects = validate_strategy_state_input_readiness(input_data)
+        except Exception as exc:
+            logger.warning("[strategy_state] input construction failed for %s: %s", code, exc)
+            return
+
+        if blocked:
+            raise StrategyDataUnavailableError(code, defects)
+
+        try:
+            snapshot = attach_strategy_state(result, input_data, previous_snapshot)
+            logger.info(
+                "[strategy_state] %s state=%s rule=%s authoritative=%s defects=%s",
+                code, snapshot.state.value, snapshot.transition_rule_id,
+                snapshot.state.value != "UNSUPPORTED", ",".join(defects),
+            )
+        except Exception as exc:
+            logger.warning("[strategy_state] attach skipped for %s: %s", code, exc)
+
     def _attach_exposure_and_market_risk_snapshot(
         self,
         result: Any,
@@ -1436,6 +1578,15 @@ class StockAnalysisPipeline:
                 code=code,
                 query_id=query_id,
             )
+            # Phase 27.2 (flag-gated): identical prompt-continuity block as the
+            # non-Agent path, appended to the same shared summary channel.
+            previous_strategy_snapshot = None
+            if getattr(self.config, "enable_strategy_state_authority", False):
+                analysis_context_pack_summary, previous_strategy_snapshot = (
+                    self._augment_summary_with_previous_strategy_state(
+                        analysis_context_pack_summary, code, query_id
+                    )
+                )
             if analysis_context_pack_summary:
                 initial_context["analysis_context_pack_summary"] = analysis_context_pack_summary
 
@@ -1523,7 +1674,10 @@ class StockAnalysisPipeline:
                     if fallback_price is not None:
                         result.current_price = fallback_price
                         result.change_pct = fallback_change_pct
-                stabilize_decision_with_structure(result, trend_result, fundamental_context)
+                stabilize_decision_with_structure(
+                    result, trend_result, fundamental_context,
+                    deterministic_priority=getattr(self.config, "enable_strategy_state_authority", False),
+                )
                 adjustments = apply_phase_decision_guardrails(
                     result,
                     market_phase_summary=market_phase_summary,
@@ -1535,6 +1689,14 @@ class StockAnalysisPipeline:
                     logger.info("[phase_decision_guardrail] Applied agent adjustments for %s: %s", code, adjustments)
                 if isinstance(fundamental_context, dict):
                     result.fundamental_context = fundamental_context
+                # Phase 27.2: deterministic strategy authority applied LAST —
+                # parity with the non-Agent path by construction (same helper).
+                self._attach_strategy_state_snapshot(
+                    result, code,
+                    trend_result=trend_result,
+                    fundamental_context=fundamental_context,
+                    previous_snapshot=previous_strategy_snapshot,
+                )
 
             resolved_stock_name = result.name if result and result.name else stock_name
             news_search_diagnostics: Optional[Dict[str, Any]] = None

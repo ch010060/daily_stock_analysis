@@ -568,6 +568,7 @@ class TestAgentResultConversion(unittest.TestCase):
              patch('src.core.pipeline.SearchService'):
 
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = True
             mock_cfg.agent_max_steps = 10
@@ -1458,6 +1459,7 @@ class TestPipelineRouting(unittest.TestCase):
              patch('src.core.pipeline.SearchService'):
 
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = True
             mock_cfg.agent_max_steps = 5
@@ -1503,6 +1505,7 @@ class TestPipelineRouting(unittest.TestCase):
              patch('src.core.pipeline.SearchService') as mock_search:
 
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = False
             mock_cfg.is_agent_available.return_value = False
@@ -1551,6 +1554,7 @@ class TestPipelineRouting(unittest.TestCase):
              patch('src.core.pipeline.SearchService'):
 
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = False
             mock_cfg.agent_max_steps = 5
@@ -1597,6 +1601,7 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
              patch('src.agent.executor.AgentExecutor.run') as mock_agent_run:
 
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = True
             mock_cfg.agent_max_steps = 10
@@ -1674,6 +1679,7 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
              patch('src.agent.factory.build_agent_executor') as mock_build_executor:
 
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = True
             mock_cfg.agent_max_steps = 10
@@ -1766,6 +1772,7 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
              patch('src.agent.factory.build_agent_executor') as mock_build_executor:
 
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = True
             mock_cfg.agent_max_steps = 10
@@ -1871,6 +1878,7 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
              patch('src.agent.factory.build_agent_executor') as mock_build_executor:
 
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = True
             mock_cfg.agent_max_steps = 10
@@ -1949,6 +1957,7 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
              patch('src.core.pipeline.current_diagnostic_snapshot') as mock_diagnostic_snapshot:
 
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = True
             mock_cfg.agent_max_steps = 10
@@ -2024,6 +2033,7 @@ class TestAgentConstructionChain(unittest.TestCase):
     def test_llm_adapter_accepts_config(self):
         """LLMToolAdapter should accept an optional config parameter."""
         mock_cfg = MagicMock()
+        mock_cfg.enable_strategy_state_authority = False
         mock_cfg.gemini_api_key = ""
         mock_cfg.anthropic_api_key = ""
         mock_cfg.openai_api_key = ""
@@ -2038,6 +2048,7 @@ class TestAgentConstructionChain(unittest.TestCase):
         """LLMToolAdapter should also work with no arguments (uses get_config)."""
         with patch('src.agent.llm_adapter.get_config') as mock_get_config:
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.gemini_api_key = ""
             mock_cfg.anthropic_api_key = ""
             mock_cfg.openai_api_key = ""
@@ -2088,6 +2099,7 @@ class TestAgentConstructionChain(unittest.TestCase):
 
         # Build LLM adapter with mocked config (no real API keys)
         mock_cfg = MagicMock()
+        mock_cfg.enable_strategy_state_authority = False
         mock_cfg.gemini_api_key = ""
         mock_cfg.anthropic_api_key = ""
         mock_cfg.openai_api_key = ""
@@ -2110,6 +2122,7 @@ class TestAgentConstructionChain(unittest.TestCase):
     def test_llm_adapter_call_completion_uses_effective_agent_models_order(self, _mock_router):
         """call_completion should use Agent effective model chain in order."""
         mock_cfg = MagicMock()
+        mock_cfg.enable_strategy_state_authority = False
         mock_cfg.agent_litellm_model = "gpt-4o-mini"
         mock_cfg.litellm_model = "gemini/gemini-2.5-flash"
         mock_cfg.litellm_fallback_models = ["openai/gpt-4o-mini", "anthropic/claude-3-5-sonnet-20241022"]
@@ -2498,6 +2511,7 @@ class TestAgentConstructionChain(unittest.TestCase):
     def test_llm_adapter_recomputes_timeout_for_each_fallback_attempt(self, _mock_router):
         """Each fallback model attempt should receive only the remaining timeout budget."""
         mock_cfg = MagicMock()
+        mock_cfg.enable_strategy_state_authority = False
         mock_cfg.agent_litellm_model = "gpt-4o-mini"
         mock_cfg.litellm_model = None
         mock_cfg.litellm_fallback_models = ["anthropic/claude-3-5-sonnet-20241022"]
@@ -2537,6 +2551,7 @@ class TestAgentConstructionChain(unittest.TestCase):
     def test_llm_adapter_rate_limit_backoff_is_bounded_by_remaining_timeout(self, _mock_router):
         """Rate-limit backoff should sleep, but never longer than the remaining timeout budget."""
         mock_cfg = MagicMock()
+        mock_cfg.enable_strategy_state_authority = False
         mock_cfg.agent_litellm_model = "gpt-4o-mini"
         mock_cfg.litellm_model = None
         mock_cfg.litellm_fallback_models = ["openai/gpt-4.1-mini"]
@@ -2599,6 +2614,7 @@ class TestAgentConstructionChain(unittest.TestCase):
     def test_llm_adapter_context_window_error_skips_sleep(self, _mock_router):
         """Context-window errors should continue fallback immediately without backoff."""
         mock_cfg = MagicMock()
+        mock_cfg.enable_strategy_state_authority = False
         mock_cfg.agent_litellm_model = "gpt-4o-mini"
         mock_cfg.litellm_model = None
         mock_cfg.litellm_fallback_models = ["anthropic/claude-3-5-sonnet-20241022"]
@@ -2636,6 +2652,7 @@ class TestAgentConstructionChain(unittest.TestCase):
     def test_llm_adapter_reports_rate_limit_suffix_when_any_fallback_hit_limit(self, _mock_router):
         """Final error should note earlier rate limiting even if the last error differs."""
         mock_cfg = MagicMock()
+        mock_cfg.enable_strategy_state_authority = False
         mock_cfg.agent_litellm_model = "gpt-4o-mini"
         mock_cfg.litellm_model = None
         mock_cfg.litellm_fallback_models = ["anthropic/claude-3-5-sonnet-20241022"]
@@ -2721,6 +2738,7 @@ class TestSafeInt(unittest.TestCase):
              patch('src.core.pipeline.SearchService'):
 
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = False
             mock_cfg.agent_max_steps = 10
@@ -2864,6 +2882,7 @@ class TestSkillActivation(unittest.TestCase):
              patch('src.core.pipeline.SearchService'):
 
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = True
             mock_cfg.agent_max_steps = 10
@@ -2919,6 +2938,7 @@ class TestInstrumentTypeAgentParity(unittest.TestCase):
 
     def _mock_cfg(self, agent_mode: bool) -> MagicMock:
         mock_cfg = MagicMock()
+        mock_cfg.enable_strategy_state_authority = False
         mock_cfg.max_workers = 2
         mock_cfg.agent_mode = agent_mode
         mock_cfg.is_agent_available.return_value = agent_mode
@@ -3067,6 +3087,7 @@ class TestAttachValuationFundamentalSnapshot(unittest.TestCase):
              patch('src.core.pipeline.NotificationService'), \
              patch('src.core.pipeline.SearchService'):
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = False
             mock_config.return_value = mock_cfg
@@ -3192,6 +3213,7 @@ class TestAttachValuationRiverSnapshot(unittest.TestCase):
              patch('src.core.pipeline.NotificationService'), \
              patch('src.core.pipeline.SearchService'):
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = False
             mock_config.return_value = mock_cfg
@@ -3393,6 +3415,7 @@ class TestAttachExposureAndMarketRiskSnapshot(unittest.TestCase):
              patch('src.core.pipeline.NotificationService'), \
              patch('src.core.pipeline.SearchService'):
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = False
             mock_config.return_value = mock_cfg
@@ -3510,6 +3533,7 @@ class TestAttachMarketFearIndexSnapshot(unittest.TestCase):
              patch('src.core.pipeline.NotificationService'), \
              patch('src.core.pipeline.SearchService'):
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = False
             mock_config.return_value = mock_cfg
@@ -3601,6 +3625,7 @@ class TestAttachMultiPeriodTrendSnapshot(unittest.TestCase):
              patch('src.core.pipeline.NotificationService'), \
              patch('src.core.pipeline.SearchService'):
             mock_cfg = MagicMock()
+            mock_cfg.enable_strategy_state_authority = False
             mock_cfg.max_workers = 2
             mock_cfg.agent_mode = False
             mock_config.return_value = mock_cfg
