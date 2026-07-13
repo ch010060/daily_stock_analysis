@@ -9,10 +9,14 @@ from unittest.mock import patch
 import pytest
 
 from src.evaluation.strategy_sequence_replay import (
+    PHASE27_3S_EVALUATION_END,
+    PHASE27_3S_EVALUATION_START,
+    PHASE27_3S_STOCKS,
     MarketBar,
     PanelSplit,
     ReplayMetrics,
     ReplayRecord,
+    analyze_breakdown_episodes,
     build_replay_input,
     calculate_metrics,
     freeze_policy_selection,
@@ -21,6 +25,7 @@ from src.evaluation.strategy_sequence_replay import (
     select_policy,
     validate_holdout_candidate,
     validate_artifact_path,
+    validate_phase27_3s_fixture,
 )
 from src.services.strategy_state_engine import (
     DEFAULT_POLICY,
@@ -32,6 +37,8 @@ from src.services.strategy_state_engine import (
 
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "phase27_3" / "panel.csv"
+PHASE27_3S_FIXTURE = Path(__file__).parents[1] / "fixtures" / "phase27_3s" / "panel.csv"
+PHASE27_3S_MANIFEST = Path(__file__).parents[1] / "fixtures" / "phase27_3s" / "manifest.json"
 
 
 def _bars(count: int = 90, *, future_close: float | None = None) -> list[MarketBar]:
@@ -285,6 +292,57 @@ def test_artifacts_must_stay_outside_repository(tmp_path: Path) -> None:
     assert validate_artifact_path(tmp_path / "phase27_3.json", repo) == tmp_path / "phase27_3.json"
 
 
+@pytest.mark.unit
+def test_phase27_3s_contract_is_frozen() -> None:
+    assert PHASE27_3S_STOCKS == ("2382", "2891", "3008", "3231", "AMZN", "META", "GOOGL", "AVGO")
+    assert PHASE27_3S_EVALUATION_START == date(2025, 10, 1)
+    assert PHASE27_3S_EVALUATION_END == date(2026, 3, 31)
+
+
+@pytest.mark.unit
+def test_phase27_3s_manifest_rejects_fixture_hash_mismatch(tmp_path: Path) -> None:
+    fixture = tmp_path / "panel.csv"
+    manifest = tmp_path / "manifest.json"
+    fixture.write_text("not-the-captured-fixture\n", encoding="utf-8")
+    manifest.write_text(json.dumps({"panel_sha256": "0" * 64}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="fixture hash"):
+        validate_phase27_3s_fixture(fixture, manifest)
+
+
+@pytest.mark.unit
+def test_breakdown_episode_summary_uses_same_symbol_windows_and_censors_tail() -> None:
+    start = date(2025, 10, 1)
+
+    def record(day: int, close: float, state: StrategyState, rule: str) -> ReplayRecord:
+        return ReplayRecord.minimal(
+            close=close,
+            daily_change_pct=0.0,
+            snapshot=_snapshot(
+                start + timedelta(days=day),
+                state,
+                previous_state=StrategyState.REDUCE_RISK,
+                rule=rule,
+                transition=rule in {"RULE_CONFIRMED_SUPPORT_BREAK", "RULE_CONFIRMED_SUPPORT_RECLAIM"},
+            ),
+        )
+
+    quick = [record(0, 85.0, StrategyState.REDUCE_RISK, "RULE_CONFIRMED_SUPPORT_BREAK")]
+    quick += [record(i, 95.0, StrategyState.REDUCE_RISK, "RULE_SUPPORT_RECLAIM_PENDING") for i in (1,)]
+    quick += [record(2, 96.0, StrategyState.WATCHLIST, "RULE_CONFIRMED_SUPPORT_RECLAIM")]
+    quick += [record(i, 100.0, StrategyState.WATCHLIST, "RULE_STATE_UNCHANGED") for i in range(3, 23)]
+    censored = [record(30, 85.0, StrategyState.REDUCE_RISK, "RULE_CONFIRMED_SUPPORT_BREAK")]
+
+    summary = analyze_breakdown_episodes({"2382": quick + censored}, {"2382": "tw"})
+
+    assert summary["total"]["confirmed_breaks"] == 2
+    assert summary["total"]["quick_recoveries"] == 1
+    assert summary["total"]["confirmed_reclaims"] == 1
+    assert summary["total"]["one_day_rebound_exit_violations"] == 0
+    assert summary["total"]["sustained_breaks"] == 0
+    assert summary["total"]["sustained_censored"] == 1
+
+
 @pytest.mark.integration
 def test_agent_and_non_agent_authority_sequence_parity() -> None:
     from src.services.strategy_state_orchestrator import attach_strategy_state
@@ -441,3 +499,29 @@ def test_phase27_3r_repaired_baseline_only(tmp_path: Path) -> None:
     assert payload["metrics"]["state_distribution"].get("INVALIDATED", 0) == 0
     assert payload["metrics"]["state_distribution"].get("REDUCE_RISK", 0) > 0
     assert payload["metrics"]["reduce_risk_direct_accumulate_exits"] == 0
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    os.environ.get("RUN_PHASE27_3S_EVAL") != "1",
+    reason="set RUN_PHASE27_3S_EVAL=1 for the frozen new holdout",
+)
+def test_phase27_3s_new_holdout(tmp_path: Path) -> None:
+    from src.evaluation.strategy_sequence_replay import run_phase27_3s_holdout
+
+    artifact = run_phase27_3s_holdout(
+        PHASE27_3S_FIXTURE,
+        PHASE27_3S_MANIFEST,
+        tmp_path,
+        reference_fixture=FIXTURE,
+    )
+    payload = json.loads(artifact.read_text(encoding="utf-8"))
+
+    assert payload["threshold_selection_performed"] is False
+    assert payload["policy"] == DEFAULT_POLICY.__dict__
+    assert payload["panel"]["stock_symbols"] == list(PHASE27_3S_STOCKS)
+    assert payload["panel"]["evaluation_start"] == "2025-10-01"
+    assert payload["panel"]["evaluation_end"] == "2026-03-31"
+    assert payload["metrics"]["same_sequence_nondeterminism_rate"] == 0
+    assert payload["semantics"]["technical_breaks_to_invalidated"] == 0
+    assert payload["episodes"]["total"]["direct_reduce_to_accumulate"] == 0

@@ -39,6 +39,24 @@ from src.services.strategy_state_orchestrator import build_strategy_state_input
 from src.stock_analyzer import StockTrendAnalyzer
 
 
+PHASE27_3S_STOCKS = ("2382", "2891", "3008", "3231", "AMZN", "META", "GOOGL", "AVGO")
+PHASE27_3S_BENCHMARKS = {"tw": "0050", "us": "SPY"}
+PHASE27_3S_SOURCE_TICKERS = {
+    "2382": "2382.TW",
+    "2891": "2891.TW",
+    "3008": "3008.TW",
+    "3231": "3231.TW",
+    "AMZN": "AMZN",
+    "META": "META",
+    "GOOGL": "GOOGL",
+    "AVGO": "AVGO",
+    "0050": "0050.TW",
+    "SPY": "SPY",
+}
+PHASE27_3S_EVALUATION_START = date(2025, 10, 1)
+PHASE27_3S_EVALUATION_END = date(2026, 3, 31)
+
+
 @dataclass(frozen=True, order=True)
 class MarketBar:
     as_of: date
@@ -612,6 +630,157 @@ def validate_artifact_path(path: Path, repository_root: Path) -> Path:
     return path.resolve()
 
 
+def validate_phase27_3s_fixture(fixture: Path, manifest_path: Path) -> dict[str, list[MarketBar]]:
+    """Validate the frozen Phase 27.3S capture before any replay is attempted."""
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    digest = hashlib.sha256(fixture.read_bytes()).hexdigest()
+    if digest != manifest.get("panel_sha256"):
+        raise ValueError("fixture hash does not match manifest")
+    if manifest.get("phase") != "27.3S":
+        raise ValueError("fixture phase must be 27.3S")
+    if manifest.get("adjustment_mode") != "auto_adjust=True":
+        raise ValueError("fixture adjustment mode changed")
+    if manifest.get("source_tickers") != PHASE27_3S_SOURCE_TICKERS:
+        raise ValueError("fixture ticker mapping changed")
+    if manifest.get("requested_range") != {
+        "start": "2025-07-01",
+        "end_exclusive": "2026-07-02",
+    }:
+        raise ValueError("fixture requested range changed")
+
+    expected = set(PHASE27_3S_STOCKS) | set(PHASE27_3S_BENCHMARKS.values())
+    seen: set[str] = set()
+    with fixture.open(newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            symbol = row.get("symbol", "")
+            seen.add(symbol)
+            values = [float(row[name]) for name in ("open", "high", "low", "close")]
+            volume = float(row["volume"])
+            if not all(math.isfinite(value) and value > 0 for value in values):
+                raise ValueError("fixture OHLC must be finite and positive")
+            if not math.isfinite(volume) or volume < 0:
+                raise ValueError("fixture volume must be finite and nonnegative")
+            if row.get("source_ticker") != PHASE27_3S_SOURCE_TICKERS.get(symbol):
+                raise ValueError("fixture row ticker mapping changed")
+    if seen != expected:
+        raise ValueError("fixture symbols changed")
+    panel = load_panel_fixture(fixture)
+    returned = manifest.get("returned_range") or {}
+    if set(returned) != expected:
+        raise ValueError("fixture returned ranges incomplete")
+    for symbol, bars in panel.items():
+        expected_range = {"start": bars[0].as_of.isoformat(), "end": bars[-1].as_of.isoformat()}
+        if returned.get(symbol) != expected_range:
+            raise ValueError(f"fixture returned range changed for {symbol}")
+    return panel
+
+
+def analyze_breakdown_episodes(
+    records_by_symbol: Mapping[str, Sequence[ReplayRecord]],
+    markets: Mapping[str, str],
+) -> dict[str, dict]:
+    """Apply the preregistered same-symbol break, recovery, and censoring definitions."""
+    buckets = {
+        name: {
+            "confirmed_breaks": 0,
+            "quick_recoveries": 0,
+            "sustained_breaks": 0,
+            "sustained_censored": 0,
+            "eligible_reclaims": 0,
+            "confirmed_reclaims": 0,
+            "one_day_rebound_exit_violations": 0,
+            "direct_reduce_to_accumulate": 0,
+            "reclaim_lags": [],
+            "reduce_risk_durations": [],
+        }
+        for name in ("total", "tw", "us")
+    }
+
+    for symbol, records in records_by_symbol.items():
+        market = markets[symbol]
+        for prior, current in zip(records, records[1:]):
+            if (
+                prior.snapshot.state == StrategyState.REDUCE_RISK
+                and current.snapshot.state == StrategyState.ACCUMULATE_ZONE
+            ):
+                buckets["total"]["direct_reduce_to_accumulate"] += 1
+                buckets[market]["direct_reduce_to_accumulate"] += 1
+
+        for index, record in enumerate(records):
+            snap = record.snapshot
+            previous_state = records[index - 1].snapshot.state if index else None
+            if (
+                snap.transition_rule_id != RULE_CONFIRMED_SUPPORT_BREAK
+                or previous_state == StrategyState.REDUCE_RISK
+                or snap.invalidation_level is None
+            ):
+                continue
+            future = list(records[index + 1:])
+            for bucket_name in ("total", market):
+                bucket = buckets[bucket_name]
+                bucket["confirmed_breaks"] += 1
+                if len(future) >= DEFAULT_POLICY.reclaim_confirmation_days:
+                    bucket["eligible_reclaims"] += 1
+                if any(
+                    item.input_data.close is not None
+                    and item.input_data.close >= snap.invalidation_level
+                    for item in future[:5]
+                ):
+                    bucket["quick_recoveries"] += 1
+                if len(future) < 20:
+                    bucket["sustained_censored"] += 1
+                elif not any(
+                    item.input_data.close is not None
+                    and item.input_data.close >= snap.invalidation_level
+                    for item in future[:20]
+                ):
+                    bucket["sustained_breaks"] += 1
+                if (
+                    future
+                    and future[0].input_data.close is not None
+                    and future[0].input_data.close >= snap.invalidation_level
+                    and future[0].snapshot.state != StrategyState.REDUCE_RISK
+                ):
+                    bucket["one_day_rebound_exit_violations"] += 1
+
+            exit_offset = next(
+                (
+                    offset
+                    for offset, item in enumerate(future, 1)
+                    if item.snapshot.state != StrategyState.REDUCE_RISK
+                ),
+                None,
+            )
+            duration = 1 + (exit_offset - 1 if exit_offset is not None else len(future))
+            reclaim_offset = next(
+                (
+                    offset
+                    for offset, item in enumerate(future, 1)
+                    if item.snapshot.transition_rule_id == RULE_CONFIRMED_SUPPORT_RECLAIM
+                ),
+                None,
+            )
+            for bucket_name in ("total", market):
+                bucket = buckets[bucket_name]
+                bucket["reduce_risk_durations"].append(duration)
+                if reclaim_offset is not None:
+                    bucket["confirmed_reclaims"] += 1
+                    bucket["reclaim_lags"].append(reclaim_offset)
+
+    result: dict[str, dict] = {}
+    for name, bucket in buckets.items():
+        reclaim_lags = bucket.pop("reclaim_lags")
+        durations = bucket.pop("reduce_risk_durations")
+        result[name] = {
+            **bucket,
+            "reclaim_lag_mean": sum(reclaim_lags) / len(reclaim_lags) if reclaim_lags else None,
+            "reclaim_lag_max": max(reclaim_lags, default=None),
+            "reduce_risk_duration_mean": sum(durations) / len(durations) if durations else None,
+            "reduce_risk_duration_max": max(durations, default=None),
+        }
+    return result
+
+
 def load_panel_fixture(path: Path) -> dict[str, list[MarketBar]]:
     panel: dict[str, list[MarketBar]] = {}
     with path.open(newline="", encoding="utf-8") as handle:
@@ -961,5 +1130,313 @@ def run_phase27_3r_baseline_replay(fixture: Path, output_dir: Path) -> Path:
         "metrics": metrics_payload,
     }
     artifact = output_dir / "phase27_3r_repaired_baseline.json"
+    artifact.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return artifact
+
+
+def _phase27_3s_outcome_cells(
+    records: Sequence[ReplayRecord], *, include_regime: bool = False
+) -> dict[str, dict]:
+    cells: dict[str, list[ReplayRecord]] = {}
+    for record in records:
+        key = f"{record.input_data.market}:{record.snapshot.state.value}"
+        if include_regime:
+            key += f":{record.regime}"
+        cells.setdefault(key, []).append(record)
+
+    def metric(rows: Sequence[ReplayRecord], name: str) -> dict[str, float | int | None]:
+        values = [getattr(row, name) for row in rows if getattr(row, name) is not None]
+        return {
+            "n": len(values),
+            "mean": sum(values) / len(values) if values else None,
+        }
+
+    return {
+        key: {
+            name: metric(rows, name)
+            for name in (
+                "forward_5d",
+                "forward_20d",
+                "forward_60d",
+                "maximum_adverse_excursion",
+                "maximum_favorable_excursion",
+                "benchmark_relative_20d",
+                "benchmark_relative_60d",
+            )
+        }
+        for key, rows in cells.items()
+    }
+
+
+def _phase27_3s_reference_records(fixture: Path) -> list[ReplayRecord]:
+    panel = load_panel_fixture(fixture)
+    symbols = ("2330", "2454", "2308", "2317", "2881", "6505", "AAPL", "MSFT", "NVDA", "LLY")
+    records: list[ReplayRecord] = []
+    for symbol in symbols:
+        market = "tw" if symbol.isdigit() else "us"
+        bars = panel[symbol]
+        inputs = [build_replay_input(symbol, market, bars, bar.as_of) for bar in bars[60:-60]]
+        records.extend(_attach_labels(replay_inputs(inputs), bars, panel[PHASE27_3S_BENCHMARKS[market]]))
+    return records
+
+
+def run_phase27_3s_holdout(
+    fixture: Path,
+    manifest_path: Path,
+    output_dir: Path,
+    *,
+    reference_fixture: Path,
+) -> Path:
+    """Execute the frozen Phase 27.3S baseline once; no policy selection exists here."""
+    repository_root = Path(__file__).resolve().parents[2]
+    output_dir = validate_artifact_path(output_dir, repository_root)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    panel = validate_phase27_3s_fixture(fixture, manifest_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    markets = {symbol: ("tw" if symbol.isdigit() else "us") for symbol in PHASE27_3S_STOCKS}
+    records_by_symbol: dict[str, list[ReplayRecord]] = {}
+    inputs_by_symbol: dict[str, list[StrategyStateInput]] = {}
+    nondeterministic = 0
+
+    for symbol in PHASE27_3S_STOCKS:
+        market = markets[symbol]
+        bars = panel[symbol]
+        full_inputs = [
+            build_replay_input(symbol, market, bars, bar.as_of)
+            for bar in bars[60:]
+            if bar.as_of <= PHASE27_3S_EVALUATION_END
+        ]
+        first = replay_inputs(full_inputs, DEFAULT_POLICY)
+        second = replay_inputs(full_inputs, DEFAULT_POLICY)
+        nondeterministic += sum(a.snapshot_bytes != b.snapshot_bytes for a, b in zip(first, second))
+        labeled = _attach_labels(first, bars, panel[PHASE27_3S_BENCHMARKS[market]])
+        holdout = [
+            record
+            for record in labeled
+            if PHASE27_3S_EVALUATION_START <= record.input_data.as_of <= PHASE27_3S_EVALUATION_END
+        ]
+        records_by_symbol[symbol] = holdout
+        inputs_by_symbol[symbol] = [record.input_data for record in holdout]
+
+    all_records = [record for symbol in PHASE27_3S_STOCKS for record in records_by_symbol[symbol]]
+    metrics = calculate_metrics(all_records, DEFAULT_POLICY)
+    by_market = {
+        market: calculate_metrics(
+            [
+                record
+                for symbol in PHASE27_3S_STOCKS
+                if markets[symbol] == market
+                for record in records_by_symbol[symbol]
+            ],
+            DEFAULT_POLICY,
+        )
+        for market in ("tw", "us")
+    }
+    episodes = analyze_breakdown_episodes(records_by_symbol, markets)
+    regimes = {
+        market: {
+            regime: sum(
+                record.regime == regime
+                for symbol in PHASE27_3S_STOCKS
+                if markets[symbol] == market
+                for record in records_by_symbol[symbol]
+            )
+            for regime in sorted({record.regime for record in all_records})
+        }
+        for market in ("tw", "us")
+    }
+
+    inputs = [item for symbol in PHASE27_3S_STOCKS for item in inputs_by_symbol[symbol]]
+    independent_support = sum(
+        any(
+            not any(
+                ma is not None and math.isclose(level, ma, rel_tol=1e-6, abs_tol=1e-8)
+                for ma in (item.ma5, item.ma10, item.ma20)
+            )
+            for level in item.deterministic_support_levels
+        )
+        for item in inputs
+    )
+    zone_bases: dict[str, int] = {}
+    for record in all_records:
+        if record.snapshot.buy_zone:
+            for basis in record.snapshot.buy_zone.basis:
+                zone_bases[basis] = zone_bases.get(basis, 0) + 1
+    provenance = {
+        "total_inputs": len(inputs),
+        "serialized_support_inputs": sum(bool(item.deterministic_support_levels) for item in inputs),
+        "independent_support_inputs": independent_support,
+        "ma_fallback_inputs": sum(
+            not any(
+                not any(
+                    ma is not None and math.isclose(level, ma, rel_tol=1e-6, abs_tol=1e-8)
+                    for ma in (item.ma5, item.ma10, item.ma20)
+                )
+                for level in item.deterministic_support_levels
+            )
+            and any(ma is not None and ma < item.close for ma in (item.ma60, item.ma20))
+            for item in inputs
+        ),
+        "serialized_resistance_inputs": sum(bool(item.deterministic_resistance_levels) for item in inputs),
+        "zone_basis_distribution": dict(sorted(zone_bases.items())),
+    }
+
+    reference_cells = _phase27_3s_outcome_cells(_phase27_3s_reference_records(reference_fixture))
+    holdout_cells = _phase27_3s_outcome_cells(all_records)
+    outcome_failures = []
+    for cell in sorted(set(reference_cells) & set(holdout_cells)):
+        for metric_name in (
+            "forward_20d",
+            "forward_60d",
+            "benchmark_relative_20d",
+            "benchmark_relative_60d",
+        ):
+            old = reference_cells[cell][metric_name]
+            new = holdout_cells[cell][metric_name]
+            if old["n"] >= 10 and new["n"] >= 10 and old["mean"] - new["mean"] > 0.10:
+                outcome_failures.append({
+                    "cell": cell,
+                    "metric": metric_name,
+                    "reference_mean": old["mean"],
+                    "holdout_mean": new["mean"],
+                })
+
+    required_regimes = {
+        "sharp_rally",
+        "sharp_decline",
+        "sideways",
+        "ordinary_pullback",
+        "rebound_after_decline",
+        "high_volatility",
+    }
+    observed_regimes = {record.regime for record in all_records}
+    underpowered_reasons = []
+    for market in ("tw", "us"):
+        if episodes[market]["confirmed_breaks"] < 2:
+            underpowered_reasons.append(f"{market}:confirmed_breaks<2")
+        if episodes[market]["quick_recoveries"] < 1:
+            underpowered_reasons.append(f"{market}:quick_recoveries<1")
+        if episodes[market]["sustained_breaks"] < 1:
+            underpowered_reasons.append(f"{market}:sustained_breaks<1")
+    if not required_regimes <= observed_regimes:
+        underpowered_reasons.append("missing_regimes:" + ",".join(sorted(required_regimes - observed_regimes)))
+    for symbol, records in records_by_symbol.items():
+        if len(records) < 20:
+            underpowered_reasons.append(f"{symbol}:evaluations<20")
+
+    total = len(all_records)
+    distribution = metrics.state_distribution
+    structural_failures = []
+    checks = {
+        "same_sequence_nondeterminism": nondeterministic == 0,
+        "unsupported": metrics.unsupported == 0,
+        "anchor_lint": metrics.anchor_lint_failures == 0,
+        "zone_movement": metrics.zone_moves_without_trigger == 0,
+        "zone_entry_contradiction": metrics.zone_entry_contradictions == 0,
+        "untriggered_flips": metrics.untriggered_state_flips == 0,
+        "rally_upgrades": metrics.unjustified_rally_upgrade_rate <= 0.05,
+        "decline_downgrades": metrics.unjustified_decline_downgrade_rate <= 0.05,
+        "break_recognition": metrics.confirmed_break_recognition_rate == 1.0,
+        "critical_hysteresis": metrics.critical_hysteresis_suppressions == 0,
+        "terminal_invalidated": metrics.terminal_invalidations == 0,
+        "direct_reduce_accumulate": episodes["total"]["direct_reduce_to_accumulate"] == 0,
+        "one_day_rebound": episodes["total"]["one_day_rebound_exit_violations"] == 0,
+        "confirmed_reclaims": (
+            episodes["total"]["confirmed_reclaims"] == episodes["total"]["eligible_reclaims"]
+        ),
+        "single_state_share": max(distribution.values(), default=0) / max(total, 1) <= 0.70,
+        "accumulate_share": distribution.get("ACCUMULATE_ZONE", 0) / max(total, 1) >= 0.05,
+        "reduce_present": (
+            episodes["total"]["confirmed_breaks"] == 0 or distribution.get("REDUCE_RISK", 0) > 0
+        ),
+        "do_not_chase_share": distribution.get("DO_NOT_CHASE", 0) / max(total, 1) <= 0.50,
+        "outcome_diagnostics": not outcome_failures,
+    }
+    structural_failures.extend(name for name, passed in checks.items() if not passed)
+    if underpowered_reasons:
+        status = "PHASE_27_3S_NEW_HOLDOUT_UNDERPOWERED"
+    elif structural_failures:
+        status = "PHASE_27_3S_NEW_HOLDOUT_FAIL_POLICY_NOT_CLEARED"
+    else:
+        status = "PHASE_27_3S_NEW_HOLDOUT_PASS_READY_FOR_REVIEW"
+
+    rr_rejections = sum(
+        record.snapshot.transition_rule_id == RULE_RISK_REWARD_OVEREXTENDED for record in all_records
+    )
+    rr_rejections_by_market = {
+        market: sum(
+            record.snapshot.transition_rule_id == RULE_RISK_REWARD_OVEREXTENDED
+            for symbol in PHASE27_3S_STOCKS
+            if markets[symbol] == market
+            for record in records_by_symbol[symbol]
+        )
+        for market in ("tw", "us")
+    }
+    payload = {
+        "schema_version": 1,
+        "phase": "27.3S",
+        "status": status,
+        "threshold_selection_performed": False,
+        "policy": asdict(DEFAULT_POLICY),
+        "capture": manifest,
+        "panel": {
+            "stock_symbols": list(PHASE27_3S_STOCKS),
+            "evaluation_start": PHASE27_3S_EVALUATION_START.isoformat(),
+            "evaluation_end": PHASE27_3S_EVALUATION_END.isoformat(),
+            "total_evaluations": total,
+            "evaluations_by_symbol": {symbol: len(records) for symbol, records in records_by_symbol.items()},
+            "evaluations_by_market": {
+                market: sum(len(records_by_symbol[s]) for s in PHASE27_3S_STOCKS if markets[s] == market)
+                for market in ("tw", "us")
+            },
+        },
+        "regimes_by_market": regimes,
+        "episodes": episodes,
+        "metrics": {
+            **metrics.to_dict(),
+            "same_input_nondeterminism_rate": 0.0,
+            "same_sequence_nondeterminism_rate": nondeterministic / max(total, 1),
+            "by_market": {market: value.to_dict() for market, value in by_market.items()},
+            "rr_rejection_count": rr_rejections,
+            "rr_rejection_rate": rr_rejections / max(total, 1),
+            "rr_rejection_count_by_market": rr_rejections_by_market,
+        },
+        "support_provenance": provenance,
+        "semantics": {
+            "technical_breaks_to_invalidated": metrics.unjustified_terminal_invalidations,
+            "terminal_invalidated_count": metrics.terminal_invalidations,
+            "conclusion": (
+                "INVALIDATION_SEMANTICS_VALIDATED"
+                if not underpowered_reasons and not any(
+                    name in structural_failures
+                    for name in ("terminal_invalidated", "direct_reduce_accumulate", "one_day_rebound")
+                )
+                else (
+                    "INVALIDATION_SEMANTICS_NOT_VALIDATED_UNDERPOWERED"
+                    if underpowered_reasons
+                    else "INVALIDATION_SEMANTICS_REJECTED"
+                )
+            ),
+        },
+        "support_conclusion": (
+            "INDEPENDENT_SUPPORT_CONSTRUCTION_NOT_VALIDATED"
+            if independent_support == 0
+            else "INDEPENDENT_SUPPORT_CONSTRUCTION_VALIDATED"
+        ),
+        "outcomes": {
+            "holdout_by_market_state": holdout_cells,
+            "holdout_by_market_state_regime": _phase27_3s_outcome_cells(
+                all_records, include_regime=True
+            ),
+            "reference_by_market_state": reference_cells,
+            "gate_failures": outcome_failures,
+        },
+        "gates": {
+            "checks": checks,
+            "underpowered_reasons": underpowered_reasons,
+            "failures": structural_failures,
+        },
+    }
+    artifact = output_dir / "phase27_3s_new_holdout.json"
     artifact.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return artifact

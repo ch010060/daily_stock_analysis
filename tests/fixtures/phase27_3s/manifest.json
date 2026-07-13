@@ -1,0 +1,78 @@
+{
+  "adjustment_mode": "auto_adjust=True",
+  "captured_at_utc": "2026-07-13T03:11:03.414288+00:00",
+  "panel_sha256": "47fa30bf8958ed22bf5f3c6dad2671963519e2aa227264cfd32ff0d2f241a217",
+  "phase": "27.3S",
+  "requested_range": {
+    "end_exclusive": "2026-07-02",
+    "start": "2025-07-01"
+  },
+  "returned_range": {
+    "0050": {
+      "end": "2026-07-01",
+      "start": "2025-07-01"
+    },
+    "2382": {
+      "end": "2026-07-01",
+      "start": "2025-07-01"
+    },
+    "2891": {
+      "end": "2026-07-01",
+      "start": "2025-07-01"
+    },
+    "3008": {
+      "end": "2026-07-01",
+      "start": "2025-07-01"
+    },
+    "3231": {
+      "end": "2026-07-01",
+      "start": "2025-07-01"
+    },
+    "AMZN": {
+      "end": "2026-07-01",
+      "start": "2025-07-01"
+    },
+    "AVGO": {
+      "end": "2026-07-01",
+      "start": "2025-07-01"
+    },
+    "GOOGL": {
+      "end": "2026-07-01",
+      "start": "2025-07-01"
+    },
+    "META": {
+      "end": "2026-07-01",
+      "start": "2025-07-01"
+    },
+    "SPY": {
+      "end": "2026-07-01",
+      "start": "2025-07-01"
+    }
+  },
+  "rows": {
+    "0050": 244,
+    "2382": 243,
+    "2891": 243,
+    "3008": 243,
+    "3231": 243,
+    "AMZN": 252,
+    "AVGO": 252,
+    "GOOGL": 252,
+    "META": 252,
+    "SPY": 252
+  },
+  "sanitization": "selected OHLCV columns only; finite positive OHLC; nonnegative volume; no provider payload metadata",
+  "source": "Yahoo Finance via yfinance",
+  "source_tickers": {
+    "0050": "0050.TW",
+    "2382": "2382.TW",
+    "2891": "2891.TW",
+    "3008": "3008.TW",
+    "3231": "3231.TW",
+    "AMZN": "AMZN",
+    "AVGO": "AVGO",
+    "GOOGL": "GOOGL",
+    "META": "META",
+    "SPY": "SPY"
+  }
+}

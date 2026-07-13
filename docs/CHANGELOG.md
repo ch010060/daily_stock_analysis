@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [測試] Phase 27.3S 依凍結計畫完成全新 TW/US holdout 基線重播（968 次評估、無調參）；結果因 TW 無確認跌破且兩市場均缺快速修復事件而判定 underpowered，另有 DO_NOT_CHASE 佔比 64.57% 與 4 個結果診斷格超過凍結惡化門檻，故不批准 Phase 27.4 或新閾值，並另行預註冊未執行的擴充驗證集。
+
 - [修復] Phase 27.3R 補回 `TrendAnalysisResult` 已計算但先前未序列化的決定性支撐/壓力陣列（有限正數、固定排序、容差去重，並保留短均線錨定防護與舊版 MA fallback），同時將確認技術跌破由永久 `INVALIDATED` 改為暫時 `REDUCE_RISK`；新增連續 2 個交易觀察站回失效位後先回 `WATCHLIST` 的集中式重啟規則，禁止單日反彈直接恢復累積。生產閾值與功能旗標預設值不變。
 
 - [測試] 新增 Phase 27.3 離線個股策略連續歷史重播與凍結 holdout 校準工具（TW/US 10 檔、1,468 次評估）；校準候選因 holdout 假失效與狀態收斂惡化遭拒，Phase 27.2R 生產閾值維持不變，並記錄需先修正技術支撐/壓力序列化與 INVALIDATED 重啟語義後再驗證。
