@@ -6,6 +6,7 @@ import csv
 import hashlib
 import itertools
 import json
+import math
 from dataclasses import asdict, dataclass, replace
 from datetime import date
 from pathlib import Path
@@ -17,12 +18,14 @@ from src.services.strategy_state_engine import (
     BUY_ZONE_CURRENT_PRICE_ANCHOR_REJECTED,
     DEFAULT_POLICY,
     RULE_CONFIRMED_SUPPORT_BREAK,
+    RULE_CONFIRMED_SUPPORT_RECLAIM,
     RULE_HOLD_EXISTING_ONLY,
     RULE_HYSTERESIS_HOLD,
     RULE_INITIAL_WATCHLIST,
     RULE_RISK_FLAG_REDUCE,
     RULE_RISK_REWARD_OVEREXTENDED,
     RULE_THESIS_INVALIDATED,
+    RULE_TERMINAL_STATE_PERSISTED,
     RULE_VALID_BUY_ZONE_ENTERED,
     RULE_WAIT_FOR_PULLBACK,
     StrategyPolicy,
@@ -97,6 +100,13 @@ class ReplayMetrics:
     confirmed_breaks: int
     recognized_confirmed_breaks: int
     false_invalidations: int
+    terminal_invalidations: int
+    unjustified_terminal_invalidations: int
+    quick_recovery_false_invalidations: int
+    quick_recovery_technical_breaks: int
+    reduce_risk_exits: int
+    confirmed_reclaim_exits: int
+    reduce_risk_direct_accumulate_exits: int
     critical_hysteresis_suppressions: int
     invalidated_reactivations: int
     transitions: int
@@ -130,6 +140,13 @@ class ReplayMetrics:
             confirmed_breaks=0,
             recognized_confirmed_breaks=0,
             false_invalidations=0,
+            terminal_invalidations=0,
+            unjustified_terminal_invalidations=0,
+            quick_recovery_false_invalidations=0,
+            quick_recovery_technical_breaks=0,
+            reduce_risk_exits=0,
+            confirmed_reclaim_exits=0,
+            reduce_risk_direct_accumulate_exits=0,
             critical_hysteresis_suppressions=0,
             invalidated_reactivations=0,
             transitions=0,
@@ -266,6 +283,7 @@ _VALID_TRANSITION_RULES = frozenset({
     RULE_RISK_REWARD_OVEREXTENDED,
     RULE_HOLD_EXISTING_ONLY,
     RULE_CONFIRMED_SUPPORT_BREAK,
+    RULE_CONFIRMED_SUPPORT_RECLAIM,
     RULE_THESIS_INVALIDATED,
     RULE_RISK_FLAG_REDUCE,
     RULE_INITIAL_WATCHLIST,
@@ -290,6 +308,9 @@ def calculate_metrics(
     unsupported = anchor_failures = zone_moves = contradictions = untriggered = 0
     oscillations = rallies = rally_upgrades = declines = decline_downgrades = 0
     confirmed = recognized = false_invalidations = critical_suppressions = reactivations = transitions = 0
+    terminal_invalidations = unjustified_terminal_invalidations = 0
+    quick_recovery_false_invalidations = quick_recovery_technical_breaks = 0
+    reduce_risk_exits = confirmed_reclaim_exits = direct_accumulate_exits = 0
     confirmation_lags: list[int] = []
     distribution: dict[str, int] = {}
     previous: ReplayRecord | None = None
@@ -311,6 +332,10 @@ def calculate_metrics(
             changed = snap.state != prior.state
             transitions += changed
             reactivations += prior.state == StrategyState.INVALIDATED and snap.state != StrategyState.INVALIDATED
+            if prior.state == StrategyState.REDUCE_RISK and snap.state != StrategyState.REDUCE_RISK:
+                reduce_risk_exits += 1
+                confirmed_reclaim_exits += snap.transition_rule_id == RULE_CONFIRMED_SUPPORT_RECLAIM
+                direct_accumulate_exits += snap.state == StrategyState.ACCUMULATE_ZONE
             if _zone_key(snap) != _zone_key(prior) and prior.buy_zone is not None:
                 documented = any(reason.startswith("zone_revised:") for reason in snap.reasons)
                 revision_advanced = snap.buy_zone is not None and snap.buy_zone.revision > prior.buy_zone.revision
@@ -356,11 +381,11 @@ def calculate_metrics(
             )
         confirmed_event = (
             snap.transition_rule_id == RULE_CONFIRMED_SUPPORT_BREAK
-            and (previous is None or previous.snapshot.state != StrategyState.INVALIDATED)
+            and (previous is None or previous.snapshot.state != StrategyState.REDUCE_RISK)
         )
         if confirmed_event:
             confirmed += 1
-            recognized += snap.state == StrategyState.INVALIDATED
+            recognized += snap.state == StrategyState.REDUCE_RISK
             confirmation_lags.append(snap.invalidation_confirm_count)
         critical_suppressions += (
             snap.transition_rule_id == RULE_HYSTERESIS_HOLD
@@ -372,10 +397,12 @@ def calculate_metrics(
                 for reason in snap.reasons
             )
         )
-        false_invalidations += (
-            snap.state == StrategyState.INVALIDATED
-            and snap.transition_rule_id not in {RULE_CONFIRMED_SUPPORT_BREAK, RULE_THESIS_INVALIDATED}
-        )
+        if snap.state == StrategyState.INVALIDATED:
+            terminal_invalidations += 1
+            unjustified_terminal_invalidations += snap.transition_rule_id not in {
+                RULE_THESIS_INVALIDATED,
+                RULE_TERMINAL_STATE_PERSISTED,
+            }
         recent_states.append(snap.state)
         if len(recent_states) >= 3:
             a, b, c = recent_states[-3:]
@@ -393,7 +420,7 @@ def calculate_metrics(
         )
         if (
             snap.transition_rule_id != RULE_CONFIRMED_SUPPORT_BREAK
-            or prior_state == StrategyState.INVALIDATED
+            or prior_state == StrategyState.REDUCE_RISK
             or snap.invalidation_level is None
         ):
             continue
@@ -404,7 +431,12 @@ def calculate_metrics(
             and later.input_data.close >= snap.invalidation_level
             for later in future
         )
-        false_invalidations += recovered
+        if recovered and snap.state == StrategyState.INVALIDATED:
+            quick_recovery_false_invalidations += 1
+        elif recovered and snap.state == StrategyState.REDUCE_RISK:
+            quick_recovery_technical_breaks += 1
+
+    false_invalidations = unjustified_terminal_invalidations + quick_recovery_false_invalidations
 
     def rate(value: int, denominator: int = total) -> float:
         return value / denominator if denominator else 0.0
@@ -424,6 +456,13 @@ def calculate_metrics(
         confirmed_breaks=confirmed,
         recognized_confirmed_breaks=recognized,
         false_invalidations=false_invalidations,
+        terminal_invalidations=terminal_invalidations,
+        unjustified_terminal_invalidations=unjustified_terminal_invalidations,
+        quick_recovery_false_invalidations=quick_recovery_false_invalidations,
+        quick_recovery_technical_breaks=quick_recovery_technical_breaks,
+        reduce_risk_exits=reduce_risk_exits,
+        confirmed_reclaim_exits=confirmed_reclaim_exits,
+        reduce_risk_direct_accumulate_exits=direct_accumulate_exits,
         critical_hysteresis_suppressions=critical_suppressions,
         invalidated_reactivations=reactivations,
         transitions=transitions,
@@ -841,5 +880,86 @@ def run_phase27_3_evaluation(fixture: Path, output_dir: Path) -> Path:
         },
     }
     artifact = output_dir / "phase27_3_evaluation.json"
+    artifact.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return artifact
+
+
+def run_phase27_3r_baseline_replay(fixture: Path, output_dir: Path) -> Path:
+    """Replay only the repaired default policy; never select against the old holdout."""
+    repository_root = Path(__file__).resolve().parents[2]
+    output_dir = validate_artifact_path(output_dir, repository_root)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    panel = load_panel_fixture(fixture)
+    stock_symbols = ["2330", "2454", "2308", "2317", "2881", "6505", "AAPL", "MSFT", "NVDA", "LLY"]
+    markets = {symbol: ("tw" if symbol.isdigit() else "us") for symbol in stock_symbols}
+    records: list[ReplayRecord] = []
+    nondeterministic = 0
+    serialized_support_inputs = independent_support_inputs = resistance_inputs = 0
+    for symbol in stock_symbols:
+        bars = panel[symbol]
+        inputs = [build_replay_input(symbol, markets[symbol], bars, bar.as_of) for bar in bars[60:-60]]
+        serialized_support_inputs += sum(bool(item.deterministic_support_levels) for item in inputs)
+        independent_support_inputs += sum(
+            any(
+                not any(
+                    ma is not None and math.isclose(level, ma, rel_tol=1e-6, abs_tol=1e-8)
+                    for ma in (item.ma5, item.ma10, item.ma20)
+                )
+                for level in item.deterministic_support_levels
+            )
+            for item in inputs
+        )
+        resistance_inputs += sum(bool(item.deterministic_resistance_levels) for item in inputs)
+        first = replay_inputs(inputs, DEFAULT_POLICY)
+        second = replay_inputs(inputs, DEFAULT_POLICY)
+        nondeterministic += sum(a.snapshot_bytes != b.snapshot_bytes for a, b in zip(first, second))
+        records.extend(first)
+
+    metrics = calculate_metrics(records, DEFAULT_POLICY)
+    zone_bases = [basis for record in records if record.snapshot.buy_zone for basis in record.snapshot.buy_zone.basis]
+    metrics_payload = metrics.to_dict()
+    metrics_payload.update({
+        "same_input_nondeterminism_rate": 0.0,
+        "same_sequence_nondeterminism_rate": nondeterministic / max(len(records), 1),
+    })
+    payload = {
+        "schema_version": 2,
+        "phase": "27.3R",
+        "threshold_selection_performed": False,
+        "old_holdout_used_for_selection": False,
+        "policy": asdict(DEFAULT_POLICY),
+        "panel": {
+            "stock_symbols": stock_symbols,
+            "markets": sorted(set(markets.values())),
+            "total_evaluations": len(records),
+            "date_start": min(record.input_data.as_of for record in records).isoformat(),
+            "date_end": max(record.input_data.as_of for record in records).isoformat(),
+        },
+        "input_coverage": {
+            "serialized_support_inputs": serialized_support_inputs,
+            "independent_support_inputs": independent_support_inputs,
+            "serialized_resistance_inputs": resistance_inputs,
+            "serialized_support_input_rate": serialized_support_inputs / len(records),
+            "independent_support_input_rate": independent_support_inputs / len(records),
+            "serialized_resistance_input_rate": resistance_inputs / len(records),
+            "independent_support_zone_count": sum(basis.startswith("support:") for basis in zone_bases),
+            "ma_fallback_zone_count": sum(basis in {"ma20", "ma60"} for basis in zone_bases),
+        },
+        "old_phase27_3_baseline": {
+            "INVALIDATED": 257,
+            "REDUCE_RISK": 0,
+            "quick_recovery_false_invalidations": 13,
+            "confirmed_breaks": 17,
+            "recognized_confirmed_breaks": 17,
+            "ACCUMULATE_ZONE": 311,
+            "untriggered_state_flip_rate": 0.0,
+            "zone_entry_contradiction_rate": 0.0,
+            "anchor_lint_failure_rate": 0.0,
+            "unjustified_rally_upgrade_rate": 0.0,
+            "unjustified_decline_downgrade_rate": 0.023255813953488372,
+        },
+        "metrics": metrics_payload,
+    }
+    artifact = output_dir / "phase27_3r_repaired_baseline.json"
     artifact.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return artifact

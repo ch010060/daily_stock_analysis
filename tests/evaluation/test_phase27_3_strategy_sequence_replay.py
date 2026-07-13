@@ -108,11 +108,8 @@ def test_builder_preserves_actual_production_serialization_semantics() -> None:
     bars = _bars()
     input_data = build_replay_input("2454", "tw", bars, bars[69].as_of)
 
-    # TrendAnalysisResult.to_dict() currently omits calculated S/R arrays.
-    # The replay intentionally preserves that production behavior instead of
-    # inventing a more favorable second input contract.
-    assert input_data.deterministic_support_levels == ()
-    assert input_data.deterministic_resistance_levels == ()
+    assert input_data.deterministic_support_levels
+    assert input_data.deterministic_resistance_levels
     assert input_data.ma20 is not None
     assert input_data.ma60 is not None
 
@@ -170,7 +167,7 @@ def test_metrics_detect_zone_entry_contradiction_and_untriggered_zone_move() -> 
 
 
 @pytest.mark.unit
-def test_metrics_count_confirmed_break_that_quickly_recovers_as_false_invalidation() -> None:
+def test_metrics_separate_quick_recovery_from_false_terminal_invalidation() -> None:
     zone = BuyZone(95.0, 100.0, ("support:97",), date(2025, 1, 2), 0, "TECHNICAL_ONLY")
     records = [
         ReplayRecord.minimal(
@@ -183,7 +180,7 @@ def test_metrics_count_confirmed_break_that_quickly_recovers_as_false_invalidati
             daily_change_pct=-13.3,
             snapshot=_snapshot(
                 date(2025, 1, 3),
-                StrategyState.INVALIDATED,
+                StrategyState.REDUCE_RISK,
                 previous_state=StrategyState.ACCUMULATE_ZONE,
                 rule="RULE_CONFIRMED_SUPPORT_BREAK",
                 transition=True,
@@ -194,9 +191,9 @@ def test_metrics_count_confirmed_break_that_quickly_recovers_as_false_invalidati
             daily_change_pct=-1.2,
             snapshot=_snapshot(
                 date(2025, 1, 6),
-                StrategyState.INVALIDATED,
-                previous_state=StrategyState.INVALIDATED,
-                rule="RULE_CONFIRMED_SUPPORT_BREAK",
+                StrategyState.REDUCE_RISK,
+                previous_state=StrategyState.REDUCE_RISK,
+                rule="RULE_SUPPORT_RECLAIM_PENDING",
                 transition=False,
             ),
         ),
@@ -206,8 +203,8 @@ def test_metrics_count_confirmed_break_that_quickly_recovers_as_false_invalidati
             snapshot=_snapshot(
                 date(2025, 1, 7),
                 StrategyState.WATCHLIST,
-                previous_state=StrategyState.INVALIDATED,
-                rule="RULE_INITIAL_WATCHLIST",
+                previous_state=StrategyState.REDUCE_RISK,
+                rule="RULE_CONFIRMED_SUPPORT_RECLAIM",
                 transition=True,
             ),
         ),
@@ -215,7 +212,11 @@ def test_metrics_count_confirmed_break_that_quickly_recovers_as_false_invalidati
 
     metrics = calculate_metrics(records, DEFAULT_POLICY)
     assert metrics.confirmed_breaks == 1
-    assert metrics.false_invalidations == 1
+    assert metrics.recognized_confirmed_breaks == 1
+    assert metrics.false_invalidations == 0
+    assert metrics.quick_recovery_technical_breaks == 1
+    assert metrics.confirmed_reclaim_exits == 1
+    assert metrics.reduce_risk_direct_accumulate_exits == 0
 
 
 @pytest.mark.unit
@@ -286,6 +287,8 @@ def test_artifacts_must_stay_outside_repository(tmp_path: Path) -> None:
 
 @pytest.mark.integration
 def test_agent_and_non_agent_authority_sequence_parity() -> None:
+    from src.services.strategy_state_orchestrator import attach_strategy_state
+    from src.stock_analyzer import TrendAnalysisResult
     from tests.test_strategy_state_orchestrator import PipelineAttachTestCase, _llm_result
 
     pipeline = PipelineAttachTestCase()._make_pipeline(flag=True)
@@ -296,7 +299,17 @@ def test_agent_and_non_agent_authority_sequence_parity() -> None:
         (date(2026, 7, 9), 4620.0, 17.71),
     ]
     for as_of, close, change_pct in sequence:
-        trend = PipelineAttachTestCase()._trend(close)
+        trend = TrendAnalysisResult(
+            code="2454",
+            current_price=close,
+            ma5=4054.0,
+            ma10=4100.0,
+            ma20=4200.0,
+            ma60=3800.0,
+            volume_ratio_5d=1.0,
+            support_levels=[3880.0, 4054.0, 4100.0],
+            resistance_levels=[4700.0],
+        )
         outputs = []
         for operation, decision, prediction in (
             ("買進", "buy", "強烈看多"),
@@ -312,7 +325,10 @@ def test_agent_and_non_agent_authority_sequence_parity() -> None:
             result.valuation_river_snapshot = None
             with patch("src.core.pipeline.get_market_for_stock", return_value="tw"), patch(
                 "src.services.history_loader.get_frozen_target_date", return_value=as_of
-            ):
+            ), patch(
+                "src.services.strategy_state_orchestrator.attach_strategy_state",
+                wraps=attach_strategy_state,
+            ) as attach_spy:
                 pipeline._attach_strategy_state_snapshot(
                     result,
                     "2454",
@@ -320,7 +336,9 @@ def test_agent_and_non_agent_authority_sequence_parity() -> None:
                     fundamental_context=PipelineAttachTestCase()._neutral_fundamental(),
                     previous_snapshot=previous,
                 )
+            strategy_input = attach_spy.call_args.args[1]
             outputs.append({
+                "input": strategy_input,
                 "snapshot": result.strategy_state_snapshot,
                 "operation_advice": result.operation_advice,
                 "decision_type": result.decision_type,
@@ -367,8 +385,11 @@ def test_compact_fixture_manifest_is_sanitized_and_complete() -> None:
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(os.environ.get("RUN_PHASE27_EVAL") != "1", reason="set RUN_PHASE27_EVAL=1 for the heavy replay")
-def test_real_panel_acceptance(tmp_path: Path) -> None:
+@pytest.mark.skipif(
+    os.environ.get("RUN_PHASE27_LEGACY_CALIBRATION") != "1",
+    reason="historical Phase 27.3 calibration is frozen; do not reuse its holdout",
+)
+def test_legacy_phase27_3_panel_acceptance(tmp_path: Path) -> None:
     from src.evaluation.strategy_sequence_replay import run_phase27_3_evaluation
 
     artifact = run_phase27_3_evaluation(FIXTURE, tmp_path)
@@ -388,3 +409,35 @@ def test_real_panel_acceptance(tmp_path: Path) -> None:
     assert payload["baseline"]["unjustified_rally_upgrade_rate"] <= 0.05
     assert payload["baseline"]["unjustified_decline_downgrade_rate"] <= 0.05
     assert payload["selection"]["holdout_evaluated_once"] is True
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(os.environ.get("RUN_PHASE27_EVAL") != "1", reason="set RUN_PHASE27_EVAL=1 for baseline-only repair replay")
+def test_phase27_3r_repaired_baseline_only(tmp_path: Path) -> None:
+    from src.evaluation.strategy_sequence_replay import run_phase27_3r_baseline_replay
+
+    artifact = run_phase27_3r_baseline_replay(FIXTURE, tmp_path)
+    payload = json.loads(artifact.read_text(encoding="utf-8"))
+
+    assert payload["threshold_selection_performed"] is False
+    assert payload["old_holdout_used_for_selection"] is False
+    assert payload["policy"] == {
+        "support_tolerance_pct": 0.02,
+        "anchor_lint_tolerance_pct": 0.01,
+        "minimum_risk_reward": 2.0,
+        "hysteresis_days": 3,
+        "invalidation_confirmation_days": 2,
+        "reclaim_confirmation_days": 2,
+    }
+    assert payload["panel"]["total_evaluations"] >= 240
+    assert payload["metrics"]["same_sequence_nondeterminism_rate"] == 0
+    assert payload["metrics"]["unsupported_rate"] == 0
+    assert payload["metrics"]["anchor_lint_failure_rate"] == 0
+    assert payload["metrics"]["zone_movement_without_trigger_rate"] == 0
+    assert payload["metrics"]["zone_entry_contradiction_rate"] == 0
+    assert payload["metrics"]["untriggered_state_flip_rate"] == 0
+    assert payload["metrics"]["unjustified_rally_upgrade_rate"] <= 0.05
+    assert payload["metrics"]["unjustified_decline_downgrade_rate"] <= 0.05
+    assert payload["metrics"]["state_distribution"].get("INVALIDATED", 0) == 0
+    assert payload["metrics"]["state_distribution"].get("REDUCE_RISK", 0) > 0
+    assert payload["metrics"]["reduce_risk_direct_accumulate_exits"] == 0

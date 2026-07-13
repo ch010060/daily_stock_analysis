@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修復] Phase 27.3R 補回 `TrendAnalysisResult` 已計算但先前未序列化的決定性支撐/壓力陣列（有限正數、固定排序、容差去重，並保留短均線錨定防護與舊版 MA fallback），同時將確認技術跌破由永久 `INVALIDATED` 改為暫時 `REDUCE_RISK`；新增連續 2 個交易觀察站回失效位後先回 `WATCHLIST` 的集中式重啟規則，禁止單日反彈直接恢復累積。生產閾值與功能旗標預設值不變。
+
 - [測試] 新增 Phase 27.3 離線個股策略連續歷史重播與凍結 holdout 校準工具（TW/US 10 檔、1,468 次評估）；校準候選因 holdout 假失效與狀態收斂惡化遭拒，Phase 27.2R 生產閾值維持不變，並記錄需先修正技術支撐/壓力序列化與 INVALIDATED 重啟語義後再驗證。
 
 - [新功能] 新增可選的決定性策略狀態權威（`ENABLE_STRATEGY_STATE_AUTHORITY`，預設關閉）：開啟後個股報告的最終 `operation_advice`/`decision_type`/買區由純函式策略狀態機決定（8 狀態、跨日持久化、遲滯防跳動），LLM 原始行動欄位降級為診斷 metadata 並記錄機器可讀衝突碼；前次決定性狀態以緊湊區塊注入 prompt 維持敘事連續性（兩條分析路徑一致）；Web 完整報告新增「策略狀態（決定性引擎）」區塊（僅在權威快照存在時渲染，舊報告完全不變）。個股標的路由於引擎呼叫前完成（ETF/指數不產生任何策略狀態欄位）；必要決定性資料（現價/交易日/資料品質）缺失時視為資料源執行失敗，分析任務直接失敗且不落庫，不再以「不支援」佔位完成報告；缺valuation不影響支援判定（技術面單獨可支撐時仍為有效狀態）。關閉（預設）時所有現有行為完全不變。
