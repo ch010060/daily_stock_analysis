@@ -20,10 +20,13 @@ from src.evaluation.strategy_sequence_replay import (
     analyze_breakdown_episodes,
     build_replay_input,
     calculate_metrics,
+    classify_do_not_chase_retention,
     freeze_policy_selection,
     load_panel_fixture,
     replay_inputs,
+    run_phase27_3u_lifecycle_ab,
     select_policy,
+    summarize_do_not_chase_lifecycle,
     summarize_state_runs,
     validate_holdout_candidate,
     validate_artifact_path,
@@ -31,9 +34,17 @@ from src.evaluation.strategy_sequence_replay import (
 )
 from src.services.strategy_state_engine import (
     DEFAULT_POLICY,
+    INVALIDATION_BREACH_PENDING,
+    RULE_DO_NOT_CHASE_CLEARED,
+    RULE_DO_NOT_CHASE_REVALIDATED,
+    RULE_CONFIRMED_SUPPORT_BREAK,
+    RULE_HYSTERESIS_HOLD,
+    RULE_RISK_REWARD_OVEREXTENDED,
+    RULE_VALID_BUY_ZONE_ENTERED,
     BuyZone,
     StrategyPolicy,
     StrategyState,
+    StrategyStateInput,
     StrategyStateSnapshot,
 )
 
@@ -398,9 +409,200 @@ def test_state_run_summary_separates_entries_occupancy_duration_and_censoring() 
     assert summary["transitions_into_state"] == 2
     assert summary["observations"] == 4
     assert summary["duration_median"] == 2.0
+    assert summary["duration_p75"] == 2.5
+    assert summary["duration_p90"] == 2.8
     assert summary["duration_max"] == 3
     assert summary["exit_rule_distribution"] == {"RULE_WAIT_FOR_PULLBACK": 1}
     assert summary["right_censored_runs"] == 1
+
+
+@pytest.mark.unit
+def test_do_not_chase_retention_categories_are_mutually_exclusive() -> None:
+    zone = BuyZone(
+        low=90.0,
+        high=95.0,
+        basis=("support:92.0",),
+        created_at=date(2025, 1, 2),
+        revision=0,
+        zone_type="TECHNICAL_ONLY",
+    )
+    base = _snapshot(date(2025, 1, 2), StrategyState.DO_NOT_CHASE, zone=zone)
+    records = [
+        ReplayRecord.minimal(close=110.0, daily_change_pct=0.0, snapshot=replace(
+            base,
+            transition_rule_id=RULE_RISK_REWARD_OVEREXTENDED,
+            reasons=("rr_at_price=0.5",),
+        )),
+        ReplayRecord.minimal(close=109.0, daily_change_pct=0.0, snapshot=replace(
+            base,
+            as_of=date(2025, 1, 3),
+            transition_rule_id=RULE_DO_NOT_CHASE_REVALIDATED,
+            reasons=("rr_at_price=0.6",),
+        )),
+        ReplayRecord.minimal(close=100.0, daily_change_pct=0.0, snapshot=replace(
+            base,
+            as_of=date(2025, 1, 4),
+            transition_rule_id=RULE_HYSTERESIS_HOLD,
+            reasons=("suppressed_transition_to=WAIT_FOR_PULLBACK",),
+        )),
+        ReplayRecord.minimal(close=89.0, daily_change_pct=0.0, snapshot=replace(
+            base,
+            as_of=date(2025, 1, 5),
+            reasons=(INVALIDATION_BREACH_PENDING,),
+        )),
+        ReplayRecord.minimal(close=89.0, daily_change_pct=0.0, snapshot=replace(
+            base,
+            as_of=date(2025, 1, 6),
+            reasons=(),
+        )),
+        ReplayRecord.minimal(close=100.0, daily_change_pct=0.0, snapshot=replace(
+            base,
+            as_of=date(2025, 1, 7),
+            buy_zone=None,
+            reasons=(),
+        )),
+    ]
+
+    assert classify_do_not_chase_retention(records[0], records[1]) == "CURRENT_TRIGGER_STILL_TRUE"
+    assert classify_do_not_chase_retention(records[1], records[2]) == "HYSTERESIS_SUPPRESSED_EXIT"
+    assert classify_do_not_chase_retention(records[2], records[3]) == "CURRENT_TRIGGER_CLEARED_BUT_STATE_PERSISTED"
+    assert classify_do_not_chase_retention(records[3], records[4]) == "CURRENT_TRIGGER_CLEARED_BUT_STATE_PERSISTED"
+    assert classify_do_not_chase_retention(records[4], records[5]) == "NO_VALID_ZONE_AVAILABLE"
+
+    summary = summarize_do_not_chase_lifecycle({"2454": records})
+    assert summary["entries"] == 1
+    assert summary["retention_reasons"] == {
+        "CURRENT_TRIGGER_CLEARED_BUT_STATE_PERSISTED": 2,
+        "CURRENT_TRIGGER_STILL_TRUE": 2,
+        "HYSTERESIS_SUPPRESSED_EXIT": 1,
+        "NO_VALID_ZONE_AVAILABLE": 1,
+        "OTHER_EXPLICIT_REASON": 0,
+    }
+    assert sum(summary["retention_reasons"].values()) == (
+        summary["observations"] - summary["transitions_into_state"]
+    )
+    assert summary["trigger_true_and_retained"] == 2
+    assert summary["trigger_false_but_retained"] == 2
+    assert summary["trigger_unobservable_but_retained"] == 1
+    assert summary["hysteresis_delayed_exits"] == 1
+    assert summary["right_censored_after_trigger_cleared"] == 0
+    assert summary["right_censored_trigger_unobservable"] == 1
+
+
+@pytest.mark.unit
+def test_do_not_chase_exit_lag_covers_every_exit_state() -> None:
+    zone = BuyZone(
+        low=90.0,
+        high=95.0,
+        basis=("support:92.0",),
+        created_at=date(2025, 1, 2),
+        revision=0,
+        zone_type="TECHNICAL_ONLY",
+    )
+    records = [
+        ReplayRecord.minimal(
+            close=110.0,
+            daily_change_pct=0.0,
+            snapshot=replace(
+                _snapshot(date(2025, 1, 2), StrategyState.DO_NOT_CHASE, zone=zone),
+                reasons=("rr_at_price=0.5",),
+            ),
+        ),
+        ReplayRecord.minimal(
+            close=93.0,
+            daily_change_pct=0.0,
+            snapshot=_snapshot(
+                date(2025, 1, 3),
+                StrategyState.ACCUMULATE_ZONE,
+                zone=zone,
+                rule=RULE_VALID_BUY_ZONE_ENTERED,
+            ),
+        ),
+        ReplayRecord.minimal(
+            close=110.0,
+            daily_change_pct=0.0,
+            snapshot=replace(
+                _snapshot(date(2025, 1, 4), StrategyState.DO_NOT_CHASE, zone=zone),
+                reasons=("rr_at_price=0.5",),
+            ),
+        ),
+        ReplayRecord.minimal(
+            close=85.0,
+            daily_change_pct=0.0,
+            snapshot=_snapshot(
+                date(2025, 1, 5),
+                StrategyState.REDUCE_RISK,
+                zone=zone,
+                rule=RULE_CONFIRMED_SUPPORT_BREAK,
+            ),
+        ),
+    ]
+
+    summary = summarize_do_not_chase_lifecycle({"2454": records})
+
+    assert summary["exit_state_distribution"] == {
+        "ACCUMULATE_ZONE": 1,
+        "REDUCE_RISK": 1,
+    }
+    assert summary["trigger_clear_to_exit_observations"] == [0, 0]
+    assert summary["trigger_clear_to_exit_calendar_days"] == [0, 0]
+
+
+@pytest.mark.unit
+def test_replay_evaluator_hook_changes_only_selected_lifecycle_observation() -> None:
+    inputs = [
+        StrategyStateInput(
+            symbol="X",
+            market="us",
+            instrument_type="stock",
+            as_of=date(2025, 1, 2) + timedelta(days=index),
+            close=100.0 + index,
+        )
+        for index in range(2)
+    ]
+    calls = []
+
+    def evaluator(input_data, previous, policy):
+        calls.append((input_data.as_of, previous.as_of if previous else None, policy))
+        return _snapshot(input_data.as_of, StrategyState.WATCHLIST)
+
+    records = replay_inputs(inputs, evaluator=evaluator)
+
+    assert len(records) == 2
+    assert calls[0][1] is None
+    assert calls[1][1] == inputs[0].as_of
+    assert all(call[2] == DEFAULT_POLICY for call in calls)
+
+
+@pytest.mark.unit
+def test_trigger_clear_lag_resets_when_rr_trigger_reappears() -> None:
+    snapshots = [
+        replace(
+            _snapshot(date(2025, 1, 2), StrategyState.DO_NOT_CHASE),
+            transition_rule_id=RULE_RISK_REWARD_OVEREXTENDED,
+            reasons=("rr_at_price=0.5",),
+        ),
+        replace(
+            _snapshot(date(2025, 1, 3), StrategyState.DO_NOT_CHASE),
+            transition_rule_id=RULE_HYSTERESIS_HOLD,
+            reasons=("suppressed_transition_to=WATCHLIST",),
+        ),
+        replace(
+            _snapshot(date(2025, 1, 4), StrategyState.DO_NOT_CHASE),
+            transition_rule_id=RULE_DO_NOT_CHASE_REVALIDATED,
+            reasons=("rr_at_price=0.4",),
+        ),
+        _snapshot(date(2025, 1, 5), StrategyState.WATCHLIST),
+    ]
+    records = [
+        ReplayRecord.minimal(close=100.0, daily_change_pct=0.0, snapshot=snapshot)
+        for snapshot in snapshots
+    ]
+
+    summary = summarize_do_not_chase_lifecycle({"X": records})
+
+    assert summary["trigger_clear_to_exit_calendar_days"] == [0]
+    assert summary["trigger_clear_to_exit_observations"] == [0]
 
 
 @pytest.mark.integration
@@ -415,7 +617,12 @@ def test_agent_and_non_agent_authority_sequence_parity() -> None:
         (date(2026, 7, 7), 4100.0, 1.0),
         (date(2026, 7, 8), 3925.0, -4.27),
         (date(2026, 7, 9), 4620.0, 17.71),
+        (date(2026, 7, 10), 4625.0, 0.11),
+        (date(2026, 7, 13), 4625.0, 0.0),
+        (date(2026, 7, 14), 4625.0, 0.0),
+        (date(2026, 7, 17), 3780.0, -18.27),
     ]
+    observed_rules = []
     for as_of, close, change_pct in sequence:
         trend = TrendAnalysisResult(
             code="2454",
@@ -468,6 +675,9 @@ def test_agent_and_non_agent_authority_sequence_parity() -> None:
         assert outputs[0]["input"].market_structure_support_levels == (3880.0,)
         assert outputs[0]["input"].market_structure_resistance_levels == (4700.0,)
         previous = StrategyStateSnapshot.from_dict(outputs[0]["snapshot"])
+        observed_rules.append(previous.transition_rule_id)
+    assert RULE_DO_NOT_CHASE_REVALIDATED in observed_rules
+    assert previous.transition_rule_id == RULE_DO_NOT_CHASE_CLEARED
 
 
 @pytest.mark.integration
@@ -615,3 +825,61 @@ def test_phase27_3t_development_ab(tmp_path: Path) -> None:
     assert payload["arms"]["B_market_structure"]["same_sequence_nondeterminism_rate"] == 0
     assert payload["arms"]["B_market_structure"]["provenance"]["independent_support_inputs"] > 0
     assert set(payload["panels"]) == {"phase27_3", "phase27_3s"}
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    os.environ.get("RUN_PHASE27_3U_EVAL") != "1",
+    reason="set RUN_PHASE27_3U_EVAL=1 for the seen-fixture lifecycle A/B replay",
+)
+def test_phase27_3u_lifecycle_ab(tmp_path: Path) -> None:
+    artifact = run_phase27_3u_lifecycle_ab(
+        FIXTURE,
+        PHASE27_3S_FIXTURE,
+        PHASE27_3S_MANIFEST,
+        tmp_path,
+    )
+    payload = json.loads(artifact.read_text(encoding="utf-8"))
+
+    assert payload["phase27_3s_a_consumed"] is False
+    assert payload["threshold_selection_performed"] is False
+    assert payload["policy"] == DEFAULT_POLICY.__dict__
+    assert set(payload["arms"]) == {"A_phase27_3t", "B_lifecycle_repair"}
+    assert payload["inputs_byte_equivalent"] is True
+    assert payload["causal_level_coverage_byte_equivalent"] is True
+    assert payload["arms"]["B_lifecycle_repair"]["same_sequence_nondeterminism_rate"] == 0
+    assert payload["arms"]["B_lifecycle_repair"]["same_input_nondeterminism_rate"] == 0
+    assert payload["status"] == "PHASE_27_3U_FAILED_PERSISTENCE_OR_STRUCTURAL_GATES"
+    assert payload["arms"]["A_phase27_3t"]["metrics"]["state_distribution"] == {
+        "ACCUMULATE_ZONE": 152,
+        "DO_NOT_CHASE": 1768,
+        "HOLD_ONLY": 11,
+        "REDUCE_RISK": 219,
+        "WAIT_FOR_PULLBACK": 55,
+        "WATCHLIST": 231,
+    }
+    assert payload["arms"]["A_phase27_3t"]["lifecycle"]["transitions_into_state"] == 75
+    assert sum(
+        payload["arms"]["A_phase27_3t"]["lifecycle"]["retention_reasons"].values()
+    ) == 1768 - 75
+    assert payload["arms"]["A_phase27_3t"]["lifecycle"]["duration_median"] == 8
+    assert payload["arms"]["A_phase27_3t"]["lifecycle"]["right_censored_runs"] == 14
+    assert payload["arms"]["B_lifecycle_repair"]["lifecycle"][
+        "retention_reasons"
+    ]["CURRENT_TRIGGER_CLEARED_BUT_STATE_PERSISTED"] == 0
+    assert payload["arms"]["B_lifecycle_repair"]["lifecycle"][
+        "retention_reasons"
+    ]["OTHER_EXPLICIT_REASON"] == 0
+    assert sum(
+        payload["arms"]["B_lifecycle_repair"]["lifecycle"]["retention_reasons"].values()
+    ) == 1765 - 75
+    assert set(payload["arms"]["B_lifecycle_repair"]["lifecycle_by_panel"]) == {
+        "phase27_3",
+        "phase27_3s",
+    }
+    assert set(payload["arms"]["B_lifecycle_repair"]["lifecycle_by_market"]) == {"tw", "us"}
+    assert set(payload["arms"]["B_lifecycle_repair"]["lifecycle_by_symbol"]) == set(
+        payload["arms"]["B_lifecycle_repair"]["metrics_by_symbol"]
+    )
+    assert payload["development_gates"]["unexplained_retention"] is True
+    assert payload["development_gates"]["combined_do_not_chase_below_50pct"] is False

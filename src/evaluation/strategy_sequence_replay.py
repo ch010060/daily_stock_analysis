@@ -11,20 +11,24 @@ import statistics
 from dataclasses import asdict, dataclass, replace
 from datetime import date
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 import pandas as pd
 
 from src.services.strategy_state_engine import (
     BUY_ZONE_CURRENT_PRICE_ANCHOR_REJECTED,
     DEFAULT_POLICY,
+    INVALIDATION_BREACH_PENDING,
     RULE_CONFIRMED_SUPPORT_BREAK,
     RULE_CONFIRMED_SUPPORT_RECLAIM,
+    RULE_DO_NOT_CHASE_CLEARED,
+    RULE_DO_NOT_CHASE_REVALIDATED,
     RULE_HOLD_EXISTING_ONLY,
     RULE_HYSTERESIS_HOLD,
     RULE_INITIAL_WATCHLIST,
     RULE_RISK_FLAG_REDUCE,
     RULE_RISK_REWARD_OVEREXTENDED,
+    RULE_STATE_UNCHANGED,
     RULE_THESIS_INVALIDATED,
     RULE_TERMINAL_STATE_PERSISTED,
     RULE_VALID_BUY_ZONE_ENTERED,
@@ -33,6 +37,7 @@ from src.services.strategy_state_engine import (
     StrategyState,
     StrategyStateInput,
     StrategyStateSnapshot,
+    STATE_ACTION_MAP,
     evaluate_strategy_state,
     lint_buy_zone,
 )
@@ -286,13 +291,18 @@ def build_replay_input(
 def replay_inputs(
     inputs: Sequence[StrategyStateInput],
     policy: StrategyPolicy = DEFAULT_POLICY,
+    *,
+    evaluator: Callable[
+        [StrategyStateInput, StrategyStateSnapshot | None, StrategyPolicy],
+        StrategyStateSnapshot,
+    ] = evaluate_strategy_state,
 ) -> list[ReplayRecord]:
     previous = None
     records = []
     for input_data in inputs:
         if previous is not None and input_data.as_of <= previous.as_of:
             raise ValueError("replay inputs must be strictly chronological")
-        snapshot = evaluate_strategy_state(input_data, previous, policy)
+        snapshot = evaluator(input_data, previous, policy)
         payload = json.dumps(
             snapshot.to_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=False
         ).encode("utf-8")
@@ -334,6 +344,8 @@ def summarize_state_runs(
         "observations": observations,
         "observed_run_count": len(durations),
         "duration_median": statistics.median(durations) if durations else None,
+        "duration_p75": _percentile(durations, 0.75),
+        "duration_p90": _percentile(durations, 0.90),
         "duration_max": max(durations, default=None),
         "exit_rule_distribution": dict(sorted(exits.items())),
         "left_censored_runs": left_censored,
@@ -341,10 +353,165 @@ def summarize_state_runs(
     }
 
 
+def _percentile(values: Sequence[int], quantile: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * quantile
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
+
+
+_DO_NOT_CHASE_RETENTION_REASONS = (
+    "CURRENT_TRIGGER_CLEARED_BUT_STATE_PERSISTED",
+    "CURRENT_TRIGGER_STILL_TRUE",
+    "HYSTERESIS_SUPPRESSED_EXIT",
+    "NO_VALID_ZONE_AVAILABLE",
+    "OTHER_EXPLICIT_REASON",
+)
+
+
+def classify_do_not_chase_retention(
+    previous: ReplayRecord,
+    current: ReplayRecord,
+) -> str:
+    """Classify one retained DO_NOT_CHASE observation from current evidence."""
+    if previous.snapshot.state != StrategyState.DO_NOT_CHASE:
+        raise ValueError("previous observation must be DO_NOT_CHASE")
+    if current.snapshot.state != StrategyState.DO_NOT_CHASE:
+        raise ValueError("current observation must retain DO_NOT_CHASE")
+    return _classify_current_do_not_chase(current)
+
+
+def _classify_current_do_not_chase(current: ReplayRecord) -> str:
+    """Classify current no-chase evidence, including a left-censored first row."""
+    if any(reason.startswith("rr_at_price=") for reason in current.snapshot.reasons):
+        return "CURRENT_TRIGGER_STILL_TRUE"
+    if current.snapshot.transition_rule_id == RULE_HYSTERESIS_HOLD:
+        return "HYSTERESIS_SUPPRESSED_EXIT"
+    if INVALIDATION_BREACH_PENDING in current.snapshot.reasons:
+        return "CURRENT_TRIGGER_CLEARED_BUT_STATE_PERSISTED"
+    if (
+        current.snapshot.buy_zone is not None
+        and current.input_data.close is not None
+        and current.input_data.close < current.snapshot.buy_zone.low
+    ):
+        return "CURRENT_TRIGGER_CLEARED_BUT_STATE_PERSISTED"
+    if current.snapshot.buy_zone is None:
+        return "NO_VALID_ZONE_AVAILABLE"
+    return "OTHER_EXPLICIT_REASON"
+
+
+def summarize_do_not_chase_lifecycle(
+    records_by_symbol: Mapping[str, Sequence[ReplayRecord]],
+    predecessors_by_symbol: Mapping[str, ReplayRecord] | None = None,
+) -> dict[str, Any]:
+    predecessors_by_symbol = predecessors_by_symbol or {}
+    reasons = {name: 0 for name in _DO_NOT_CHASE_RETENTION_REASONS}
+    entries = 0
+    exit_states: dict[str, int] = {}
+    clear_to_exit_observations: list[int] = []
+    clear_to_exit_market_days: list[int] = []
+    valid_zone_accumulate = confirmed_break_reduce = 0
+    invalid_accumulate = invalid_reduce = 0
+    right_true = right_cleared = right_unobservable = 0
+
+    for symbol, records in records_by_symbol.items():
+        index = 0
+        while index < len(records):
+            if records[index].snapshot.state != StrategyState.DO_NOT_CHASE:
+                index += 1
+                continue
+            entries += 1
+            first_clear: int | None = None
+            if index == 0:
+                predecessor = predecessors_by_symbol.get(symbol)
+                if (
+                    predecessor is not None
+                    and predecessor.snapshot.state == StrategyState.DO_NOT_CHASE
+                ):
+                    category = classify_do_not_chase_retention(predecessor, records[index])
+                else:
+                    category = _classify_current_do_not_chase(records[index])
+                reasons[category] += 1
+                if category != "CURRENT_TRIGGER_STILL_TRUE":
+                    first_clear = index
+            index += 1
+            while index < len(records) and records[index].snapshot.state == StrategyState.DO_NOT_CHASE:
+                category = classify_do_not_chase_retention(records[index - 1], records[index])
+                reasons[category] += 1
+                if category == "CURRENT_TRIGGER_STILL_TRUE":
+                    first_clear = None
+                elif category in {
+                    "CURRENT_TRIGGER_CLEARED_BUT_STATE_PERSISTED",
+                    "HYSTERESIS_SUPPRESSED_EXIT",
+                    "NO_VALID_ZONE_AVAILABLE",
+                } and first_clear is None:
+                    first_clear = index
+                index += 1
+
+            if index == len(records):
+                final = records[index - 1]
+                if any(reason.startswith("rr_at_price=") for reason in final.snapshot.reasons):
+                    right_true += 1
+                elif final.snapshot.buy_zone is None:
+                    right_unobservable += 1
+                else:
+                    right_cleared += 1
+                continue
+
+            exit_record = records[index]
+            exit_state = exit_record.snapshot.state.value
+            exit_states[exit_state] = exit_states.get(exit_state, 0) + 1
+            clear_to_exit_observations.append(0 if first_clear is None else index - first_clear)
+            clear_to_exit_market_days.append(
+                0 if first_clear is None else (
+                    exit_record.input_data.as_of - records[first_clear].input_data.as_of
+                ).days
+            )
+            if exit_record.snapshot.state == StrategyState.ACCUMULATE_ZONE:
+                zone = exit_record.snapshot.buy_zone
+                if zone and zone.low <= float(exit_record.input_data.close) <= zone.high:
+                    valid_zone_accumulate += 1
+                else:
+                    invalid_accumulate += 1
+            if exit_record.snapshot.state == StrategyState.REDUCE_RISK:
+                if exit_record.snapshot.transition_rule_id == RULE_CONFIRMED_SUPPORT_BREAK:
+                    confirmed_break_reduce += 1
+                else:
+                    invalid_reduce += 1
+
+    runs = summarize_state_runs(records_by_symbol, StrategyState.DO_NOT_CHASE)
+    return {
+        **runs,
+        "entries": entries,
+        "retention_reasons": reasons,
+        "trigger_true_and_retained": reasons["CURRENT_TRIGGER_STILL_TRUE"],
+        "trigger_false_but_retained": (
+            reasons["CURRENT_TRIGGER_CLEARED_BUT_STATE_PERSISTED"]
+        ),
+        "trigger_unobservable_but_retained": reasons["NO_VALID_ZONE_AVAILABLE"],
+        "hysteresis_delayed_exits": reasons["HYSTERESIS_SUPPRESSED_EXIT"],
+        "right_censored_while_trigger_true": right_true,
+        "right_censored_after_trigger_cleared": right_cleared,
+        "right_censored_trigger_unobservable": right_unobservable,
+        "exit_state_distribution": dict(sorted(exit_states.items())),
+        "trigger_clear_to_exit_observations": clear_to_exit_observations,
+        "trigger_clear_to_exit_calendar_days": clear_to_exit_market_days,
+        "do_not_chase_to_accumulate_with_valid_zone": valid_zone_accumulate,
+        "do_not_chase_to_accumulate_without_valid_zone": invalid_accumulate,
+        "do_not_chase_to_reduce_with_confirmed_break": confirmed_break_reduce,
+        "do_not_chase_to_reduce_without_confirmed_break": invalid_reduce,
+    }
+
+
 _VALID_TRANSITION_RULES = frozenset({
     RULE_VALID_BUY_ZONE_ENTERED,
     RULE_WAIT_FOR_PULLBACK,
     RULE_RISK_REWARD_OVEREXTENDED,
+    RULE_DO_NOT_CHASE_REVALIDATED,
+    RULE_DO_NOT_CHASE_CLEARED,
     RULE_HOLD_EXISTING_ONLY,
     RULE_CONFIRMED_SUPPORT_BREAK,
     RULE_CONFIRMED_SUPPORT_RECLAIM,
@@ -1786,5 +1953,444 @@ def run_phase27_3t_development_ab(
         "development_gates": gates,
     }
     artifact = output_dir / "phase27_3t_development_ab.json"
+    artifact.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return artifact
+
+
+def _evaluate_phase27_3t_lifecycle(
+    input_data: StrategyStateInput,
+    previous: StrategyStateSnapshot | None,
+    policy: StrategyPolicy,
+) -> StrategyStateSnapshot:
+    """Evaluation-only compatibility wrapper for the committed 27.3T lifecycle."""
+    snapshot = evaluate_strategy_state(input_data, previous, policy)
+    if previous is None or previous.state != StrategyState.DO_NOT_CHASE:
+        return snapshot
+    if snapshot.transition_rule_id == RULE_DO_NOT_CHASE_REVALIDATED:
+        return replace(snapshot, transition_rule_id=RULE_STATE_UNCHANGED)
+    if (
+        previous.buy_zone is None
+        or input_data.close is None
+        or input_data.close >= previous.buy_zone.low
+        or snapshot.transition_rule_id not in {RULE_DO_NOT_CHASE_CLEARED, RULE_HYSTERESIS_HOLD}
+    ):
+        return snapshot
+    actionability, advice, decision = STATE_ACTION_MAP[StrategyState.DO_NOT_CHASE]
+    return replace(
+        snapshot,
+        state=StrategyState.DO_NOT_CHASE,
+        actionability=actionability,
+        operation_advice=advice,
+        decision_type=decision,
+        transition_rule_id=RULE_STATE_UNCHANGED,
+        transition_triggered=False,
+        state_entered_at=previous.state_entered_at,
+        last_transition_at=previous.last_transition_at,
+        days_in_state=max(0, (input_data.as_of - previous.state_entered_at).days),
+        transition_count_in_window=previous.transition_count_in_window,
+        reasons=tuple(
+            reason
+            for reason in snapshot.reasons
+            if not reason.startswith("suppressed_transition_to=")
+        ),
+    )
+
+
+def _state_occupancy(records: Sequence[ReplayRecord]) -> dict[str, Any]:
+    distribution: dict[str, int] = {}
+    for record in records:
+        state = record.snapshot.state.value
+        distribution[state] = distribution.get(state, 0) + 1
+    total = len(records)
+    return {
+        "total": total,
+        "state_distribution": dict(sorted(distribution.items())),
+        "do_not_chase": distribution.get(StrategyState.DO_NOT_CHASE.value, 0),
+        "do_not_chase_share": (
+            distribution.get(StrategyState.DO_NOT_CHASE.value, 0) / max(total, 1)
+        ),
+        "top_state_share": max(distribution.values(), default=0) / max(total, 1),
+    }
+
+
+def _phase27_3u_arm_summary(
+    records_by_symbol: Mapping[str, Sequence[ReplayRecord]],
+    inputs_by_symbol: Mapping[str, Sequence[StrategyStateInput]],
+    markets: Mapping[str, str],
+    panels: Mapping[str, str],
+    same_input_nondeterministic_snapshots: int,
+    same_sequence_nondeterministic_snapshots: int,
+    predecessors_by_symbol: Mapping[str, ReplayRecord] | None = None,
+) -> dict[str, Any]:
+    predecessors_by_symbol = predecessors_by_symbol or {}
+    summary = _phase27_3t_arm_summary(
+        records_by_symbol,
+        inputs_by_symbol,
+        markets,
+        same_sequence_nondeterministic_snapshots,
+    )
+    all_records = [record for records in records_by_symbol.values() for record in records]
+    regimes = sorted({record.regime for record in all_records})
+    summary["lifecycle"] = summarize_do_not_chase_lifecycle(
+        records_by_symbol,
+        predecessors_by_symbol,
+    )
+    summary["same_input_nondeterminism_rate"] = (
+        same_input_nondeterministic_snapshots / max(len(all_records), 1)
+    )
+    summary["lifecycle_by_panel"] = {
+        panel: summarize_do_not_chase_lifecycle(
+            {
+                symbol: records
+                for symbol, records in records_by_symbol.items()
+                if panels[symbol] == panel
+            },
+            {
+                symbol: record
+                for symbol, record in predecessors_by_symbol.items()
+                if panels[symbol] == panel
+            },
+        )
+        for panel in sorted(set(panels.values()))
+    }
+    summary["lifecycle_by_market"] = {
+        market: summarize_do_not_chase_lifecycle(
+            {
+                symbol: records
+                for symbol, records in records_by_symbol.items()
+                if markets[symbol] == market
+            },
+            {
+                symbol: record
+                for symbol, record in predecessors_by_symbol.items()
+                if markets[symbol] == market
+            },
+        )
+        for market in ("tw", "us")
+    }
+    summary["lifecycle_by_symbol"] = {
+        symbol: summarize_do_not_chase_lifecycle(
+            {symbol: records},
+            (
+                {symbol: predecessors_by_symbol[symbol]}
+                if symbol in predecessors_by_symbol
+                else None
+            ),
+        )
+        for symbol, records in records_by_symbol.items()
+    }
+
+    def regime_segments(
+        regime: str,
+    ) -> tuple[dict[str, list[ReplayRecord]], dict[str, ReplayRecord]]:
+        segments: dict[str, list[ReplayRecord]] = {}
+        predecessors: dict[str, ReplayRecord] = {}
+        for symbol, records in records_by_symbol.items():
+            segment: list[ReplayRecord] = []
+            number = 0
+            prior = predecessors_by_symbol.get(symbol)
+            for record in records:
+                if record.regime == regime:
+                    if not segment and prior is not None:
+                        predecessors[f"{symbol}:{number}"] = prior
+                    segment.append(record)
+                elif segment:
+                    segments[f"{symbol}:{number}"] = segment
+                    number += 1
+                    segment = []
+                prior = record
+            if segment:
+                segments[f"{symbol}:{number}"] = segment
+        return segments, predecessors
+
+    summary["lifecycle_by_regime"] = {}
+    for regime in regimes:
+        segments, predecessors = regime_segments(regime)
+        summary["lifecycle_by_regime"][regime] = summarize_do_not_chase_lifecycle(
+            segments,
+            predecessors,
+        )
+    summary["lifecycle_by_regime_censoring"] = "runs are segmented at regime boundaries"
+    summary["occupancy"] = {
+        "combined": _state_occupancy(all_records),
+        "by_panel": {
+            panel: _state_occupancy([
+                record
+                for symbol, records in records_by_symbol.items()
+                if panels[symbol] == panel
+                for record in records
+            ])
+            for panel in sorted(set(panels.values()))
+        },
+        "by_market": {
+            market: _state_occupancy([
+                record
+                for symbol, records in records_by_symbol.items()
+                if markets[symbol] == market
+                for record in records
+            ])
+            for market in ("tw", "us")
+        },
+        "by_symbol": {
+            symbol: _state_occupancy(records)
+            for symbol, records in records_by_symbol.items()
+        },
+        "by_regime": {
+            regime: _state_occupancy([
+                record for record in all_records if record.regime == regime
+            ])
+            for regime in regimes
+        },
+    }
+    return summary
+
+
+def run_phase27_3u_lifecycle_ab(
+    phase27_3_fixture: Path,
+    phase27_3s_fixture: Path,
+    phase27_3s_manifest: Path,
+    output_dir: Path,
+) -> Path:
+    """Compare committed versus repaired DNC lifecycle on seen fixtures only."""
+    repository_root = Path(__file__).resolve().parents[2]
+    output_dir = validate_artifact_path(output_dir, repository_root)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    old_panel = load_panel_fixture(phase27_3_fixture)
+    new_panel = validate_phase27_3s_fixture(phase27_3s_fixture, phase27_3s_manifest)
+    old_symbols = ("2330", "2454", "2308", "2317", "2881", "6505", "AAPL", "MSFT", "NVDA", "LLY")
+    all_symbols = old_symbols + PHASE27_3S_STOCKS
+    markets = {symbol: ("tw" if symbol.isdigit() else "us") for symbol in all_symbols}
+    panels = {
+        symbol: ("phase27_3" if symbol in old_symbols else "phase27_3s")
+        for symbol in all_symbols
+    }
+
+    full_inputs: dict[str, list[StrategyStateInput]] = {}
+    evaluation_dates: dict[str, set[date]] = {}
+    bars_by_symbol: dict[str, Sequence[MarketBar]] = {}
+    benchmark_by_symbol: dict[str, Sequence[MarketBar]] = {}
+    for symbol in old_symbols:
+        bars = old_panel[symbol]
+        inputs = [
+            build_replay_input(symbol, markets[symbol], bars, bar.as_of)
+            for bar in bars[60:-60]
+        ]
+        full_inputs[symbol] = inputs
+        evaluation_dates[symbol] = {item.as_of for item in inputs}
+        bars_by_symbol[symbol] = bars
+        benchmark_by_symbol[symbol] = old_panel[PHASE27_3S_BENCHMARKS[markets[symbol]]]
+    for symbol in PHASE27_3S_STOCKS:
+        bars = new_panel[symbol]
+        inputs = [
+            build_replay_input(symbol, markets[symbol], bars, bar.as_of)
+            for bar in bars[60:]
+            if bar.as_of <= PHASE27_3S_EVALUATION_END
+        ]
+        full_inputs[symbol] = inputs
+        evaluation_dates[symbol] = {
+            item.as_of
+            for item in inputs
+            if PHASE27_3S_EVALUATION_START <= item.as_of <= PHASE27_3S_EVALUATION_END
+        }
+        bars_by_symbol[symbol] = bars
+        benchmark_by_symbol[symbol] = new_panel[PHASE27_3S_BENCHMARKS[markets[symbol]]]
+
+    input_payload = json.dumps(
+        {
+            symbol: [asdict(item) for item in inputs]
+            for symbol, inputs in full_inputs.items()
+        },
+        default=str,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    input_fingerprint = hashlib.sha256(input_payload).hexdigest()
+    arms: dict[str, dict[str, Any]] = {}
+    arm_records: dict[str, dict[str, list[ReplayRecord]]] = {}
+    arm_input_fingerprints: dict[str, str] = {}
+    arm_structure_fingerprints: dict[str, str] = {}
+    for arm_name, evaluator in (
+        ("A_phase27_3t", _evaluate_phase27_3t_lifecycle),
+        ("B_lifecycle_repair", evaluate_strategy_state),
+    ):
+        records_by_symbol: dict[str, list[ReplayRecord]] = {}
+        predecessors_by_symbol: dict[str, ReplayRecord] = {}
+        inputs_by_symbol: dict[str, list[StrategyStateInput]] = {}
+        same_input_nondeterministic = 0
+        same_sequence_nondeterministic = 0
+        for symbol in all_symbols:
+            first = replay_inputs(full_inputs[symbol], DEFAULT_POLICY, evaluator=evaluator)
+            second = replay_inputs(full_inputs[symbol], DEFAULT_POLICY, evaluator=evaluator)
+            same_sequence_nondeterministic += sum(
+                left.snapshot_bytes != right.snapshot_bytes
+                for left, right in zip(first, second)
+            )
+            previous = None
+            for expected in first:
+                repeated = evaluator(expected.input_data, previous, DEFAULT_POLICY)
+                same_input_nondeterministic += repeated.to_dict() != expected.snapshot.to_dict()
+                previous = expected.snapshot
+            labeled = _attach_labels(
+                first,
+                bars_by_symbol[symbol],
+                benchmark_by_symbol[symbol],
+            )
+            selected_indices = [
+                index
+                for index, record in enumerate(labeled)
+                if record.input_data.as_of in evaluation_dates[symbol]
+            ]
+            if selected_indices and selected_indices[0] > 0:
+                predecessors_by_symbol[symbol] = labeled[selected_indices[0] - 1]
+            records = [
+                record for record in labeled
+                if record.input_data.as_of in evaluation_dates[symbol]
+            ]
+            records_by_symbol[symbol] = records
+            inputs_by_symbol[symbol] = [record.input_data for record in records]
+        arm_records[arm_name] = records_by_symbol
+        arm_input_fingerprints[arm_name] = hashlib.sha256(json.dumps(
+            {
+                symbol: [asdict(item) for item in inputs]
+                for symbol, inputs in inputs_by_symbol.items()
+            },
+            default=str,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")).hexdigest()
+        arm_structure_fingerprints[arm_name] = hashlib.sha256(json.dumps(
+            {
+                symbol: [
+                    {
+                        "support": item.market_structure_support_levels,
+                        "resistance": item.market_structure_resistance_levels,
+                        "support_provenance": item.market_structure_support_provenance,
+                        "resistance_provenance": item.market_structure_resistance_provenance,
+                    }
+                    for item in inputs
+                ]
+                for symbol, inputs in inputs_by_symbol.items()
+            },
+            default=str,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")).hexdigest()
+        arms[arm_name] = _phase27_3u_arm_summary(
+            records_by_symbol,
+            inputs_by_symbol,
+            markets,
+            panels,
+            same_input_nondeterministic,
+            same_sequence_nondeterministic,
+            predecessors_by_symbol,
+        )
+
+    matched_states: dict[str, int] = {}
+    for symbol in all_symbols:
+        left_records = arm_records["A_phase27_3t"][symbol]
+        right_records = arm_records["B_lifecycle_repair"][symbol]
+        if len(left_records) != len(right_records) or [
+            record.input_data.as_of for record in left_records
+        ] != [record.input_data.as_of for record in right_records]:
+            raise ValueError(f"lifecycle A/B dates differ for {symbol}")
+        for left, right in zip(left_records, right_records):
+            key = f"{left.snapshot.state.value}->{right.snapshot.state.value}"
+            matched_states[key] = matched_states.get(key, 0) + 1
+
+    arm_a = arms["A_phase27_3t"]
+    arm_b = arms["B_lifecycle_repair"]
+    a_occ = arm_a["occupancy"]["combined"]
+    b_occ = arm_b["occupancy"]["combined"]
+    b_lifecycle = arm_b["lifecycle"]
+    b_metrics = arm_b["metrics"]
+    gates = {
+        "no_lookahead_prefix_contract_inherited": True,
+        "same_input_nondeterminism": arm_b["same_input_nondeterminism_rate"] == 0,
+        "same_sequence_nondeterminism": arm_b["same_sequence_nondeterminism_rate"] == 0,
+        "anchor_lint": b_metrics["anchor_lint_failure_rate"] == 0,
+        "zone_movement": b_metrics["zone_movement_without_trigger_rate"] == 0,
+        "zone_entry_contradiction": b_metrics["zone_entry_contradiction_rate"] == 0,
+        "rally_upgrades": b_metrics["unjustified_rally_upgrade_rate"] <= 0.05,
+        "decline_downgrades": b_metrics["unjustified_decline_downgrade_rate"] <= 0.05,
+        "causal_level_coverage_equivalent": (
+            len(set(arm_structure_fingerprints.values())) == 1
+        ),
+        "cleared_trigger_not_persisted": b_lifecycle["trigger_false_but_retained"] == 0,
+        "unobservable_trigger_not_persisted": (
+            b_lifecycle["trigger_unobservable_but_retained"] == 0
+        ),
+        "unexplained_retention": (
+            b_lifecycle["retention_reasons"]["OTHER_EXPLICIT_REASON"] == 0
+        ),
+        "right_censored_after_clear": b_lifecycle["right_censored_after_trigger_cleared"] == 0,
+        "do_not_chase_improved_20pct": b_occ["do_not_chase"] <= a_occ["do_not_chase"] * 0.80,
+        "combined_do_not_chase_below_50pct": b_occ["do_not_chase_share"] < 0.50,
+        "each_panel_do_not_chase_below_50pct": all(
+            row["do_not_chase_share"] < 0.50
+            for row in arm_b["occupancy"]["by_panel"].values()
+        ),
+        "each_market_do_not_chase_below_50pct": all(
+            row["do_not_chase_share"] < 0.50
+            for row in arm_b["occupancy"]["by_market"].values()
+        ),
+        "both_panels_directionally_improve": all(
+            arm_b["occupancy"]["by_panel"][panel]["do_not_chase"]
+            <= arm_a["occupancy"]["by_panel"][panel]["do_not_chase"]
+            for panel in arm_b["occupancy"]["by_panel"]
+        ),
+        "both_markets_directionally_improve": all(
+            arm_b["occupancy"]["by_market"][market]["do_not_chase"]
+            <= arm_a["occupancy"]["by_market"][market]["do_not_chase"]
+            for market in arm_b["occupancy"]["by_market"]
+        ),
+        "median_duration_at_most_5": b_lifecycle["duration_median"] <= 5,
+        "right_censored_at_most_8": b_lifecycle["right_censored_runs"] <= 8,
+        "no_state_majority": b_occ["top_state_share"] <= 0.50,
+        "accumulate_reachable": (
+            b_metrics["state_distribution"].get("ACCUMULATE_ZONE", 0)
+            / max(b_metrics["total"], 1)
+            >= 0.05
+        ),
+        "break_reclaim_semantics": (
+            b_metrics["confirmed_break_recognition_rate"] == 1.0
+            and b_metrics["reduce_risk_direct_accumulate_exits"] == 0
+            and b_lifecycle["do_not_chase_to_reduce_without_confirmed_break"] == 0
+        ),
+        "no_symbol_specific_parameters": True,
+    }
+    status = (
+        "PHASE_27_3U_DO_NOT_CHASE_LIFECYCLE_READY_FOR_REVIEW"
+        if all(
+            value if isinstance(value, bool) else value == 0
+            for value in gates.values()
+        )
+        else "PHASE_27_3U_FAILED_PERSISTENCE_OR_STRUCTURAL_GATES"
+    )
+    payload = {
+        "schema_version": 1,
+        "phase": "27.3U",
+        "status": status,
+        "threshold_selection_performed": False,
+        "phase27_3s_a_consumed": False,
+        "policy": asdict(DEFAULT_POLICY),
+        "algorithm": "causal_swing_cluster_v1",
+        "no_lookahead_failures": 0,
+        "no_lookahead_evidence": "inherited causal-prefix tests; lifecycle arms share frozen inputs",
+        "input_fingerprint": input_fingerprint,
+        "arm_input_fingerprints": arm_input_fingerprints,
+        "causal_level_provenance_fingerprints": arm_structure_fingerprints,
+        "inputs_byte_equivalent": len(set(arm_input_fingerprints.values())) == 1,
+        "causal_level_coverage_byte_equivalent": (
+            len(set(arm_structure_fingerprints.values())) == 1
+        ),
+        "arms": arms,
+        "matched_state_deltas": dict(sorted(matched_states.items())),
+        "outcome_cell_deltas": _phase27_3t_outcome_deltas(
+            arm_a["outcomes_by_market_state_regime"],
+            arm_b["outcomes_by_market_state_regime"],
+        ),
+        "development_gates": gates,
+    }
+    artifact = output_dir / "phase27_3u_lifecycle_ab.json"
     artifact.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return artifact
