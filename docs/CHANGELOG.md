@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 台股日報新增以官方 TWSE/TPEx 完成日線為基礎的決定性技術分析快照與分析優先閱讀版面，涵蓋 MA5/10/20/60/120、Wilder RSI14、MACD、ATR、客觀 K 線、支撐壓力、反彈確認/失效及分交易所成交金額；缺漏資料依來源局部抑制，不使用 Yahoo/FinMind 總報酬作 OHLC fallback，舊紀錄維持相容。
+
 - [新功能] 美股個股完整報告新增估值河流圖支援：以 yfinance 財報年度實際 EPS/BVPS（`income_stmt`/`balance_sheet`，非反推）建構階梯狀倍數視覺參考帶，並新增「實際 EPS」/「預估 EPS」（`trailingEps`/`forwardEps`）點時參考數值；台股同步新增「實際 EPS」欄位（來自 `TaiwanStockFinancialStatements` 最新一季 EPS，與既有反推 EPS 明確區分標示）；ETF/指數維持不支援估值河流圖。所有數值皆為後端決定性運算，LLM 不參與。
 
 - [新功能] 台股個股完整報告新增「估值河流圖」（`valuation_river_snapshot`）：以 FinMind `TaiwanStockPER`/`TaiwanStockPrice` 反推歷史隱含 EPS，畫出固定倍數（14x/18x/22x/26x/30x/34x/38x，26x 為中性分界）視覺參考帶與實際收盤價疊圖；完全由後端決定性運算，LLM 不參與、不產生目標價/公允價值/買賣建議；美股、ETF、指數與非股票標的顯示明確的 unavailable 卡片，不繪製假造歷史河流圖；不影響既有 `valuation_snapshot`/`fundamental_snapshot`/四大師視角補充/評分/趨勢/操作建議欄位。

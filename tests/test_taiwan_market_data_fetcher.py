@@ -24,6 +24,7 @@ Coverage:
 import json
 import os
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Dict
 from unittest.mock import MagicMock, patch
@@ -452,6 +453,81 @@ class TestNoCnFallback(unittest.TestCase):
             result = fetcher.get_total_return_index("TAIEX", _START, _END)
         self.assertIn("provider", result["cache_meta"])
         self.assertEqual(result["cache_meta"]["provider"], "TaiwanMarketDataFetcher")
+
+
+def _official_rows(count=260):
+    rows = []
+    current = date(2025, 6, 13)
+    close = 1000.0
+    while len(rows) < count:
+        if current.weekday() < 5:
+            rows.append({
+                "date": current.isoformat(), "open": close - 1,
+                "high": close + 2, "low": close - 2, "close": close,
+            })
+            close += 1
+        current += timedelta(days=1)
+    return rows
+
+
+class _OfficialProvider:
+    def __init__(self, available):
+        self.available = available
+        self.rows = _official_rows()
+
+    def load_series(self, series, *, end_date, minimum_rows):
+        is_value = "traded_value" in series
+        rows = (
+            [{"date": row["date"], "value": 100_000_000_000} for row in self.rows]
+            if is_value else self.rows
+        )
+        if not self.available:
+            rows = []
+        return {
+            "ok": self.available,
+            "rows": rows,
+            "provider": "TWSE" if series.startswith("taiex") or series.startswith("twse") else "TPEx",
+            "endpoint_family": series,
+            "index_kind": None if is_value else "price_index",
+            "metric_kind": "traded_value" if is_value else "ohlc",
+            "raw_unit": "TWD" if is_value else "index_points",
+            "normalized_unit": "TWD" if is_value else "index_points",
+            "requested_months": ["2026-06"],
+            "fetched_at": "2026-06-12T09:00:00Z",
+            "terms_access_risk": "medium",
+            "status": "available" if self.available else "unavailable",
+            "suppression_reason": None if self.available else "test_provider_failure",
+        }
+
+
+class TestTechnicalAnalysisSnapshotIntegration(unittest.TestCase):
+    def test_nested_analysis_snapshot_is_always_present_on_provider_failure(self):
+        with patch.dict(os.environ, _fixture_env(), clear=False):
+            fetcher = TaiwanMarketDataFetcher(
+                fixture_root=_FIXTURE_ROOT,
+                official_provider=_OfficialProvider(False),
+            )
+            snapshot = fetcher.get_tw_market_snapshot(_START, _END)
+
+        analysis = snapshot["tw_daily_snapshot"]["tw_market_analysis_snapshot"]
+        self.assertEqual(analysis["kind"], "tw_market_analysis_snapshot")
+        self.assertFalse(analysis["analysis_ready"])
+        self.assertEqual(analysis["source_status"]["TAIEX"]["status"], "unavailable")
+
+    def test_nested_analysis_uses_only_official_price_index_rows(self):
+        with patch.dict(os.environ, _fixture_env(), clear=False):
+            fetcher = TaiwanMarketDataFetcher(
+                fixture_root=_FIXTURE_ROOT,
+                official_provider=_OfficialProvider(True),
+            )
+            with patch.object(fetcher, "get_taiex_via_yfinance", side_effect=AssertionError("forbidden")):
+                snapshot = fetcher.get_tw_market_snapshot(_START, _END)
+
+        analysis = snapshot["tw_daily_snapshot"]["tw_market_analysis_snapshot"]
+        self.assertTrue(analysis["analysis_ready"])
+        self.assertEqual(analysis["source_status"]["TAIEX"]["provider"], "TWSE")
+        self.assertEqual(analysis["source_status"]["TAIEX"]["index_kind"], "price_index")
+        self.assertEqual(analysis["indices"]["TAIEX"]["input_last_date"], analysis["data_date"])
 
 
 class TestTWProfileStillPasses(unittest.TestCase):

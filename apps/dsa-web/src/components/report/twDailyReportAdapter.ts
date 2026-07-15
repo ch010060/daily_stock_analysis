@@ -40,6 +40,37 @@ export interface TwDailyReportModel {
   margin: TwDailyRow[];
   representatives: TwDailyRow[];
   risks: string[];
+  analysis?: TwDailyAnalysis;
+}
+
+export interface TwDailyAnalysis {
+  title: string;
+  generatedAt: string;
+  marketState: string;
+  openingSummary: string;
+  coreJudgement: string[];
+  movingAverageAnalysis: string[];
+  momentumAnalysis: string[];
+  priceActionAnalysis: string[];
+  volumeAnalysis: string[];
+  supportResistanceAnalysis: string[];
+  confirmationConditions: string[];
+  invalidationConditions: string[];
+  tpexBreadth: string[];
+  article?: TwDailyAnalysisArticle;
+}
+
+export interface TwDailyAnalysisArticle {
+  headline: string;
+  marketContext: string;
+  sessionSummary: string;
+  coreLabel: string;
+  coreSummary: string;
+  trendParagraphs: string[];
+  priceActionParagraphs: string[];
+  confirmationParagraph: string;
+  supportingContext: string[];
+  tpexContext: string;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -50,6 +81,12 @@ const asRecord = (value: unknown): UnknownRecord | null => (
 
 const asArray = (value: unknown): UnknownRecord[] => (
   Array.isArray(value) ? value.map(asRecord).filter((item): item is UnknownRecord => Boolean(item)) : []
+);
+
+const stringList = (value: unknown): string[] => (
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
+    : []
 );
 
 const firstValue = (record: UnknownRecord, keys: string[]): unknown => {
@@ -244,6 +281,46 @@ export function buildTwDailyReportFromSnapshot(value: unknown): TwDailyReportMod
   const institutionalFlows = asArray(firstValue(snapshot, ['institutionalFlows', 'institutional_flows']));
   const marginShort = asArray(firstValue(snapshot, ['marginShort', 'margin_short']));
   const representatives = asArray(firstValue(snapshot, ['representatives']));
+  const analysisSnapshot = asRecord(firstValue(snapshot, ['twMarketAnalysisSnapshot', 'tw_market_analysis_snapshot']));
+  const articleRecord = analysisSnapshot ? asRecord(firstValue(analysisSnapshot, ['analysisArticle', 'analysis_article'])) : null;
+  const articleCore = articleRecord ? asRecord(firstValue(articleRecord, ['coreJudgement', 'core_judgement'])) : null;
+  const article: TwDailyAnalysisArticle | undefined = articleRecord
+    && stringValue(articleRecord, ['status']) === 'available'
+    && articleCore
+    ? {
+      headline: stringValue(articleRecord, ['headline'], '台股加權指數最新技術分析'),
+      marketContext: stringValue(articleRecord, ['marketContext', 'market_context']),
+      sessionSummary: stringValue(articleRecord, ['sessionSummary', 'session_summary']),
+      coreLabel: stringValue(articleCore, ['label']),
+      coreSummary: stringValue(articleCore, ['summary']),
+      trendParagraphs: stringList(firstValue(articleRecord, ['trendParagraphs', 'trend_paragraphs'])),
+      priceActionParagraphs: stringList(firstValue(articleRecord, ['priceActionParagraphs', 'price_action_paragraphs'])),
+      confirmationParagraph: stringValue(articleRecord, ['confirmationParagraph', 'confirmation_paragraph']),
+      supportingContext: stringList(firstValue(articleRecord, ['supportingContext', 'supporting_context'])),
+      tpexContext: stringValue(articleRecord, ['tpexContext', 'tpex_context']),
+    }
+    : undefined;
+  const narrative = analysisSnapshot ? asRecord(firstValue(analysisSnapshot, ['narrative'])) : null;
+  const analysisReady = analysisSnapshot
+    && stringValue(analysisSnapshot, ['kind']) === 'tw_market_analysis_snapshot'
+    && firstValue(analysisSnapshot, ['analysisReady', 'analysis_ready']) === true
+    && (article || narrative);
+  const analysis: TwDailyAnalysis | undefined = analysisReady ? {
+    title: article?.headline || stringValue(narrative || {}, ['title'], '台股加權指數最新技術分析'),
+    generatedAt: stringValue(analysisSnapshot, ['generatedAt', 'generated_at']),
+    marketState: stringValue(analysisSnapshot, ['marketState', 'market_state']),
+    openingSummary: article?.sessionSummary || stringValue(narrative || {}, ['openingSummary', 'opening_summary']),
+    coreJudgement: article ? [article.coreLabel, article.coreSummary] : stringList(firstValue(narrative || {}, ['coreJudgement', 'core_judgement'])),
+    movingAverageAnalysis: stringList(firstValue(narrative || {}, ['movingAverageAnalysis', 'moving_average_analysis'])),
+    momentumAnalysis: stringList(firstValue(narrative || {}, ['momentumAnalysis', 'momentum_analysis'])),
+    priceActionAnalysis: stringList(firstValue(narrative || {}, ['priceActionAnalysis', 'price_action_analysis'])),
+    volumeAnalysis: stringList(firstValue(narrative || {}, ['volumeAnalysis', 'volume_analysis'])),
+    supportResistanceAnalysis: stringList(firstValue(narrative || {}, ['supportResistanceAnalysis', 'support_resistance_analysis'])),
+    confirmationConditions: stringList(firstValue(narrative || {}, ['confirmationConditions', 'confirmation_conditions'])),
+    invalidationConditions: stringList(firstValue(narrative || {}, ['invalidationConditions', 'invalidation_conditions'])),
+    tpexBreadth: stringList(firstValue(narrative || {}, ['tpexBreadth', 'tpex_breadth'])),
+    article,
+  } : undefined;
 
   if (!dataDate || (!indices.length && !institutionalFlows.length && !marginShort.length && !representatives.length)) {
     return null;
@@ -337,7 +414,7 @@ export function buildTwDailyReportFromSnapshot(value: unknown): TwDailyReportMod
   return {
     title: '台股大盤回顧',
     dataDate,
-    source,
+    source: analysis ? 'TWSE / TPEx / FinMind' : source,
     dataStatus: statusItemsFromSnapshot(snapshot).length ? '部分資料需留意' : '結構化快照資料已載入',
     statusItems: statusItemsFromSnapshot(snapshot),
     highlights: highlights.length ? highlights : ['本次台股日報已載入結構化 FinMind 快照。'],
@@ -347,6 +424,7 @@ export function buildTwDailyReportFromSnapshot(value: unknown): TwDailyReportMod
     margin: marginRows,
     representatives: representativeRows,
     risks: statusItemsFromSnapshot(snapshot).filter((item) => item.startsWith('缺漏') || item.startsWith('部分失敗')),
+    analysis,
   };
 }
 

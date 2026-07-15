@@ -96,10 +96,12 @@ def _run_tw_market_review_section():
     """
     from datetime import timedelta
     from data_provider.taiwan_market import TaiwanMarketDataFetcher
+    from src.core.trading_calendar import get_effective_trading_date
     from src.core.tw_market_review import render_tw_market_review_text
 
-    end_date = datetime.now().strftime("%Y-%m-%d")
-    start_date = (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d")
+    completed_date = get_effective_trading_date("tw")
+    end_date = completed_date.strftime("%Y-%m-%d")
+    start_date = (completed_date - timedelta(days=14)).strftime("%Y-%m-%d")
     try:
         fetcher = TaiwanMarketDataFetcher()
         snapshot = fetcher.get_tw_market_snapshot(start_date, end_date)
