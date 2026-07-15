@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.evaluation import strategy_rr_semantic_audit as rr_audit
 from src.evaluation.strategy_sequence_replay import (
     PHASE27_3S_EVALUATION_END,
     PHASE27_3S_EVALUATION_START,
@@ -46,6 +47,7 @@ from src.services.strategy_state_engine import (
     StrategyState,
     StrategyStateInput,
     StrategyStateSnapshot,
+    evaluate_strategy_state,
 )
 
 
@@ -574,6 +576,262 @@ def test_replay_evaluator_hook_changes_only_selected_lifecycle_observation() -> 
     assert all(call[2] == DEFAULT_POLICY for call in calls)
 
 
+def _phase27_3v_input(
+    *,
+    as_of: date = date(2025, 1, 2),
+    close: float = 100.0,
+    support: float = 90.0,
+    resistance: float | None = 105.0,
+    provenance: tuple[dict, ...] = (),
+) -> StrategyStateInput:
+    return StrategyStateInput(
+        symbol="2454",
+        market="tw",
+        instrument_type="stock",
+        as_of=as_of,
+        close=close,
+        deterministic_support_levels=(support,),
+        deterministic_resistance_levels=(resistance,) if resistance is not None else (),
+        market_structure_resistance_levels=tuple(
+            level["price"]
+            for level in provenance
+            if level.get("status") == "active"
+        ),
+        market_structure_resistance_provenance=provenance,
+    )
+
+
+@pytest.mark.unit
+def test_rr_diagnostic_distinguishes_now_from_planned_zone() -> None:
+    input_data = _phase27_3v_input()
+    snapshot = evaluate_strategy_state(input_data, None)
+
+    diagnostic = rr_audit.diagnose_rr(input_data, snapshot)
+
+    assert snapshot.state == StrategyState.DO_NOT_CHASE
+    assert diagnostic["zone_lower"] == 88.2
+    assert diagnostic["zone_upper"] == 91.8
+    assert diagnostic["invalidation_level"] == 86.436
+    assert diagnostic["entry_references"] == {
+        "E0": 100.0,
+        "E1": 100.0,
+        "E2": 90.0,
+        "E3": 91.8,
+        "E4": 88.2,
+    }
+    assert diagnostic["rr_now"] == pytest.approx(0.3686228)
+    assert diagnostic["rr_at_planned_zone"] == pytest.approx(2.460849)
+    assert diagnostic["reward"] == 5.0
+    assert diagnostic["risk"] == pytest.approx(13.564)
+
+
+@pytest.mark.unit
+def test_semantic_arms_distinguish_planned_setup_from_immediate_chase() -> None:
+    input_data = _phase27_3v_input()
+
+    arm_a, guard_a = rr_audit.evaluate_semantic_arm(input_data, None, arm="A")
+    arm_b, guard_b = rr_audit.evaluate_semantic_arm(input_data, None, arm="B")
+    arm_c, guard_c = rr_audit.evaluate_semantic_arm(input_data, None, arm="C")
+
+    assert arm_a.state == StrategyState.DO_NOT_CHASE
+    assert arm_b.state == StrategyState.WAIT_FOR_PULLBACK
+    assert arm_c.state == StrategyState.WAIT_FOR_PULLBACK
+    assert guard_a is None
+    assert guard_b is None
+    assert guard_c == "DO_NOT_CHASE_NOW"
+
+
+@pytest.mark.unit
+def test_no_attractive_setup_anywhere_does_not_false_accumulate() -> None:
+    input_data = _phase27_3v_input(resistance=100.0)
+
+    results = {
+        arm: rr_audit.evaluate_semantic_arm(input_data, None, arm=arm)
+        for arm in ("A", "B", "C")
+    }
+
+    assert results["A"][0].state == StrategyState.DO_NOT_CHASE
+    assert results["B"][0].state == StrategyState.DO_NOT_CHASE
+    assert results["C"][0].state == StrategyState.WATCHLIST
+    assert all(
+        snapshot.state != StrategyState.ACCUMULATE_ZONE
+        for snapshot, _guard in results.values()
+    )
+
+
+@pytest.mark.unit
+def test_zone_entry_supersedes_every_semantic_guard() -> None:
+    initial = _phase27_3v_input()
+    next_input = _phase27_3v_input(as_of=date(2025, 1, 3), close=91.0)
+
+    for arm in ("A", "B", "C"):
+        previous, _ = rr_audit.evaluate_semantic_arm(initial, None, arm=arm)
+        current, guard = rr_audit.evaluate_semantic_arm(next_input, previous, arm=arm)
+        assert current.state == StrategyState.ACCUMULATE_ZONE
+        assert guard is None
+
+
+@pytest.mark.unit
+def test_holder_counterfactual_never_reduces_without_breakdown() -> None:
+    input_data = _phase27_3v_input()
+    snapshot = evaluate_strategy_state(input_data, None)
+    diagnostic = rr_audit.diagnose_rr(input_data, snapshot)
+
+    holder = rr_audit.holder_counterfactual(diagnostic, has_position=True)
+    non_holder = rr_audit.holder_counterfactual(diagnostic, has_position=False)
+    unknown = rr_audit.holder_counterfactual(diagnostic, has_position=None)
+
+    assert holder == {
+        "state": "HOLD_ONLY",
+        "action_guard": "DO_NOT_ADD_NOW",
+        "meaning": "HOLDER_HOLD_WITHOUT_ADDING",
+    }
+    assert non_holder["state"] == "WAIT_FOR_PULLBACK"
+    assert non_holder["meaning"] == "NON_HOLDER_WAIT_FOR_ENTRY"
+    assert unknown["meaning"] == "AMBIGUOUS_CURRENT_CONTRACT"
+
+
+@pytest.mark.unit
+def test_resistance_selectors_reject_broken_stale_and_choose_deterministically() -> None:
+    provenance = (
+        {"price": 105.0, "status": "broken", "touch_count": 5, "prominence": 3.0,
+         "confirmed_at": "2024-12-01", "last_seen_at": "2024-11-20"},
+        {"price": 107.0, "status": "active", "touch_count": 1, "prominence": 1.0,
+         "confirmed_at": "2024-12-02", "last_seen_at": "2024-11-21"},
+        {"price": 110.0, "status": "active", "touch_count": 3, "prominence": 2.0,
+         "confirmed_at": "2024-12-03", "last_seen_at": "2024-11-22"},
+        {"price": 120.0, "status": "stale", "touch_count": 9, "prominence": 4.0,
+         "confirmed_at": "2024-01-01", "last_seen_at": "2024-01-01"},
+    )
+    input_data = _phase27_3v_input(resistance=None, provenance=provenance)
+
+    selected = {
+        selector: rr_audit.select_resistance_targets(
+            input_data,
+            entry=100.0,
+            selector=selector,
+            zone_midpoint=90.0,
+        )
+        for selector in ("R0", "R1", "R2", "R3", "R4", "R5")
+    }
+
+    assert [row["price"] for row in selected["R1"]] == [107.0]
+    assert [row["price"] for row in selected["R2"]] == [110.0]
+    assert [row["price"] for row in selected["R4"]] == [110.0]
+    assert [row["price"] for row in selected["R5"]] == [107.0, 110.0]
+    assert all(
+        target["status"] == "active"
+        for targets in selected.values()
+        for target in targets
+    )
+    assert selected == {
+        selector: rr_audit.select_resistance_targets(
+            input_data,
+            entry=100.0,
+            selector=selector,
+            zone_midpoint=90.0,
+        )
+        for selector in selected
+    }
+
+
+@pytest.mark.unit
+def test_resistance_selector_rejects_future_confirmed_provenance() -> None:
+    input_data = _phase27_3v_input(provenance=({
+        "price": 110.0,
+        "status": "active",
+        "touch_count": 2,
+        "prominence": 1.0,
+        "confirmed_at": "2025-01-03",
+        "last_seen_at": "2025-01-01",
+    },))
+
+    with pytest.raises(ValueError, match="future-confirmed resistance provenance"):
+        rr_audit.select_resistance_targets(input_data, entry=100.0, selector="R1")
+
+
+@pytest.mark.unit
+def test_sparse_resistance_is_unknown_and_extreme_rally_remains_guarded() -> None:
+    sparse = _phase27_3v_input(resistance=None)
+    sparse_snapshot = evaluate_strategy_state(sparse, None)
+    sparse_diagnostic = rr_audit.diagnose_rr(sparse, sparse_snapshot)
+    extreme = _phase27_3v_input(close=130.0)
+
+    assert sparse_diagnostic["selected_resistance"] is None
+    assert sparse_diagnostic["rr_now"] is None
+    assert sparse_diagnostic["rr_at_planned_zone"] is None
+    for arm in ("A", "B", "C"):
+        snapshot, guard = rr_audit.evaluate_semantic_arm(extreme, None, arm=arm)
+        assert snapshot.state != StrategyState.ACCUMULATE_ZONE
+        assert (
+            snapshot.state == StrategyState.DO_NOT_CHASE
+            or guard == "DO_NOT_CHASE_NOW"
+            or snapshot.transition_rule_id == rr_audit.RULE_EVAL_PLANNED_ZONE_WAIT
+        )
+
+
+@pytest.mark.unit
+def test_dnc_classification_is_exactly_one_and_position_truth_remains_unknown() -> None:
+    input_data = _phase27_3v_input()
+    snapshot = evaluate_strategy_state(input_data, None)
+
+    classification = rr_audit.classify_dnc(rr_audit.diagnose_rr(input_data, snapshot))
+
+    assert classification == {
+        "primary": "PRICE_ABOVE_VALID_ZONE_RR_FROM_CURRENT_PRICE",
+        "holder_meaning": "AMBIGUOUS_CURRENT_CONTRACT",
+    }
+    assert classification["primary"] in rr_audit.DNC_PRIMARY_CATEGORIES
+    assert classification["holder_meaning"] in rr_audit.HOLDER_MEANINGS
+
+
+@pytest.mark.unit
+def test_late_primary_categories_follow_frozen_r4_e4_precedence() -> None:
+    input_data = _phase27_3v_input()
+    snapshot = evaluate_strategy_state(input_data, None)
+    diagnostic = rr_audit.diagnose_rr(input_data, snapshot)
+    residual = {
+        **diagnostic,
+        "rr_at_planned_zone": None,
+        "rr_now_r4": 2.1,
+        "rr_at_zone_lower": 1.0,
+    }
+
+    assert rr_audit.classify_dnc(residual)["primary"] == "RESISTANCE_TOO_CLOSE"
+    residual["rr_now"] = 2.1
+    assert rr_audit.classify_dnc(residual)["primary"] == "OTHER_EXPLICIT_REASON"
+    residual["rr_now"] = diagnostic["rr_now"]
+    residual["rr_now_r4"] = None
+    assert rr_audit.classify_dnc(residual)["primary"] == "RISK_DISTANCE_TOO_LARGE"
+
+
+@pytest.mark.unit
+def test_semantic_adapters_do_not_create_boundary_flip_explosion() -> None:
+    inputs = [
+        _phase27_3v_input(as_of=date(2025, 1, 2) + timedelta(days=index), close=close)
+        for index, close in enumerate((100.0, 99.0, 100.0, 99.0, 100.0))
+    ]
+    transitions = {}
+    for arm in ("A", "B", "C"):
+        previous = None
+        states = []
+        for input_data in inputs:
+            previous, _ = rr_audit.evaluate_semantic_arm(input_data, previous, arm=arm)
+            states.append(previous.state)
+        transitions[arm] = sum(left != right for left, right in zip(states, states[1:]))
+
+    assert transitions["B"] <= transitions["A"]
+    assert transitions["C"] <= transitions["A"]
+
+
+@pytest.mark.unit
+def test_semantic_arm_definitions_have_no_symbol_overrides() -> None:
+    assert all(
+        not definition["symbol_overrides"]
+        for definition in rr_audit.SEMANTIC_ARM_DEFINITIONS.values()
+    )
+
+
 @pytest.mark.unit
 def test_trigger_clear_lag_resets_when_rr_trigger_reappears() -> None:
     snapshots = [
@@ -883,3 +1141,118 @@ def test_phase27_3u_lifecycle_ab(tmp_path: Path) -> None:
     )
     assert payload["development_gates"]["unexplained_retention"] is True
     assert payload["development_gates"]["combined_do_not_chase_below_50pct"] is False
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    os.environ.get("RUN_PHASE27_3V_EVAL") != "1",
+    reason="set RUN_PHASE27_3V_EVAL=1 for the frozen resistance/RR semantic audit",
+)
+def test_phase27_3v_resistance_rr_semantic_audit(tmp_path: Path) -> None:
+    artifact = rr_audit.run_phase27_3v_semantic_audit(
+        FIXTURE,
+        PHASE27_3S_FIXTURE,
+        PHASE27_3S_MANIFEST,
+        tmp_path,
+    )
+    payload = json.loads(artifact.read_text(encoding="utf-8"))
+
+    assert payload["phase"] == "27.3V"
+    assert payload["phase27_3s_a_consumed"] is False
+    assert payload["threshold_selection_performed"] is False
+    assert payload["policy"] == DEFAULT_POLICY.__dict__
+    assert payload["state_outputs_frozen_before_outcomes"] is True
+    assert set(payload["arms"]) >= {"A_current", "B_planned_zone", "C_action_guard"}
+    assert all(arm["total_evaluations"] == 2436 for arm in payload["arms"].values())
+    assert payload["arms"]["A_current"]["state_distribution"] == {
+        "ACCUMULATE_ZONE": 152,
+        "DO_NOT_CHASE": 1765,
+        "HOLD_ONLY": 11,
+        "REDUCE_RISK": 219,
+        "WAIT_FOR_PULLBACK": 55,
+        "WATCHLIST": 234,
+    }
+    assert payload["same_input_nondeterminism_rate"] == 0
+    assert payload["same_sequence_nondeterminism_rate"] == 0
+    assert payload["input_fingerprints_identical"] is True
+    assert payload["causal_provenance_fingerprints_identical"] is True
+    assert sum(payload["dnc_diagnostics"]["primary_categories"].values()) == 1765
+    assert payload["dnc_diagnostics"]["holder_meanings"] == {
+        "AMBIGUOUS_CURRENT_CONTRACT": 1765,
+    }
+    assert all(
+        sum(matrix.values()) == 2436
+        for matrix in payload["matched_state_matrices"].values()
+    )
+    assert payload["arm_d"]["historical_execution"] == "BLOCKED_NO_POSITION_INPUT"
+    assert payload["status"] == "PHASE_27_3V_CONFIRMS_STRATEGY_PRODUCTIZATION_SHOULD_STOP"
+    assert payload["viable_arms"] == []
+    assert payload["arm_e_preregistered_condition"] == {
+        "included": False,
+        "r0_structural_defect_count": 0,
+    }
+    assert payload["arms"]["B_planned_zone"]["state_distribution"] == {
+        "ACCUMULATE_ZONE": 152,
+        "DO_NOT_CHASE": 446,
+        "HOLD_ONLY": 11,
+        "REDUCE_RISK": 219,
+        "WAIT_FOR_PULLBACK": 1374,
+        "WATCHLIST": 234,
+    }
+    assert payload["arms"]["C_action_guard"]["state_distribution"] == {
+        "ACCUMULATE_ZONE": 152,
+        "HOLD_ONLY": 11,
+        "REDUCE_RISK": 219,
+        "WAIT_FOR_PULLBACK": 1596,
+        "WATCHLIST": 458,
+    }
+    assert payload["dnc_diagnostics"]["entry_reference_disagreement"]["total"] == 1310
+    assert payload["dnc_diagnostics"]["primary_categories"] == {
+        "NO_VALID_ZONE": 227,
+        "OTHER_EXPLICIT_REASON": 3,
+        "PREVIOUS_ZONE_SEMANTIC_CONFLICT": 222,
+        "PRICE_ABOVE_VALID_ZONE_RR_FROM_CURRENT_PRICE": 1307,
+        "PRICE_INSIDE_OR_NEAR_ZONE_BUT_RR_FAIL": 6,
+    }
+    assert payload["arm_d"]["counterfactual_lenses"]["holder"]["total"] == 1765
+    assert payload["arm_d"]["counterfactual_lenses"]["non_holder"]["total"] == 1765
+    assert payload["no_lookahead_failures"] == 0
+    assert payload["development_gates"]["B_planned_zone"][
+        "holder_nonholder_semantics"
+    ] is False
+    assert payload["arms"]["A_current"]["true_immediate_overextension"] == {
+        "eligible": 456,
+        "detected": 431,
+    }
+    assert payload["arms"]["B_planned_zone"]["true_immediate_overextension"] == {
+        "eligible": 456,
+        "detected": 427,
+    }
+    assert payload["arms"]["C_action_guard"]["true_immediate_overextension"] == {
+        "eligible": 456,
+        "detected": 436,
+    }
+    assert payload["development_gates"]["B_planned_zone"][
+        "immediate_overextension_detectable"
+    ] is False
+    assert payload["development_gates"]["C_action_guard"][
+        "immediate_overextension_detectable"
+    ] is False
+    expected_failed_gates = {
+        "holder_nonholder_semantics",
+        "immediate_overextension_detectable",
+        "no_combined_state_majority",
+        "no_unexplained_symbol_100pct",
+        "panel_concentration",
+        "wait_not_indiscriminate",
+    }
+    assert {
+        key
+        for key, passed in payload["development_gates"]["B_planned_zone"].items()
+        if not passed
+    } == expected_failed_gates
+    assert {
+        key
+        for key, passed in payload["development_gates"]["C_action_guard"].items()
+        if not passed
+    } == expected_failed_gates
