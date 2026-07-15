@@ -6,6 +6,7 @@ import os
 import sys
 import tempfile
 import unittest
+from datetime import date
 from types import ModuleType, SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -45,6 +46,31 @@ from src.core.tw_market_review import build_tw_market_review_context
 from src.storage import AnalysisHistory, DatabaseManager
 
 run_market_review = market_review_module.run_market_review
+
+
+class TaiwanCompletedSessionGateTestCase(unittest.TestCase):
+    def test_tw_review_requests_only_through_effective_completed_session(self) -> None:
+        fetcher = MagicMock()
+        fetcher.get_tw_market_snapshot.return_value = {
+            "availability": {"required_ok": False, "sources": []},
+            "tw_daily_snapshot": {"kind": "tw_daily_snapshot"},
+        }
+
+        with patch(
+            "src.core.trading_calendar.get_effective_trading_date",
+            return_value=date(2026, 7, 14),
+        ), patch(
+            "data_provider.taiwan_market.TaiwanMarketDataFetcher",
+            return_value=fetcher,
+        ), patch(
+            "src.core.tw_market_review.render_tw_market_review_text",
+            return_value="# 台股大盤回顧",
+        ):
+            market_review_module._run_tw_market_review_section()
+
+        fetcher.get_tw_market_snapshot.assert_called_once_with(
+            "2026-06-30", "2026-07-14"
+        )
 
 
 class TaiwanMarketSnapshotEnrichmentTestCase(unittest.TestCase):

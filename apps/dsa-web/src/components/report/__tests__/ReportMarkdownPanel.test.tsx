@@ -249,6 +249,24 @@ describe('ReportMarkdownPanel', () => {
                       dataDate: '2026-06-26',
                       missingFields: ['PER', 'PBR', 'dividend_yield'],
                     }],
+                    twMarketAnalysisSnapshot: {
+                      kind: 'tw_market_analysis_snapshot',
+                      analysisReady: true,
+                      dataDate: '2026-06-26',
+                      marketState: 'closed',
+                      narrative: {
+                        title: '台股加權指數最新技術分析',
+                        openingSummary: '加權指數收在 23,000 點。',
+                        coreJudgement: ['反彈中但未確認翻多'],
+                        movingAverageAnalysis: ['指數低於 MA20。'],
+                        momentumAnalysis: ['RSI14 動能改善。'],
+                        priceActionAnalysis: [],
+                        volumeAnalysis: [],
+                        supportResistanceAnalysis: ['支撐區 22,700–22,900 點。'],
+                        confirmationConditions: [],
+                        invalidationConditions: [],
+                      },
+                    },
                     dataStatus: { missingFields: [], staleFields: [], partialFailures: [] },
                   },
                 },
@@ -261,6 +279,8 @@ describe('ReportMarkdownPanel', () => {
     );
 
     expect(await screen.findByTestId('tw-daily-reader')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '台股加權指數最新技術分析' })).toBeInTheDocument();
+    expect(screen.getByText('反彈中但未確認翻多')).toBeInTheDocument();
     expect(screen.getByText('006208')).toBeInTheDocument();
     expect(screen.queryByTestId('report-markdown-body')).not.toBeInTheDocument();
   });

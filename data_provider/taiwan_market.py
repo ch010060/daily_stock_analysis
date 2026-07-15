@@ -29,6 +29,10 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
+
+from data_provider.taiwan_exchange import OfficialTaiwanExchangeProvider
+from src.services.tw_market_analysis_snapshot import build_tw_market_analysis_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -176,9 +180,11 @@ class TaiwanMarketDataFetcher:
         self,
         fixture_root: Optional[Path] = None,
         session=None,
+        official_provider=None,
     ) -> None:
         self._fixture_root = fixture_root or _fixture_root()
         self._session = session  # optional requests.Session for testing
+        self._official_provider = official_provider
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -415,6 +421,26 @@ class TaiwanMarketDataFetcher:
         per_0050 = self.get_reference_stock_per("0050", start_date, end_date)
         per_006208 = self.get_reference_stock_per("006208", start_date, end_date)
         per_2330 = self.get_reference_stock_per("2330", start_date, end_date)
+        no_network = self._no_network()
+        official_provider = self._official_provider or OfficialTaiwanExchangeProvider(
+            session=self._session,
+            allow_network=not no_network,
+            cache_dir=(self._fixture_root / "official_exchange_cache") if no_network else None,
+        )
+        official = {
+            "TAIEX": official_provider.load_series(
+                "taiex_ohlc", end_date=end_date, minimum_rows=260
+            ),
+            "TPEx": official_provider.load_series(
+                "tpex_ohlc", end_date=end_date, minimum_rows=260
+            ),
+            "twse_traded_value": official_provider.load_series(
+                "twse_traded_value", end_date=end_date, minimum_rows=20
+            ),
+            "tpex_traded_value": official_provider.load_series(
+                "tpex_traded_value", end_date=end_date, minimum_rows=20
+            ),
+        }
 
         required_sections = {
             "trading_dates": trading_dates,
@@ -443,7 +469,9 @@ class TaiwanMarketDataFetcher:
         })
 
         last_trading_date: Optional[str] = None
-        if taiex["ok"] and taiex["rows"]:
+        if official["TAIEX"].get("rows"):
+            last_trading_date = official["TAIEX"]["rows"][-1].get("date")
+        elif taiex["ok"] and taiex["rows"]:
             last_trading_date = taiex["rows"][-1].get("date")
 
         sections = {
@@ -457,6 +485,7 @@ class TaiwanMarketDataFetcher:
                 "sources": sources,
                 "as_of": last_trading_date,
             },
+            "official_exchange": official,
         }
         sections["tw_daily_snapshot"] = self._build_tw_daily_snapshot(sections)
         return sections
@@ -490,7 +519,7 @@ class TaiwanMarketDataFetcher:
                 "unavailable_reason": value.get("unavailable_reason"),
             })
 
-        return {
+        snapshot = {
             "kind": "tw_daily_snapshot",
             "source": "finmind",
             "data_date": data_date,
@@ -501,6 +530,56 @@ class TaiwanMarketDataFetcher:
             "representatives": self._snapshot_representatives(sections, data_status),
             "data_status": data_status,
         }
+        official = sections.get("official_exchange") or {}
+        source_metadata = {
+            key: {
+                field: result.get(field)
+                for field in (
+                    "provider", "endpoint_family", "index_kind", "metric_kind",
+                    "raw_unit", "normalized_unit", "requested_months", "fetched_at",
+                    "terms_access_risk",
+                )
+            }
+            for key, result in official.items()
+            if isinstance(result, dict)
+        }
+        source_metadata["institutional"] = {
+            "provider": "FinMind",
+            "endpoint_family": (sections.get("institutional_total") or {}).get("dataset"),
+            "index_kind": None,
+            "metric_kind": "institutional_flow",
+            "raw_unit": "TWD",
+            "normalized_unit": "TWD",
+            "requested_months": [],
+            "fetched_at": None,
+            "terms_access_risk": "medium",
+        }
+        source_metadata["margin"] = {
+            "provider": "FinMind",
+            "endpoint_family": (sections.get("margin_total") or {}).get("dataset"),
+            "index_kind": None,
+            "metric_kind": "margin_short",
+            "raw_unit": "dataset_defined",
+            "normalized_unit": "dataset_defined",
+            "requested_months": [],
+            "fetched_at": None,
+            "terms_access_risk": "medium",
+        }
+        market_now = datetime.now(ZoneInfo("Asia/Taipei")).isoformat()
+        snapshot["tw_market_analysis_snapshot"] = build_tw_market_analysis_snapshot(
+            taiex_rows=(official.get("TAIEX") or {}).get("rows") or [],
+            tpex_rows=(official.get("TPEx") or {}).get("rows") or [],
+            twse_traded_value_rows=(official.get("twse_traded_value") or {}).get("rows") or [],
+            tpex_traded_value_rows=(official.get("tpex_traded_value") or {}).get("rows") or [],
+            institutional_rows=(sections.get("institutional_total") or {}).get("rows") or [],
+            margin_rows=(sections.get("margin_total") or {}).get("rows") or [],
+            representatives=snapshot["representatives"],
+            source_metadata=source_metadata,
+            primary_data_date=data_date or "",
+            generated_at=datetime.now(timezone.utc).isoformat(),
+            market_now=market_now,
+        )
+        return snapshot
 
     def _snapshot_indices(self, sections: Dict[str, Any]) -> List[Dict[str, Any]]:
         data_date = (sections.get("availability") or {}).get("as_of")

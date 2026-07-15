@@ -103,6 +103,91 @@ class TestTWMarketReviewTitle(unittest.TestCase):
         text = render_tw_market_review_text(snapshot)
         self.assertIn("# 台股大盤回顧", text)
 
+
+class TestTWMarketTechnicalNarrativeRendering(unittest.TestCase):
+    def test_analysis_article_is_rendered_as_integrated_prose(self):
+        snapshot = _full_fixture_snapshot()
+        snapshot["tw_daily_snapshot"]["tw_market_analysis_snapshot"] = {
+            "kind": "tw_market_analysis_snapshot",
+            "analysis_ready": True,
+            "data_date": "2026-07-14",
+            "market_state": "closed",
+            "analysis_article": {
+                "status": "available",
+                "headline": "台股加權指數最新技術分析",
+                "market_context": "資料時間：2026 年 7 月 15 日 06:30（台股尚未開盤）",
+                "session_summary": "最新完整交易日加權指數收在 44,737.95 點，下跌 642.57 點。",
+                "core_judgement": {"label": "短空中多", "summary": "低檔出現承接，但尚未確認止跌。"},
+                "trend_paragraphs": [
+                    "指數低於 MA5、MA10 與 MA20，但仍高於 MA60 與 MA120，因此短線偏空、中期多頭結構尚未破壞。",
+                    "RSI14 位於中性偏弱區，MACD 仍處空方結構，反彈動能尚未確認。",
+                ],
+                "price_action_paragraphs": ["指數下探支撐區後收回部分跌幅，成交金額接近近期均值，顯示低檔有承接但止跌尚未確認。"],
+                "confirmation_paragraph": "收盤先站回 MA5 再收復 MA10 與 MA20，反彈確認度才會提高；跌破主要支撐則修正風險升高。",
+                "supporting_context": ["外資偏賣、投信偏買，法人方向分歧，尚不足以改變技術面判斷。"],
+                "tpex_context": "櫃買指數弱於加權指數，市場廣度尚未止穩。",
+            },
+            "narrative": {
+                "title": "不應優先使用的舊 checklist",
+                "moving_average_analysis": ["指數低於 MA5，距離 -1.32%。"],
+            },
+        }
+
+        text = render_tw_market_review_text(snapshot)
+
+        self.assertTrue(text.startswith("# 台股加權指數最新技術分析"))
+        self.assertIn("**短空中多｜低檔出現承接，但尚未確認止跌。**", text)
+        self.assertIn("MA5、MA10 與 MA20，但仍高於 MA60 與 MA120", text)
+        self.assertIn("RSI14 位於中性偏弱區，MACD 仍處空方結構", text)
+        self.assertIn("成交金額接近近期均值", text)
+        self.assertIn("收盤先站回 MA5", text)
+        self.assertIn("法人方向分歧", text)
+        self.assertNotIn("均線位置與結構", text)
+        self.assertNotIn("- 指數低於 MA5", text)
+        self.assertNotIn("不應優先使用的舊 checklist", text)
+
+    def test_usable_analysis_snapshot_becomes_primary_markdown_body(self):
+        snapshot = _full_fixture_snapshot()
+        snapshot["tw_daily_snapshot"]["tw_market_analysis_snapshot"] = {
+            "kind": "tw_market_analysis_snapshot",
+            "analysis_ready": True,
+            "data_date": "2026-06-12",
+            "market_state": "closed",
+            "narrative": {
+                "title": "台股加權指數最新技術分析",
+                "opening_summary": "加權指數收在 22,100 點，單日上漲 120 點。",
+                "core_judgement": ["反彈中但未確認翻多"],
+                "moving_average_analysis": ["指數仍低於 MA20。"],
+                "momentum_analysis": ["RSI14 回升，MACD 空方動能收斂。"],
+                "price_action_analysis": ["K 線出現長下影線。"],
+                "volume_analysis": ["TWSE 成交金額低於近 20 日均值。"],
+                "support_resistance_analysis": ["支撐區 21,800–22,000 點。"],
+                "confirmation_conditions": ["收盤站回 MA20。"],
+                "invalidation_conditions": ["收盤跌破近期低點。"],
+                "tpex_breadth": ["櫃買指數同步止穩。"],
+            },
+        }
+
+        text = render_tw_market_review_text(snapshot)
+
+        self.assertTrue(text.startswith("# 台股加權指數最新技術分析"))
+        for heading in ("核心判斷", "均線位置與結構", "動能 / 指標解讀", "K 線與量價訊號", "支撐 / 壓力 / 觀察區", "反彈確認條件", "失效 / 轉弱條件", "TPEx / 廣度補充"):
+            self.assertIn(heading, text)
+        self.assertNotIn("## 資料可用性說明", text)
+
+    def test_unavailable_analysis_snapshot_keeps_legacy_markdown(self):
+        snapshot = _full_fixture_snapshot()
+        snapshot["tw_daily_snapshot"]["tw_market_analysis_snapshot"] = {
+            "kind": "tw_market_analysis_snapshot",
+            "analysis_ready": False,
+            "narrative": {},
+        }
+
+        text = render_tw_market_review_text(snapshot)
+
+        self.assertTrue(text.startswith("# 台股大盤回顧"))
+        self.assertIn("## 指數表現", text)
+
     def test_title_in_degraded_render(self):
         text = render_tw_market_review_text(_empty_snapshot())
         self.assertIn("# 台股大盤回顧", text)
@@ -298,6 +383,20 @@ class TestTWMarketReviewUsesCorrectProvider(unittest.TestCase):
                 forbidden_import, source,
                 f"Forbidden import '{forbidden_import}' found in tw_market_review.py",
             )
+
+    def test_renderer_has_no_provider_or_llm_runtime_dependency(self):
+        import inspect
+        import src.core.tw_market_review as mod
+
+        source = inspect.getsource(mod)
+        for forbidden in (
+            "OfficialTaiwanExchangeProvider",
+            "from data_provider",
+            "requests.get",
+            "GeminiAnalyzer",
+            "OpenAI",
+        ):
+            self.assertNotIn(forbidden, source)
 
     def test_build_context_returns_required_keys(self):
         snapshot = _full_fixture_snapshot()

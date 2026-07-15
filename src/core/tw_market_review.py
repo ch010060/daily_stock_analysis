@@ -25,6 +25,93 @@ _MARGIN_NAME_MAP: List[tuple] = [
 ]
 
 
+def _text_list(value: Any) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
+
+def _analysis_snapshot(snapshot: Dict[str, Any]) -> Dict[str, Any]:
+    daily = snapshot.get("tw_daily_snapshot") or {}
+    analysis = daily.get("tw_market_analysis_snapshot") or {}
+    if not isinstance(analysis, dict):
+        return {}
+    if analysis.get("kind") != "tw_market_analysis_snapshot" or not analysis.get("analysis_ready"):
+        return {}
+    article = analysis.get("analysis_article") or {}
+    narrative = analysis.get("narrative") or {}
+    return analysis if (isinstance(article, dict) and article) or (isinstance(narrative, dict) and narrative) else {}
+
+
+def _render_analysis_article(article: Dict[str, Any]) -> Optional[str]:
+    if article.get("status") != "available" or not isinstance(article.get("core_judgement"), dict):
+        return None
+    core = article["core_judgement"]
+    sections = [
+        f"# {article.get('headline') or '台股加權指數最新技術分析'}",
+        f"> {article.get('market_context')}",
+        str(article.get("session_summary") or "").strip(),
+        "## 核心判斷\n\n"
+        f"**{core.get('label')}｜{core.get('summary')}**",
+    ]
+    trend = _text_list(article.get("trend_paragraphs"))
+    if trend:
+        sections.append("\n\n".join(trend))
+    price_action = _text_list(article.get("price_action_paragraphs"))
+    confirmation = str(article.get("confirmation_paragraph") or "").strip()
+    if price_action or confirmation:
+        sections.append("## K 線、量價與關鍵位置\n\n" + "\n\n".join([*price_action, *([confirmation] if confirmation else [])]))
+    supporting = _text_list(article.get("supporting_context"))
+    tpex = str(article.get("tpex_context") or "").strip()
+    if tpex:
+        supporting.insert(0, tpex)
+    if supporting:
+        sections.append("## 法人、融資與市場廣度佐證\n\n" + "\n\n".join(supporting))
+    return "\n\n".join(item for item in sections if item)
+
+
+def _render_analysis_markdown(snapshot: Dict[str, Any]) -> Optional[str]:
+    analysis = _analysis_snapshot(snapshot)
+    if not analysis:
+        return None
+    article = analysis.get("analysis_article") or {}
+    if isinstance(article, dict):
+        rendered = _render_analysis_article(article)
+        if rendered:
+            return rendered
+    narrative = analysis["narrative"]
+    title = str(narrative.get("title") or "台股加權指數最新技術分析")
+    data_date = str(analysis.get("data_date") or "—")
+    market_state = {
+        "open_incomplete": "台灣市場目前交易中；本報告僅使用前一完整交易日資料",
+        "closed": "台灣市場目前已收盤",
+        "outside_session": "台灣市場目前休市",
+    }.get(str(analysis.get("market_state") or ""), "市場狀態未確認")
+    sections = [f"# {title}\n\n> 資料日期：{data_date}｜{market_state}"]
+    opening = narrative.get("opening_summary")
+    if isinstance(opening, str) and opening.strip():
+        sections.append(opening.strip())
+
+    section_map = (
+        ("核心判斷", "core_judgement"),
+        ("均線位置與結構", "moving_average_analysis"),
+        ("動能 / 指標解讀", "momentum_analysis"),
+        ("K 線與量價訊號", "price_action_analysis"),
+        ("K 線與量價訊號", "volume_analysis"),
+        ("支撐 / 壓力 / 觀察區", "support_resistance_analysis"),
+        ("反彈確認條件", "confirmation_conditions"),
+        ("失效 / 轉弱條件", "invalidation_conditions"),
+        ("TPEx / 廣度補充", "tpex_breadth"),
+    )
+    grouped: Dict[str, List[str]] = {}
+    for heading, key in section_map:
+        grouped.setdefault(heading, []).extend(_text_list(narrative.get(key)))
+    for heading, items in grouped.items():
+        if items:
+            sections.append(f"## {heading}\n\n" + "\n".join(f"- {item}" for item in items))
+    return "\n\n".join(sections)
+
+
 def _latest_rows_on_or_before(rows: List[Dict[str, Any]], data_date: Optional[str]) -> tuple[Dict[str, Any], Dict[str, Any]]:
     if not rows:
         return {}, {}
@@ -114,6 +201,10 @@ def render_tw_market_review_text(
 
     No LLM call. No live provider call. Pure data formatting.
     """
+    analysis_markdown = _render_analysis_markdown(snapshot)
+    if analysis_markdown:
+        return analysis_markdown
+
     ctx = build_tw_market_review_context(snapshot)
     availability = ctx["availability"]
     as_of = ctx["as_of"] or datetime.now().strftime("%Y-%m-%d")

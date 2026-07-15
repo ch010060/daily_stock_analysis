@@ -106,11 +106,38 @@ const RowList: React.FC<{ rows: TwDailyRow[]; emptyText: string }> = ({ rows, em
   );
 };
 
+const AnalysisList: React.FC<{ items: string[] }> = ({ items }) => (
+  <ul className="space-y-2">
+    {items.map((item) => (
+      <li key={item} className="flex gap-2 text-sm leading-6 text-secondary-text">
+        <span aria-hidden="true" className="mt-2.5 h-1 w-1 shrink-0 rounded-full bg-primary" />
+        <span>{item}</span>
+      </li>
+    ))}
+  </ul>
+);
+
+const AnalysisParagraphs: React.FC<{ items: string[] }> = ({ items }) => (
+  <div className="space-y-4">
+    {items.map((item) => (
+      <p key={item} className="text-[15px] leading-8 text-secondary-text">{item}</p>
+    ))}
+  </div>
+);
+
+const marketStateLabel = (state: string): string => ({
+  closed: '市場已收盤，使用最新完成交易日資料',
+  outside_session: '市場休市，使用最新完成交易日資料',
+  open_incomplete: '市場交易中，本報告不含當日未完成 K 線',
+}[state] || '使用最新完成交易日資料');
+
 export const TwDailyReportView: React.FC<TwDailyReportViewProps> = ({ report, className }) => {
   const summary = meaningfulText(report.summary, SUMMARY_FILLERS);
   const risks = report.risks
     .map((risk) => meaningfulText(risk, RISK_FILLERS))
     .filter((risk): risk is string => Boolean(risk));
+  const analysis = report.analysis;
+  const article = analysis?.article;
 
   return (
   <article
@@ -125,7 +152,9 @@ export const TwDailyReportView: React.FC<TwDailyReportViewProps> = ({ report, cl
         <div>
           <p className="text-xs font-bold tracking-[0.22em] text-muted-text">TAIWAN DAILY</p>
           <h2 className="mt-1 text-3xl font-black tracking-tight text-foreground md:text-4xl">台股日報</h2>
-          <p className="mt-2 text-sm text-secondary-text">FinMind 台股最後交易日快照</p>
+          <p className="mt-2 text-sm text-secondary-text">
+            {analysis ? '官方日線技術分析 · 法人與槓桿資料補充' : 'FinMind 台股最後交易日快照'}
+          </p>
         </div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs md:text-right">
           <div>
@@ -140,8 +169,66 @@ export const TwDailyReportView: React.FC<TwDailyReportViewProps> = ({ report, cl
       </div>
     </header>
 
-    <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,0.9fr)]">
+    <div
+      className={cx(
+        'mt-5 grid gap-6',
+        !article && 'xl:grid-cols-[minmax(0,1fr)_20rem]',
+      )}
+    >
       <main className="space-y-5">
+        {analysis ? (
+          <>
+            <section>
+              <p className="text-xs font-semibold text-muted-text">{article?.marketContext || marketStateLabel(analysis.marketState)}</p>
+              <h1 className="mt-2 text-2xl font-black leading-tight tracking-tight text-foreground md:text-3xl">
+                {analysis.title}
+              </h1>
+              {analysis.openingSummary ? (
+                <p className="mt-4 text-sm leading-7 text-secondary-text">{analysis.openingSummary}</p>
+              ) : null}
+            </section>
+
+            {analysis.coreJudgement.length ? (
+              <section className="rounded-xl border-l-4 border-primary bg-background/60 px-4 py-3">
+                <p className="text-xs font-bold tracking-[0.18em] text-muted-text">核心判斷</p>
+                <p className="mt-1 text-xl font-black leading-8 text-foreground">{analysis.coreJudgement[0]}</p>
+                {analysis.coreJudgement.length > 1 ? (
+                  <p className="mt-2 text-[15px] font-semibold leading-7 text-secondary-text">{analysis.coreJudgement[1]}</p>
+                ) : null}
+              </section>
+            ) : null}
+
+            {article ? (
+              <>
+                {article.trendParagraphs.length ? (
+                  <Section title="趨勢與動能"><AnalysisParagraphs items={article.trendParagraphs} /></Section>
+                ) : null}
+                {[...article.priceActionParagraphs, article.confirmationParagraph].filter(Boolean).length ? (
+                  <Section title="K 線、量價與關鍵位置">
+                    <AnalysisParagraphs items={[...article.priceActionParagraphs, article.confirmationParagraph].filter(Boolean)} />
+                  </Section>
+                ) : null}
+                {[article.tpexContext, ...article.supportingContext].filter(Boolean).length ? (
+                  <Section title="法人、融資與市場廣度佐證">
+                    <AnalysisParagraphs items={[article.tpexContext, ...article.supportingContext].filter(Boolean)} />
+                  </Section>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {analysis.movingAverageAnalysis.length ? <Section title="均線位置與結構"><AnalysisList items={analysis.movingAverageAnalysis} /></Section> : null}
+                {analysis.momentumAnalysis.length ? <Section title="動能 / 指標解讀"><AnalysisList items={analysis.momentumAnalysis} /></Section> : null}
+                {[...analysis.priceActionAnalysis, ...analysis.volumeAnalysis].length ? (
+                  <Section title="K 線與量價訊號"><AnalysisList items={[...analysis.priceActionAnalysis, ...analysis.volumeAnalysis]} /></Section>
+                ) : null}
+                {analysis.supportResistanceAnalysis.length ? <Section title="支撐 / 壓力 / 觀察區"><AnalysisList items={analysis.supportResistanceAnalysis} /></Section> : null}
+                {analysis.confirmationConditions.length ? <Section title="反彈確認條件"><AnalysisList items={analysis.confirmationConditions} /></Section> : null}
+                {analysis.invalidationConditions.length ? <Section title="失效 / 轉弱條件"><AnalysisList items={analysis.invalidationConditions} /></Section> : null}
+                {analysis.tpexBreadth.length ? <Section title="TPEx / 廣度補充"><AnalysisList items={analysis.tpexBreadth} /></Section> : null}
+              </>
+            )}
+          </>
+        ) : (
         <Section title="今日重點" compact>
           <ul className="space-y-2">
             {report.highlights.map((item) => (
@@ -152,16 +239,19 @@ export const TwDailyReportView: React.FC<TwDailyReportViewProps> = ({ report, cl
             ))}
           </ul>
         </Section>
+        )}
 
-        {summary ? (
+        {!analysis && summary ? (
           <Section title={report.title}>
             <p className="text-sm leading-7 text-muted-text">{summary}</p>
           </Section>
         ) : null}
 
-        <Section title="法人與資金面">
-          <RowList rows={report.institutional} emptyText="法人資金資料暫不可用。" />
-        </Section>
+        {!article ? (
+          <Section title="法人與資金面">
+            <RowList rows={report.institutional} emptyText="法人資金資料暫不可用。" />
+          </Section>
+        ) : null}
 
         {risks.length ? (
           <Section title="風險解讀 / 操作觀察">
@@ -174,16 +264,26 @@ export const TwDailyReportView: React.FC<TwDailyReportViewProps> = ({ report, cl
         ) : null}
       </main>
 
-      <aside className="min-w-0 space-y-5 rounded-xl border border-border/80 bg-background/55 p-4">
-        <Section title="主要指數" compact>
-          <RowList rows={report.indices} emptyText="主要指數資料暫不可用。" />
-        </Section>
-        <Section title="融資融券">
-          <RowList rows={report.margin} emptyText="融資融券資料暫不可用。" />
-        </Section>
-        <Section title="代表標的">
-          <RowList rows={report.representatives} emptyText="代表標的資料暫不可用。" />
-        </Section>
+      <aside className="min-w-0 rounded-xl border border-border/80 bg-background/55 p-4">
+        <details open={!article}>
+          <summary className="cursor-pointer text-sm font-bold text-foreground">完整結構化證據</summary>
+          <div className="mt-5 space-y-5">
+            <Section title="主要指數" compact>
+              <RowList rows={report.indices} emptyText="主要指數資料暫不可用。" />
+            </Section>
+            {article ? (
+              <Section title="法人買賣明細">
+                <RowList rows={report.institutional} emptyText="法人資金資料暫不可用。" />
+              </Section>
+            ) : null}
+            <Section title="融資融券">
+              <RowList rows={report.margin} emptyText="融資融券資料暫不可用。" />
+            </Section>
+            <Section title="代表標的">
+              <RowList rows={report.representatives} emptyText="代表標的資料暫不可用。" />
+            </Section>
+          </div>
+        </details>
       </aside>
     </div>
   </article>

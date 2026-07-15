@@ -176,6 +176,52 @@ const STRUCTURED_TW_DAILY_SNAPSHOT = {
   },
 };
 
+const ANALYTICAL_TW_DAILY_SNAPSHOT = {
+  ...STRUCTURED_TW_DAILY_SNAPSHOT,
+  twMarketAnalysisSnapshot: {
+    kind: 'tw_market_analysis_snapshot',
+    schemaVersion: 1,
+    analysisReady: true,
+    dataDate: '2026-06-26',
+    generatedAt: '2026-06-26T06:30:00Z',
+    marketState: 'closed',
+    analysisArticle: {
+      status: 'available',
+      headline: '台股加權指數最新技術分析',
+      marketContext: '資料時間：2026 年 6 月 26 日 18:30（台股已收盤）',
+      sessionSummary: '最新完整交易日加權指數收在 23,000 點，單日下跌 120 點。',
+      coreJudgement: {
+        label: '短空中多',
+        summary: '低檔出現承接，但尚未確認止跌。',
+        evidenceRuleIds: ['TREND_STRUCTURE_COMPOSITE'],
+      },
+      trendParagraphs: [
+        '指數低於 MA5、MA10 與 MA20，但仍高於 MA60 與 MA120，因此短線偏空、中期多頭結構尚未破壞。',
+        'RSI14 位於中性偏弱區，MACD 仍處空方結構，反彈動能尚未完成確認。',
+      ],
+      priceActionParagraphs: [
+        '指數下探支撐區後收回部分跌幅，成交金額接近近期均值，顯示低檔有承接但尚未止跌。',
+      ],
+      confirmationParagraph: '收盤先站回 MA5，再收復 MA10 與 MA20，反彈確認度才會提高；跌破主要支撐則修正風險升高。',
+      supportingContext: ['外資偏賣、投信偏買，法人方向分歧，尚不足以改變技術面判斷。'],
+      tpexContext: '櫃買指數弱於加權指數，市場廣度尚未止穩。',
+    },
+    narrative: {
+      title: '台股加權指數最新技術分析',
+      openingSummary: '最新完成交易日加權指數收在 23,000 點，單日下跌 120 點。',
+      coreJudgement: ['反彈中但未確認翻多'],
+      movingAverageAnalysis: ['指數低於 MA20 約 1.3%。', '均線結構為短空中多。'],
+      momentumAnalysis: ['RSI14 為 43.2，動能改善。', 'MACD 空方柱狀體收斂。'],
+      priceActionAnalysis: ['K 線出現長下影線，低檔有承接。'],
+      volumeAnalysis: ['TWSE 成交金額低於近 20 日均值，反彈量能不足。'],
+      supportResistanceAnalysis: ['支撐區 22,700–22,900 點。', '壓力區 23,300–23,500 點。'],
+      confirmationConditions: ['收盤站回 MA20。'],
+      invalidationConditions: ['收盤跌破近期低點。'],
+      tpexBreadth: ['櫃買指數同步止穩。'],
+    },
+  },
+};
+
 describe('TwDailyReportView', () => {
   it('parses the deterministic Taiwan daily markdown into a structured view model', () => {
     const report = parseTwDailyReportMarkdown(PARSEABLE_MARKET_REVIEW);
@@ -225,6 +271,48 @@ describe('TwDailyReportView', () => {
     expect(screen.getByText('2330')).toBeInTheDocument();
     expect(screen.getByText(/PER 24\.50/)).toBeInTheDocument();
     expect(screen.getAllByText('估值資料未提供').length).toBeGreaterThan(0);
+  });
+
+  it('prioritizes the deterministic analytical narrative over snapshot highlights', () => {
+    const report = buildTwDailyReportFromSnapshot(ANALYTICAL_TW_DAILY_SNAPSHOT);
+
+    expect(report?.analysis).toBeDefined();
+    render(<TwDailyReportView report={report!} />);
+
+    expect(screen.getByRole('heading', { name: '台股加權指數最新技術分析' })).toBeInTheDocument();
+    expect(screen.getByText('短空中多')).toBeInTheDocument();
+    expect(screen.getByText('低檔出現承接，但尚未確認止跌。')).toBeInTheDocument();
+    expect(screen.getByText('趨勢與動能')).toBeInTheDocument();
+    expect(screen.getByText('K 線、量價與關鍵位置')).toBeInTheDocument();
+    expect(screen.getByText(/MA5、MA10 與 MA20，但仍高於 MA60 與 MA120/)).toBeInTheDocument();
+    expect(screen.getByText(/RSI14 位於中性偏弱區，MACD 仍處空方結構/)).toBeInTheDocument();
+    expect(screen.getByText(/成交金額接近近期均值/)).toBeInTheDocument();
+    expect(screen.getByText(/收盤先站回 MA5/)).toBeInTheDocument();
+    expect(screen.getByText(/法人方向分歧/)).toBeInTheDocument();
+    expect(screen.queryByText('均線位置與結構')).not.toBeInTheDocument();
+    expect(screen.queryByText('指數低於 MA20 約 1.3%。')).not.toBeInTheDocument();
+    expect(screen.queryByText('TREND_STRUCTURE_COMPOSITE')).not.toBeInTheDocument();
+    expect(screen.queryByText('今日重點')).not.toBeInTheDocument();
+  });
+
+  it('suppresses the TPEx analytical block cleanly when no exact-date narrative exists', () => {
+    const report = buildTwDailyReportFromSnapshot({
+      ...ANALYTICAL_TW_DAILY_SNAPSHOT,
+      twMarketAnalysisSnapshot: {
+        ...ANALYTICAL_TW_DAILY_SNAPSHOT.twMarketAnalysisSnapshot,
+        analysisArticle: {
+          ...ANALYTICAL_TW_DAILY_SNAPSHOT.twMarketAnalysisSnapshot.analysisArticle,
+          tpexContext: undefined,
+        },
+        narrative: {
+          ...ANALYTICAL_TW_DAILY_SNAPSHOT.twMarketAnalysisSnapshot.narrative,
+          tpexBreadth: undefined,
+        },
+      },
+    });
+
+    render(<TwDailyReportView report={report!} />);
+    expect(screen.queryByText(/市場廣度尚未止穩/)).not.toBeInTheDocument();
   });
 
   it('uses Taiwan color semantics for price, flow, and margin rows', () => {
@@ -317,5 +405,98 @@ describe('TwDailyReportView', () => {
     expect(container.innerHTML).not.toContain('dangerouslySetInnerHTML');
     expect(container.innerHTML).not.toContain('html2canvas');
     expect(container.innerHTML).not.toContain('jsPDF');
+  });
+
+  // -------------------------------------------------------------------
+  // Blocker 1 regression: analysis-only snapshot must not be suppressed
+  // when FinMind supporting sections are empty or unavailable.
+  // -------------------------------------------------------------------
+
+  const ANALYSIS_ONLY_SNAPSHOT = {
+    kind: 'tw_daily_snapshot',
+    source: 'finmind',
+    dataDate: '2026-06-26',
+    datasets: [],
+    indices: [],
+    institutionalFlows: [],
+    marginShort: [],
+    representatives: [],
+    dataStatus: {
+      missingFields: [],
+      staleFields: [],
+      partialFailures: [],
+    },
+    twMarketAnalysisSnapshot: {
+      kind: 'tw_market_analysis_snapshot',
+      schemaVersion: 1,
+      analysisReady: true,
+      dataDate: '2026-06-26',
+      generatedAt: '2026-06-26T06:30:00Z',
+      marketState: 'closed',
+      analysisArticle: {
+        status: 'available',
+        headline: '台股加權指數最新技術分析',
+        marketContext: '資料時間：2026 年 6 月 26 日 18:30（台股已收盤）',
+        sessionSummary: '最新完整交易日加權指數收在 23,000 點，單日下跌 120 點。',
+        coreJudgement: {
+          label: '短空中多',
+          summary: '低檔出現承接，但尚未確認止跌。',
+        },
+        trendParagraphs: [
+          '指數低於 MA5、MA10 與 MA20，但仍高於 MA60 與 MA120，因此短線偏空、中期多頭結構尚未破壞。',
+        ],
+        priceActionParagraphs: [
+          '指數下探支撐區後收回部分跌幅，成交金額接近近期均值。',
+        ],
+        confirmationParagraph: '收盤先站回 MA5，再收復 MA10 與 MA20，反彈確認度才會提高。',
+        supportingContext: [],
+        tpexContext: '櫃買指數弱於加權指數，市場廣度尚未止穩。',
+      },
+    },
+  };
+
+  it('returns a non-null model from an analysis-only snapshot (regression: guard must not suppress analysis)', () => {
+    const report = buildTwDailyReportFromSnapshot(ANALYSIS_ONLY_SNAPSHOT);
+    expect(report).not.toBeNull();
+    expect(report?.dataDate).toBe('2026-06-26');
+  });
+
+  it('includes analysis in the model built from an analysis-only snapshot', () => {
+    const report = buildTwDailyReportFromSnapshot(ANALYSIS_ONLY_SNAPSHOT);
+    expect(report?.analysis).toBeDefined();
+    expect(report?.analysis?.article).toBeDefined();
+    expect(report?.analysis?.article?.headline).toBe('台股加權指數最新技術分析');
+  });
+
+  it('renders the deterministic article from an analysis-only snapshot', () => {
+    const report = buildTwDailyReportFromSnapshot(ANALYSIS_ONLY_SNAPSHOT);
+    render(<TwDailyReportView report={report!} />);
+
+    expect(screen.getByRole('heading', { name: '台股加權指數最新技術分析' })).toBeInTheDocument();
+    expect(screen.getByText('短空中多')).toBeInTheDocument();
+    expect(screen.getByText('低檔出現承接，但尚未確認止跌。')).toBeInTheDocument();
+    expect(screen.getByText(/MA5、MA10 與 MA20，但仍高於 MA60 與 MA120/)).toBeInTheDocument();
+  });
+
+  it('returns null when there is neither analysis nor any supporting structured section', () => {
+    expect(buildTwDailyReportFromSnapshot({
+      kind: 'tw_daily_snapshot',
+      dataDate: '2026-06-26',
+      indices: [],
+      institutionalFlows: [],
+      marginShort: [],
+      representatives: [],
+      dataStatus: {},
+    })).toBeNull();
+
+    expect(buildTwDailyReportFromSnapshot({
+      kind: 'tw_daily_snapshot',
+      dataDate: '',
+      indices: [{ symbol: 'TAIEX' }],
+      institutionalFlows: [],
+      marginShort: [],
+      representatives: [],
+      dataStatus: {},
+    })).toBeNull();
   });
 });
