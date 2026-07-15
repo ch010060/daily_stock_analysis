@@ -423,6 +423,7 @@ class TaiwanMarketDataFetcher:
         per_2330 = self.get_reference_stock_per("2330", start_date, end_date)
         no_network = self._no_network()
         official_provider = self._official_provider or OfficialTaiwanExchangeProvider(
+            session=self._session,
             allow_network=not no_network,
             cache_dir=(self._fixture_root / "official_exchange_cache") if no_network else None,
         )

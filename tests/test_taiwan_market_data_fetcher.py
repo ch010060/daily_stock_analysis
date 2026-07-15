@@ -559,5 +559,95 @@ class TestScopeGateStillDefersTW(unittest.TestCase):
         self.assertIn("us", run)
 
 
+class TestSessionInjection(unittest.TestCase):
+    """Blocker 2 regression: injected session must reach official exchange provider."""
+
+    def test_official_provider_receives_injected_session(self):
+        """When session is injected and no official_provider is given,
+        OfficialTaiwanExchangeProvider must be constructed with session."""
+        from unittest.mock import patch, MagicMock
+        from data_provider import taiwan_exchange
+
+        fake_session = MagicMock()
+        captured_session = []
+        original_init = taiwan_exchange.OfficialTaiwanExchangeProvider.__init__
+
+        def tracking_init(self, *, session=None, cache_dir=None, now=None, allow_network=True):
+            captured_session.append(session)
+            kwargs = {"session": session, "cache_dir": cache_dir, "allow_network": allow_network}
+            if now is not None:
+                kwargs["now"] = now
+            return original_init(self, **kwargs)
+
+        env = _fixture_env()
+        with patch.dict(os.environ, env, clear=False):
+            with patch.object(
+                taiwan_exchange.OfficialTaiwanExchangeProvider,
+                "__init__",
+                tracking_init,
+            ):
+                fetcher = TaiwanMarketDataFetcher(
+                    fixture_root=_FIXTURE_ROOT, session=fake_session,
+                )
+                _ = fetcher.get_tw_market_snapshot(_START, _END)
+
+        self.assertTrue(len(captured_session) > 0, "Provider was never constructed")
+        self.assertIs(
+            captured_session[0], fake_session,
+            "OfficialTaiwanExchangeProvider did not receive the injected session",
+        )
+
+    def test_explicit_official_provider_is_preserved(self):
+        """An explicitly injected official_provider must not be replaced."""
+        from unittest.mock import MagicMock
+
+        explicit_provider = MagicMock()
+        explicit_provider.load_series.return_value = {
+            "ok": True,
+            "rows": [{"date": "2026-06-12", "open": 100, "high": 101, "low": 99, "close": 100}],
+            "provider": "TWSE",
+            "endpoint_family": "test",
+            "index_kind": "price_index",
+            "metric_kind": "ohlc",
+            "raw_unit": "index_points",
+            "normalized_unit": "index_points",
+            "requested_months": ["2026-06"],
+            "first_date": "2026-06-12",
+            "latest_date": "2026-06-12",
+            "row_count": 1,
+            "data_date": _END,
+            "as_of": "2026-06-12",
+            "lag_sessions": None,
+            "fetched_at": "2026-06-12T09:00:00Z",
+            "status": "available",
+            "suppression_reason": None,
+            "terms_access_risk": "medium",
+        }
+
+        fake_session = MagicMock()
+        env = _fixture_env()
+        with patch.dict(os.environ, env, clear=False):
+            fetcher = TaiwanMarketDataFetcher(
+                fixture_root=_FIXTURE_ROOT,
+                session=fake_session,
+                official_provider=explicit_provider,
+            )
+            _ = fetcher.get_tw_market_snapshot(_START, _END)
+
+        self.assertTrue(explicit_provider.load_series.called)
+        # explicit provider's session should NOT be overwritten
+        explicit_provider.load_series.assert_called()
+
+    def test_fixture_no_network_behavior_unchanged(self):
+        """Fixture mode must still work (cached completed months used)."""
+        env = _fixture_env()
+        with patch.dict(os.environ, env, clear=False):
+            fetcher = TaiwanMarketDataFetcher(fixture_root=_FIXTURE_ROOT)
+            snapshot = fetcher.get_tw_market_snapshot(_START, _END)
+
+        self.assertIn("tw_daily_snapshot", snapshot)
+        self.assertIn("tw_market_analysis_snapshot", snapshot["tw_daily_snapshot"])
+
+
 if __name__ == "__main__":
     unittest.main()

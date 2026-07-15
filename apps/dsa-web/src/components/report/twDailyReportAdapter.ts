@@ -322,7 +322,7 @@ export function buildTwDailyReportFromSnapshot(value: unknown): TwDailyReportMod
     article,
   } : undefined;
 
-  if (!dataDate || (!indices.length && !institutionalFlows.length && !marginShort.length && !representatives.length)) {
+  if (!dataDate || (!analysis && !indices.length && !institutionalFlows.length && !marginShort.length && !representatives.length)) {
     return null;
   }
 
