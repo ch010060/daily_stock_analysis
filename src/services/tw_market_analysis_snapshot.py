@@ -343,9 +343,9 @@ def _index_analysis(rows: List[Dict[str, Any]], value_rows: List[Dict[str, Any]]
 def _judgement(analysis: Dict[str, Any]) -> Dict[str, Any]:
     latest = analysis["latest_bar"]
     mas = analysis["moving_averages"]
-    candle = analysis["candlestick"]
-    invalidation = candle["completed_close_breakdown"]
     alignment = analysis["ma_alignment"]
+    support = analysis["support_levels"][:1]
+    invalidation = _support_zone_state(latest["close"], support[0] if support else None) == "broken_zone"
     confirmed = latest["close"] > mas["ma20"]["value"] and alignment == "bullish" and mas["ma20"]["slope"] > 0
     rebound = analysis["change"] > 0 and latest["close"] < mas["ma20"]["value"]
     if invalidation:
@@ -356,7 +356,6 @@ def _judgement(analysis: Dict[str, Any]) -> Dict[str, Any]:
         category, rule_id, headline = "unconfirmed_rebound", "TECHNICAL_REBOUND_UNCONFIRMED", "反彈中但未確認翻多"
     else:
         category, rule_id, headline = "contextual", "TREND_MIXED_CONTEXT", "短線整理，方向仍待確認"
-    support = analysis["support_levels"][:1]
     resistance = analysis["resistance_levels"][:1]
     confirmation_conditions = [
         {"rule_id": "CONFIRM_CLOSE_ABOVE_MA20", "text": "收盤站上 MA20 且短期均線轉為多頭排列。", "met": confirmed},
@@ -383,6 +382,20 @@ def _zone_text(zone: Dict[str, Any]) -> str:
     return f"{zone['lower']:,.0f}～{zone['upper']:,.0f} 點"
 
 
+def _support_zone_state(close: float, zone: Optional[Dict[str, Any]]) -> str:
+    """Three-state support-zone classification, evaluated against the zone's
+    own lower/upper boundary rather than a proxy signal (e.g. a new trailing
+    N-session closing low) that can diverge from the zone actually shown in
+    the narrative. Boundaries are inclusive of the zone (state B)."""
+    if not zone:
+        return "unavailable"
+    if close > zone["upper"]:
+        return "above_zone"
+    if close < zone["lower"]:
+        return "broken_zone"
+    return "testing_zone"
+
+
 def _tested_support(analysis: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     zones = analysis.get("support_levels") or []
     if not zones:
@@ -406,7 +419,12 @@ def _market_context(snapshot: Dict[str, Any]) -> str:
     return f"資料時間：{formatted}（{state}）"
 
 
-def _core_judgement(snapshot: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
+def _core_judgement(
+    snapshot: Dict[str, Any],
+    analysis: Dict[str, Any],
+    support_state: str,
+    support_text: str,
+) -> Dict[str, Any]:
     mas = analysis["moving_averages"]
     candle = analysis["candlestick"]
     rsi = analysis["momentum"]["rsi14"]
@@ -432,7 +450,7 @@ def _core_judgement(snapshot: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[
         ("mixed", "mixed"): "短中期結構分歧",
         ("mixed", "bearish"): "短線修復、中期偏空",
     }[(short, medium)]
-    invalidated = bool(candle.get("completed_close_breakdown")) or snapshot.get("market_judgement", {}).get("category") == "invalidation"
+    invalidated = support_state == "broken_zone" or snapshot.get("market_judgement", {}).get("category") == "invalidation"
     confirmed = (
         short == "bullish"
         and mas["ma5"]["slope"] > 0
@@ -449,6 +467,8 @@ def _core_judgement(snapshot: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[
         summary = "出現技術性反彈，但短期均線與動能尚未確認止跌。"
     elif lower_recovery and short == "bearish":
         summary = "低檔出現承接，但尚未確認止跌。"
+    elif short == "bearish" and support_state == "testing_zone":
+        summary = f"短線持續下探，指數已進入 {support_text}支撐區並正接受測試，若跌破區間下緣，修正風險將進一步提高。"
     elif short == "bearish":
         summary = "短線仍在修正，中期結構是否延續取決於支撐能否守住。"
     else:
@@ -513,7 +533,10 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
     macd = analysis["momentum"]["macd"]
     candle = analysis["candlestick"]
     volume = analysis.get("volume_analysis") or {"state": "unavailable"}
-    core = _core_judgement(snapshot, analysis)
+    support = _tested_support(analysis)
+    support_text = _zone_text(support) if support else "最近確認支撐區"
+    support_state = _support_zone_state(bar["close"], support)
+    core = _core_judgement(snapshot, analysis, support_state, support_text)
 
     value_summary = ""
     if volume.get("state") == "available":
@@ -546,16 +569,23 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
     )
     momentum = f"RSI14 為 {rsi['value']:.1f}，位於{rsi_state}區並較前一日{rsi_move}；{macd_text}，因此短線動能{'尚未完成翻多確認' if core['short_term'] != 'bullish' else '已有改善，但仍需後續價格確認'}。"
 
-    support = _tested_support(analysis)
-    support_text = _zone_text(support) if support else "最近確認支撐區"
     recovered = bar["close"] - bar["low"]
-    recovery_text = (
-        f"盤中下探 {support_text}後，收盤自低點回升 {recovered:,.0f} 點，日 K 留下明顯下影線，顯示支撐附近已有承接"
-        if candle.get("range", 0) and candle.get("lower_shadow", 0) / candle["range"] >= 0.35
-        else f"指數盤中測試 {support_text}，收盤距低點回升 {recovered:,.0f} 點"
-    )
-    if candle.get("completed_close_breakdown"):
-        recovery_text = f"收盤已跌破 {support_text}，原支撐失效，反彈前必須先重新站回該區"
+    long_lower_shadow = bool(candle.get("range", 0)) and candle.get("lower_shadow", 0) / candle["range"] >= 0.35
+    if support_state == "broken_zone":
+        recovery_text = f"收盤跌破 {support['lower']:,.0f} 點，原支撐區正式失效，修正風險進一步提高"
+    elif support_state == "testing_zone":
+        shadow_note = "，日 K 留下明顯下影線，顯示支撐附近已有承接" if long_lower_shadow else ""
+        recovery_text = (
+            f"指數已進入 {support_text}支撐區，支撐正在接受測試；"
+            f"收盤距盤中低點回升 {recovered:,.0f} 點{shadow_note}，"
+            "目前尚未跌破區間下緣，但收盤位於區間內，承接力仍待確認"
+        )
+    else:
+        recovery_text = (
+            f"盤中下探 {support_text}後，收盤自低點回升 {recovered:,.0f} 點，日 K 留下明顯下影線，顯示支撐附近已有承接"
+            if long_lower_shadow
+            else f"指數盤中測試 {support_text}，收盤距低點回升 {recovered:,.0f} 點"
+        )
     volume_text = ""
     if volume.get("state") == "available":
         if volume.get("direction") == "expansion":
@@ -565,15 +595,30 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
         else:
             volume_text = "；成交金額接近近 20 日均值，量能尚未提供額外止跌確認"
     price_action = f"{recovery_text}{volume_text}。"
-    if mas["ma5"]["position"] == "below" and not candle.get("completed_close_breakdown"):
+    if mas["ma5"]["position"] == "below" and support_state != "broken_zone":
         price_action += "但收盤仍未站回短期均線，因此現階段只能視為低檔承接，不能直接判定修正結束。"
 
     resistance_band = f"MA10 至 MA20 約 {min(mas['ma10']['value'], mas['ma20']['value']):,.0f}～{max(mas['ma10']['value'], mas['ma20']['value']):,.0f} 點"
-    confirmation = (
+    rebound_confirmation = (
         f"接下來若收盤先站回 MA5（約 {mas['ma5']['value']:,.0f} 點），再收復 {resistance_band}；"
-        f"若成交金額沒有明顯萎縮且動能同步改善，反彈確認度才會提高。若收盤跌破 {support_text}，"
-        "代表本次低檔承接失敗，修正風險將進一步升高。"
+        f"若成交金額沒有明顯萎縮且動能同步改善，反彈確認度才會提高。"
     )
+    if support_state == "broken_zone":
+        # Current state already reports the break; the follow-up condition must
+        # be a reclaim/next-support watch, not a repeat of the same break as if
+        # it were still pending (that would contradict the price-action prose).
+        confirmation = (
+            f"跌破支撐區後，反彈確認須先重新站回 {support_text}；"
+            "若持續無法收復，修正風險將維持在偏高水準。"
+        )
+    elif support_state == "testing_zone":
+        confirmation = (
+            f"{rebound_confirmation}若後續收盤有效跌破 {support['lower']:,.0f} 點，才代表該支撐區正式失效。"
+        )
+    else:
+        confirmation = (
+            f"{rebound_confirmation}若收盤跌破 {support_text}，代表本次低檔承接失敗，修正風險將進一步升高。"
+        )
     result = {
         "status": "available",
         "headline": "台股加權指數最新技術分析",

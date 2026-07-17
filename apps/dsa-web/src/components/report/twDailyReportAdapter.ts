@@ -428,6 +428,53 @@ export function buildTwDailyReportFromSnapshot(value: unknown): TwDailyReportMod
   };
 }
 
+/**
+ * Taiwan-only plain-text export of the currently rendered `TwDailyReportModel`.
+ * Built from the view model (not the raw persisted markdown) so it can never
+ * include the US market review or other composite-report sections that share
+ * the same underlying record.
+ */
+export function buildTwDailyCopyText(report: TwDailyReportModel): string {
+  const lines: string[] = [];
+  const analysis = report.analysis;
+  const article = analysis?.article;
+
+  if (analysis) {
+    lines.push(`# ${analysis.title}`);
+    if (article?.marketContext) lines.push('', article.marketContext);
+    if (analysis.openingSummary) lines.push('', analysis.openingSummary);
+    if (analysis.coreJudgement.length) {
+      lines.push('', '## 核心判斷', analysis.coreJudgement[0]);
+      if (analysis.coreJudgement[1]) lines.push(analysis.coreJudgement[1]);
+    }
+    if (article) {
+      if (article.trendParagraphs.length) lines.push('', '## 趨勢與動能', ...article.trendParagraphs);
+      const priceAction = [...article.priceActionParagraphs, article.confirmationParagraph].filter(Boolean);
+      if (priceAction.length) lines.push('', '## K 線、量價與關鍵位置', ...priceAction);
+      const supporting = [article.tpexContext, ...article.supportingContext].filter(Boolean);
+      if (supporting.length) lines.push('', '## 法人、融資與市場廣度佐證', ...supporting);
+    } else {
+      if (analysis.movingAverageAnalysis.length) lines.push('', '## 均線位置與結構', ...analysis.movingAverageAnalysis);
+      if (analysis.momentumAnalysis.length) lines.push('', '## 動能 / 指標解讀', ...analysis.momentumAnalysis);
+      const priceVolume = [...analysis.priceActionAnalysis, ...analysis.volumeAnalysis];
+      if (priceVolume.length) lines.push('', '## K 線與量價訊號', ...priceVolume);
+      if (analysis.supportResistanceAnalysis.length) lines.push('', '## 支撐 / 壓力 / 觀察區', ...analysis.supportResistanceAnalysis);
+      if (analysis.confirmationConditions.length) lines.push('', '## 反彈確認條件', ...analysis.confirmationConditions);
+      if (analysis.invalidationConditions.length) lines.push('', '## 失效 / 轉弱條件', ...analysis.invalidationConditions);
+      if (analysis.tpexBreadth.length) lines.push('', '## TPEx / 廣度補充', ...analysis.tpexBreadth);
+    }
+    return lines.join('\n').trim();
+  }
+
+  lines.push(`# ${report.title}`, '', `資料日期：${report.dataDate}`);
+  if (report.highlights.length) lines.push('', '## 今日重點', ...report.highlights.map((item) => `- ${item}`));
+  if (report.indices.length) lines.push('', '## 指數表現', ...report.indices.map((row) => `- ${row.label}：${row.value}`));
+  if (report.institutional.length) lines.push('', '## 法人與資金面', ...report.institutional.map((row) => `- ${row.label}：${row.value}`));
+  if (report.margin.length) lines.push('', '## 融資融券觀察', ...report.margin.map((row) => `- ${row.label}：${row.value}`));
+  if (report.representatives.length) lines.push('', '## 代表標的', ...report.representatives.map((row) => `- ${row.label}：${row.value}`));
+  return lines.join('\n').trim();
+}
+
 export const extractTwDailySnapshotFromReport = (report?: AnalysisReport | null): unknown | null => {
   const details = report?.details;
   if (!details) return null;

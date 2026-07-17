@@ -11,6 +11,7 @@ import { Tooltip } from '../common/Tooltip';
 import { MermaidDiagram } from './MermaidDiagram';
 import { TwDailyReportView } from './TwDailyReportView';
 import {
+  buildTwDailyCopyText,
   buildTwDailyReportFromSnapshot,
   extractTwDailySnapshotFromReport,
   parseTwDailyReportMarkdown,
@@ -304,29 +305,34 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
     ? buildTwDailyReportFromSnapshot(extractTwDailySnapshotFromReport(detail)) ?? parseTwDailyReportMarkdown(sanitizedContent)
     : null;
   const isPrintVariant = variant === 'print';
+  // Copy actions must scope to what's actually shown: the Taiwan daily article
+  // only, never the composite market_review markdown it was extracted from.
+  const copySourceText = twDailyReport ? buildTwDailyCopyText(twDailyReport) : content;
+  const copyMarkdownLabel = twDailyReport ? text.copyTwDailyMarkdown : text.copyMarkdownSource;
+  const copyPlainTextLabel = twDailyReport ? text.copyTwDailyPlainText : text.copyPlainText;
 
   const handleCopyMarkdown = useCallback(async () => {
-    if (!content) return;
+    if (!copySourceText) return;
     try {
-      await navigator.clipboard.writeText(content);
+      await navigator.clipboard.writeText(copySourceText);
       setCopiedType('markdown');
       setTimeout(() => setCopiedType(null), 2000);
     } catch (error) {
       console.error('Copy failed:', error);
     }
-  }, [content]);
+  }, [copySourceText]);
 
   const handleCopyPlainText = useCallback(async () => {
-    if (!content) return;
+    if (!copySourceText) return;
     try {
-      const plainText = markdownToPlainText(content);
+      const plainText = markdownToPlainText(copySourceText);
       await navigator.clipboard.writeText(plainText);
       setCopiedType('text');
       setTimeout(() => setCopiedType(null), 2000);
     } catch (error) {
       console.error('Copy failed:', error);
     }
-  }, [content]);
+  }, [copySourceText]);
 
   const handleDownloadPdf = useCallback(async () => {
     if (!content || isGeneratingPdf) return;
@@ -428,14 +434,14 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
             </span>
           </Tooltip>
 
-          <Tooltip content={text.copyMarkdownSource}>
+          <Tooltip content={copyMarkdownLabel}>
             <span className="inline-flex">
               <button
                 type="button"
                 onClick={handleCopyMarkdown}
-                disabled={isLoading || !content || copiedType !== null}
+                disabled={isLoading || !copySourceText || copiedType !== null}
                 className="home-surface-button flex h-10 w-10 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
-                aria-label={text.copyMarkdownSource}
+                aria-label={copyMarkdownLabel}
               >
                 {copiedType === 'markdown' ? (
                   <svg className="h-6 w-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -450,14 +456,14 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
             </span>
           </Tooltip>
 
-          <Tooltip content={text.copyPlainText}>
+          <Tooltip content={copyPlainTextLabel}>
             <span className="inline-flex">
               <button
                 type="button"
                 onClick={handleCopyPlainText}
-                disabled={isLoading || !content || copiedType !== null}
+                disabled={isLoading || !copySourceText || copiedType !== null}
                 className="home-surface-button flex h-10 w-10 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
-                aria-label={text.copyPlainText}
+                aria-label={copyPlainTextLabel}
               >
                 {copiedType === 'text' ? (
                   <svg className="h-6 w-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">

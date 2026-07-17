@@ -5,6 +5,8 @@ import unittest
 from datetime import date, timedelta
 
 from src.services.tw_market_analysis_snapshot import (
+    _judgement,
+    _support_zone_state,
     build_tw_market_analysis_snapshot,
     compose_tw_market_analysis_article,
 )
@@ -110,6 +112,72 @@ def _reference_article_snapshot():
                 {"name": "MarginPurchaseMoney", "TodayBalance": 604_034_106_000, "YesBalance": 618_300_058_000},
             ]},
             "representatives": [],
+        },
+    }
+
+
+def _testing_zone_snapshot(close_override=None, low_override=None):
+    """2026-07-16 production-shaped facts: a severe single-day decline closing
+    inside (not below) the tested support zone. Regression fixture for the
+    copy-scope/support-zone-semantics bugfix."""
+    ma = {
+        "ma5": {"value": 45700.0, "distance_pct": -6.6, "slope": -150.0, "direction": "down", "position": "below"},
+        "ma10": {"value": 46000.0, "distance_pct": -7.2, "slope": -80.0, "direction": "down", "position": "below"},
+        "ma20": {"value": 46200.0, "distance_pct": -7.6, "slope": 10.0, "direction": "up", "position": "below"},
+        "ma60": {"value": 41000.0, "distance_pct": 4.1, "slope": 90.0, "direction": "up", "position": "above"},
+        "ma120": {"value": 43000.0, "distance_pct": -0.8, "slope": 60.0, "direction": "up", "position": "below"},
+    }
+    support = [{
+        "lower": 42353.0, "upper": 42990.0, "level": 42671.5, "as_of": "2026-07-16",
+        "source": "delayed_pivot_or_rolling20", "confirmation_state": "confirmed_close_history",
+        "confidence": "medium", "invalidation_rule": "two_closes_beyond_zone",
+    }]
+    close = 42671.27 if close_override is None else close_override
+    low = 42640.00 if low_override is None else low_override
+    high, open_ = 45630.0, 45620.0
+    taiex = {
+        "latest_bar": {"date": "2026-07-16", "open": open_, "high": high, "low": low, "close": close},
+        "previous_close": 45625.70,
+        "change": close - 45625.70,
+        "change_pct": (close - 45625.70) / 45625.70 * 100,
+        "moving_averages": ma,
+        "ma_alignment": "bearish",
+        "momentum": {
+            "rsi14": {"value": 34.2, "previous": 41.5, "direction": "deteriorating"},
+            "macd": {"dif": -300.0, "signal": -100.0, "histogram": -200.0, "previous_histogram": -150.0, "direction": "deteriorating", "state": "bearish"},
+        },
+        "atr14": 1450.0,
+        "candlestick": {
+            "body": abs(close - open_), "range": high - low,
+            "upper_shadow": 0.0, "lower_shadow": min(open_, close) - low,
+            "doji": False, "long_lower_shadow": False, "long_upper_shadow": False,
+            "gap": "none", "inside_bar": False, "outside_bar": False,
+            "bullish_engulfing": False, "bearish_engulfing": False,
+            "completed_close_reclaim": False,
+            # Deliberately stale/true: the legacy 20-session-low proxy this bugfix
+            # removes from the support-break decision. Must not drive the verdict.
+            "completed_close_breakdown": True,
+        },
+        "support_levels": support,
+        "resistance_levels": [],
+        "volume_analysis": {"state": "unavailable"},
+    }
+    return {
+        "kind": "tw_market_analysis_snapshot",
+        "analysis_ready": True,
+        "data_date": "2026-07-16",
+        "generated_at": "2026-07-17T03:26:00+00:00",
+        "market_state": "open_incomplete",
+        "indices": {
+            "TAIEX": taiex,
+            "TPEx": {"latest_bar": {"date": "2026-07-16", "close": 300.0}, "change": -22.6, "change_pct": -7.02},
+        },
+        "market_judgement": {
+            "category": "contextual", "rule_id": "TREND_MIXED_CONTEXT",
+            "confirmation_conditions": [], "invalidation_conditions": [],
+        },
+        "supporting_evidence": {
+            "institutional": {"status": "suppressed"}, "margin": {"status": "suppressed"}, "representatives": [],
         },
     }
 
@@ -247,14 +315,17 @@ class TwMarketAnalysisSnapshotTest(unittest.TestCase):
         self.assertEqual(snapshot["source_status"]["margin"]["status"], "suppressed")
         self.assertEqual([item["symbol"] for item in snapshot["supporting_evidence"]["representatives"]], ["2330"])
 
-    def test_rule_priority_places_invalidation_before_rebound_context(self) -> None:
+    def test_deep_intraday_low_with_recovery_above_zone_is_not_misclassified_as_invalidation(self) -> None:
+        """Regression for the copy-scope/support-zone-semantics bugfix: a sharp
+        drop that closes back above the freshly-formed support zone (an intraday
+        test with recovery) must not be reported as a confirmed support break."""
         rows = _bars()
         rows[-1] = {**rows[-1], "open": rows[-2]["close"] - 5, "high": rows[-2]["close"],
                     "low": rows[-2]["low"] - 40, "close": rows[-2]["low"] - 30}
         snapshot = self._build(taiex_rows=rows, primary_data_date=rows[-1]["date"])
 
-        self.assertEqual(snapshot["market_judgement"]["category"], "invalidation")
-        self.assertTrue(snapshot["market_judgement"]["invalidation_conditions"])
+        self.assertNotEqual(snapshot["market_judgement"]["category"], "invalidation")
+        self.assertFalse(snapshot["market_judgement"]["invalidation_conditions"][0]["met"])
 
 
 class TwMarketAnalysisArticleGoldenTest(unittest.TestCase):
@@ -322,6 +393,118 @@ class TwMarketAnalysisArticleGoldenTest(unittest.TestCase):
         article = compose_tw_market_analysis_article(unavailable)
         self.assertEqual(article["status"], "unavailable")
         self.assertEqual(article["trend_paragraphs"], [])
+
+
+class TwSupportZoneStateTest(unittest.TestCase):
+    """Pure classifier: ABOVE_ZONE / TESTING_ZONE / BROKEN_ZONE boundary semantics."""
+
+    ZONE = {"lower": 100.0, "upper": 110.0}
+
+    def test_close_above_zone_upper_is_above_zone(self) -> None:
+        self.assertEqual(_support_zone_state(111.0, self.ZONE), "above_zone")
+
+    def test_close_exactly_at_upper_boundary_is_testing_zone(self) -> None:
+        self.assertEqual(_support_zone_state(110.0, self.ZONE), "testing_zone")
+
+    def test_close_inside_zone_is_testing_zone(self) -> None:
+        self.assertEqual(_support_zone_state(105.0, self.ZONE), "testing_zone")
+
+    def test_close_exactly_at_lower_boundary_is_testing_zone(self) -> None:
+        self.assertEqual(_support_zone_state(100.0, self.ZONE), "testing_zone")
+
+    def test_close_below_zone_lower_is_broken_zone(self) -> None:
+        self.assertEqual(_support_zone_state(99.99, self.ZONE), "broken_zone")
+
+    def test_missing_zone_is_unavailable(self) -> None:
+        self.assertEqual(_support_zone_state(105.0, None), "unavailable")
+
+
+class TwJudgementSupportZonePriorityTest(unittest.TestCase):
+    def test_confirmed_support_break_takes_priority_over_confirmed_trend(self) -> None:
+        analysis = {
+            "latest_bar": {"close": 990.0},
+            "change": 5.0,
+            "moving_averages": {
+                "ma20": {"value": 950.0, "slope": 5.0},
+                "ma60": {"value": 900.0}, "ma120": {"value": 850.0},
+            },
+            "ma_alignment": "bullish",
+            "support_levels": [{"lower": 995.0, "upper": 1005.0, "level": 1000.0}],
+            "resistance_levels": [],
+        }
+
+        judgement = _judgement(analysis)
+
+        self.assertEqual(judgement["category"], "invalidation")
+        self.assertEqual(judgement["rule_id"], "PRICE_SUPPORT_BREAKDOWN")
+        self.assertTrue(judgement["invalidation_conditions"][0]["met"])
+
+    def test_close_testing_the_zone_does_not_trigger_invalidation(self) -> None:
+        analysis = {
+            "latest_bar": {"close": 1002.0},
+            "change": 5.0,
+            "moving_averages": {
+                "ma20": {"value": 950.0, "slope": 5.0},
+                "ma60": {"value": 900.0}, "ma120": {"value": 850.0},
+            },
+            "ma_alignment": "bullish",
+            "support_levels": [{"lower": 995.0, "upper": 1005.0, "level": 1000.0}],
+            "resistance_levels": [],
+        }
+
+        judgement = _judgement(analysis)
+
+        self.assertEqual(judgement["category"], "confirmed_trend")
+        self.assertFalse(judgement["invalidation_conditions"][0]["met"])
+
+
+class TwSupportZoneArticleTest(unittest.TestCase):
+    """Golden-fixture coverage for the real 2026-07-16 report the operator flagged:
+    close 42,671.27 inside support zone 42,353-42,990 must read as a support test,
+    not a confirmed breakdown."""
+
+    def test_real_fixture_close_inside_zone_reads_as_testing_not_broken(self) -> None:
+        article = compose_tw_market_analysis_article(_testing_zone_snapshot())
+        price_action = "\n".join(article["price_action_paragraphs"])
+
+        self.assertNotIn("原支撐失效", price_action)
+        self.assertNotIn("收盤已跌破 42,353～42,990", price_action)
+        self.assertNotIn("原支撐失效", article["core_judgement"]["summary"])
+        self.assertIn("支撐正在接受測試", price_action)
+        self.assertIn("42,353", price_action)
+
+    def test_testing_zone_confirmation_references_lower_boundary_as_future_condition(self) -> None:
+        article = compose_tw_market_analysis_article(_testing_zone_snapshot())
+
+        self.assertIn("42,353", article["confirmation_paragraph"])
+        self.assertIn("正式失效", article["confirmation_paragraph"])
+        self.assertNotIn("原支撐失效", article["confirmation_paragraph"])
+
+    def test_broken_zone_close_below_lower_boundary_reports_current_invalidation(self) -> None:
+        broken = _testing_zone_snapshot(close_override=42200.0, low_override=42150.0)
+
+        article = compose_tw_market_analysis_article(broken)
+        price_action = "\n".join(article["price_action_paragraphs"])
+
+        self.assertIn("跌破 42,353", price_action)
+        self.assertIn("原支撐區正式失效", price_action)
+        self.assertIn("原支撐失效", article["core_judgement"]["summary"])
+
+    def test_broken_zone_confirmation_does_not_repeat_break_as_untriggered_condition(self) -> None:
+        broken = _testing_zone_snapshot(close_override=42200.0, low_override=42150.0)
+
+        article = compose_tw_market_analysis_article(broken)
+
+        self.assertNotIn("若收盤跌破 42,353～42,990 點，代表本次低檔承接失敗", article["confirmation_paragraph"])
+        self.assertIn("重新站回", article["confirmation_paragraph"])
+
+    def test_above_zone_does_not_claim_a_current_break(self) -> None:
+        above = _testing_zone_snapshot(close_override=44737.95, low_override=43654.04)
+
+        article = compose_tw_market_analysis_article(above)
+
+        self.assertNotIn("原支撐失效", article["core_judgement"]["summary"])
+        self.assertNotIn("原支撐失效", "\n".join(article["price_action_paragraphs"]))
 
 
 if __name__ == "__main__":
