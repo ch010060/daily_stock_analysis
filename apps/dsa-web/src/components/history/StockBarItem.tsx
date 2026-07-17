@@ -4,9 +4,8 @@ import type { StockBarItem as StockBarItemType } from '../../types/analysis';
 import { getSentimentColor } from '../../types/analysis';
 import { formatDateTime } from '../../utils/format';
 import { getMarketPhaseSummaryLabel } from '../../utils/marketPhase';
+import { resolveMarketReviewIdentity } from '../../utils/marketReviewIdentity';
 import { truncateStockName } from '../../utils/stockName';
-
-const MARKET_REVIEW_DISPLAY_NAME = '台股日報';
 
 interface StockBarItemProps {
   item: StockBarItemType;
@@ -36,7 +35,8 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
   isMarketReview = false,
 }) => {
   const sentimentColor = item.sentimentScore !== undefined ? getSentimentColor(item.sentimentScore) : null;
-  const stockName = isMarketReview ? MARKET_REVIEW_DISPLAY_NAME : (item.stockName || item.stockCode);
+  const marketReviewIdentity = isMarketReview ? resolveMarketReviewIdentity(item.marketReviewRegion) : null;
+  const stockName = marketReviewIdentity ? marketReviewIdentity.displayName : (item.stockName || item.stockCode);
   const operationLabel = getOperationBadgeLabel(item.operationAdvice);
   const phaseLabel = getMarketPhaseSummaryLabel(item.marketPhaseSummary, undefined)?.replace('市場階段: ', '').replace('市場階段：', '').replace('市場階段: ', '').replace('市場階段：', '');
   const handleActivate = () => onClick(item.id);
@@ -82,7 +82,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-1 shrink-0" data-testid="history-card-actions">
-              {isMarketReview ? (
+              {marketReviewIdentity ? (
                 <Badge
                   variant="default"
                   size="sm"
@@ -93,7 +93,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
                     backgroundColor: 'rgba(245,158,11,0.1)',
                   }}
                 >
-                  大盤
+                  {marketReviewIdentity.regionBadge}
                 </Badge>
               ) : operationLabel && sentimentColor ? (
                 <Badge

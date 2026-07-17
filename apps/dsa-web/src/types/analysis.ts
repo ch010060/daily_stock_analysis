@@ -402,6 +402,7 @@ export interface HistoryItem {
   turnoverRate?: number;
   modelUsed?: string;  // Display-only model snapshot from persisted history; runtime provider/model/base URL still come from analyzer configuration
   marketPhaseSummary?: MarketPhaseSummary | null;
+  marketReviewRegion?: string | null;  // market_review records only: persisted region (tw/us/tw,us); absent for normal stock reports
   createdAt: string;
 }
 
@@ -460,6 +461,7 @@ export interface StockBarItem {
   lastAnalysisTime?: string;
   modelUsed?: string;
   marketPhaseSummary?: MarketPhaseSummary | null;
+  marketReviewRegion?: string | null;
 }
 
 export interface StockBarResponse {

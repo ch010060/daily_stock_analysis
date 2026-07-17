@@ -276,6 +276,26 @@ def run_market_review(
     return None
 
 
+_MARKET_REVIEW_IDENTITY: Dict[tuple, Dict[str, str]] = {
+    ("tw",): {"display_name": "台股日報", "region_badge": "TW"},
+    ("us",): {"display_name": "美股日報", "region_badge": "US"},
+    ("tw", "us"): {"display_name": "台美市場日報", "region_badge": "TW+US"},
+    (): {"display_name": "市場日報", "region_badge": "MARKET"},
+}
+
+
+def resolve_market_review_identity(region: Optional[str]) -> Dict[str, str]:
+    """Canonical, order-independent display identity for a market-review
+    record's region, so a US-only record never surfaces as 台股日報 and a
+    combined record isn't mislabeled as Taiwan-only. Pure function; does not
+    touch persisted data."""
+    tokens = {part.strip().lower() for part in str(region or "").split(",") if part.strip()}
+    if "all" in tokens or "both" in tokens:
+        tokens = {"tw", "us"}
+    resolved = tuple(sorted(tokens & {"tw", "us"}))
+    return dict(_MARKET_REVIEW_IDENTITY.get(resolved, _MARKET_REVIEW_IDENTITY[()]))
+
+
 def _persist_market_review_history(
     *,
     review_report: str,
@@ -291,14 +311,15 @@ def _persist_market_review_history(
 
         report_language = normalize_report_language(getattr(config, "report_language", "zh"))
         summary = _summarize_market_review(review_report, report_language)
+        identity = resolve_market_review_identity(region)
         if report_language == "en":
             stock_name = "Market Review"
             operation_advice = "View review"
             trend_prediction = "Market review"
         else:
-            stock_name = "台股日報"
-            operation_advice = "查看台股日報"
-            trend_prediction = "台股日報"
+            stock_name = identity["display_name"]
+            operation_advice = f"查看{identity['display_name']}"
+            trend_prediction = identity["display_name"]
 
         result = AnalysisResult(
             code=MARKET_REVIEW_HISTORY_CODE,
@@ -317,6 +338,7 @@ def _persist_market_review_history(
         context_snapshot = {
             "report_kind": MARKET_REVIEW_REPORT_TYPE,
             "market_review_region": region,
+            "market_review_identity": identity,
             "report_language": report_language,
         }
         if market_light_snapshots:

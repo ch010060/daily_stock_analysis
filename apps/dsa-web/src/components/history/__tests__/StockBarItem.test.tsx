@@ -28,6 +28,39 @@ const legacyMarketReviewItem: StockBarItem = {
   lastAnalysisTime: '2026-06-23T08:00:00Z',
 };
 
+const usOnlyMarketReviewItem: StockBarItem = {
+  id: 211,
+  stockCode: 'MARKET',
+  stockName: '台股日報',
+  sentimentScore: 50,
+  operationAdvice: '查看台股日報',
+  analysisCount: 5,
+  lastAnalysisTime: '2026-07-18T00:23:00Z',
+  marketReviewRegion: 'us',
+};
+
+const combinedMarketReviewItem: StockBarItem = {
+  id: 209,
+  stockCode: 'MARKET',
+  stockName: '台股日報',
+  sentimentScore: 50,
+  operationAdvice: '查看台股日報',
+  analysisCount: 5,
+  lastAnalysisTime: '2026-07-17T23:59:00Z',
+  marketReviewRegion: 'tw,us',
+};
+
+const twOnlyMarketReviewItem: StockBarItem = {
+  id: 300,
+  stockCode: 'MARKET',
+  stockName: '台股日報',
+  sentimentScore: 50,
+  operationAdvice: '查看台股日報',
+  analysisCount: 5,
+  lastAnalysisTime: '2026-07-18T01:00:00Z',
+  marketReviewRegion: 'tw',
+};
+
 describe('StockBarItemComponent', () => {
   it('shows the 台股日報 title for the MARKET pseudo-record even when the persisted name is the legacy 大盤覆盤 wording', () => {
     render(
@@ -45,6 +78,55 @@ describe('StockBarItemComponent', () => {
     expect(
       screen.getByRole('button', { name: /^台股日報 MARKET 歷史記錄$/ }),
     ).toBeInTheDocument();
+  });
+
+  it('labels a US-only market review record 美股日報 / US, never 台股日報', () => {
+    render(
+      <StockBarItemComponent
+        item={usOnlyMarketReviewItem}
+        isViewing={false}
+        onClick={vi.fn()}
+        onDelete={vi.fn()}
+        isMarketReview
+      />,
+    );
+
+    expect(screen.getByText('美股日報')).toBeInTheDocument();
+    expect(screen.queryByText('台股日報')).not.toBeInTheDocument();
+    const actions = screen.getByTestId('history-card-actions');
+    expect(within(actions).getByText('US')).toBeInTheDocument();
+  });
+
+  it('labels a combined TW+US market review record 台美市場日報 / TW+US', () => {
+    render(
+      <StockBarItemComponent
+        item={combinedMarketReviewItem}
+        isViewing={false}
+        onClick={vi.fn()}
+        onDelete={vi.fn()}
+        isMarketReview
+      />,
+    );
+
+    expect(screen.getByText('台美市場日報')).toBeInTheDocument();
+    const actions = screen.getByTestId('history-card-actions');
+    expect(within(actions).getByText('TW+US')).toBeInTheDocument();
+  });
+
+  it('labels a TW-only market review record 台股日報 / TW', () => {
+    render(
+      <StockBarItemComponent
+        item={twOnlyMarketReviewItem}
+        isViewing={false}
+        onClick={vi.fn()}
+        onDelete={vi.fn()}
+        isMarketReview
+      />,
+    );
+
+    expect(screen.getByText('台股日報')).toBeInTheDocument();
+    const actions = screen.getByTestId('history-card-actions');
+    expect(within(actions).getByText('TW')).toBeInTheDocument();
   });
 
   it('keeps market phase in the meta row instead of the action row', () => {

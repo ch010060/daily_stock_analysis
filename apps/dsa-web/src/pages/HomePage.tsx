@@ -685,6 +685,7 @@ const HomePage: React.FC = () => {
       lastAnalysisTime: latestMarketReview.createdAt,
       modelUsed: latestMarketReview.modelUsed,
       marketPhaseSummary: latestMarketReview.marketPhaseSummary,
+      marketReviewRegion: latestMarketReview.marketReviewRegion,
     };
 
     return [marketReviewItem, ...stockItems].sort((left, right) => {

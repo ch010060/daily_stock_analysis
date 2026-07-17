@@ -302,6 +302,47 @@ describe('ReportMarkdownPanel', () => {
     expect(screen.queryByTestId('tw-daily-reader')).not.toBeInTheDocument();
   });
 
+  it('renders a US-only market_review record (no Taiwan snapshot, no Taiwan headings) as the generic body, never the Taiwan reader', async () => {
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue([
+      '# 2026-07-18 美股大盤回顧',
+      '',
+      '> **今日市場狀態：** 科技主導的全面回調。',
+      '',
+      '## 一、盤面總覽',
+      '',
+      '三大指數全線下跌，納斯達克跌幅最大。',
+    ].join('\n'));
+
+    render(
+      <ReportMarkdownPanel
+        recordId={211}
+        stockName="美股日報"
+        stockCode="MARKET"
+        initialDetail={{
+          meta: {
+            id: 211,
+            queryId: 'market-review-us-only',
+            stockCode: 'MARKET',
+            stockName: '美股日報',
+            reportType: 'market_review',
+            createdAt: '2026-07-18T00:23:00Z',
+          },
+          summary: {
+            analysisSummary: '美股日報摘要',
+            operationAdvice: '查看美股日報',
+            trendPrediction: '美股日報',
+            sentimentScore: 50,
+          },
+        }}
+        onRequestClose={() => {}}
+      />
+    );
+
+    expect(await screen.findByRole('heading', { name: '2026-07-18 美股大盤回顧' })).toBeInTheDocument();
+    expect(screen.queryByTestId('tw-daily-reader')).not.toBeInTheDocument();
+    expect(screen.getByTestId('report-markdown-body')).toBeInTheDocument();
+  });
+
   describe('copy scope', () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
     let originalClipboard: Navigator['clipboard'] | undefined;
