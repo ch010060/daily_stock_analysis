@@ -5,6 +5,7 @@ import unittest
 from datetime import date, timedelta
 
 from src.services.tw_market_analysis_snapshot import (
+    _close_location_state,
     _judgement,
     _support_zone_state,
     build_tw_market_analysis_snapshot,
@@ -116,7 +117,7 @@ def _reference_article_snapshot():
     }
 
 
-def _testing_zone_snapshot(close_override=None, low_override=None):
+def _testing_zone_snapshot(close_override=None, low_override=None, high_override=None):
     """2026-07-16 production-shaped facts: a severe single-day decline closing
     inside (not below) the tested support zone. Regression fixture for the
     copy-scope/support-zone-semantics bugfix."""
@@ -134,7 +135,8 @@ def _testing_zone_snapshot(close_override=None, low_override=None):
     }]
     close = 42671.27 if close_override is None else close_override
     low = 42640.00 if low_override is None else low_override
-    high, open_ = 45630.0, 45620.0
+    high = 45630.0 if high_override is None else high_override
+    open_ = 45620.0
     taiex = {
         "latest_bar": {"date": "2026-07-16", "open": open_, "high": high, "low": low, "close": close},
         "previous_close": 45625.70,
@@ -505,6 +507,112 @@ class TwSupportZoneArticleTest(unittest.TestCase):
 
         self.assertNotIn("原支撐失效", article["core_judgement"]["summary"])
         self.assertNotIn("原支撐失效", "\n".join(article["price_action_paragraphs"]))
+
+
+class TwCloseLocationStateTest(unittest.TestCase):
+    """Pure classifier: near_low / partial_recovery / strong_recovery / flat_range,
+    independent of the support-zone axis."""
+
+    def test_close_at_the_low_is_near_low(self) -> None:
+        self.assertEqual(_close_location_state(high=110.0, low=100.0, close=100.0), "near_low")
+
+    def test_close_location_exactly_at_0_15_boundary_is_near_low(self) -> None:
+        # (close - low) / (high - low) == 0.15 exactly
+        self.assertEqual(_close_location_state(high=200.0, low=100.0, close=115.0), "near_low")
+
+    def test_close_location_just_above_0_15_is_partial_recovery(self) -> None:
+        self.assertEqual(_close_location_state(high=200.0, low=100.0, close=115.01), "partial_recovery")
+
+    def test_close_location_just_below_0_60_is_partial_recovery(self) -> None:
+        self.assertEqual(_close_location_state(high=200.0, low=100.0, close=159.99), "partial_recovery")
+
+    def test_close_location_at_0_60_boundary_is_strong_recovery(self) -> None:
+        self.assertEqual(_close_location_state(high=200.0, low=100.0, close=160.0), "strong_recovery")
+
+    def test_close_at_the_high_is_strong_recovery(self) -> None:
+        self.assertEqual(_close_location_state(high=110.0, low=100.0, close=110.0), "strong_recovery")
+
+    def test_flat_range_high_equals_low_is_flat_range_no_division_error(self) -> None:
+        self.assertEqual(_close_location_state(high=100.0, low=100.0, close=100.0), "flat_range")
+
+
+class TwCloseLocationArticleTest(unittest.TestCase):
+    """Golden-fixture coverage for the operator's 2026-07-17 report: a session
+    that closed exactly at its low must not be narrated as showing low-level
+    buying support, and must never print a zero-valued recovery figure."""
+
+    def test_real_fixture_close_at_low_reads_as_selling_pressure_not_buying_support(self) -> None:
+        # Fixture A: high=45,234.08, low=close=42,671.27, support 42,353-42,990.
+        article = compose_tw_market_analysis_article(
+            _testing_zone_snapshot(high_override=45234.08, low_override=42671.27, close_override=42671.27)
+        )
+        price_action = "\n".join(article["price_action_paragraphs"])
+
+        self.assertIn("支撐正在接受測試", price_action)
+        self.assertIn("收盤貼近當日最低點", price_action)
+        self.assertIn("賣壓持續至收盤", price_action)
+        self.assertIn("42,353", article["confirmation_paragraph"])
+        self.assertNotIn("回升 0 點", price_action)
+        self.assertNotIn("低檔承接", price_action)
+        self.assertNotIn("原支撐失效", price_action)
+        self.assertNotIn("收盤已跌破 42,353～42,990", price_action)
+
+    def test_partial_recovery_wording_avoids_overstating_buying_support(self) -> None:
+        # close_location = (42700-42200)/(43200-42200) = 0.5 -> partial_recovery, testing_zone.
+        article = compose_tw_market_analysis_article(
+            _testing_zone_snapshot(high_override=43200.0, low_override=42200.0, close_override=42700.0)
+        )
+        price_action = "\n".join(article["price_action_paragraphs"])
+
+        self.assertIn("支撐正在接受測試", price_action)
+        self.assertIn("回升幅度有限", price_action)
+        self.assertNotIn("回升 0 點", price_action)
+        self.assertNotIn("明顯脫離", price_action)
+        self.assertNotIn("原支撐失效", price_action)
+
+    def test_strong_recovery_may_describe_buying_support(self) -> None:
+        # close_location = (42700-42200)/(42900-42200) = 500/700 ~= 0.714 -> strong_recovery, testing_zone.
+        article = compose_tw_market_analysis_article(
+            _testing_zone_snapshot(high_override=42900.0, low_override=42200.0, close_override=42700.0)
+        )
+        price_action = "\n".join(article["price_action_paragraphs"])
+
+        self.assertIn("支撐正在接受測試", price_action)
+        self.assertIn("顯示支撐附近已有承接", price_action)
+        self.assertNotIn("原支撐失效", price_action)
+
+    def test_flat_range_prints_no_fake_recovery_or_support_claim(self) -> None:
+        article = compose_tw_market_analysis_article(
+            _testing_zone_snapshot(high_override=42671.27, low_override=42671.27, close_override=42671.27)
+        )
+        price_action = "\n".join(article["price_action_paragraphs"])
+
+        self.assertIn("支撐正在接受測試", price_action)
+        self.assertNotIn("回升", price_action)
+        self.assertNotIn("低檔承接", price_action)
+
+    def test_broken_zone_with_strong_intraday_recovery_stays_broken(self) -> None:
+        # close_location = (42200-41800)/(42600-41800) = 0.5 -> partial_recovery, but close < 42,353 lower -> broken_zone.
+        broken = _testing_zone_snapshot(high_override=42300.0, low_override=41800.0, close_override=42200.0)
+
+        article = compose_tw_market_analysis_article(broken)
+        price_action = "\n".join(article["price_action_paragraphs"])
+
+        self.assertIn("跌破 42,353", price_action)
+        self.assertIn("原支撐區正式失效", price_action)
+        self.assertIn("重新站回", article["confirmation_paragraph"])
+        self.assertNotIn("若收盤跌破 42,353～42,990 點，代表本次低檔承接失敗", article["confirmation_paragraph"])
+
+    def test_above_zone_with_near_low_close_stays_factual(self) -> None:
+        # close is far above the support zone (above_zone) but also near the day's own low.
+        above = _testing_zone_snapshot(high_override=50000.0, low_override=44700.0, close_override=44737.95)
+
+        article = compose_tw_market_analysis_article(above)
+        price_action = "\n".join(article["price_action_paragraphs"])
+
+        self.assertNotIn("支撐正在接受測試", price_action)
+        self.assertNotIn("顯示支撐附近已有承接", price_action)
+        self.assertNotIn("原支撐失效", price_action)
 
 
 if __name__ == "__main__":

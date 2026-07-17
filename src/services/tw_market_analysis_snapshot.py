@@ -396,6 +396,22 @@ def _support_zone_state(close: float, zone: Optional[Dict[str, Any]]) -> str:
     return "testing_zone"
 
 
+def _close_location_state(high: float, low: float, close: float) -> str:
+    """Normalized intraday close-location classification, independent of the
+    support-zone axis: whether a close near a support zone reflects buying
+    support (close far from the low) or continued selling pressure (close at
+    or near the low) cannot be inferred from the zone state alone."""
+    daily_range = high - low
+    if daily_range <= 1e-9:
+        return "flat_range"
+    location = min(1.0, max(0.0, (close - low) / daily_range))
+    if location <= 0.15:
+        return "near_low"
+    if location < 0.60:
+        return "partial_recovery"
+    return "strong_recovery"
+
+
 def _tested_support(analysis: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     zones = analysis.get("support_levels") or []
     if not zones:
@@ -570,22 +586,41 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
     momentum = f"RSI14 為 {rsi['value']:.1f}，位於{rsi_state}區並較前一日{rsi_move}；{macd_text}，因此短線動能{'尚未完成翻多確認' if core['short_term'] != 'bullish' else '已有改善，但仍需後續價格確認'}。"
 
     recovered = bar["close"] - bar["low"]
-    long_lower_shadow = bool(candle.get("range", 0)) and candle.get("lower_shadow", 0) / candle["range"] >= 0.35
+    location_state = _close_location_state(bar["high"], bar["low"], bar["close"])
     if support_state == "broken_zone":
         recovery_text = f"收盤跌破 {support['lower']:,.0f} 點，原支撐區正式失效，修正風險進一步提高"
     elif support_state == "testing_zone":
-        shadow_note = "，日 K 留下明顯下影線，顯示支撐附近已有承接" if long_lower_shadow else ""
-        recovery_text = (
-            f"指數已進入 {support_text}支撐區，支撐正在接受測試；"
-            f"收盤距盤中低點回升 {recovered:,.0f} 點{shadow_note}，"
-            "目前尚未跌破區間下緣，但收盤位於區間內，承接力仍待確認"
-        )
-    else:
-        recovery_text = (
-            f"盤中下探 {support_text}後，收盤自低點回升 {recovered:,.0f} 點，日 K 留下明顯下影線，顯示支撐附近已有承接"
-            if long_lower_shadow
-            else f"指數盤中測試 {support_text}，收盤距低點回升 {recovered:,.0f} 點"
-        )
+        if location_state == "near_low":
+            recovery_text = (
+                f"指數已進入 {support_text}支撐區，支撐正在接受測試；"
+                "收盤貼近當日最低點，顯示賣壓持續至收盤。"
+                "目前尚未跌破區間下緣，但承接力偏弱，尚未出現明確止跌訊號"
+            )
+        elif location_state == "flat_range":
+            recovery_text = (
+                f"指數已進入 {support_text}支撐區，支撐正在接受測試；"
+                "目前尚未跌破區間下緣，承接力仍待確認"
+            )
+        elif location_state == "strong_recovery":
+            recovery_text = (
+                f"指數已進入 {support_text}支撐區，支撐正在接受測試；"
+                f"收盤距盤中低點回升 {recovered:,.0f} 點，日 K 留下明顯下影線，顯示支撐附近已有承接，"
+                "目前尚未跌破區間下緣，承接力仍待確認"
+            )
+        else:  # partial_recovery
+            recovery_text = (
+                f"指數已進入 {support_text}支撐區，支撐正在接受測試；"
+                f"收盤自低點收回部分跌幅（約 {recovered:,.0f} 點），但回升幅度有限，"
+                "支撐區內已有初步反應，尚不足以確認止跌"
+            )
+    elif location_state == "near_low":
+        recovery_text = f"指數盤中測試 {support_text}後回升，但收盤貼近當日最低點，追價力道保守，尚未形成明確止跌訊號"
+    elif location_state == "flat_range":
+        recovery_text = f"指數盤中測試 {support_text}"
+    elif location_state == "strong_recovery":
+        recovery_text = f"盤中下探 {support_text}後，收盤自低點回升 {recovered:,.0f} 點，日 K 留下明顯下影線，顯示支撐附近已有承接"
+    else:  # partial_recovery
+        recovery_text = f"指數盤中測試 {support_text}，收盤自低點收回部分跌幅（約 {recovered:,.0f} 點），但回升幅度有限"
     volume_text = ""
     if volume.get("state") == "available":
         if volume.get("direction") == "expansion":
@@ -595,7 +630,7 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
         else:
             volume_text = "；成交金額接近近 20 日均值，量能尚未提供額外止跌確認"
     price_action = f"{recovery_text}{volume_text}。"
-    if mas["ma5"]["position"] == "below" and support_state != "broken_zone":
+    if mas["ma5"]["position"] == "below" and support_state != "broken_zone" and location_state not in {"near_low", "flat_range"}:
         price_action += "但收盤仍未站回短期均線，因此現階段只能視為低檔承接，不能直接判定修正結束。"
 
     resistance_band = f"MA10 至 MA20 約 {min(mas['ma10']['value'], mas['ma20']['value']):,.0f}～{max(mas['ma10']['value'], mas['ma20']['value']):,.0f} 點"
