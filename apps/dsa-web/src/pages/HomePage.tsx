@@ -21,6 +21,7 @@ import {
 } from '../components/report/twDailyReportAdapter';
 import { TaskPanel } from '../components/tasks';
 import { useDashboardLifecycle, useHomeDashboardState } from '../hooks';
+import { useStockPoolStore } from '../stores';
 import { useWatchlist } from '../hooks/useWatchlist';
 import type { SetupStatusResponse } from '../types/systemConfig';
 import { getReportText, normalizeReportLanguage } from '../utils/reportLanguage';
@@ -29,6 +30,8 @@ import { resolveMarketReviewIdentity } from '../utils/marketReviewIdentity';
 import type { StockBarItem } from '../types/analysis';
 
 const DUPLICATE_BANNER_AUTO_DISMISS_MS = 5000;
+const MARKET_REVIEW_RECONCILE_MAX_ATTEMPTS = 3;
+const MARKET_REVIEW_RECONCILE_RETRY_DELAY_MS = 200;
 
 type MarketReviewNotice = {
   variant: 'success' | 'warning' | 'danger';
@@ -496,6 +499,37 @@ const HomePage: React.FC = () => {
     });
   }, [selectedAnalysisSkills, selectedReport, submitAnalysis]);
 
+  // Selects the just-completed Taiwan daily record as the one authoritative
+  // selectedReport, so the sidebar, full-report action, and reader all refer
+  // to the same persisted record instead of leaving a stale individual-stock
+  // selection active alongside the live completion payload. Identity is
+  // resolved via HistoryItem.queryId, which _persist_market_review_history()
+  // always sets to the triggering task_id (see src/core/market_review.py) —
+  // matching by symbol=='MARKET' alone could pick an older combined record.
+  const reconcileCompletedMarketReview = useCallback(
+    async (taskId: string): Promise<boolean> => {
+      for (let attempt = 0; attempt < MARKET_REVIEW_RECONCILE_MAX_ATTEMPTS; attempt += 1) {
+        await refreshMarketReviewHistory(false);
+        const match = useStockPoolStore
+          .getState()
+          .marketReviewHistoryItems.find((item) => item.queryId === taskId);
+        if (match) {
+          await selectHistoryItem(match.id);
+          setMarketReviewReport(null);
+          setMarketReviewSnapshot(null);
+          return true;
+        }
+        if (attempt < MARKET_REVIEW_RECONCILE_MAX_ATTEMPTS - 1) {
+          await new Promise((resolve) => {
+            window.setTimeout(resolve, MARKET_REVIEW_RECONCILE_RETRY_DELAY_MS);
+          });
+        }
+      }
+      return false;
+    },
+    [refreshMarketReviewHistory, selectHistoryItem],
+  );
+
   const pollMarketReviewStatus = useCallback(
     async (taskId: string) => {
       stopMarketReviewPolling();
@@ -564,6 +598,9 @@ const HomePage: React.FC = () => {
                 title: `${displayName}已完成`,
                 message: marketReviewText ? `${displayName}任務已完成，結果如下：` : `${displayName}任務已完成，結果已生成並按配置推送。`,
               });
+              if (marketReviewText) {
+                await reconcileCompletedMarketReview(taskId);
+              }
             }
             setMarketReviewError(null);
             scrollMarketReviewFeedbackIntoView();
@@ -626,7 +663,7 @@ const HomePage: React.FC = () => {
         }, intervalMs);
       }
     },
-    [scrollMarketReviewFeedbackIntoView, stopMarketReviewPolling],
+    [reconcileCompletedMarketReview, scrollMarketReviewFeedbackIntoView, stopMarketReviewPolling],
   );
 
   const handleTriggerMarketReview = useCallback(async () => {

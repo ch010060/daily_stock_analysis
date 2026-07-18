@@ -181,6 +181,81 @@ const structuredMarketReviewSnapshot = {
   dataStatus: { missingFields: [], staleFields: [], partialFailures: [] },
 };
 
+const visaHistoryItem = {
+  id: 5,
+  queryId: 'visa-q-1',
+  stockCode: 'V',
+  stockName: 'Visa',
+  createdAt: '2026-07-17T08:00:00Z',
+};
+
+const visaStockBarItem = {
+  id: 5,
+  stockCode: 'V',
+  stockName: 'Visa',
+  reportType: 'detailed' as const,
+  sentimentScore: 55,
+  operationAdvice: '持有觀察',
+  analysisCount: 1,
+  lastAnalysisTime: '2026-07-17T08:00:00Z',
+};
+
+const visaReport = {
+  meta: {
+    id: 5,
+    queryId: 'visa-q-1',
+    stockCode: 'V',
+    stockName: 'Visa',
+    reportType: 'detailed' as const,
+    reportLanguage: 'zh' as const,
+    createdAt: '2026-07-17T08:00:00Z',
+  },
+  summary: {
+    analysisSummary: 'Visa 個股獨有分析摘要',
+    operationAdvice: '持有觀察',
+    trendPrediction: '短線震盪',
+    sentimentScore: 55,
+  },
+};
+
+const newTwHistoryItem = {
+  id: 42,
+  queryId: 'task-tw-reconcile-1',
+  stockCode: 'MARKET',
+  stockName: '台股日報',
+  reportType: 'market_review' as const,
+  marketReviewRegion: 'tw',
+  createdAt: '2026-07-18T09:00:00Z',
+};
+
+const olderTwHistoryItem = {
+  id: 41,
+  queryId: 'task-tw-old',
+  stockCode: 'MARKET',
+  stockName: '台股日報',
+  reportType: 'market_review' as const,
+  marketReviewRegion: 'tw',
+  createdAt: '2026-07-17T09:00:00Z',
+};
+
+const newTwHistoryReport = {
+  meta: {
+    id: 42,
+    queryId: 'task-tw-reconcile-1',
+    stockCode: 'MARKET',
+    stockName: '台股日報',
+    reportType: 'market_review' as const,
+    reportLanguage: 'zh' as const,
+    createdAt: '2026-07-18T09:00:00Z',
+  },
+  summary: {
+    analysisSummary: '台股日報摘要',
+    operationAdvice: '檢視覆盤',
+    trendPrediction: '台股日報',
+    sentimentScore: 50,
+  },
+};
+
 describe('HomePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -711,6 +786,202 @@ describe('HomePage', () => {
     await waitFor(() => {
       expect(screen.getAllByTestId('tw-daily-reader')).toHaveLength(1);
     });
+  });
+
+  it('reconciles to the newly completed Taiwan daily record without a page reload, replacing a previously selected stock report', async () => {
+    vi.mocked(historyApi.getStockBarList).mockResolvedValue({
+      total: 1,
+      items: [visaStockBarItem],
+    });
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({ total: 1, page: 1, limit: 10, items: [newTwHistoryItem] });
+      }
+      return Promise.resolve({ total: 1, page: 1, limit: 20, items: [visaHistoryItem] });
+    });
+    vi.mocked(historyApi.getDetail).mockImplementation((recordId: number) => (
+      recordId === 42 ? Promise.resolve(newTwHistoryReport) : Promise.resolve(visaReport)
+    ));
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue(parseableMarketReviewMarkdown);
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      sendNotification: true,
+      message: '台股日報任務已提交',
+      taskId: 'task-tw-reconcile-1',
+    });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: 'task-tw-reconcile-1',
+      status: 'completed',
+      marketReviewReport: parseableMarketReviewMarkdown,
+      marketReviewSnapshot: structuredMarketReviewSnapshot,
+      marketReviewRegion: 'tw',
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    // Visa is auto-selected and visible before the Taiwan daily action runs.
+    await screen.findByText('Visa 個股獨有分析摘要');
+    expect(screen.getByRole('button', { name: '重新分析' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '追問 AI' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '台股日報' }));
+
+    await waitFor(() => {
+      expect(historyApi.getDetail).toHaveBeenCalledWith(42);
+    });
+    await screen.findByTestId('tw-daily-reader');
+
+    // Exactly one reader; no stale Visa content or stock-only controls remain.
+    expect(screen.getAllByTestId('tw-daily-reader')).toHaveLength(1);
+    expect(screen.queryByText('Visa 個股獨有分析摘要')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '重新分析' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '追問 AI' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '歷史趨勢' })).not.toBeInTheDocument();
+
+    // The full-report action now targets the new Taiwan record, not Visa.
+    expect(screen.getByRole('button', { name: /完整分析報告/ })).toBeEnabled();
+  });
+
+  it('selects the exact newly completed Taiwan record by task identity, not merely the newest MARKET row', async () => {
+    vi.mocked(historyApi.getStockBarList).mockResolvedValue({ total: 0, items: [] });
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
+      if (params.reportType === 'market_review') {
+        // Newest-first list already contains an older MARKET row alongside
+        // the just-completed one; identity must resolve by task/query id,
+        // not by "pick historyItems[0]" or "pick any MARKET row".
+        return Promise.resolve({
+          total: 2,
+          page: 1,
+          limit: 10,
+          items: [olderTwHistoryItem, newTwHistoryItem],
+        });
+      }
+      return Promise.resolve({ total: 0, page: 1, limit: 20, items: [] });
+    });
+    vi.mocked(historyApi.getDetail).mockImplementation((recordId: number) => (
+      recordId === 42 ? Promise.resolve(newTwHistoryReport) : Promise.resolve(marketReviewHistoryReport)
+    ));
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue(parseableMarketReviewMarkdown);
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      sendNotification: true,
+      message: '台股日報任務已提交',
+      taskId: 'task-tw-reconcile-1',
+    });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: 'task-tw-reconcile-1',
+      status: 'completed',
+      marketReviewReport: parseableMarketReviewMarkdown,
+      marketReviewSnapshot: structuredMarketReviewSnapshot,
+      marketReviewRegion: 'tw',
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '台股日報' }));
+
+    await waitFor(() => {
+      expect(historyApi.getDetail).toHaveBeenCalledWith(42);
+    });
+    expect(historyApi.getDetail).not.toHaveBeenCalledWith(41);
+  });
+
+  it('keeps the currently selected stock report untouched when the Taiwan daily task fails', async () => {
+    vi.mocked(historyApi.getStockBarList).mockResolvedValue({
+      total: 1,
+      items: [visaStockBarItem],
+    });
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({ total: 0, page: 1, limit: 10, items: [] });
+      }
+      return Promise.resolve({ total: 1, page: 1, limit: 20, items: [visaHistoryItem] });
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(visaReport);
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      sendNotification: true,
+      message: '台股日報任務已提交',
+      taskId: 'task-tw-fail-1',
+    });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: 'task-tw-fail-1',
+      status: 'failed',
+      error: '台股日報執行失敗。',
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText('Visa 個股獨有分析摘要');
+
+    fireEvent.click(screen.getByRole('button', { name: '台股日報' }));
+
+    await waitFor(() => {
+      expect(analysisApi.getStatus).toHaveBeenCalled();
+    });
+    expect(await screen.findByText('Visa 個股獨有分析摘要')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '重新分析' })).toBeInTheDocument();
+    expect(screen.queryByTestId('tw-daily-reader')).not.toBeInTheDocument();
+    expect(historyApi.getDetail).not.toHaveBeenCalledWith(42);
+  });
+
+  it('restores the normal Visa stock report after navigating back from a reconciled Taiwan daily record', async () => {
+    vi.mocked(historyApi.getStockBarList).mockResolvedValue({
+      total: 1,
+      items: [visaStockBarItem],
+    });
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
+      if (params.reportType === 'market_review') {
+        return Promise.resolve({ total: 1, page: 1, limit: 10, items: [newTwHistoryItem] });
+      }
+      return Promise.resolve({ total: 1, page: 1, limit: 20, items: [visaHistoryItem] });
+    });
+    vi.mocked(historyApi.getDetail).mockImplementation((recordId: number) => (
+      recordId === 42 ? Promise.resolve(newTwHistoryReport) : Promise.resolve(visaReport)
+    ));
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue(parseableMarketReviewMarkdown);
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      sendNotification: true,
+      message: '台股日報任務已提交',
+      taskId: 'task-tw-reconcile-1',
+    });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: 'task-tw-reconcile-1',
+      status: 'completed',
+      marketReviewReport: parseableMarketReviewMarkdown,
+      marketReviewSnapshot: structuredMarketReviewSnapshot,
+      marketReviewRegion: 'tw',
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText('Visa 個股獨有分析摘要');
+    fireEvent.click(screen.getByRole('button', { name: '台股日報' }));
+    await screen.findByTestId('tw-daily-reader');
+    expect(screen.queryByText('Visa 個股獨有分析摘要')).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Visa / }));
+
+    await screen.findByText('Visa 個股獨有分析摘要');
+    expect(screen.queryByTestId('tw-daily-reader')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '重新分析' })).toBeInTheDocument();
   });
 
   it('shows an accurate skip notice instead of a false success message when market review is skipped', async () => {
