@@ -636,7 +636,7 @@ const HomePage: React.FC = () => {
     setMarketReviewReport(null);
     scrollMarketReviewFeedbackIntoView();
     try {
-      const result = await analysisApi.triggerMarketReview({ sendNotification: notify });
+      const result = await analysisApi.triggerMarketReview({ sendNotification: notify, region: 'tw' });
       setMarketReviewNotice({
         variant: 'success',
         title: '台股日報已提交',

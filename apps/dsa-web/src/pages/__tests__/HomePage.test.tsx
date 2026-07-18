@@ -610,7 +610,7 @@ describe('HomePage', () => {
     fireEvent.click(await screen.findByRole('button', { name: '台股日報' }));
 
     await waitFor(() => {
-      expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
+      expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true, region: 'tw' });
     });
     expect(await screen.findByText('台股日報已完成')).toBeInTheDocument();
     expect(await screen.findByTestId('tw-daily-reader')).toBeInTheDocument();
@@ -620,7 +620,11 @@ describe('HomePage', () => {
     expect(analysisApi.getStatus).toHaveBeenCalledWith('task-1');
   });
 
-  it('shows a region-aware completion title (美股日報已完成) when the trading-calendar-resolved region is US-only, not the static 台股日報 label', async () => {
+  it('always requests region=tw and shows 台股日報已完成, even when the backend record carries a stale/legacy non-tw region', async () => {
+    // The 台股日報 button pins region: 'tw' explicitly (see handleTriggerMarketReview),
+    // so a non-trading-day/calendar-driven expansion to 'us' or 'tw,us' can no
+    // longer happen from this action. This guards against silently regressing
+    // back to the old calendar-driven auto-switch behavior.
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 0,
       page: 1,
@@ -630,14 +634,15 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
       sendNotification: true,
-      message: '市場回顧任務已提交',
-      taskId: 'task-us-only',
+      message: '台股日報任務已提交',
+      taskId: 'task-tw-pinned',
     });
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
-      taskId: 'task-us-only',
+      taskId: 'task-tw-pinned',
       status: 'completed',
-      marketReviewReport: '# 2026-07-18 美股大盤回顧\n\n三大指數全線下跌。',
-      marketReviewRegion: 'us',
+      marketReviewReport: parseableMarketReviewMarkdown,
+      marketReviewSnapshot: structuredMarketReviewSnapshot,
+      marketReviewRegion: 'tw',
     });
 
     render(
@@ -649,10 +654,11 @@ describe('HomePage', () => {
     fireEvent.click(await screen.findByRole('button', { name: '台股日報' }));
 
     await waitFor(() => {
-      expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
+      expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true, region: 'tw' });
     });
-    expect(await screen.findByText('美股日報已完成')).toBeInTheDocument();
-    expect(screen.queryByText('台股日報已完成')).not.toBeInTheDocument();
+    expect(await screen.findByText('台股日報已完成')).toBeInTheDocument();
+    expect(screen.queryByText('美股日報已完成')).not.toBeInTheDocument();
+    expect(screen.queryByText('台美市場日報已完成')).not.toBeInTheDocument();
   });
 
   it('does not render duplicate Taiwan daily readers when completion arrives while MARKET history is selected', async () => {
@@ -735,7 +741,7 @@ describe('HomePage', () => {
     fireEvent.click(await screen.findByRole('button', { name: '台股日報' }));
 
     await waitFor(() => {
-      expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
+      expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true, region: 'tw' });
     });
     expect(await screen.findByText('台股日報已跳過：沒有可持久化的盤勢回顧內容')).toBeInTheDocument();
     expect(screen.queryByText('台股日報已完成')).not.toBeInTheDocument();

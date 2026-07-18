@@ -25,6 +25,10 @@ export interface AnalysisRequest {
 
 export interface MarketReviewRequest {
   sendNotification?: boolean;
+  /** Explicit region pin (e.g. 'tw'). Set by the 台股日報 action so a
+   * non-trading-day fallback only rolls back the data date, never expands
+   * to the full configured multi-region scope. */
+  region?: string;
 }
 
 export interface MarketReviewAccepted {

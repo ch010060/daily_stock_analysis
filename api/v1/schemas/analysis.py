@@ -108,6 +108,12 @@ class MarketReviewRequest(BaseModel):
         True,
         description="是否在大盤覆盤完成後傳送推送通知",
     )
+    region: Optional[str] = Field(
+        None,
+        description="顯式指定的市場範圍（例如 'tw'）。指定時固定使用該範圍，"
+        "非交易日僅回退資料日期、不套用設定檔多市場 fallback；"
+        "留空則沿用既有設定檔 + 交易日曆判斷行為。",
+    )
 
 
 class MarketReviewAccepted(BaseModel):

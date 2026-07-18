@@ -627,15 +627,25 @@ def trigger_market_review(
 ) -> MarketReviewAccepted:
     """Trigger market review from Web/API without blocking the request."""
     request = request or MarketReviewRequest()
+    requested_region = getattr(request, "region", None)
 
-    override_region = _compute_market_review_override_region(config)
-    if override_region == "":
-        return MarketReviewAccepted(
-            status="accepted",
-            message="今日台股日報相關市場均為非交易日，已跳過台股日報",
-            send_notification=request.send_notification,
-            trace_id=None,
-        )
+    if requested_region:
+        # Explicit region (e.g. the web "台股日報" button pinning region="tw"):
+        # always use it as-is. The non-trading-day calendar fallback below is
+        # only for the no-region-specified, config-default path — an explicit
+        # single-region request must never be widened to the full configured
+        # multi-region scope. Each market's report builder already resolves
+        # to its own latest completed trading session on non-trading days.
+        override_region = requested_region
+    else:
+        override_region = _compute_market_review_override_region(config)
+        if override_region == "":
+            return MarketReviewAccepted(
+                status="accepted",
+                message="今日台股日報相關市場均為非交易日，已跳過台股日報",
+                send_notification=request.send_notification,
+                trace_id=None,
+            )
 
     lock_token = _try_acquire_market_review_lock(config)
     if lock_token is None:

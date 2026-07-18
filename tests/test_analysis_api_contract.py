@@ -291,6 +291,77 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         acquire.assert_not_called()
         task_queue.submit_background_task.assert_not_called()
 
+    def test_trigger_market_review_with_explicit_region_bypasses_calendar_expansion(self) -> None:
+        """An explicit region=tw request must not be widened to the full
+        configured (tw,us) region by the non-trading-day fallback — the
+        override-region calendar computation is for the no-region-specified
+        (config-default) path only."""
+        if trigger_market_review is None or analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        task_queue = MagicMock()
+        task_queue.submit_background_task.return_value = SimpleNamespace(task_id="market-task-2")
+        request = SimpleNamespace(send_notification=True, region="tw")
+        config = SimpleNamespace(trading_day_check_enabled=True, market_review_region="all")
+
+        with patch.object(
+            analysis_endpoint_module,
+            "_try_acquire_market_review_lock",
+            return_value=object(),
+        ), patch.object(
+            analysis_endpoint_module,
+            "_compute_market_review_override_region",
+        ) as compute_region, patch(
+            "api.v1.endpoints.analysis.get_task_queue", return_value=task_queue
+        ):
+            response = trigger_market_review(
+                request=request,
+                config=config,
+            )
+
+        compute_region.assert_not_called()
+        self.assertEqual(response.status, "accepted")
+        task_queue.submit_background_task.assert_called_once()
+        _, kwargs = task_queue.submit_background_task.call_args
+        self.assertEqual(kwargs.get("stock_name"), "台股日報")
+
+    def test_trigger_market_review_with_explicit_region_does_not_skip_on_non_trading_day(self) -> None:
+        """Saturday click of 台股日報 (explicit region=tw) must still submit
+        the task — the calendar-driven 'all configured markets closed, skip'
+        branch only applies when no explicit region was requested."""
+        if trigger_market_review is None or analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        task_queue = MagicMock()
+        task_queue.submit_background_task.return_value = SimpleNamespace(task_id="market-task-3")
+        request = SimpleNamespace(send_notification=True, region="tw")
+        config = SimpleNamespace(trading_day_check_enabled=True, market_review_region="all")
+
+        with patch.object(
+            analysis_endpoint_module,
+            "_try_acquire_market_review_lock",
+            return_value=object(),
+        ), patch(
+            "src.core.trading_calendar.get_open_markets_today",
+            return_value=set(),
+        ), patch.object(
+            analysis_endpoint_module, "_run_market_review_background",
+        ) as run_background, patch(
+            "api.v1.endpoints.analysis.get_task_queue", return_value=task_queue
+        ):
+            response = trigger_market_review(
+                request=request,
+                config=config,
+            )
+            submitted_fn = task_queue.submit_background_task.call_args.args[0]
+            submitted_fn()
+
+        self.assertEqual(response.status, "accepted")
+        self.assertNotIn("已跳過", response.message)
+        task_queue.submit_background_task.assert_called_once()
+        run_background.assert_called_once()
+        self.assertEqual(run_background.call_args.kwargs["override_region"], "tw")
+
     def test_trigger_analysis_maps_sp500_natural_inputs_to_spx(self) -> None:
         if trigger_analysis is None:
             self.skipTest("fastapi is not installed in this test environment")
