@@ -216,6 +216,7 @@ def get_history_list(
                 volume_ratio=item.get("volume_ratio"),
                 turnover_rate=item.get("turnover_rate"),
                 model_used=item.get("model_used"),
+                market_review_region=item.get("market_review_region"),
                 created_at=item.get("created_at")
             )
             for item in result.get("items", [])

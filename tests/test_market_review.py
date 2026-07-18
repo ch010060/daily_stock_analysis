@@ -2,6 +2,7 @@
 """Tests for localized market review wrappers."""
 
 import importlib
+import json
 import os
 import sys
 import tempfile
@@ -510,7 +511,12 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                     os.environ["DATABASE_PATH"] = old_db_path
 
     def test_persist_market_review_history_uses_market_overview_wording_not_legacy_recap_term(self) -> None:
-        """History/stock-bar card title must not surface the legacy 大盤覆盤/大盤復盤 wording."""
+        """History/stock-bar card title must not surface the legacy 大盤覆盤/大盤復盤 wording.
+
+        Region is US-only here, so the correct display name is 美股日報 (region
+        identity fix), not the old hardcoded 台股日報 — see
+        TW_US_MARKET_REVIEW_HISTORY_REGION_IDENTITY_FIX for the history-list
+        mislabeling this test used to lock in."""
         with tempfile.TemporaryDirectory() as temp_dir:
             old_db_path = os.environ.get("DATABASE_PATH")
             os.environ["DATABASE_PATH"] = os.path.join(temp_dir, "market_review_history.db")
@@ -532,7 +538,7 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                         AnalysisHistory.query_id == "market-task-002"
                     ).first()
                     self.assertIsNotNone(row)
-                    self.assertEqual(row.name, "台股日報")
+                    self.assertEqual(row.name, "美股日報")
                     self.assertNotIn("大盤覆盤", row.name)
                     self.assertNotIn("大盤復盤", row.name)
                     self.assertNotIn("大盤覆盤", row.operation_advice or "")
@@ -544,6 +550,108 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                     os.environ.pop("DATABASE_PATH", None)
                 else:
                     os.environ["DATABASE_PATH"] = old_db_path
+
+
+class MarketReviewIdentityTest(unittest.TestCase):
+    """Canonical, order-independent region -> display identity mapping."""
+
+    def test_tw_only_resolves_to_taiwan_daily(self) -> None:
+        identity = market_review_module.resolve_market_review_identity("tw")
+        self.assertEqual(identity["display_name"], "台股日報")
+        self.assertEqual(identity["region_badge"], "TW")
+
+    def test_us_only_resolves_to_us_daily(self) -> None:
+        identity = market_review_module.resolve_market_review_identity("us")
+        self.assertEqual(identity["display_name"], "美股日報")
+        self.assertEqual(identity["region_badge"], "US")
+
+    def test_tw_us_combined_resolves_to_combined_daily(self) -> None:
+        identity = market_review_module.resolve_market_review_identity("tw,us")
+        self.assertEqual(identity["display_name"], "台美市場日報")
+        self.assertEqual(identity["region_badge"], "TW+US")
+
+    def test_region_order_does_not_change_identity(self) -> None:
+        self.assertEqual(
+            market_review_module.resolve_market_review_identity("us,tw"),
+            market_review_module.resolve_market_review_identity("tw,us"),
+        )
+
+    def test_all_resolves_to_combined_daily(self) -> None:
+        identity = market_review_module.resolve_market_review_identity("all")
+        self.assertEqual(identity["display_name"], "台美市場日報")
+        self.assertEqual(identity["region_badge"], "TW+US")
+
+    def test_both_resolves_to_combined_daily(self) -> None:
+        identity = market_review_module.resolve_market_review_identity("both")
+        self.assertEqual(identity["display_name"], "台美市場日報")
+        self.assertEqual(identity["region_badge"], "TW+US")
+
+    def test_unknown_or_missing_region_falls_back_to_generic(self) -> None:
+        for region in (None, "", "eu", "apac"):
+            identity = market_review_module.resolve_market_review_identity(region)
+            self.assertEqual(identity["display_name"], "市場日報", region)
+            self.assertEqual(identity["region_badge"], "MARKET", region)
+
+
+class MarketReviewHistoryIdentityPersistenceTest(unittest.TestCase):
+    """Real-record-shape regression tests mirroring the operator-observed
+    id=209 (tw,us), id=210/211 (us) records, persisted via the actual
+    _persist_market_review_history path against an isolated temp sqlite DB."""
+
+    def _persist_and_fetch(self, *, region: str, query_id: str, review_report: str = "## 正文\n\n內容"):
+        saved = market_review_module._persist_market_review_history(
+            review_report=review_report,
+            markdown_report=f"# 🎯 大盤回顧\n\n{review_report}",
+            region=region,
+            config=SimpleNamespace(report_language="zh"),
+            query_id=query_id,
+        )
+        self.assertEqual(saved, 1)
+        db = DatabaseManager.get_instance()
+        with db.get_session() as session:
+            row = session.query(AnalysisHistory).filter(
+                AnalysisHistory.query_id == query_id
+            ).first()
+            self.assertIsNotNone(row)
+            return row.name, json.loads(row.context_snapshot)
+
+    def setUp(self) -> None:
+        self._temp_dir = tempfile.TemporaryDirectory()
+        self._old_db_path = os.environ.get("DATABASE_PATH")
+        os.environ["DATABASE_PATH"] = os.path.join(self._temp_dir.name, "market_review_identity.db")
+        Config._instance = None
+        DatabaseManager.reset_instance()
+
+    def tearDown(self) -> None:
+        DatabaseManager.reset_instance()
+        Config._instance = None
+        if self._old_db_path is None:
+            os.environ.pop("DATABASE_PATH", None)
+        else:
+            os.environ["DATABASE_PATH"] = self._old_db_path
+        self._temp_dir.cleanup()
+
+    def test_tw_only_record_persists_taiwan_daily_identity(self) -> None:
+        name, ctx = self._persist_and_fetch(region="tw", query_id="identity-tw")
+        self.assertEqual(name, "台股日報")
+        self.assertEqual(ctx["market_review_region"], "tw")
+        self.assertEqual(ctx["market_review_identity"]["display_name"], "台股日報")
+        self.assertEqual(ctx["market_review_identity"]["region_badge"], "TW")
+
+    def test_us_only_record_like_id_210_211_persists_us_daily_identity(self) -> None:
+        name, ctx = self._persist_and_fetch(region="us", query_id="identity-us")
+        self.assertEqual(name, "美股日報")
+        self.assertNotEqual(name, "台股日報")
+        self.assertEqual(ctx["market_review_region"], "us")
+        self.assertEqual(ctx["market_review_identity"]["display_name"], "美股日報")
+        self.assertEqual(ctx["market_review_identity"]["region_badge"], "US")
+
+    def test_combined_record_like_id_209_persists_combined_daily_identity(self) -> None:
+        name, ctx = self._persist_and_fetch(region="tw,us", query_id="identity-tw-us")
+        self.assertEqual(name, "台美市場日報")
+        self.assertEqual(ctx["market_review_region"], "tw,us")
+        self.assertEqual(ctx["market_review_identity"]["display_name"], "台美市場日報")
+        self.assertEqual(ctx["market_review_identity"]["region_badge"], "TW+US")
 
 
 if __name__ == "__main__":

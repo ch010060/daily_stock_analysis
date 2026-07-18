@@ -27,11 +27,12 @@ except ModuleNotFoundError:
 try:
     from fastapi.testclient import TestClient
     from api.app import create_app
-    from api.v1.endpoints.history import get_history_detail
+    from api.v1.endpoints.history import get_history_detail, get_history_list
 except ModuleNotFoundError:
     TestClient = None
     create_app = None
     get_history_detail = None
+    get_history_list = None
 
 from src.config import Config
 from src.storage import DatabaseManager, AnalysisHistory, BacktestResult
@@ -395,6 +396,83 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(item["change_pct"], -4.61)
         self.assertEqual(item["volume_ratio"], 1.17)
         self.assertEqual(item["turnover_rate"], 11.46)
+
+    def test_history_list_exposes_market_review_region_for_badge(self) -> None:
+        """Market-review history items must expose their persisted region so the
+        UI can distinguish TW/US/combined records instead of a generic label
+        (see TW_US_MARKET_REVIEW_HISTORY_REGION_IDENTITY_FIX)."""
+        result = AnalysisResult(
+            code="MARKET",
+            name="美股日報",
+            sentiment_score=50,
+            trend_prediction="美股日報",
+            operation_advice="查看美股日報",
+            analysis_summary="summary",
+        )
+        context_snapshot = {
+            "market_review_region": "us",
+            "market_review_identity": {"display_name": "美股日報", "region_badge": "US"},
+        }
+
+        saved = self.db.save_analysis_history(
+            result=result,
+            query_id="query_market_review_region",
+            report_type="market_review",
+            news_content="新聞摘要",
+            context_snapshot=context_snapshot,
+            save_snapshot=True,
+        )
+        self.assertEqual(saved, 1)
+
+        service = HistoryService(self.db)
+        payload = service.get_history_list(stock_code="MARKET", page=1, limit=5)
+
+        self.assertEqual(payload["total"], 1)
+        self.assertEqual(payload["items"][0]["market_review_region"], "us")
+
+    def test_history_list_market_review_region_is_absent_for_normal_stock(self) -> None:
+        """Non-market-review items must not report a spurious region."""
+        record_id = self._save_history("query_non_market_review_region")
+
+        service = HistoryService(self.db)
+        payload = service.get_history_list(stock_code="2330", page=1, limit=5)
+
+        item = next(i for i in payload["items"] if i["id"] == record_id)
+        self.assertIsNone(item.get("market_review_region"))
+
+    def test_history_list_api_response_carries_market_review_region(self) -> None:
+        """GET /api/v1/history must serialize market_review_region through the
+        Pydantic HistoryItem model, not just the internal service dict."""
+        if get_history_list is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        result = AnalysisResult(
+            code="MARKET",
+            name="台美市場日報",
+            sentiment_score=50,
+            trend_prediction="台美市場日報",
+            operation_advice="查看台美市場日報",
+            analysis_summary="summary",
+        )
+        saved = self.db.save_analysis_history(
+            result=result,
+            query_id="query_market_review_region_api",
+            report_type="market_review",
+            news_content="新聞摘要",
+            context_snapshot={
+                "market_review_region": "tw,us",
+                "market_review_identity": {"display_name": "台美市場日報", "region_badge": "TW+US"},
+            },
+            save_snapshot=True,
+        )
+        self.assertEqual(saved, 1)
+
+        response = get_history_list(
+            stock_code="MARKET", start_date=None, end_date=None, page=1, limit=5, db_manager=self.db
+        )
+
+        self.assertEqual(response.total, 1)
+        self.assertEqual(response.items[0].market_review_region, "tw,us")
 
     def test_history_list_matches_equivalent_suffixed_stock_codes(self) -> None:
         """Same-stock history should include rows saved with supported TW/US suffixes."""

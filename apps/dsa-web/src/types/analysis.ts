@@ -25,6 +25,10 @@ export interface AnalysisRequest {
 
 export interface MarketReviewRequest {
   sendNotification?: boolean;
+  /** Explicit region pin (e.g. 'tw'). Set by the 台股日報 action so a
+   * non-trading-day fallback only rolls back the data date, never expands
+   * to the full configured multi-region scope. */
+  region?: string;
 }
 
 export interface MarketReviewAccepted {
@@ -337,6 +341,7 @@ export interface TaskStatus {
   marketReviewReport?: string;
   marketReviewSnapshot?: Record<string, unknown>;
   marketReviewSkipReason?: string;
+  marketReviewRegion?: string | null;
   error?: string;
   stockName?: string;
   originalQuery?: string;
@@ -402,6 +407,7 @@ export interface HistoryItem {
   turnoverRate?: number;
   modelUsed?: string;  // Display-only model snapshot from persisted history; runtime provider/model/base URL still come from analyzer configuration
   marketPhaseSummary?: MarketPhaseSummary | null;
+  marketReviewRegion?: string | null;  // market_review records only: persisted region (tw/us/tw,us); absent for normal stock reports
   createdAt: string;
 }
 
@@ -460,6 +466,7 @@ export interface StockBarItem {
   lastAnalysisTime?: string;
   modelUsed?: string;
   marketPhaseSummary?: MarketPhaseSummary | null;
+  marketReviewRegion?: string | null;
 }
 
 export interface StockBarResponse {

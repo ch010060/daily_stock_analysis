@@ -152,8 +152,11 @@ class MarketCommandRegionFilterTestCase(unittest.TestCase):
         kwargs = market_review_module.run_market_review.call_args.kwargs
         self.assertEqual(kwargs.get("override_region"), "cn,hk")
 
-    def test_all_relevant_markets_closed_skips_review(self) -> None:
-        """If compute_effective_region returns '', skip review and notify."""
+    def test_all_relevant_markets_closed_falls_back_to_full_region_instead_of_skipping(self) -> None:
+        """A manual /market command on a non-trading day (e.g. Saturday) must
+        not skip; it should run with the full configured region and let the
+        report builder resolve each market to its own latest completed
+        trading session (get_effective_trading_date) instead."""
         message = _make_message()
         config, notifier, runtime_analyzer, runtime_search, market_review_module, runtime_module, notify_notifier = self._patch_dependencies(
             market_review_region="cn",
@@ -163,12 +166,18 @@ class MarketCommandRegionFilterTestCase(unittest.TestCase):
         cmd = MarketCommand()
         cmd._run_market_review(message, config, None)
 
-        market_review_module.run_market_review.assert_not_called()
-        runtime_module.build_market_review_runtime.assert_not_called()
-        notify_notifier.send.assert_called_once()
-        sent = notify_notifier.send.call_args.args[0]
-        self.assertIn("休市", sent)
-        self.assertEqual(notify_notifier.send.call_args.kwargs["route_type"], "report")
+        runtime_module.build_market_review_runtime.assert_called_once_with(
+            config,
+            source_message=message,
+        )
+        market_review_module.run_market_review.assert_called_once_with(
+            notifier=notifier,
+            analyzer=runtime_analyzer,
+            search_service=runtime_search,
+            send_notification=True,
+            override_region=None,
+        )
+        notify_notifier.send.assert_not_called()
 
     def test_trading_day_check_disabled_does_not_pass_override(self) -> None:
         """When TRADING_DAY_CHECK_ENABLED=false, override_region stays None."""

@@ -232,6 +232,7 @@ class HistoryService:
             "change_pct": self._safe_float(realtime_fields.get("change_pct")),
             "volume_ratio": self._safe_float(volume_ratio),
             "turnover_rate": self._safe_float(turnover_rate),
+            "market_review_region": snapshot_obj.get("market_review_region") if isinstance(snapshot_obj, dict) else None,
         }
 
     def _record_to_list_item_dict(self, record) -> Dict[str, Any]:

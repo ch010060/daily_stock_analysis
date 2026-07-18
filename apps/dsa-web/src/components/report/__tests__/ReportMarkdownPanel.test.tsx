@@ -302,6 +302,291 @@ describe('ReportMarkdownPanel', () => {
     expect(screen.queryByTestId('tw-daily-reader')).not.toBeInTheDocument();
   });
 
+  it('renders a US-only market_review record (no Taiwan snapshot, no Taiwan headings) as the generic body, never the Taiwan reader', async () => {
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue([
+      '# 2026-07-18 美股大盤回顧',
+      '',
+      '> **今日市場狀態：** 科技主導的全面回調。',
+      '',
+      '## 一、盤面總覽',
+      '',
+      '三大指數全線下跌，納斯達克跌幅最大。',
+    ].join('\n'));
+
+    render(
+      <ReportMarkdownPanel
+        recordId={211}
+        stockName="美股日報"
+        stockCode="MARKET"
+        initialDetail={{
+          meta: {
+            id: 211,
+            queryId: 'market-review-us-only',
+            stockCode: 'MARKET',
+            stockName: '美股日報',
+            reportType: 'market_review',
+            createdAt: '2026-07-18T00:23:00Z',
+          },
+          summary: {
+            analysisSummary: '美股日報摘要',
+            operationAdvice: '查看美股日報',
+            trendPrediction: '美股日報',
+            sentimentScore: 50,
+          },
+        }}
+        onRequestClose={() => {}}
+      />
+    );
+
+    expect(await screen.findByRole('heading', { name: '2026-07-18 美股大盤回顧' })).toBeInTheDocument();
+    expect(screen.queryByTestId('tw-daily-reader')).not.toBeInTheDocument();
+    expect(screen.getByTestId('report-markdown-body')).toBeInTheDocument();
+  });
+
+  describe('copy scope', () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    let originalClipboard: Navigator['clipboard'] | undefined;
+
+    beforeEach(() => {
+      writeTextMock.mockClear();
+      originalClipboard = navigator.clipboard;
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: writeTextMock },
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+    });
+
+    const COMPOSITE_MARKDOWN = [
+      '# 台股大盤回顧',
+      '',
+      '> 資料日期：2026-07-16',
+      '',
+      '## 指數表現',
+      '',
+      '- 加權報酬指數（TAIEX）：42,671.27 點 🔴 -2,954.43（-6.48%）',
+      '',
+      '## 法人與資金面',
+      '',
+      '- 外資：買 1,200.0 億，賣 1,000.0 億，淨 ▼ 200.0 億',
+      '',
+      '## 融資融券觀察',
+      '',
+      '- 融資餘額：今日 2,200.0 億，較昨日 ▼ 10.0 億',
+      '',
+      '## 0050 / 臺積電參考',
+      '',
+      '- 元大台灣50（0050）：收盤 150.20（2026-07-16）',
+      '',
+      '---',
+      '',
+      '## 美股大盤回顧',
+      '',
+      '道瓊工業指數下跌 500 點，那斯達克同步走弱。',
+      '',
+      '### 操作建議',
+      '',
+      '建議觀望，等待風險釋放後再行布局。',
+    ].join('\n');
+
+    const marketReviewDetail = {
+      meta: {
+        id: 33,
+        queryId: 'market-review-q-copy-scope',
+        stockCode: 'MARKET',
+        stockName: '台股日報',
+        reportType: 'market_review' as const,
+        createdAt: '2026-07-16T00:00:00Z',
+      },
+      summary: {
+        analysisSummary: '台股日報摘要',
+        operationAdvice: '檢視資料',
+        trendPrediction: '大盤回顧',
+        sentimentScore: 50,
+      },
+      details: {
+        contextSnapshot: {
+          marketLightSnapshots: {
+            tw: {
+              twDailySnapshot: {
+                kind: 'tw_daily_snapshot',
+                source: 'finmind',
+                dataDate: '2026-07-16',
+                indices: [],
+                institutionalFlows: [],
+                marginShort: [],
+                representatives: [],
+                twMarketAnalysisSnapshot: {
+                  kind: 'tw_market_analysis_snapshot',
+                  analysisReady: true,
+                  dataDate: '2026-07-16',
+                  marketState: 'open_incomplete',
+                  analysisArticle: {
+                    status: 'available',
+                    headline: '台股加權指數最新技術分析',
+                    marketContext: '資料時間：2026 年 7 月 17 日 03:26（台股交易中；分析僅採前一完整交易日）',
+                    sessionSummary: '最新完整交易日為 2026-07-16，加權指數收在 42,671.27 點，下跌 2,954.43 點、跌幅 6.48%。',
+                    coreJudgement: {
+                      label: '短空中性',
+                      summary: '短線持續下探，指數已進入 42,353～42,990 點支撐區並正接受測試，若跌破區間下緣，修正風險將進一步提高。',
+                    },
+                    trendParagraphs: ['指數收盤仍低於 MA5、MA10 與 MA20，短期均線維持偏空結構。'],
+                    priceActionParagraphs: ['指數已進入 42,353～42,990 點支撐區，支撐正在接受測試；目前尚未跌破區間下緣，但收盤位於區間內，承接力仍待確認。'],
+                    confirmationParagraph: '若後續收盤有效跌破 42,353 點，才代表該支撐區正式失效。',
+                    supportingContext: ['外資偏賣、投信偏買，法人方向分歧且整體仍偏賣。'],
+                    tpexContext: '櫃買指數當日下跌 7.02%，表現弱於加權指數。',
+                  },
+                },
+                dataStatus: { missingFields: [], staleFields: [], partialFailures: [] },
+              },
+            },
+          },
+        },
+      },
+    };
+
+    it('scopes the Taiwan daily Markdown copy action to the article only, excluding the composite US/full-market markdown', async () => {
+      vi.mocked(historyApi.getMarkdown).mockResolvedValue(COMPOSITE_MARKDOWN);
+
+      render(
+        <ReportMarkdownPanel
+          recordId={33}
+          stockName="台股日報"
+          stockCode="MARKET"
+          initialDetail={marketReviewDetail}
+          onRequestClose={() => {}}
+        />
+      );
+
+      expect(await screen.findByTestId('tw-daily-reader')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /複製台股日報.*Markdown/ }));
+      await waitFor(() => expect(writeTextMock).toHaveBeenCalledTimes(1));
+      const copiedMarkdown = writeTextMock.mock.calls[0][0] as string;
+
+      expect(copiedMarkdown).toContain('台股加權指數最新技術分析');
+      expect(copiedMarkdown).toContain('42,353');
+      expect(copiedMarkdown).toContain('支撐正在接受測試');
+      expect(copiedMarkdown).not.toContain('美股大盤回顧');
+      expect(copiedMarkdown).not.toContain('操作建議');
+      expect(copiedMarkdown).not.toContain('道瓊工業指數');
+    });
+
+    it('scopes the Taiwan daily plain-text copy action to the article only, excluding the composite US/full-market markdown', async () => {
+      vi.mocked(historyApi.getMarkdown).mockResolvedValue(COMPOSITE_MARKDOWN);
+
+      render(
+        <ReportMarkdownPanel
+          recordId={33}
+          stockName="台股日報"
+          stockCode="MARKET"
+          initialDetail={marketReviewDetail}
+          onRequestClose={() => {}}
+        />
+      );
+
+      expect(await screen.findByTestId('tw-daily-reader')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /複製台股日報.*純文字/ }));
+      await waitFor(() => expect(writeTextMock).toHaveBeenCalledTimes(1));
+      const copiedPlainText = writeTextMock.mock.calls[0][0] as string;
+
+      expect(copiedPlainText).toContain('台股加權指數最新技術分析');
+      expect(copiedPlainText).not.toContain('美股大盤回顧');
+      expect(copiedPlainText).not.toContain('操作建議');
+    });
+
+    it('copies the full report unaffected when no Taiwan daily reader is active', async () => {
+      vi.mocked(historyApi.getMarkdown).mockResolvedValue('# Report title\n\nA paragraph.');
+
+      render(
+        <ReportMarkdownPanel
+          recordId={1}
+          stockName="Test Co"
+          stockCode="TST"
+          onRequestClose={() => {}}
+        />
+      );
+
+      expect(await screen.findByRole('heading', { name: 'Report title' })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: '複製 Markdown 原始碼' }));
+      await waitFor(() => expect(writeTextMock).toHaveBeenCalledWith('# Report title\n\nA paragraph.'));
+    });
+
+    it('still copies a useful Taiwan-only payload for the legacy markdown fallback reader', async () => {
+      vi.mocked(historyApi.getMarkdown).mockResolvedValue([
+        '# 台股大盤回顧',
+        '',
+        '> 資料日期：2026-06-26',
+        '',
+        '## 今日盤勢摘要',
+        '',
+        '今日所有必要指標資料完整，可進行完整分析。',
+        '',
+        '## 指數表現',
+        '',
+        '- 加權報酬指數（TAIEX）：23,000.00 點 🟢 +120.00（+0.52%）',
+        '',
+        '## 法人與資金面',
+        '',
+        '- 外資：買 1,200.0 億，賣 1,000.0 億，淨 ▲ 200.0 億',
+        '',
+        '## 融資融券觀察',
+        '',
+        '- 融資餘額：今日 2,200.0 億，較昨日 ▼ 10.0 億',
+        '',
+        '## 0050 / 臺積電參考',
+        '',
+        '- 元大台灣50（0050）：收盤 180.20（2026-06-26）',
+        '',
+        '## 風險與注意事項',
+        '',
+        '- 市場有風險，投資需謹慎。',
+      ].join('\n'));
+
+      render(
+        <ReportMarkdownPanel
+          recordId={2}
+          stockName="台股日報"
+          stockCode="MARKET"
+          initialDetail={{
+            meta: {
+              id: 2,
+              queryId: 'market-review-legacy-copy',
+              stockCode: 'MARKET',
+              stockName: '台股日報',
+              reportType: 'market_review',
+              createdAt: '2026-06-26T00:00:00Z',
+            },
+            summary: {
+              analysisSummary: '台股日報摘要',
+              operationAdvice: '檢視資料',
+              trendPrediction: '大盤回顧',
+              sentimentScore: 50,
+            },
+          }}
+          onRequestClose={() => {}}
+        />
+      );
+
+      expect(await screen.findByTestId('tw-daily-reader')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /複製台股日報.*Markdown/ }));
+      await waitFor(() => expect(writeTextMock).toHaveBeenCalledTimes(1));
+      const copied = writeTextMock.mock.calls[0][0] as string;
+
+      expect(copied).toContain('加權報酬指數');
+      expect(copied).toContain('外資');
+    });
+  });
+
   it('renders Markdown as editorial report sections with styled headings, tables, and callouts', async () => {
     vi.mocked(historyApi.getMarkdown).mockResolvedValue(
       '# Report title\n\n> 分析日期: **2026-06-27** | 報告生成時間: 15:49\n\n## Section A\n\n### Risk section\n\n> Important callout.\n\n| 操作點位 | 目前價格 |\n| --- | --- |\n| 理想買進點 | Wait |\n'

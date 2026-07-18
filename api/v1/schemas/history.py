@@ -39,6 +39,10 @@ class HistoryItem(BaseModel):
         None,
         description="分析歷史記錄中的模型快照，僅用於展示歷史後設資料；不參與模型配置或執行時路由決策",
     )
+    market_review_region: Optional[str] = Field(
+        None,
+        description="大盤覆盤記錄的持久化區域（tw / us / tw,us），僅 market_review 型別記錄存在；一般個股記錄為 None",
+    )
     created_at: Optional[str] = Field(None, description="建立時間")
     
     model_config = ConfigDict(json_schema_extra={

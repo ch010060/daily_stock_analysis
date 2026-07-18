@@ -108,6 +108,12 @@ class MarketReviewRequest(BaseModel):
         True,
         description="是否在大盤覆盤完成後傳送推送通知",
     )
+    region: Optional[str] = Field(
+        None,
+        description="顯式指定的市場範圍（例如 'tw'）。指定時固定使用該範圍，"
+        "非交易日僅回退資料日期、不套用設定檔多市場 fallback；"
+        "留空則沿用既有設定檔 + 交易日曆判斷行為。",
+    )
 
 
 class MarketReviewAccepted(BaseModel):
@@ -280,6 +286,10 @@ class TaskStatus(BaseModel):
     market_review_skip_reason: Optional[str] = Field(
         None,
         description="台股日報任務已完成但未產生可持久化報告時的跳過原因（僅大盤覆盤任務）",
+    )
+    market_review_region: Optional[str] = Field(
+        None,
+        description="大盤覆盤任務實際執行的區域（tw / us / tw,us），用於區域感知的完成訊息（僅大盤覆盤任務）",
     )
     error: Optional[str] = Field(
         None, 

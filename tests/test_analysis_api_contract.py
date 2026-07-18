@@ -246,6 +246,24 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         self.assertEqual(result, "tw")
 
+    def test_compute_market_review_override_region_falls_back_to_config_when_all_markets_closed(self) -> None:
+        """A manual web trigger on a non-trading day (e.g. Saturday) must fall
+        back to the full configured region instead of skipping — the report
+        builder already resolves each market to its latest completed trading
+        session (get_effective_trading_date), so there is nothing to skip."""
+        if analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        config = SimpleNamespace(trading_day_check_enabled=True, market_review_region="all")
+
+        with patch(
+            "src.core.trading_calendar.get_open_markets_today",
+            return_value=set(),
+        ):
+            result = analysis_endpoint_module._compute_market_review_override_region(config)
+
+        self.assertIsNone(result)
+
     def test_trigger_market_review_skips_when_configured_markets_closed(self) -> None:
         if trigger_market_review is None or analysis_endpoint_module is None:
             self.skipTest("analysis endpoint helpers unavailable in this environment")
@@ -272,6 +290,77 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertIn("台股日報", response.message)
         acquire.assert_not_called()
         task_queue.submit_background_task.assert_not_called()
+
+    def test_trigger_market_review_with_explicit_region_bypasses_calendar_expansion(self) -> None:
+        """An explicit region=tw request must not be widened to the full
+        configured (tw,us) region by the non-trading-day fallback — the
+        override-region calendar computation is for the no-region-specified
+        (config-default) path only."""
+        if trigger_market_review is None or analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        task_queue = MagicMock()
+        task_queue.submit_background_task.return_value = SimpleNamespace(task_id="market-task-2")
+        request = SimpleNamespace(send_notification=True, region="tw")
+        config = SimpleNamespace(trading_day_check_enabled=True, market_review_region="all")
+
+        with patch.object(
+            analysis_endpoint_module,
+            "_try_acquire_market_review_lock",
+            return_value=object(),
+        ), patch.object(
+            analysis_endpoint_module,
+            "_compute_market_review_override_region",
+        ) as compute_region, patch(
+            "api.v1.endpoints.analysis.get_task_queue", return_value=task_queue
+        ):
+            response = trigger_market_review(
+                request=request,
+                config=config,
+            )
+
+        compute_region.assert_not_called()
+        self.assertEqual(response.status, "accepted")
+        task_queue.submit_background_task.assert_called_once()
+        _, kwargs = task_queue.submit_background_task.call_args
+        self.assertEqual(kwargs.get("stock_name"), "台股日報")
+
+    def test_trigger_market_review_with_explicit_region_does_not_skip_on_non_trading_day(self) -> None:
+        """Saturday click of 台股日報 (explicit region=tw) must still submit
+        the task — the calendar-driven 'all configured markets closed, skip'
+        branch only applies when no explicit region was requested."""
+        if trigger_market_review is None or analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        task_queue = MagicMock()
+        task_queue.submit_background_task.return_value = SimpleNamespace(task_id="market-task-3")
+        request = SimpleNamespace(send_notification=True, region="tw")
+        config = SimpleNamespace(trading_day_check_enabled=True, market_review_region="all")
+
+        with patch.object(
+            analysis_endpoint_module,
+            "_try_acquire_market_review_lock",
+            return_value=object(),
+        ), patch(
+            "src.core.trading_calendar.get_open_markets_today",
+            return_value=set(),
+        ), patch.object(
+            analysis_endpoint_module, "_run_market_review_background",
+        ) as run_background, patch(
+            "api.v1.endpoints.analysis.get_task_queue", return_value=task_queue
+        ):
+            response = trigger_market_review(
+                request=request,
+                config=config,
+            )
+            submitted_fn = task_queue.submit_background_task.call_args.args[0]
+            submitted_fn()
+
+        self.assertEqual(response.status, "accepted")
+        self.assertNotIn("已跳過", response.message)
+        task_queue.submit_background_task.assert_called_once()
+        run_background.assert_called_once()
+        self.assertEqual(run_background.call_args.kwargs["override_region"], "tw")
 
     def test_trigger_analysis_maps_sp500_natural_inputs_to_spx(self) -> None:
         if trigger_analysis is None:
@@ -506,6 +595,34 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         self.assertEqual(result, {"result": "report", "market_review_snapshot": snapshot})
 
+    def test_run_market_review_background_includes_region_when_persisted(self) -> None:
+        """Completion messaging needs the actually-resolved region, not the
+        button's static label (see MARKET_REVIEW_ACTION_REGION_ROUTING fix)."""
+        if analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        runtime_notifier = MagicMock()
+        runtime_search = MagicMock()
+        runtime_analyzer = MagicMock()
+        with patch.object(
+            analysis_endpoint_module,
+            "_build_market_review_runtime",
+            return_value=(runtime_notifier, runtime_analyzer, runtime_search),
+        ), patch.object(
+            analysis_endpoint_module, "_load_market_review_snapshot", return_value=None,
+        ), patch.object(
+            analysis_endpoint_module, "_load_market_review_region", return_value="us",
+        ), patch("src.core.market_review.run_market_review", return_value="report"):
+            result = analysis_endpoint_module._run_market_review_background(
+                send_notification=False,
+                override_region="us",
+                lock_token=None,
+                config=SimpleNamespace(),
+                query_id="market-task-region",
+            )
+
+        self.assertEqual(result, {"result": "report", "market_review_region": "us"})
+
     def test_get_analysis_status_returns_market_review_report_from_queue(self) -> None:
         if get_analysis_status is None or analysis_endpoint_module is None:
             self.skipTest("analysis endpoint helpers unavailable in this environment")
@@ -566,6 +683,34 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(status.status, "completed")
         self.assertIsNone(status.market_review_report)
         self.assertEqual(status.market_review_skip_reason, "台股日報已跳過：沒有可持久化的盤勢回顧內容")
+
+    def test_get_analysis_status_returns_market_review_region_from_queue(self) -> None:
+        """A US-only run must surface region='us' so the frontend can render
+        美股日報, not the hard-coded 台股日報, regardless of button label."""
+        if get_analysis_status is None or analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        queue = MagicMock()
+        queue.get_task.return_value = SimpleNamespace(
+            task_id="market-task-region",
+            stock_code="market_review",
+            stock_name="台股日報",
+            status=analysis_endpoint_module.TaskStatusEnum.COMPLETED,
+            progress=100,
+            result={
+                "result": "US market review text",
+                "market_review_region": "us",
+            },
+            error=None,
+            original_query=None,
+            selection_source=None,
+            analysis_phase="auto",
+        )
+
+        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue):
+            status = get_analysis_status("market-task-region")
+
+        self.assertEqual(status.market_review_region, "us")
 
     def test_get_analysis_status_normalizes_completed_queue_result_contract(self) -> None:
         if get_analysis_status is None or analysis_endpoint_module is None:
@@ -808,6 +953,35 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.market_review_report, "# 🎯 盤勢回顧\n\n回顧正文")
         self.assertIsNone(result.result)
+
+    def test_get_analysis_status_returns_market_review_region_from_db(self) -> None:
+        """DB-fallback path (task no longer in the in-memory queue) must also
+        surface the persisted region, not just the in-memory-queue path."""
+        if get_analysis_status is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        mock_queue = MagicMock()
+        mock_queue.get_task.return_value = None
+        mock_db = MagicMock()
+        mock_db.get_analysis_history.return_value = [
+            SimpleNamespace(
+                id=11,
+                code="MARKET",
+                name="美股日報",
+                report_type="market_review",
+                raw_result={"raw_response": "# 美股大盤回顧\n\n正文"},
+                news_content="正文",
+                context_snapshot={"market_review_region": "us"},
+                created_at=None,
+            )
+        ]
+
+        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=mock_queue), \
+             patch("src.storage.DatabaseManager.get_instance", return_value=mock_db):
+            result = get_analysis_status("market-task-region-db")
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.market_review_region, "us")
 
     def test_get_analysis_status_completed_db_snapshot_reads_change_pct_from_raw_when_price_present(self) -> None:
         if get_analysis_status is None:
