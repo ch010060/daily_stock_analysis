@@ -320,17 +320,26 @@ class TwMarketAnalysisSnapshotTest(unittest.TestCase):
         self.assertEqual(snapshot["source_status"]["margin"]["status"], "suppressed")
         self.assertEqual([item["symbol"] for item in snapshot["supporting_evidence"]["representatives"]], ["2330"])
 
-    def test_deep_intraday_low_with_recovery_above_zone_is_not_misclassified_as_invalidation(self) -> None:
-        """Regression for the copy-scope/support-zone-semantics bugfix: a sharp
-        drop that closes back above the freshly-formed support zone (an intraday
-        test with recovery) must not be reported as a confirmed support break."""
+    def test_deep_intraday_crash_below_prior_support_is_a_genuine_invalidation(self) -> None:
+        """Regression for the PR #47 review finding ("Restore support-break
+        detection from prior zones"): a crash roughly 4x the market's typical
+        daily range, closing well below where the support zone stood BEFORE
+        today, is a genuine breakdown and must be detected as one.
+
+        This scenario used to be asserted as "not invalidation" under the
+        pre-fix self-referential zone selection (support_levels recalculated
+        INCLUDING today's own crash, which re-anchors right at today's low —
+        making close > that zone's upper bound look like a recovery). With
+        prior_support_levels (computed from data before today), the same
+        close is correctly seen as still well below the zone that was
+        actually confirmed going into today."""
         rows = _bars()
         rows[-1] = {**rows[-1], "open": rows[-2]["close"] - 5, "high": rows[-2]["close"],
                     "low": rows[-2]["low"] - 40, "close": rows[-2]["low"] - 30}
         snapshot = self._build(taiex_rows=rows, primary_data_date=rows[-1]["date"])
 
-        self.assertNotEqual(snapshot["market_judgement"]["category"], "invalidation")
-        self.assertFalse(snapshot["market_judgement"]["invalidation_conditions"][0]["met"])
+        self.assertEqual(snapshot["market_judgement"]["category"], "invalidation")
+        self.assertTrue(snapshot["market_judgement"]["invalidation_conditions"][0]["met"])
 
 
 class TwMarketAnalysisArticleGoldenTest(unittest.TestCase):
@@ -427,7 +436,7 @@ class TwSupportZoneStateTest(unittest.TestCase):
 class TwJudgementSupportZonePriorityTest(unittest.TestCase):
     def test_confirmed_support_break_takes_priority_over_confirmed_trend(self) -> None:
         analysis = {
-            "latest_bar": {"close": 990.0},
+            "latest_bar": {"close": 990.0, "low": 985.0},
             "change": 5.0,
             "moving_averages": {
                 "ma20": {"value": 950.0, "slope": 5.0},
@@ -446,7 +455,7 @@ class TwJudgementSupportZonePriorityTest(unittest.TestCase):
 
     def test_close_testing_the_zone_does_not_trigger_invalidation(self) -> None:
         analysis = {
-            "latest_bar": {"close": 1002.0},
+            "latest_bar": {"close": 1002.0, "low": 998.0},
             "change": 5.0,
             "moving_averages": {
                 "ma20": {"value": 950.0, "slope": 5.0},
@@ -461,6 +470,106 @@ class TwJudgementSupportZonePriorityTest(unittest.TestCase):
 
         self.assertEqual(judgement["category"], "confirmed_trend")
         self.assertFalse(judgement["invalidation_conditions"][0]["met"])
+
+
+class TwPriorSupportZoneSequenceRegressionTest(unittest.TestCase):
+    """PR #47 review: "Restore support-break detection from prior zones".
+
+    _zones() only emits support candidates with level <= close and re-anchors
+    its rolling-20 pivot to today's own low every session, so a support zone
+    recalculated INCLUDING today's own bar can never be broken by today's own
+    close (level <= close implies zone.lower = level - tolerance < close,
+    always). These tests exercise the real multi-day pipeline (not a
+    hand-built snapshot dict) to prove prior_support_levels — computed from
+    data BEFORE today — fixes the moving-goalpost bug."""
+
+    def _build(self, **overrides):
+        taiex = _bars()
+        kwargs = {
+            "taiex_rows": taiex,
+            "tpex_rows": [{**row, "close": row["close"] / 100, "open": row["open"] / 100,
+                           "high": row["high"] / 100, "low": row["low"] / 100} for row in taiex],
+            "twse_traded_value_rows": _values(taiex),
+            "tpex_traded_value_rows": _values(taiex),
+            "institutional_rows": [{"date": taiex[-1]["date"], "name": "Foreign_Investor", "buy": 120, "sell": 100}],
+            "margin_rows": [{"date": taiex[-1]["date"], "name": "MarginPurchaseMoney", "TodayBalance": 110, "YesBalance": 100}],
+            "representatives": [{"symbol": "2330", "data_date": taiex[-1]["date"], "close": 1000}],
+            "primary_data_date": taiex[-1]["date"],
+            "generated_at": "2026-07-15T01:00:00Z",
+            "market_now": "2026-07-15T09:30:00+08:00",
+            "source_metadata": {
+                "TAIEX": _meta("TWSE", "indicesReport/MI_5MINS_HIST", "ohlc", "index_points"),
+                "TPEx": _meta("TPEx", "indexInfo/inx", "ohlc", "index_points"),
+                "twse_traded_value": _meta("TWSE", "exchangeReport/FMTQIK", "traded_value", "TWD"),
+                "tpex_traded_value": _meta("TPEx", "daily_trading_index/st41_result.php", "traded_value", "TWD"),
+                "institutional": _meta("FinMind", "TaiwanStockTotalInstitutionalInvestors", "flow", "TWD"),
+                "margin": _meta("FinMind", "TaiwanStockTotalMarginPurchaseShortSale", "leverage", "mixed"),
+            },
+        }
+        kwargs.update(overrides)
+        return build_tw_market_analysis_snapshot(**kwargs)
+
+    @staticmethod
+    def _rows_with_last_override(*, close, low):
+        rows = _bars()
+        last = dict(rows[-1])
+        last["close"] = close
+        last["low"] = low
+        rows[-1] = last
+        return rows
+
+    def test_close_enters_prior_zone_is_testing_not_broken(self) -> None:
+        # Baseline (unmodified) prior support zone is [1229.855, 1236.145];
+        # today's close lands inside it without breaking the lower bound.
+        rows = self._rows_with_last_override(close=1233.0, low=1228.0)
+        snapshot = self._build(taiex_rows=rows, primary_data_date=rows[-1]["date"])
+
+        self.assertNotEqual(snapshot["market_judgement"]["category"], "invalidation")
+        price_action = "\n".join(snapshot["analysis_article"]["price_action_paragraphs"])
+        self.assertIn("支撐正在接受測試", price_action)
+        self.assertNotIn("原支撐失效", price_action)
+
+    def test_close_exactly_at_prior_lower_boundary_is_still_testing(self) -> None:
+        rows = self._rows_with_last_override(close=1229.855, low=1220.0)
+        snapshot = self._build(taiex_rows=rows, primary_data_date=rows[-1]["date"])
+
+        self.assertNotEqual(snapshot["market_judgement"]["category"], "invalidation")
+        price_action = "\n".join(snapshot["analysis_article"]["price_action_paragraphs"])
+        self.assertIn("支撐正在接受測試", price_action)
+        self.assertNotIn("原支撐失效", price_action)
+
+    def test_close_below_prior_lower_is_broken_even_though_recalculated_zone_would_disagree(self) -> None:
+        """The key moving-goalpost regression: today's crash creates a NEW,
+        lower recalculated support (support_levels) that would wrongly read
+        as above/testing if used directly. The fix must use
+        prior_support_levels (computed from data before today) instead."""
+        rows = self._rows_with_last_override(close=1179.855, low=1170.0)
+        snapshot = self._build(taiex_rows=rows, primary_data_date=rows[-1]["date"])
+
+        taiex_analysis = snapshot["indices"]["TAIEX"]
+        # Prove the bug condition is genuinely present in this fixture: the
+        # recalculated (current) zone differs from the prior one, so the
+        # assertions below are real proof prior_support_levels drives the
+        # result, not a coincidence of the two zones being identical.
+        self.assertNotEqual(
+            taiex_analysis["support_levels"][0]["lower"],
+            taiex_analysis["prior_support_levels"][0]["lower"],
+        )
+
+        self.assertEqual(snapshot["market_judgement"]["category"], "invalidation")
+        self.assertTrue(snapshot["market_judgement"]["invalidation_conditions"][0]["met"])
+
+        price_action = "\n".join(snapshot["analysis_article"]["price_action_paragraphs"])
+        self.assertIn("原支撐區正式失效", price_action)
+        self.assertNotIn("支撐正在接受測試", price_action)
+
+    def test_breakdown_narrative_does_not_repeat_break_as_untriggered_future_condition(self) -> None:
+        rows = self._rows_with_last_override(close=1179.855, low=1170.0)
+        snapshot = self._build(taiex_rows=rows, primary_data_date=rows[-1]["date"])
+
+        confirmation = snapshot["analysis_article"]["confirmation_paragraph"]
+        self.assertIn("重新站回", confirmation)
+        self.assertNotIn("代表本次低檔承接失敗", confirmation)
 
 
 class TwSupportZoneArticleTest(unittest.TestCase):

@@ -331,6 +331,15 @@ def _index_analysis(rows: List[Dict[str, Any]], value_rows: List[Dict[str, Any]]
     histogram = [left - right for left, right in zip(dif, signal)]
     atr = _atr(rows)
     support, resistance = _zones(rows, atr[-1])
+    # _zones() only emits support candidates with level <= close and re-anchors
+    # its rolling-20 pivot to today's own low every session, so a zone
+    # recalculated INCLUDING today can never be broken by today's own close
+    # (level <= close implies zone.lower = level - tolerance < close, always).
+    # prior_support_levels is computed from data BEFORE today, so a genuine
+    # breakdown of an already-confirmed support can actually be detected.
+    prior_rows = rows[:-1]
+    prior_atr = _atr(prior_rows)
+    prior_support, prior_resistance = _zones(prior_rows, prior_atr[-1])
     previous = rows[-2]
     latest = rows[-1]
     return {
@@ -353,6 +362,8 @@ def _index_analysis(rows: List[Dict[str, Any]], value_rows: List[Dict[str, Any]]
         "candlestick": _candle(rows, atr[-1]),
         "support_levels": support,
         "resistance_levels": resistance,
+        "prior_support_levels": prior_support,
+        "prior_resistance_levels": prior_resistance,
         "volume_analysis": _volume(value_rows, data_date),
         "input_last_date": rows[-1]["date"],
     }
@@ -362,8 +373,8 @@ def _judgement(analysis: Dict[str, Any]) -> Dict[str, Any]:
     latest = analysis["latest_bar"]
     mas = analysis["moving_averages"]
     alignment = analysis["ma_alignment"]
-    support = analysis["support_levels"][:1]
-    invalidation = _support_zone_state(latest["close"], support[0] if support else None) == "broken_zone"
+    tested_support = _tested_support(analysis)
+    invalidation = _support_zone_state(latest["close"], tested_support) == "broken_zone"
     confirmed = latest["close"] > mas["ma20"]["value"] and alignment == "bullish" and mas["ma20"]["slope"] > 0
     rebound = analysis["change"] > 0 and latest["close"] < mas["ma20"]["value"]
     if invalidation:
@@ -379,7 +390,7 @@ def _judgement(analysis: Dict[str, Any]) -> Dict[str, Any]:
         {"rule_id": "CONFIRM_CLOSE_ABOVE_MA20", "text": "收盤站上 MA20 且短期均線轉為多頭排列。", "met": confirmed},
     ]
     invalidation_conditions = [
-        {"rule_id": "INVALIDATE_SUPPORT_BREAK", "text": "收盤跌破最近確認支撐區。", "met": invalidation, "zone": support[0] if support else None},
+        {"rule_id": "INVALIDATE_SUPPORT_BREAK", "text": "收盤跌破最近確認支撐區。", "met": invalidation, "zone": tested_support},
     ]
     return {
         "category": category,
@@ -431,7 +442,14 @@ def _close_location_state(high: float, low: float, close: float) -> str:
 
 
 def _tested_support(analysis: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    zones = analysis.get("support_levels") or []
+    """Select the nearest support zone confirmed BEFORE today's session.
+    Falls back to support_levels only for snapshots persisted before
+    prior_support_levels existed (legacy records); using the recalculated
+    zone as the primary source would make a genuine breakdown of an
+    already-confirmed support undetectable (see _index_analysis)."""
+    zones = analysis.get("prior_support_levels")
+    if zones is None:
+        zones = analysis.get("support_levels") or []
     if not zones:
         return None
     low = analysis["latest_bar"]["low"]
