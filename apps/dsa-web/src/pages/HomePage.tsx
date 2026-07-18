@@ -25,6 +25,7 @@ import { useWatchlist } from '../hooks/useWatchlist';
 import type { SetupStatusResponse } from '../types/systemConfig';
 import { getReportText, normalizeReportLanguage } from '../utils/reportLanguage';
 import { buildGoogleFinanceQuoteUrl } from '../utils/googleFinance';
+import { resolveMarketReviewIdentity } from '../utils/marketReviewIdentity';
 import type { StockBarItem } from '../types/analysis';
 
 const DUPLICATE_BANNER_AUTO_DISMISS_MS = 5000;
@@ -550,14 +551,18 @@ const HomePage: React.FC = () => {
             if (!marketReviewText && skipReason) {
               setMarketReviewNotice({
                 variant: 'warning',
-                title: '台股日報已跳過',
+                title: '市場回顧已跳過',
                 message: skipReason,
               });
             } else {
+              // Region-aware: the actually-resolved region (tw/us/tw,us) may differ from
+              // whatever the trigger button's static label implied — see
+              // MARKET_REVIEW_ACTION_REGION_ROUTING_AND_LIVE_RUNTIME_FIX.
+              const { displayName } = resolveMarketReviewIdentity(status.marketReviewRegion);
               setMarketReviewNotice({
                 variant: 'success',
-                title: '台股日報已完成',
-                message: marketReviewText ? '台股日報任務已完成，結果如下：' : '台股日報任務已完成，結果已生成並按配置推送。',
+                title: `${displayName}已完成`,
+                message: marketReviewText ? `${displayName}任務已完成，結果如下：` : `${displayName}任務已完成，結果已生成並按配置推送。`,
               });
             }
             setMarketReviewError(null);

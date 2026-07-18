@@ -620,6 +620,41 @@ describe('HomePage', () => {
     expect(analysisApi.getStatus).toHaveBeenCalledWith('task-1');
   });
 
+  it('shows a region-aware completion title (美股日報已完成) when the trading-calendar-resolved region is US-only, not the static 台股日報 label', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      sendNotification: true,
+      message: '市場回顧任務已提交',
+      taskId: 'task-us-only',
+    });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: 'task-us-only',
+      status: 'completed',
+      marketReviewReport: '# 2026-07-18 美股大盤回顧\n\n三大指數全線下跌。',
+      marketReviewRegion: 'us',
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '台股日報' }));
+
+    await waitFor(() => {
+      expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
+    });
+    expect(await screen.findByText('美股日報已完成')).toBeInTheDocument();
+    expect(screen.queryByText('台股日報已完成')).not.toBeInTheDocument();
+  });
+
   it('does not render duplicate Taiwan daily readers when completion arrives while MARKET history is selected', async () => {
     vi.mocked(historyApi.getStockBarList).mockResolvedValue({
       total: 0,

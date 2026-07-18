@@ -337,6 +337,7 @@ export interface TaskStatus {
   marketReviewReport?: string;
   marketReviewSnapshot?: Record<string, unknown>;
   marketReviewSkipReason?: string;
+  marketReviewRegion?: string | null;
   error?: string;
   stockName?: string;
   originalQuery?: string;

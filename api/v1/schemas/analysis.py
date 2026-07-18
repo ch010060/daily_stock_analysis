@@ -281,6 +281,10 @@ class TaskStatus(BaseModel):
         None,
         description="台股日報任務已完成但未產生可持久化報告時的跳過原因（僅大盤覆盤任務）",
     )
+    market_review_region: Optional[str] = Field(
+        None,
+        description="大盤覆盤任務實際執行的區域（tw / us / tw,us），用於區域感知的完成訊息（僅大盤覆盤任務）",
+    )
     error: Optional[str] = Field(
         None, 
         description="錯誤資訊（僅在 failed 時存在）"

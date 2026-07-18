@@ -506,6 +506,34 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         self.assertEqual(result, {"result": "report", "market_review_snapshot": snapshot})
 
+    def test_run_market_review_background_includes_region_when_persisted(self) -> None:
+        """Completion messaging needs the actually-resolved region, not the
+        button's static label (see MARKET_REVIEW_ACTION_REGION_ROUTING fix)."""
+        if analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        runtime_notifier = MagicMock()
+        runtime_search = MagicMock()
+        runtime_analyzer = MagicMock()
+        with patch.object(
+            analysis_endpoint_module,
+            "_build_market_review_runtime",
+            return_value=(runtime_notifier, runtime_analyzer, runtime_search),
+        ), patch.object(
+            analysis_endpoint_module, "_load_market_review_snapshot", return_value=None,
+        ), patch.object(
+            analysis_endpoint_module, "_load_market_review_region", return_value="us",
+        ), patch("src.core.market_review.run_market_review", return_value="report"):
+            result = analysis_endpoint_module._run_market_review_background(
+                send_notification=False,
+                override_region="us",
+                lock_token=None,
+                config=SimpleNamespace(),
+                query_id="market-task-region",
+            )
+
+        self.assertEqual(result, {"result": "report", "market_review_region": "us"})
+
     def test_get_analysis_status_returns_market_review_report_from_queue(self) -> None:
         if get_analysis_status is None or analysis_endpoint_module is None:
             self.skipTest("analysis endpoint helpers unavailable in this environment")
@@ -566,6 +594,34 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(status.status, "completed")
         self.assertIsNone(status.market_review_report)
         self.assertEqual(status.market_review_skip_reason, "台股日報已跳過：沒有可持久化的盤勢回顧內容")
+
+    def test_get_analysis_status_returns_market_review_region_from_queue(self) -> None:
+        """A US-only run must surface region='us' so the frontend can render
+        美股日報, not the hard-coded 台股日報, regardless of button label."""
+        if get_analysis_status is None or analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        queue = MagicMock()
+        queue.get_task.return_value = SimpleNamespace(
+            task_id="market-task-region",
+            stock_code="market_review",
+            stock_name="台股日報",
+            status=analysis_endpoint_module.TaskStatusEnum.COMPLETED,
+            progress=100,
+            result={
+                "result": "US market review text",
+                "market_review_region": "us",
+            },
+            error=None,
+            original_query=None,
+            selection_source=None,
+            analysis_phase="auto",
+        )
+
+        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue):
+            status = get_analysis_status("market-task-region")
+
+        self.assertEqual(status.market_review_region, "us")
 
     def test_get_analysis_status_normalizes_completed_queue_result_contract(self) -> None:
         if get_analysis_status is None or analysis_endpoint_module is None:
@@ -808,6 +864,35 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.market_review_report, "# 🎯 盤勢回顧\n\n回顧正文")
         self.assertIsNone(result.result)
+
+    def test_get_analysis_status_returns_market_review_region_from_db(self) -> None:
+        """DB-fallback path (task no longer in the in-memory queue) must also
+        surface the persisted region, not just the in-memory-queue path."""
+        if get_analysis_status is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        mock_queue = MagicMock()
+        mock_queue.get_task.return_value = None
+        mock_db = MagicMock()
+        mock_db.get_analysis_history.return_value = [
+            SimpleNamespace(
+                id=11,
+                code="MARKET",
+                name="美股日報",
+                report_type="market_review",
+                raw_result={"raw_response": "# 美股大盤回顧\n\n正文"},
+                news_content="正文",
+                context_snapshot={"market_review_region": "us"},
+                created_at=None,
+            )
+        ]
+
+        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=mock_queue), \
+             patch("src.storage.DatabaseManager.get_instance", return_value=mock_db):
+            result = get_analysis_status("market-task-region-db")
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.market_review_region, "us")
 
     def test_get_analysis_status_completed_db_snapshot_reads_change_pct_from_raw_when_price_present(self) -> None:
         if get_analysis_status is None:

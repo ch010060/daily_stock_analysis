@@ -169,6 +169,27 @@ def _load_market_review_snapshot(query_id: Optional[str]) -> Optional[Dict[str, 
         return None
 
 
+def _load_market_review_region(query_id: Optional[str]) -> Optional[str]:
+    """Read back the persisted region for a completed market-review task, so
+    completion messaging can be region-aware (台股日報/美股日報/台美市場日報)
+    instead of always claiming 台股日報 regardless of what actually ran."""
+    if not query_id:
+        return None
+    try:
+        from src.storage import DatabaseManager
+
+        db = DatabaseManager.get_instance()
+        records = db.get_analysis_history(query_id=query_id, limit=1)
+        if not records:
+            return None
+        payload = parse_json_field(getattr(records[0], "context_snapshot", None))
+        region = payload.get("market_review_region") if isinstance(payload, dict) else None
+        return region if isinstance(region, str) and region else None
+    except Exception:
+        logger.debug("讀取大盤覆盤 region 失敗: query_id=%s", query_id, exc_info=True)
+        return None
+
+
 def _run_market_review_background(
     send_notification: bool,
     override_region: Optional[str] = None,
@@ -202,6 +223,9 @@ def _run_market_review_background(
         snapshot = _load_market_review_snapshot(query_id)
         if snapshot is not None:
             result_payload["market_review_snapshot"] = snapshot
+        region = _load_market_review_region(query_id)
+        if region is not None:
+            result_payload["market_review_region"] = region
         return result_payload
     finally:
         _release_market_review_lock(lock_token)
@@ -928,6 +952,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
         market_review_report = None
         market_review_snapshot = None
         market_review_skip_reason = None
+        market_review_region = None
 
         if task.status == TaskStatusEnum.COMPLETED and isinstance(task.result, dict):
             if task.stock_code == "market_review":
@@ -937,6 +962,9 @@ def get_analysis_status(task_id: str) -> TaskStatus:
                 snapshot = task.result.get("market_review_snapshot")
                 if isinstance(snapshot, dict):
                     market_review_snapshot = snapshot
+                region_value = task.result.get("market_review_region")
+                if isinstance(region_value, str) and region_value:
+                    market_review_region = region_value
                 if task.result.get("status") == "skipped" and not market_review_report:
                     skip_message = task.result.get("message")
                     if isinstance(skip_message, str) and skip_message.strip():
@@ -961,6 +989,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
             market_review_report=market_review_report,
             market_review_snapshot=market_review_snapshot,
             market_review_skip_reason=market_review_skip_reason,
+            market_review_region=market_review_region,
             error=task.error,
             stock_name=task.stock_name,
             original_query=task.original_query,
@@ -980,7 +1009,10 @@ def get_analysis_status(task_id: str) -> TaskStatus:
             raw_result = parse_json_field(record.raw_result)
             if getattr(record, "report_type", None) == "market_review":
                 market_review_report = None
+                record_context = parse_json_field(getattr(record, "context_snapshot", None))
                 market_review_snapshot = _extract_tw_daily_snapshot(getattr(record, "context_snapshot", None))
+                region_value = record_context.get("market_review_region") if isinstance(record_context, dict) else None
+                market_review_region = region_value if isinstance(region_value, str) and region_value else None
                 if isinstance(raw_result, dict):
                     report_text = raw_result.get("raw_response") or raw_result.get("market_review_report")
                     if isinstance(report_text, str) and report_text.strip():
@@ -996,6 +1028,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
                     result=None,
                     market_review_report=market_review_report,
                     market_review_snapshot=market_review_snapshot,
+                    market_review_region=market_review_region,
                     error=None,
                     stock_name=record.name,
                 )
