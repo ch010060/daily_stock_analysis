@@ -10,6 +10,7 @@ from src.services.tw_market_analysis_snapshot import (
     _judgement,
     _market_context,
     _market_state,
+    _support_interaction_state,
     _support_zone_state,
     build_tw_market_analysis_snapshot,
     compose_tw_market_analysis_article,
@@ -120,7 +121,15 @@ def _reference_article_snapshot():
     }
 
 
-def _testing_zone_snapshot(close_override=None, low_override=None, high_override=None):
+def _testing_zone_snapshot(
+    close_override=None,
+    low_override=None,
+    high_override=None,
+    support_lower_override=None,
+    support_upper_override=None,
+    support_level_override=None,
+    no_support=False,
+):
     """2026-07-16 production-shaped facts: a severe single-day decline closing
     inside (not below) the tested support zone. Regression fixture for the
     copy-scope/support-zone-semantics bugfix."""
@@ -131,8 +140,11 @@ def _testing_zone_snapshot(close_override=None, low_override=None, high_override
         "ma60": {"value": 41000.0, "distance_pct": 4.1, "slope": 90.0, "direction": "up", "position": "above"},
         "ma120": {"value": 43000.0, "distance_pct": -0.8, "slope": 60.0, "direction": "up", "position": "below"},
     }
-    support = [{
-        "lower": 42353.0, "upper": 42990.0, "level": 42671.5, "as_of": "2026-07-16",
+    support_lower = 42353.0 if support_lower_override is None else support_lower_override
+    support_upper = 42990.0 if support_upper_override is None else support_upper_override
+    support_level = 42671.5 if support_level_override is None else support_level_override
+    support = [] if no_support else [{
+        "lower": support_lower, "upper": support_upper, "level": support_level, "as_of": "2026-07-16",
         "source": "delayed_pivot_or_rolling20", "confirmation_state": "confirmed_close_history",
         "confidence": "medium", "invalidation_rule": "two_closes_beyond_zone",
     }]
@@ -571,6 +583,28 @@ class TwPriorSupportZoneSequenceRegressionTest(unittest.TestCase):
         self.assertIn("重新站回", confirmation)
         self.assertNotIn("代表本次低檔承接失敗", confirmation)
 
+    def test_close_above_prior_zone_and_at_intraday_low_is_not_reached_not_tested(self) -> None:
+        """PR #47 follow-up: the real operator fixture (high=45,234.08,
+        low=close=42,671.27, prior support 41,720-42,292) — the day's own low
+        never entered the prior support zone (42,671.27 > 42,292), so the
+        article must say the zone was not reached, not that it was "tested
+        then recovered." Baseline (unmodified) prior zone for this fixture's
+        260-session sequence is [1229.855, 1236.145]; low=close=1240.0 stays
+        strictly above its upper boundary."""
+        rows = self._rows_with_last_override(close=1240.0, low=1240.0)
+        snapshot = self._build(taiex_rows=rows, primary_data_date=rows[-1]["date"])
+
+        self.assertNotEqual(snapshot["market_judgement"]["category"], "invalidation")
+        price_action = "\n".join(snapshot["analysis_article"]["price_action_paragraphs"])
+        self.assertIn("尚未觸及", price_action)
+        self.assertIn("1,230～1,236", price_action)
+        self.assertIn("收盤貼近當日最低點", price_action)
+        self.assertIn("賣壓持續至收盤", price_action)
+        self.assertNotIn("盤中測試 1,230～1,236 點後回升", price_action)
+        self.assertNotIn("支撐正在接受測試", price_action)
+        self.assertNotIn("低檔承接", price_action)
+        self.assertNotIn("原支撐失效", price_action)
+
 
 class TwSupportZoneArticleTest(unittest.TestCase):
     """Golden-fixture coverage for the real 2026-07-16 report the operator flagged:
@@ -724,6 +758,132 @@ class TwCloseLocationArticleTest(unittest.TestCase):
 
         self.assertNotIn("支撐正在接受測試", price_action)
         self.assertNotIn("顯示支撐附近已有承接", price_action)
+        self.assertNotIn("原支撐失效", price_action)
+
+
+class TwSupportInteractionStateTest(unittest.TestCase):
+    """Pure classifier: distinguishes an untested prior support zone from a
+    genuine intraday touch, independent of _support_zone_state()'s
+    close-only three-state read (which _judgement()'s invalidation decision
+    continues to use unchanged)."""
+
+    ZONE = {"lower": 100.0, "upper": 110.0, "level": 105.0}
+
+    def test_low_above_zone_upper_is_not_reached(self) -> None:
+        self.assertEqual(
+            _support_interaction_state(low=110.01, close=120.0, zone=self.ZONE), "not_reached"
+        )
+
+    def test_low_exactly_at_zone_upper_counts_as_touched(self) -> None:
+        self.assertEqual(
+            _support_interaction_state(low=110.0, close=115.0, zone=self.ZONE),
+            "intraday_test_reclaimed",
+        )
+
+    def test_low_inside_zone_close_reclaims_above_upper(self) -> None:
+        self.assertEqual(
+            _support_interaction_state(low=104.0, close=112.0, zone=self.ZONE),
+            "intraday_test_reclaimed",
+        )
+
+    def test_close_exactly_at_zone_upper_is_closing_inside_zone(self) -> None:
+        self.assertEqual(
+            _support_interaction_state(low=105.0, close=110.0, zone=self.ZONE),
+            "closing_inside_zone",
+        )
+
+    def test_close_exactly_at_zone_lower_is_closing_inside_zone_not_broken(self) -> None:
+        self.assertEqual(
+            _support_interaction_state(low=98.0, close=100.0, zone=self.ZONE),
+            "closing_inside_zone",
+        )
+
+    def test_close_below_zone_lower_is_broken(self) -> None:
+        self.assertEqual(
+            _support_interaction_state(low=95.0, close=99.99, zone=self.ZONE), "broken_zone"
+        )
+
+    def test_no_zone_is_unavailable(self) -> None:
+        self.assertEqual(_support_interaction_state(low=95.0, close=99.99, zone=None), "unavailable")
+
+
+class TwSupportInteractionArticleTest(unittest.TestCase):
+    """Golden-fixture coverage for the operator's newest report: prior
+    support zone 41,720-42,292 was never entered by the day's own low
+    (42,671.27), so the article must say the zone was not reached — never
+    that it was "tested then recovered" (the pre-fix `above_zone` branch
+    conflated "close ended up above the zone" with "the zone was touched
+    intraday", since it only ever checked close, never low)."""
+
+    def test_real_fixture_low_above_zone_reads_as_not_reached_not_tested(self) -> None:
+        article = compose_tw_market_analysis_article(
+            _testing_zone_snapshot(
+                high_override=45234.08,
+                low_override=42671.27,
+                close_override=42671.27,
+                support_lower_override=41720.0,
+                support_upper_override=42292.0,
+                support_level_override=42006.0,
+            )
+        )
+        price_action = "\n".join(article["price_action_paragraphs"])
+
+        self.assertIn("尚未觸及", price_action)
+        self.assertIn("41,720～42,292", price_action)
+        self.assertIn("收盤貼近當日最低點", price_action)
+        self.assertIn("賣壓持續至收盤", price_action)
+        self.assertNotIn("盤中測試 41,720～42,292 點後回升", price_action)
+        self.assertNotIn("支撐正在接受測試", price_action)
+        self.assertNotIn("低檔承接", price_action)
+        self.assertNotIn("原支撐失效", price_action)
+        self.assertIn("41,720", article["confirmation_paragraph"])
+        self.assertNotIn("代表本次低檔承接失敗", article["confirmation_paragraph"])
+
+    def test_low_exactly_at_zone_upper_boundary_reads_as_tested_and_reclaimed(self) -> None:
+        article = compose_tw_market_analysis_article(
+            _testing_zone_snapshot(high_override=43500.0, low_override=42990.0, close_override=43100.0)
+        )
+        price_action = "\n".join(article["price_action_paragraphs"])
+
+        self.assertNotIn("尚未觸及", price_action)
+        self.assertIn("42,353", price_action)
+        self.assertNotIn("原支撐失效", price_action)
+
+    def test_intraday_dip_into_zone_then_close_above_upper_reads_as_tested(self) -> None:
+        article = compose_tw_market_analysis_article(
+            _testing_zone_snapshot(high_override=43600.0, low_override=42700.0, close_override=43200.0)
+        )
+        price_action = "\n".join(article["price_action_paragraphs"])
+
+        self.assertNotIn("尚未觸及", price_action)
+        self.assertIn("42,353", price_action)
+        self.assertNotIn("原支撐失效", price_action)
+
+    def test_not_reached_with_strong_intraday_recovery_does_not_credit_the_zone(self) -> None:
+        # low (43100) stays above zone.upper (42990); close far off the low.
+        article = compose_tw_market_analysis_article(
+            _testing_zone_snapshot(high_override=43600.0, low_override=43100.0, close_override=43550.0)
+        )
+        price_action = "\n".join(article["price_action_paragraphs"])
+
+        self.assertIn("尚未觸及", price_action)
+        self.assertNotIn("顯示支撐附近已有承接", price_action)
+        self.assertNotIn("支撐正在接受測試", price_action)
+
+    def test_no_prior_support_available_uses_fallback_without_fabricating_a_touch(self) -> None:
+        article = compose_tw_market_analysis_article(
+            _testing_zone_snapshot(
+                high_override=45234.08,
+                low_override=42671.27,
+                close_override=42671.27,
+                no_support=True,
+            )
+        )
+        price_action = "\n".join(article["price_action_paragraphs"])
+
+        self.assertNotIn("盤中測試", price_action)
+        self.assertNotIn("尚未觸及", price_action)
+        self.assertNotIn("支撐正在接受測試", price_action)
         self.assertNotIn("原支撐失效", price_action)
 
 

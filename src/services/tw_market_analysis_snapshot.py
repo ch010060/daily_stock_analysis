@@ -425,6 +425,24 @@ def _support_zone_state(close: float, zone: Optional[Dict[str, Any]]) -> str:
     return "testing_zone"
 
 
+def _support_interaction_state(*, low: float, close: float, zone: Optional[Dict[str, Any]]) -> str:
+    """Whether today's session actually entered the prior support zone,
+    distinct from _support_zone_state()'s close-only read. A close above the
+    zone's upper boundary does not by itself mean the zone was tested: the
+    day's own low must also have reached it, otherwise the zone was simply
+    never approached. Boundaries are inclusive of the zone (touched at
+    low == upper; still inside at close == upper or close == lower)."""
+    if not zone:
+        return "unavailable"
+    if close < zone["lower"]:
+        return "broken_zone"
+    if close <= zone["upper"]:
+        return "closing_inside_zone"
+    if low <= zone["upper"]:
+        return "intraday_test_reclaimed"
+    return "not_reached"
+
+
 def _close_location_state(high: float, low: float, close: float) -> str:
     """Normalized intraday close-location classification, independent of the
     support-zone axis: whether a close near a support zone reflects buying
@@ -589,6 +607,7 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
     support = _tested_support(analysis)
     support_text = _zone_text(support) if support else "最近確認支撐區"
     support_state = _support_zone_state(bar["close"], support)
+    interaction_state = _support_interaction_state(low=bar["low"], close=bar["close"], zone=support)
     core = _core_judgement(snapshot, analysis, support_state, support_text)
 
     value_summary = ""
@@ -624,9 +643,9 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
 
     recovered = bar["close"] - bar["low"]
     location_state = _close_location_state(bar["high"], bar["low"], bar["close"])
-    if support_state == "broken_zone":
+    if interaction_state == "broken_zone":
         recovery_text = f"收盤跌破 {support['lower']:,.0f} 點，原支撐區正式失效，修正風險進一步提高"
-    elif support_state == "testing_zone":
+    elif interaction_state == "closing_inside_zone":
         if location_state == "near_low":
             recovery_text = (
                 f"指數已進入 {support_text}支撐區，支撐正在接受測試；"
@@ -650,14 +669,40 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
                 f"收盤自低點收回部分跌幅（約 {recovered:,.0f} 點），但回升幅度有限，"
                 "支撐區內已有初步反應，尚不足以確認止跌"
             )
-    elif location_state == "near_low":
-        recovery_text = f"指數盤中測試 {support_text}後回升，但收盤貼近當日最低點，追價力道保守，尚未形成明確止跌訊號"
-    elif location_state == "flat_range":
-        recovery_text = f"指數盤中測試 {support_text}"
-    elif location_state == "strong_recovery":
-        recovery_text = f"盤中下探 {support_text}後，收盤自低點回升 {recovered:,.0f} 點，日 K 留下明顯下影線，顯示支撐附近已有承接"
-    else:  # partial_recovery
-        recovery_text = f"指數盤中測試 {support_text}，收盤自低點收回部分跌幅（約 {recovered:,.0f} 點），但回升幅度有限"
+    elif interaction_state == "intraday_test_reclaimed":
+        # The prior support zone was genuinely entered by today's own low and
+        # the close reclaimed above it — unlike "not_reached" below, crediting
+        # the zone for the recovery is factually supported here.
+        if location_state == "near_low":
+            recovery_text = f"指數盤中測試 {support_text}後回升，但收盤貼近當日最低點，追價力道保守，尚未形成明確止跌訊號"
+        elif location_state == "flat_range":
+            recovery_text = f"指數盤中測試 {support_text}"
+        elif location_state == "strong_recovery":
+            recovery_text = f"盤中下探 {support_text}後，收盤自低點回升 {recovered:,.0f} 點，日 K 留下明顯下影線，顯示支撐附近已有承接"
+        else:  # partial_recovery
+            recovery_text = f"指數盤中測試 {support_text}，收盤自低點收回部分跌幅（約 {recovered:,.0f} 點），但回升幅度有限"
+    elif interaction_state == "not_reached":
+        # The day's own low never entered the prior support zone (support
+        # exists, but close > zone.upper AND low > zone.upper) — the article
+        # must not claim the zone was tested; describe candle behavior on its
+        # own terms instead.
+        if location_state == "near_low":
+            recovery_text = f"指數盤中最低來到 {bar['low']:,.2f} 點，尚未觸及 {support_text}；收盤貼近當日最低點，顯示賣壓持續至收盤，尚未形成明確止跌訊號"
+        elif location_state == "flat_range":
+            recovery_text = f"指數盤中維持在 {bar['low']:,.2f} 點附近整理，尚未觸及 {support_text}"
+        elif location_state == "strong_recovery":
+            recovery_text = f"指數盤中最低來到 {bar['low']:,.2f} 點，尚未觸及 {support_text}；收盤自低點回升 {recovered:,.0f} 點，日 K 留下明顯下影線，顯示賣壓於低點附近趨緩"
+        else:  # partial_recovery
+            recovery_text = f"指數盤中最低來到 {bar['low']:,.2f} 點，尚未觸及 {support_text}；收盤自低點收回部分跌幅（約 {recovered:,.0f} 點），但回升幅度有限"
+    else:  # "unavailable" — no prior support zone to reference at all
+        if location_state == "near_low":
+            recovery_text = f"指數盤中最低來到 {bar['low']:,.2f} 點；收盤貼近當日最低點，顯示賣壓持續至收盤，尚未形成明確止跌訊號"
+        elif location_state == "flat_range":
+            recovery_text = f"指數盤中維持在 {bar['low']:,.2f} 點附近整理"
+        elif location_state == "strong_recovery":
+            recovery_text = f"指數盤中最低來到 {bar['low']:,.2f} 點；收盤自低點回升 {recovered:,.0f} 點，日 K 留下明顯下影線"
+        else:  # partial_recovery
+            recovery_text = f"指數盤中最低來到 {bar['low']:,.2f} 點；收盤自低點收回部分跌幅（約 {recovered:,.0f} 點），但回升幅度有限"
     volume_text = ""
     if volume.get("state") == "available":
         if volume.get("direction") == "expansion":
@@ -675,7 +720,7 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
         f"接下來若收盤先站回 MA5（約 {mas['ma5']['value']:,.0f} 點），再收復 {resistance_band}；"
         f"若成交金額沒有明顯萎縮且動能同步改善，反彈確認度才會提高。"
     )
-    if support_state == "broken_zone":
+    if interaction_state == "broken_zone":
         # Current state already reports the break; the follow-up condition must
         # be a reclaim/next-support watch, not a repeat of the same break as if
         # it were still pending (that would contradict the price-action prose).
@@ -683,14 +728,26 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
             f"跌破支撐區後，反彈確認須先重新站回 {support_text}；"
             "若持續無法收復，修正風險將維持在偏高水準。"
         )
-    elif support_state == "testing_zone":
+    elif interaction_state == "closing_inside_zone":
         confirmation = (
             f"{rebound_confirmation}若後續收盤有效跌破 {support['lower']:,.0f} 點，才代表該支撐區正式失效。"
         )
-    else:
+    elif interaction_state == "intraday_test_reclaimed":
+        # The zone was genuinely tested and reclaimed intraday, so framing a
+        # further close below it as a failed catch is factually supported.
         confirmation = (
             f"{rebound_confirmation}若收盤跌破 {support_text}，代表本次低檔承接失敗，修正風險將進一步升高。"
         )
+    elif interaction_state == "not_reached":
+        # The zone exists but was never engaged today — the follow-up
+        # condition is forward-looking (whether a future retest finds
+        # buyers), not a restatement of a catch that has not happened yet.
+        confirmation = (
+            f"{rebound_confirmation}後續觀察指數回測 {support_text}時能否出現承接；"
+            f"若收盤有效跌破 {support['lower']:,.0f} 點，才代表該支撐區正式失效。"
+        )
+    else:  # "unavailable" — no prior support zone to reference
+        confirmation = rebound_confirmation
     result = {
         "status": "available",
         "headline": "台股加權指數最新技術分析",
