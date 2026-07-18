@@ -683,17 +683,20 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
             recovery_text = f"指數盤中測試 {support_text}，收盤自低點收回部分跌幅（約 {recovered:,.0f} 點），但回升幅度有限"
     elif interaction_state == "not_reached":
         # The day's own low never entered the prior support zone (support
-        # exists, but close > zone.upper AND low > zone.upper) — the article
-        # must not claim the zone was tested; describe candle behavior on its
-        # own terms instead.
+        # exists, but close > zone.upper AND low > zone.upper). This is a
+        # non-event for the CURRENT session, so the K-line/price-action
+        # narrative must not name the zone at all — not even to say it was
+        # "not yet reached" — and should describe only facts that actually
+        # occurred today. The zone remains a valid forward-looking downside
+        # reference; see the confirmation paragraph below.
         if location_state == "near_low":
-            recovery_text = f"指數盤中最低來到 {bar['low']:,.2f} 點，尚未觸及 {support_text}；收盤貼近當日最低點，顯示賣壓持續至收盤，尚未形成明確止跌訊號"
+            recovery_text = f"指數盤中最低來到 {bar['low']:,.2f} 點，且收盤貼近當日最低點，顯示賣壓持續至收盤，尚未形成明確止跌訊號"
         elif location_state == "flat_range":
-            recovery_text = f"指數盤中維持在 {bar['low']:,.2f} 點附近整理，尚未觸及 {support_text}"
+            recovery_text = f"指數盤中維持在 {bar['low']:,.2f} 點附近整理"
         elif location_state == "strong_recovery":
-            recovery_text = f"指數盤中最低來到 {bar['low']:,.2f} 點，尚未觸及 {support_text}；收盤自低點回升 {recovered:,.0f} 點，日 K 留下明顯下影線，顯示賣壓於低點附近趨緩"
+            recovery_text = f"指數盤中最低來到 {bar['low']:,.2f} 點，收盤自低點回升 {recovered:,.0f} 點，日 K 留下明顯下影線，顯示賣壓於低點附近趨緩"
         else:  # partial_recovery
-            recovery_text = f"指數盤中最低來到 {bar['low']:,.2f} 點，尚未觸及 {support_text}；收盤自低點收回部分跌幅（約 {recovered:,.0f} 點），但回升幅度有限"
+            recovery_text = f"指數盤中最低來到 {bar['low']:,.2f} 點，收盤自低點收回部分跌幅（約 {recovered:,.0f} 點），但回升幅度有限"
     else:  # "unavailable" — no prior support zone to reference at all
         if location_state == "near_low":
             recovery_text = f"指數盤中最低來到 {bar['low']:,.2f} 點；收盤貼近當日最低點，顯示賣壓持續至收盤，尚未形成明確止跌訊號"

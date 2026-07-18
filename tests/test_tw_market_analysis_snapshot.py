@@ -586,24 +586,42 @@ class TwPriorSupportZoneSequenceRegressionTest(unittest.TestCase):
     def test_close_above_prior_zone_and_at_intraday_low_is_not_reached_not_tested(self) -> None:
         """PR #47 follow-up: the real operator fixture (high=45,234.08,
         low=close=42,671.27, prior support 41,720-42,292) — the day's own low
-        never entered the prior support zone (42,671.27 > 42,292), so the
-        article must say the zone was not reached, not that it was "tested
-        then recovered." Baseline (unmodified) prior zone for this fixture's
-        260-session sequence is [1229.855, 1236.145]; low=close=1240.0 stays
-        strictly above its upper boundary."""
+        never entered the prior support zone (42,671.27 > 42,292). A prior
+        checkpoint fixed the article from claiming the zone was "tested then
+        recovered" by saying it was "not yet reached" instead — but an
+        untouched zone is still a non-event for the CURRENT session, so the
+        operator clarified the K-line narrative must omit it entirely rather
+        than name-check it; the zone remains valid as a forward-looking
+        downside-scenario reference in the confirmation paragraph, symmetric
+        with the upside MA5/MA10-MA20 reclaim conditions. Baseline
+        (unmodified) prior zone for this fixture's 260-session sequence is
+        [1229.855, 1236.145]; low=close=1240.0 stays strictly above its
+        upper boundary."""
         rows = self._rows_with_last_override(close=1240.0, low=1240.0)
         snapshot = self._build(taiex_rows=rows, primary_data_date=rows[-1]["date"])
 
         self.assertNotEqual(snapshot["market_judgement"]["category"], "invalidation")
+        # Structured support evidence is untouched by this composer-only change.
+        taiex_analysis = snapshot["indices"]["TAIEX"]
+        self.assertEqual(taiex_analysis["prior_support_levels"][0]["lower"], 1229.855)
+        self.assertEqual(taiex_analysis["prior_support_levels"][0]["upper"], 1236.145)
+
         price_action = "\n".join(snapshot["analysis_article"]["price_action_paragraphs"])
-        self.assertIn("尚未觸及", price_action)
-        self.assertIn("1,230～1,236", price_action)
         self.assertIn("收盤貼近當日最低點", price_action)
         self.assertIn("賣壓持續至收盤", price_action)
+        self.assertNotIn("尚未觸及", price_action)
+        self.assertNotIn("1,230～1,236", price_action)
         self.assertNotIn("盤中測試 1,230～1,236 點後回升", price_action)
         self.assertNotIn("支撐正在接受測試", price_action)
         self.assertNotIn("低檔承接", price_action)
         self.assertNotIn("原支撐失效", price_action)
+
+        confirmation = snapshot["analysis_article"]["confirmation_paragraph"]
+        self.assertIn("站回 MA5", confirmation)
+        self.assertIn("收復 MA10 至 MA20", confirmation)
+        self.assertIn("1,230～1,236", confirmation)
+        self.assertIn("1,230", confirmation)
+        self.assertIn("正式失效", confirmation)
 
 
 class TwSupportZoneArticleTest(unittest.TestCase):
@@ -813,9 +831,16 @@ class TwSupportInteractionArticleTest(unittest.TestCase):
     (42,671.27), so the article must say the zone was not reached — never
     that it was "tested then recovered" (the pre-fix `above_zone` branch
     conflated "close ended up above the zone" with "the zone was touched
-    intraday", since it only ever checked close, never low)."""
+    intraday", since it only ever checked close, never low).
 
-    def test_real_fixture_low_above_zone_reads_as_not_reached_not_tested(self) -> None:
+    Follow-up operator clarification: an untouched zone is a non-event for
+    the CURRENT session and must not be named in the K-line/price-action
+    narrative at all (not even as "not yet reached") — but it remains a
+    technically valid downside reference and must be retained in the
+    forward-looking confirmation paragraph, symmetric with the upside
+    MA5/MA10-MA20 reclaim conditions."""
+
+    def test_real_fixture_low_above_zone_omits_zone_from_current_session_but_keeps_it_forward_looking(self) -> None:
         article = compose_tw_market_analysis_article(
             _testing_zone_snapshot(
                 high_override=45234.08,
@@ -828,16 +853,63 @@ class TwSupportInteractionArticleTest(unittest.TestCase):
         )
         price_action = "\n".join(article["price_action_paragraphs"])
 
-        self.assertIn("尚未觸及", price_action)
-        self.assertIn("41,720～42,292", price_action)
+        # Current-session narration: only actual session facts, no zone.
+        self.assertIn("42,671.27", price_action)
         self.assertIn("收盤貼近當日最低點", price_action)
         self.assertIn("賣壓持續至收盤", price_action)
+        self.assertIn("尚未形成明確止跌訊號", price_action)
+        self.assertNotIn("尚未觸及", price_action)
+        self.assertNotIn("41,720", price_action)
+        self.assertNotIn("42,292", price_action)
         self.assertNotIn("盤中測試 41,720～42,292 點後回升", price_action)
         self.assertNotIn("支撐正在接受測試", price_action)
         self.assertNotIn("低檔承接", price_action)
         self.assertNotIn("原支撐失效", price_action)
-        self.assertIn("41,720", article["confirmation_paragraph"])
-        self.assertNotIn("代表本次低檔承接失敗", article["confirmation_paragraph"])
+
+        # Forward-looking scenario planning: upside and downside both remain,
+        # symmetric — the zone is a valid future reference, not a current claim.
+        confirmation = article["confirmation_paragraph"]
+        self.assertIn("站回 MA5", confirmation)
+        self.assertIn("收復 MA10 至 MA20", confirmation)
+        self.assertIn("41,720～42,292", confirmation)
+        self.assertIn("41,720", confirmation)
+        self.assertIn("正式失效", confirmation)
+        self.assertNotIn("代表本次低檔承接失敗", confirmation)
+
+    def test_real_fixture_current_session_and_forward_looking_paragraphs_do_not_contradict(self) -> None:
+        article = compose_tw_market_analysis_article(
+            _testing_zone_snapshot(
+                high_override=45234.08,
+                low_override=42671.27,
+                close_override=42671.27,
+                support_lower_override=41720.0,
+                support_upper_override=42292.0,
+                support_level_override=42006.0,
+            )
+        )
+        price_action = "\n".join(article["price_action_paragraphs"])
+        confirmation = article["confirmation_paragraph"]
+
+        self.assertFalse("尚未觸及支撐區" in price_action and "支撐正在接受測試" in price_action)
+        self.assertFalse("盤中測試支撐區" in price_action)
+        # The zone may legitimately appear in the forward-looking paragraph
+        # even though it is absent from the current-session one — that is
+        # the intended contract, not a contradiction.
+        self.assertNotIn("41,720", price_action)
+        self.assertIn("41,720", confirmation)
+
+    def test_not_reached_with_partial_recovery_omits_zone_but_keeps_forward_looking_scenario(self) -> None:
+        # low (43100) stays above zone.upper (42990); close partially off the low.
+        article = compose_tw_market_analysis_article(
+            _testing_zone_snapshot(high_override=43600.0, low_override=43100.0, close_override=43250.0)
+        )
+        price_action = "\n".join(article["price_action_paragraphs"])
+
+        self.assertIn("回升幅度有限", price_action)
+        self.assertNotIn("尚未觸及", price_action)
+        self.assertNotIn("42,353", price_action)
+        self.assertNotIn("支撐正在接受測試", price_action)
+        self.assertIn("42,353", article["confirmation_paragraph"])
 
     def test_low_exactly_at_zone_upper_boundary_reads_as_tested_and_reclaimed(self) -> None:
         article = compose_tw_market_analysis_article(
@@ -866,9 +938,11 @@ class TwSupportInteractionArticleTest(unittest.TestCase):
         )
         price_action = "\n".join(article["price_action_paragraphs"])
 
-        self.assertIn("尚未觸及", price_action)
+        self.assertNotIn("尚未觸及", price_action)
+        self.assertNotIn("42,353", price_action)
         self.assertNotIn("顯示支撐附近已有承接", price_action)
         self.assertNotIn("支撐正在接受測試", price_action)
+        self.assertIn("42,353", article["confirmation_paragraph"])
 
     def test_no_prior_support_available_uses_fallback_without_fabricating_a_touch(self) -> None:
         article = compose_tw_market_analysis_article(
