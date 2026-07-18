@@ -24,8 +24,26 @@ def _market_state(raw: str) -> str:
         now = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError:
         return "unknown"
+
+    # Weekday/session-window arithmetic alone cannot distinguish a weekend or
+    # exchange holiday (no new session to report on) from a trading day that
+    # has simply closed for the day. Consult the trading calendar first;
+    # fall through to the original window check only once a genuine trading
+    # day is confirmed, so trading-day behavior is unchanged.
+    try:
+        from src.core.trading_calendar import MarketPhase, infer_market_phase
+
+        phase = infer_market_phase("tw", current_time=now)
+    except Exception:
+        phase = None
+
+    if phase is None or phase == MarketPhase.UNKNOWN:
+        return "calendar_unavailable"
+    if phase == MarketPhase.NON_TRADING:
+        return "outside_session"
+
     minutes = now.hour * 60 + now.minute
-    return "open_incomplete" if now.weekday() < 5 and 540 <= minutes < 810 else "closed"
+    return "open_incomplete" if 540 <= minutes < 810 else "closed"
 
 
 def _bars(rows: Iterable[Dict[str, Any]], cutoff: str) -> tuple[List[Dict[str, Any]], List[str]]:
@@ -430,7 +448,8 @@ def _market_context(snapshot: Dict[str, Any]) -> str:
     state = {
         "open_incomplete": "台股交易中；分析僅採前一完整交易日",
         "closed": "台股已收盤",
-        "outside_session": "台股休市",
+        "outside_session": "非交易日；分析採最近完整交易日",
+        "calendar_unavailable": "分析採最近完整交易日",
     }.get(str(snapshot.get("market_state") or ""), "市場狀態未確認")
     return f"資料時間：{formatted}（{state}）"
 

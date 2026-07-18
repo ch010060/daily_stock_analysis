@@ -3,10 +3,13 @@ from __future__ import annotations
 import json
 import unittest
 from datetime import date, timedelta
+from unittest.mock import patch
 
 from src.services.tw_market_analysis_snapshot import (
     _close_location_state,
     _judgement,
+    _market_context,
+    _market_state,
     _support_zone_state,
     build_tw_market_analysis_snapshot,
     compose_tw_market_analysis_article,
@@ -613,6 +616,127 @@ class TwCloseLocationArticleTest(unittest.TestCase):
         self.assertNotIn("支撐正在接受測試", price_action)
         self.assertNotIn("顯示支撐附近已有承接", price_action)
         self.assertNotIn("原支撐失效", price_action)
+
+
+class TwMarketStateNonTradingDayTest(unittest.TestCase):
+    """_market_state() must distinguish a genuinely non-trading day (weekend
+    or exchange holiday) from a trading day that has simply closed for the
+    day, and must not silently guess when the trading calendar is
+    unavailable. See MARKET_REVIEW_NON_TRADING_DAY_LABEL_POLISH."""
+
+    def test_saturday_is_outside_session_not_closed(self) -> None:
+        # 2026-07-18 is a Saturday.
+        self.assertEqual(_market_state("2026-07-18T17:31:00+08:00"), "outside_session")
+
+    def test_sunday_is_outside_session_not_closed(self) -> None:
+        # 2026-07-19 is a Sunday.
+        self.assertEqual(_market_state("2026-07-19T12:00:00+08:00"), "outside_session")
+
+    def test_weekday_exchange_holiday_is_outside_session(self) -> None:
+        from src.core.trading_calendar import MarketPhase
+
+        with patch(
+            "src.core.trading_calendar.infer_market_phase",
+            return_value=MarketPhase.NON_TRADING,
+        ):
+            # 2026-07-17 is a Friday (would otherwise be a trading day); a
+            # mocked exchange holiday must still resolve to outside_session.
+            self.assertEqual(_market_state("2026-07-17T12:00:00+08:00"), "outside_session")
+
+    def test_trading_day_before_open_preserves_closed_wording(self) -> None:
+        from src.core.trading_calendar import MarketPhase
+
+        with patch(
+            "src.core.trading_calendar.infer_market_phase",
+            return_value=MarketPhase.PREMARKET,
+        ):
+            # 08:00 local: below the 09:00 session-open minute threshold.
+            self.assertEqual(_market_state("2026-07-17T08:00:00+08:00"), "closed")
+
+    def test_trading_day_intraday_is_open_incomplete(self) -> None:
+        from src.core.trading_calendar import MarketPhase
+
+        with patch(
+            "src.core.trading_calendar.infer_market_phase",
+            return_value=MarketPhase.INTRADAY,
+        ):
+            self.assertEqual(_market_state("2026-07-17T10:00:00+08:00"), "open_incomplete")
+
+    def test_trading_day_after_close_preserves_closed_wording(self) -> None:
+        from src.core.trading_calendar import MarketPhase
+
+        with patch(
+            "src.core.trading_calendar.infer_market_phase",
+            return_value=MarketPhase.POSTMARKET,
+        ):
+            self.assertEqual(_market_state("2026-07-17T17:31:00+08:00"), "closed")
+
+    def test_calendar_unavailable_returns_neutral_state_not_a_guess(self) -> None:
+        from src.core.trading_calendar import MarketPhase
+
+        with patch(
+            "src.core.trading_calendar.infer_market_phase",
+            return_value=MarketPhase.UNKNOWN,
+        ):
+            self.assertEqual(_market_state("2026-07-18T17:31:00+08:00"), "calendar_unavailable")
+
+    def test_calendar_call_raising_returns_neutral_state(self) -> None:
+        with patch(
+            "src.core.trading_calendar.infer_market_phase",
+            side_effect=RuntimeError("calendar unavailable"),
+        ):
+            self.assertEqual(_market_state("2026-07-18T17:31:00+08:00"), "calendar_unavailable")
+
+
+class TwMarketContextNonTradingDayWordingTest(unittest.TestCase):
+    def test_outside_session_wording_references_latest_completed_session(self) -> None:
+        text = _market_context({
+            "generated_at": "2026-07-18T09:31:00+00:00",
+            "market_state": "outside_session",
+        })
+        self.assertIn("非交易日", text)
+        self.assertIn("最近完整交易日", text)
+        self.assertNotIn("台股已收盤", text)
+        self.assertNotIn("台股交易中", text)
+
+    def test_calendar_unavailable_wording_is_neutral(self) -> None:
+        text = _market_context({
+            "generated_at": "2026-07-18T09:31:00+00:00",
+            "market_state": "calendar_unavailable",
+        })
+        self.assertIn("最近完整交易日", text)
+        self.assertNotIn("台股已收盤", text)
+        self.assertNotIn("台股交易中", text)
+
+    def test_closed_wording_unchanged(self) -> None:
+        text = _market_context({
+            "generated_at": "2026-07-17T09:31:00+00:00",
+            "market_state": "closed",
+        })
+        self.assertIn("台股已收盤", text)
+
+    def test_open_incomplete_wording_unchanged(self) -> None:
+        text = _market_context({
+            "generated_at": "2026-07-17T03:31:00+00:00",
+            "market_state": "open_incomplete",
+        })
+        self.assertIn("台股交易中；分析僅採前一完整交易日", text)
+
+    def test_real_operator_fixture_generated_on_non_trading_saturday(self) -> None:
+        """Fixture from the operator's actual runtime report: generated
+        2026-07-18 17:31 Asia/Taipei (Saturday), analyzing the latest
+        completed session 2026-07-17."""
+        market_now = "2026-07-18T17:31:00+08:00"
+        state = _market_state(market_now)
+        text = _market_context({
+            "generated_at": "2026-07-18T09:31:00+00:00",  # same instant in UTC
+            "market_state": state,
+        })
+
+        self.assertEqual(state, "outside_session")
+        self.assertIn("非交易日", text)
+        self.assertIn("最近完整交易日", text)
+        self.assertNotIn("台股已收盤", text)
 
 
 if __name__ == "__main__":
