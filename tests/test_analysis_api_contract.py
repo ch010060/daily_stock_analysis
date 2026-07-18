@@ -246,6 +246,24 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         self.assertEqual(result, "tw")
 
+    def test_compute_market_review_override_region_falls_back_to_config_when_all_markets_closed(self) -> None:
+        """A manual web trigger on a non-trading day (e.g. Saturday) must fall
+        back to the full configured region instead of skipping — the report
+        builder already resolves each market to its latest completed trading
+        session (get_effective_trading_date), so there is nothing to skip."""
+        if analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        config = SimpleNamespace(trading_day_check_enabled=True, market_review_region="all")
+
+        with patch(
+            "src.core.trading_calendar.get_open_markets_today",
+            return_value=set(),
+        ):
+            result = analysis_endpoint_module._compute_market_review_override_region(config)
+
+        self.assertIsNone(result)
+
     def test_trigger_market_review_skips_when_configured_markets_closed(self) -> None:
         if trigger_market_review is None or analysis_endpoint_module is None:
             self.skipTest("analysis endpoint helpers unavailable in this environment")

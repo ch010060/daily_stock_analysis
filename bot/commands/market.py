@@ -104,10 +104,18 @@ class MarketCommand(BotCommand):
             )
 
             open_markets = get_open_markets_today()
-            return compute_effective_region(
+            effective = compute_effective_region(
                 getattr(config, "market_review_region", "cn") or "cn",
                 open_markets,
             )
+            if effective == "":
+                # No configured market is open today. /market is a manual,
+                # on-demand command, not the scheduled path, so fall back to
+                # the full configured region instead of skipping: each
+                # market's report builder already resolves to its own latest
+                # completed trading session (get_effective_trading_date).
+                return None
+            return effective
         except Exception as exc:
             logger.warning("交易日過濾失敗，按配置繼續執行大盤覆盤: %s", exc)
             return None

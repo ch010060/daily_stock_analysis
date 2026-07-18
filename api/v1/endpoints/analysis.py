@@ -126,10 +126,21 @@ def _compute_market_review_override_region(config: Config) -> Optional[str]:
         )
 
         open_markets = get_open_markets_today()
-        return compute_effective_region(
+        effective = compute_effective_region(
             getattr(config, "market_review_region", "tw") or "tw",
             open_markets,
         )
+        if effective == "":
+            # No configured market is open today (e.g. weekend/holiday for
+            # every configured region). This is a manual, on-demand trigger,
+            # not the scheduled/cron path, so skip the "no override" early
+            # exit rather than the report itself: returning None here makes
+            # run_market_review() fall back to the full configured region,
+            # and each market's report builder already resolves to its own
+            # latest completed trading session (get_effective_trading_date)
+            # instead of requiring today to be a trading day.
+            return None
+        return effective
     except Exception as exc:
         logger.warning("台股日報交易日過濾失敗，按配置繼續執行: %s", exc)
         return None
