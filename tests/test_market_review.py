@@ -462,30 +462,31 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
             Config._instance = None
             DatabaseManager.reset_instance()
             try:
+                market_light_snapshots = {
+                    "tw": {
+                        "region": "tw",
+                        "trade_date": "2026-03-06",
+                        "status": "red",
+                        "score": 30,
+                        "label": "偏防守",
+                        "temperature_label": "偏弱",
+                        "reasons": ["test"],
+                        "guidance": "test",
+                        "dimensions": {
+                            "breadth": {"score": 20, "available": True},
+                            "index": {"score": 30, "available": True},
+                            "limit": {"score": 10, "available": True},
+                        },
+                        "data_quality": "ok",
+                    }
+                }
                 saved = market_review_module._persist_market_review_history(
                     review_report="## 今日大盤\n\n覆盤正文",
                     markdown_report="# 🎯 大盤覆盤\n\n## 今日大盤\n\n覆盤正文",
                     region="tw",
                     config=SimpleNamespace(report_language="zh"),
                     query_id="market-task-001",
-                    market_light_snapshots={
-                        "tw": {
-                            "region": "tw",
-                            "trade_date": "2026-03-06",
-                            "status": "red",
-                            "score": 30,
-                            "label": "偏防守",
-                            "temperature_label": "偏弱",
-                            "reasons": ["test"],
-                            "guidance": "test",
-                            "dimensions": {
-                                "breadth": {"score": 20, "available": True},
-                                "index": {"score": 30, "available": True},
-                                "limit": {"score": 10, "available": True},
-                            },
-                            "data_quality": "ok",
-                        }
-                    },
+                    market_light_snapshots=market_light_snapshots,
                 )
 
                 self.assertEqual(saved, 1)
@@ -502,6 +503,10 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                     self.assertIn("# 🎯 大盤覆盤", row.raw_result)
                     self.assertIn('"market_light_snapshots"', row.context_snapshot)
                     self.assertIn('"trade_date": "2026-03-06"', row.context_snapshot)
+                    self.assertEqual(
+                        json.loads(row.context_snapshot)["market_light_snapshots"],
+                        market_light_snapshots,
+                    )
             finally:
                 DatabaseManager.reset_instance()
                 Config._instance = None

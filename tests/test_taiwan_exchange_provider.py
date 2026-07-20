@@ -47,6 +47,33 @@ TPEX_VALUE = {
     }],
 }
 
+TWSE_2026_07_20 = {
+    "stat": "OK",
+    "fields": TWSE_OHLC["fields"],
+    "data": [
+        ["115/07/17", "45,234.08", "45,234.08", "42,671.27", "42,671.27"],
+        ["115/07/20", "42,793.15", "43,084.51", "41,967.75", "42,449.70"],
+    ],
+}
+
+TWSE_VALUE_2026_07_20 = {
+    "stat": "OK",
+    "fields": TWSE_VALUE["fields"],
+    "data": [["115/07/20", "12,566,601,514", "1,041,457,434,398", "5,674,801", "42,449.70", "-221.57"]],
+}
+
+TPEX_2026_07_20 = {
+    "stat": "ok",
+    "tables": [{
+        "title": "櫃買指數(月查詢)",
+        "fields": TPEX_OHLC["tables"][0]["fields"],
+        "data": [
+            ["2026/07/17", "401.65", "401.65", "378.20", "378.44", "-28.57"],
+            ["2026/07/20", "378.15", "378.15", "357.22", "368.53", "-9.91"],
+        ],
+    }],
+}
+
 
 class _Response:
     status_code = 200
@@ -116,6 +143,22 @@ class TaiwanExchangeParserTest(unittest.TestCase):
     def test_empty_valid_response_is_not_fabricated(self) -> None:
         payload = {"stat": "OK", "fields": TWSE_OHLC["fields"], "data": []}
         self.assertEqual(parse_twse_ohlc(payload), [])
+
+    def test_2026_07_20_official_price_index_and_turnover_provenance(self) -> None:
+        taiex = parse_twse_ohlc(TWSE_2026_07_20)
+        twse_value = parse_twse_traded_value(TWSE_VALUE_2026_07_20)
+        tpex = parse_tpex_ohlc(TPEX_2026_07_20)
+
+        self.assertEqual(taiex[-1], {
+            "date": "2026-07-20", "open": 42793.15, "high": 43084.51,
+            "low": 41967.75, "close": 42449.70,
+        })
+        self.assertAlmostEqual(taiex[-1]["close"] - taiex[-2]["close"], -221.57, places=2)
+        self.assertEqual(twse_value[-1], {"date": "2026-07-20", "value": 1_041_457_434_398})
+        self.assertEqual(f"{twse_value[-1]['value'] / 1_000_000_000_000:.2f}", "1.04")
+        self.assertEqual(tpex[-2]["close"], 378.44)
+        self.assertEqual(tpex[-1]["close"], 368.53)
+        self.assertAlmostEqual((tpex[-1]["close"] - tpex[-2]["close"]) / tpex[-2]["close"] * 100, -2.62, places=2)
 
 
 class TaiwanExchangeBootstrapTest(unittest.TestCase):

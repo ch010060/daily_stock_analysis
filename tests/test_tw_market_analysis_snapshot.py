@@ -40,6 +40,32 @@ def _values(bars):
     return [{"date": row["date"], "value": 100_000_000_000 + index * 1_000_000_000} for index, row in enumerate(bars)]
 
 
+def _tw_daily_2026_07_20_bars():
+    """Deterministic multi-session history ending with official TWSE rows."""
+    dates = []
+    current = date(2026, 7, 16)
+    while len(dates) < 118:
+        if current.weekday() < 5:
+            dates.append(current.isoformat())
+        current -= timedelta(days=1)
+    steady_range = 1168.9599692307781
+    rows = [
+        {
+            "date": row_date,
+            "open": 42600.0,
+            "high": 42006.39 + steady_range,
+            "low": 42006.39,
+            "close": 42600.0,
+        }
+        for row_date in reversed(dates)
+    ]
+    rows.extend([
+        {"date": "2026-07-17", "open": 45234.08, "high": 45234.08, "low": 42671.27, "close": 42671.27},
+        {"date": "2026-07-20", "open": 42793.15, "high": 43084.51, "low": 41967.75, "close": 42449.70},
+    ])
+    return rows
+
+
 def _meta(provider: str, endpoint: str, metric: str, unit: str):
     return {
         "provider": provider,
@@ -241,6 +267,65 @@ class TwMarketAnalysisSnapshotTest(unittest.TestCase):
         kwargs.update(overrides)
         return build_tw_market_analysis_snapshot(**kwargs)
 
+    def _build_2026_07_20(self):
+        rows = _tw_daily_2026_07_20_bars()
+        values = [{"date": row["date"], "value": 1_227_400_518_099} for row in rows]
+        values[-1]["value"] = 1_041_457_434_398
+        return self._build(
+            taiex_rows=rows,
+            tpex_rows=[],
+            twse_traded_value_rows=values,
+            tpex_traded_value_rows=[],
+            institutional_rows=[],
+            margin_rows=[],
+            primary_data_date="2026-07-20",
+            generated_at="2026-07-20T09:31:00Z",
+            market_now="2026-07-20T17:31:00+08:00",
+        )
+
+    def test_authoritative_2026_07_20_taiex_fixture_survives_pipeline(self) -> None:
+        snapshot = self._build_2026_07_20()
+        analysis = snapshot["indices"]["TAIEX"]
+        bar = analysis["latest_bar"]
+        zone = snapshot["market_judgement"]["invalidation_conditions"][0]["zone"]
+
+        self.assertEqual(bar, {
+            "date": "2026-07-20", "open": 42793.15, "high": 43084.51,
+            "low": 41967.75, "close": 42449.70,
+        })
+        self.assertEqual(analysis["previous_close"], 42671.27)
+        self.assertAlmostEqual(analysis["change"], -221.57, places=2)
+        self.assertAlmostEqual(analysis["change_pct"], -0.5192486654)
+        self.assertEqual(round(bar["close"] - bar["low"]), 482)
+        self.assertEqual(round(zone["lower"]), 41688)
+        self.assertEqual(round(zone["upper"]), 42325)
+        self.assertEqual(
+            _support_interaction_state(low=bar["low"], close=bar["close"], zone=zone),
+            "intraday_test_reclaimed",
+        )
+        self.assertIn("收在 42,449.70 點", snapshot["analysis_article"]["session_summary"])
+        self.assertIn("下跌 221.57 點、跌幅 0.52%", snapshot["analysis_article"]["session_summary"])
+
+    def test_reclaimed_support_invalidation_names_lower_boundary(self) -> None:
+        confirmation = self._build_2026_07_20()["analysis_article"]["confirmation_paragraph"]
+
+        self.assertIn("支撐區下緣 41,688 點", confirmation)
+        self.assertNotIn("跌破 41,688～42,325", confirmation)
+
+    def test_below_average_value_does_not_claim_selling_pressure_contracted(self) -> None:
+        price_action = self._build_2026_07_20()["analysis_article"]["price_action_paragraphs"][0]
+
+        self.assertIn("收盤自低點收回部分跌幅（約 482 點）", price_action)
+        self.assertIn("量能縮減", price_action)
+        for unsupported in ("賣壓雖收斂", "賣壓減輕", "拋壓消退"):
+            self.assertNotIn(unsupported, price_action)
+
+    def test_twse_fmtqik_total_is_labeled_market_turnover(self) -> None:
+        summary = self._build_2026_07_20()["analysis_article"]["session_summary"]
+
+        self.assertIn("TWSE 市場成交金額約 1.04 兆元", summary)
+        self.assertNotIn("TWSE 股票成交金額", summary)
+
     def test_builds_versioned_deterministic_analysis_and_narrative(self) -> None:
         snapshot = self._build()
 
@@ -368,7 +453,8 @@ class TwMarketAnalysisArticleGoldenTest(unittest.TestCase):
         self.assertIn("43,363～43,946", article["price_action_paragraphs"][0])
         self.assertIn("成交金額", article["price_action_paragraphs"][0])
         self.assertIn("收盤先站回 MA5", article["confirmation_paragraph"])
-        self.assertIn("跌破 43,363～43,946", article["confirmation_paragraph"])
+        self.assertIn("支撐區下緣 43,363", article["confirmation_paragraph"])
+        self.assertNotIn("跌破 43,363～43,946", article["confirmation_paragraph"])
         self.assertIn("法人方向分歧", text)
         self.assertIn("不足以改變技術面", text)
         self.assertNotIn("方向仍待確認", text)
@@ -823,6 +909,27 @@ class TwSupportInteractionStateTest(unittest.TestCase):
 
     def test_no_zone_is_unavailable(self) -> None:
         self.assertEqual(_support_interaction_state(low=95.0, close=99.99, zone=None), "unavailable")
+
+    def test_2026_07_20_close_inside_zone_is_not_failure(self) -> None:
+        zone = {"lower": 41688.0, "upper": 42325.0, "level": 42006.0}
+        self.assertEqual(
+            _support_interaction_state(low=41967.75, close=42100.0, zone=zone),
+            "closing_inside_zone",
+        )
+
+    def test_2026_07_20_close_at_lower_boundary_is_inside(self) -> None:
+        zone = {"lower": 41688.0, "upper": 42325.0, "level": 42006.0}
+        self.assertEqual(
+            _support_interaction_state(low=41600.0, close=41688.0, zone=zone),
+            "closing_inside_zone",
+        )
+
+    def test_2026_07_20_close_below_lower_boundary_is_broken(self) -> None:
+        zone = {"lower": 41688.0, "upper": 42325.0, "level": 42006.0}
+        self.assertEqual(
+            _support_interaction_state(low=41600.0, close=41687.99, zone=zone),
+            "broken_zone",
+        )
 
 
 class TwSupportInteractionArticleTest(unittest.TestCase):
