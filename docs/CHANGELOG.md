@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修復] 台股日報將支撐失效條件明確限定為有效跌破支撐區下緣，並移除由成交金額縮減直接推論賣壓收斂的敘事；TWSE FMTQIK 總額改以「市場成交金額」標示。
+
 - [新功能] 台股日報新增以官方 TWSE/TPEx 完成日線為基礎的決定性技術分析快照與分析優先閱讀版面，涵蓋 MA5/10/20/60/120、Wilder RSI14、MACD、ATR、客觀 K 線、支撐壓力、反彈確認/失效及分交易所成交金額；缺漏資料依來源局部抑制，不使用 Yahoo/FinMind 總報酬作 OHLC fallback，舊紀錄維持相容。
 
 - [新功能] 美股個股完整報告新增估值河流圖支援：以 yfinance 財報年度實際 EPS/BVPS（`income_stmt`/`balance_sheet`，非反推）建構階梯狀倍數視覺參考帶，並新增「實際 EPS」/「預估 EPS」（`trailingEps`/`forwardEps`）點時參考數值；台股同步新增「實際 EPS」欄位（來自 `TaiwanStockFinancialStatements` 最新一季 EPS，與既有反推 EPS 明確區分標示）；ETF/指數維持不支援估值河流圖。所有數值皆為後端決定性運算，LLM 不參與。

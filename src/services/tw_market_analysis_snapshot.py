@@ -612,7 +612,7 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
 
     value_summary = ""
     if volume.get("state") == "available":
-        value_summary = f"，TWSE 股票成交金額約 {volume['value'] / 1_000_000_000_000:.2f} 兆元"
+        value_summary = f"，TWSE 市場成交金額約 {volume['value'] / 1_000_000_000_000:.2f} 兆元"
     session_summary = (
         f"最新完整交易日為 {bar['date']}，加權指數收在 {bar['close']:,.2f} 點，"
         f"{'上漲' if analysis['change'] >= 0 else '下跌'} {abs(analysis['change']):,.2f} 點、"
@@ -711,7 +711,7 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
         if volume.get("direction") == "expansion":
             volume_text = "；成交金額高於近 20 日均值，" + ("放量下跌顯示賣壓仍重" if analysis["change"] < 0 else "量價同步回升提高反彈可信度")
         elif volume.get("direction") == "contraction":
-            volume_text = "；成交金額低於近 20 日均值，" + ("縮量反彈的確認度仍不足" if analysis["change"] > 0 else "賣壓雖收斂但尚未形成反轉訊號")
+            volume_text = "；成交金額低於近 20 日均值，量能縮減，但尚未出現足以確認止跌的量價訊號"
         else:
             volume_text = "；成交金額接近近 20 日均值，量能尚未提供額外止跌確認"
     price_action = f"{recovery_text}{volume_text}。"
@@ -733,13 +733,14 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
         )
     elif interaction_state == "closing_inside_zone":
         confirmation = (
-            f"{rebound_confirmation}若後續收盤有效跌破 {support['lower']:,.0f} 點，才代表該支撐區正式失效。"
+            f"{rebound_confirmation}若後續收盤有效跌破支撐區下緣 {support['lower']:,.0f} 點，才代表該支撐區正式失效。"
         )
     elif interaction_state == "intraday_test_reclaimed":
         # The zone was genuinely tested and reclaimed intraday, so framing a
         # further close below it as a failed catch is factually supported.
         confirmation = (
-            f"{rebound_confirmation}若收盤跌破 {support_text}，代表本次低檔承接失敗，修正風險將進一步升高。"
+            f"{rebound_confirmation}若後續收盤有效跌破支撐區下緣 {support['lower']:,.0f} 點，"
+            "才代表本次低檔承接失敗，修正風險將進一步升高。"
         )
     elif interaction_state == "not_reached":
         # The zone exists but was never engaged today — the follow-up
@@ -747,7 +748,7 @@ def compose_tw_market_analysis_article(snapshot: Dict[str, Any]) -> Dict[str, An
         # buyers), not a restatement of a catch that has not happened yet.
         confirmation = (
             f"{rebound_confirmation}後續觀察指數回測 {support_text}時能否出現承接；"
-            f"若收盤有效跌破 {support['lower']:,.0f} 點，才代表該支撐區正式失效。"
+            f"若後續收盤有效跌破支撐區下緣 {support['lower']:,.0f} 點，才代表該支撐區正式失效。"
         )
     else:  # "unavailable" — no prior support zone to reference
         confirmation = rebound_confirmation
