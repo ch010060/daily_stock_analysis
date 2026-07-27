@@ -1,4 +1,5 @@
 import apiClient from './index';
+import { toCamelCase } from './utils';
 import { API_BASE_URL } from '../utils/constants';
 import { createApiError, isApiRequestError, parseApiError } from './error';
 
@@ -42,6 +43,16 @@ export interface ChatSessionItem {
   last_active: string | null;
 }
 
+export interface ChatJobStatus {
+  sessionId: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  createdAt: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  error?: string | null;
+  stepCount: number;
+}
+
 export interface ChatSessionMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -70,6 +81,26 @@ export const agentApi = {
   },
   async deleteChatSession(sessionId: string): Promise<void> {
     await apiClient.delete(`/api/v1/agent/chat/sessions/${sessionId}`);
+  },
+
+  /**
+   * Get chat analysis job status for a session.
+   * @param sessionId Session ID to check
+   * @returns Job status info or null if no job exists
+   */
+  getChatJobStatus: async (sessionId: string): Promise<ChatJobStatus | null> => {
+    try {
+      const response = await apiClient.get<Record<string, unknown>>(
+        `/api/v1/agent/chat/job/${sessionId}`,
+      );
+      return toCamelCase<ChatJobStatus>(response.data);
+    } catch (error: unknown) {
+      // 404 means no job exists — not an error for our purposes
+      if (isApiRequestError(error) && error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   },
   async sendChat(content: string): Promise<{ success: boolean }> {
     const response = await apiClient.post<{
