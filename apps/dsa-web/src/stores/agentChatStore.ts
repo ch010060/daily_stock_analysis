@@ -89,6 +89,10 @@ interface AgentChatState {
   completionBadge: boolean;
   hasInitialLoad: boolean;
   abortController: AbortController | null;
+  /** setTimeout handle for polling a session's job completion. */
+  pendingSessionPolling: ReturnType<typeof setTimeout> | null;
+  /** The session being polled for job completion. */
+  pendingPollingSessionId: string | null;
 }
 
 interface AgentChatActions {
@@ -99,6 +103,8 @@ interface AgentChatActions {
   switchSession: (targetSessionId: string) => Promise<void>;
   startNewChat: () => void;
   startStream: (payload: ChatStreamRequest, meta?: StreamMeta) => Promise<void>;
+  /** Poll chat job status for a session, reloading messages on completion. */
+  pollChatJobCompletion: (targetSessionId: string) => Promise<void>;
 }
 
 const getInitialSessionId = (): string =>
@@ -118,6 +124,8 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
   completionBadge: false,
   hasInitialLoad: false,
   abortController: null,
+  pendingSessionPolling: null,
+  pendingPollingSessionId: null,
 
   setCurrentRoute: (path) => set({ currentRoute: path }),
 
@@ -157,6 +165,28 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
                 content: m.content,
               })),
             });
+            // Check for running analysis job on initial load (e.g. page refresh)
+            const hasUnansweredQuery =
+              msgs.length > 0 &&
+              msgs[msgs.length - 1].role === 'user';
+            if (hasUnansweredQuery) {
+              try {
+                const jobStatus = await agentApi.getChatJobStatus(savedId);
+                if (get().sessionId !== savedId) return;
+                if (jobStatus && jobStatus.status === 'running') {
+                  set({
+                    loading: true,
+                    progressSteps: [{
+                      type: 'thinking',
+                      message: '分析仍在後台進行中...',
+                    }],
+                  });
+                  get().pollChatJobCompletion(savedId);
+                }
+              } catch {
+                // Ignore
+              }
+            }
           }
         } else {
           const newId = generateUUID();
@@ -174,9 +204,16 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
   },
 
   switchSession: async (targetSessionId) => {
-    const { sessionId, messages, abortController } = get();
+    const { sessionId, messages, abortController, pendingSessionPolling } = get();
     if (targetSessionId === sessionId && messages.length > 0) return;
 
+    // Cancel any ongoing polling (we're leaving the previous polling target)
+    if (pendingSessionPolling !== null) {
+      clearTimeout(pendingSessionPolling);
+      set({ pendingSessionPolling: null, pendingPollingSessionId: null });
+    }
+
+    // Abort current SSE stream (detach observer; analysis continues on backend)
     abortController?.abort();
     set({
       messages: [],
@@ -200,14 +237,46 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
           content: m.content,
         })),
       });
+
+      // Check if there is a running analysis job for this session.
+      // If the last message is from user without an assistant response,
+      // the analysis may still be in progress on the backend.
+      const hasUnansweredQuery =
+        msgs.length > 0 &&
+        msgs[msgs.length - 1].role === 'user';
+      if (hasUnansweredQuery) {
+        try {
+          const jobStatus = await agentApi.getChatJobStatus(targetSessionId);
+          if (get().sessionId !== targetSessionId) return;
+          if (jobStatus && jobStatus.status === 'running') {
+            // Analysis is still running — show loading and poll for completion.
+            set({
+              loading: true,
+              progressSteps: [{
+                type: 'thinking',
+                message: '分析仍在後台進行中...',
+              }],
+            });
+            // Start polling (async, no await)
+            get().pollChatJobCompletion(targetSessionId);
+          }
+        } catch {
+          // Ignore errors from status check (e.g. network timeout)
+        }
+      }
     } catch {
       // Ignore
     }
   },
 
   startNewChat: () => {
+    // Cancel any in-flight polling first
+    const st = get();
+    if (st.pendingSessionPolling !== null) {
+      clearTimeout(st.pendingSessionPolling);
+    }
     // Abort any in-flight stream so the old request does not keep running
-    get().abortController?.abort();
+    st.abortController?.abort();
     const newId = generateUUID();
     set({
       sessionId: newId,
@@ -216,13 +285,21 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
       progressSteps: [],
       chatError: null,
       abortController: null,
+      pendingSessionPolling: null,
+      pendingPollingSessionId: null,
     });
     localStorage.setItem(STORAGE_KEY_SESSION, newId);
   },
 
   startStream: async (payload, meta) => {
     if (get().loading) return;
-    const { abortController: prevAc, sessionId: storeSessionId } = get();
+    // Cancel any pending polling — we're starting fresh
+    const currentState = get();
+    if (currentState.pendingSessionPolling !== null) {
+      clearTimeout(currentState.pendingSessionPolling);
+      set({ pendingSessionPolling: null, pendingPollingSessionId: null });
+    }
+    const { abortController: prevAc, sessionId: storeSessionId } = currentState;
     prevAc?.abort();
 
     const ac = new AbortController();
@@ -364,6 +441,85 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         });
       }
       await get().loadSessions();
+    }
+  },
+
+  pollChatJobCompletion: async (targetSessionId) => {
+    // Guard: only poll if we're still on this session
+    if (get().sessionId !== targetSessionId) return;
+
+    // Clear old polling handle
+    const prev = get().pendingSessionPolling;
+    if (prev !== null) clearTimeout(prev);
+    set({ pendingSessionPolling: null, pendingPollingSessionId: targetSessionId });
+
+    try {
+      const jobStatus = await agentApi.getChatJobStatus(targetSessionId);
+      if (get().sessionId !== targetSessionId) return;
+
+      if (!jobStatus) {
+        // No job found (TTL expired or never existed) — stop polling
+        set({
+          loading: false,
+          progressSteps: [],
+          pendingSessionPolling: null,
+          pendingPollingSessionId: null,
+        });
+        return;
+      }
+
+      if (jobStatus.status === 'completed') {
+        // Analysis completed — reload messages to get the assistant response
+        const msgs = await agentApi.getChatSessionMessages(targetSessionId);
+        if (get().sessionId !== targetSessionId) return;
+        set({
+          messages: msgs.map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+          })),
+          loading: false,
+          progressSteps: [],
+          pendingSessionPolling: null,
+          pendingPollingSessionId: null,
+        });
+        return;
+      }
+
+      if (jobStatus.status === 'failed') {
+        set({
+          loading: false,
+          progressSteps: [],
+          pendingSessionPolling: null,
+          pendingPollingSessionId: null,
+          chatError: getParsedApiError(jobStatus.error || '分析失敗'),
+        });
+        return;
+      }
+
+      if (jobStatus.status === 'queued' || jobStatus.status === 'running') {
+        // Still running — update progress and poll again
+        set({
+          loading: true,
+          progressSteps: [{
+            type: 'thinking',
+            message: '分析仍在後台進行中...',
+          }],
+        });
+        // Poll again after 3 seconds
+        const timeoutHandle = setTimeout(() => {
+          get().pollChatJobCompletion(targetSessionId);
+        }, 3000);
+        set({ pendingSessionPolling: timeoutHandle });
+      }
+    } catch {
+      // Transient error — retry after 5 seconds
+      if (get().sessionId === targetSessionId) {
+        const timeoutHandle = setTimeout(() => {
+          get().pollChatJobCompletion(targetSessionId);
+        }, 5000);
+        set({ pendingSessionPolling: timeoutHandle });
+      }
     }
   },
 }));

@@ -422,14 +422,31 @@ async def agent_chat_stream(request: ChatRequest):
       - generating: final answer being generated
       - done: analysis complete, contains 'content' and 'success'
       - error: error occurred, contains 'message'
+
+    Lifecycle semantics:
+      - Analysis execution is decoupled from the SSE HTTP connection lifetime.
+      - A ChatJobManager tracks running jobs by session_id.
+      - If a job already exists for this session, the request attaches as an
+        observer rather than starting a duplicate analysis.
+      - Client disconnect (CSSE cancellation or navigation) does not cancel
+        the analysis — it continues in a thread pool thread and persists
+        results via conversation_manager.
+      - Frontend can check GET /agent/chat/job/{session_id} for status.
     """
+    from src.agent.job_manager import get_chat_job_manager
+
     config = get_config()
     if not config.is_agent_available():
         raise HTTPException(status_code=400, detail="Agent mode is not enabled")
 
     session_id = request.session_id or str(uuid.uuid4())
     loop = asyncio.get_running_loop()
-    queue: asyncio.Queue = asyncio.Queue()
+
+    job_manager = get_chat_job_manager()
+    event_queue: asyncio.Queue = asyncio.Queue()
+
+    # Store main event loop reference for thread-safe SSE broadcasting
+    job_manager.set_main_loop(loop)
 
     # Pass explicit skills into context for the orchestrator.
     # Direct assignment so caller-provided skills always take precedence.
@@ -440,63 +457,75 @@ async def agent_chat_stream(request: ChatRequest):
     if skills is not None:
         stream_ctx["skills"] = skills
 
-    def progress_callback(event: dict):
-        # Enrich tool events with display names
-        if event.get("type") in ("tool_start", "tool_done"):
-            tool = event.get("tool", "")
-            event["display_name"] = TOOL_DISPLAY_NAMES.get(tool, tool)
-        asyncio.run_coroutine_threadsafe(queue.put(event), loop)
+    # Check if there's already a running job for this session.
+    # If yes, attach as observer (don't start a duplicate analysis).
+    is_running = job_manager.attach_observer(session_id, event_queue)
 
-    def run_sync():
-        try:
-            executor = _build_executor(config, skills or None)
-            result = executor.chat(
-                message=request.message,
-                session_id=session_id,
-                progress_callback=progress_callback,
-                context=stream_ctx,
-            )
-            asyncio.run_coroutine_threadsafe(
-                queue.put({
+    if not is_running:
+        # No existing job — this is the primary execution request.
+        # Create job and start analysis in a background thread.
+        job_manager.create_job(session_id)
+        job_manager.attach_observer(session_id, event_queue)
+
+        def progress_callback(event: dict):
+            # Enrich tool events with display names
+            if event.get("type") in ("tool_start", "tool_done"):
+                tool = event.get("tool", "")
+                event["display_name"] = TOOL_DISPLAY_NAMES.get(tool, tool)
+            # Broadcast to ALL observer queues via job manager
+            job_manager.broadcast_event(session_id, event)
+
+        def run_sync():
+            try:
+                job_manager.start_job(session_id)
+                executor = _build_executor(config, skills or None)
+                result = executor.chat(
+                    message=request.message,
+                    session_id=session_id,
+                    progress_callback=progress_callback,
+                    context=stream_ctx,
+                )
+
+                done_event = {
                     "type": "done",
                     "success": result.success,
                     "content": result.content,
                     "error": result.error,
                     "total_steps": result.total_steps,
                     "session_id": session_id,
-                }),
-                loop,
-            )
-        except Exception as exc:
-            logger.error(f"Agent stream error: {exc}")
-            asyncio.run_coroutine_threadsafe(
-                queue.put({"type": "error", "message": str(exc)}),
-                loop,
-            )
+                }
+                job_manager.broadcast_event(session_id, done_event)
+
+                if result.success:
+                    job_manager.complete_job(session_id, step_count=result.total_steps or 0)
+                else:
+                    job_manager.fail_job(session_id, result.error or "Unknown error")
+            except Exception as exc:
+                logger.error(f"Agent stream error: {exc}")
+                job_manager.broadcast_event(session_id, {"type": "error", "message": str(exc)})
+                job_manager.fail_job(session_id, str(exc)[:200])
+
+        # Run analysis in a thread pool — survives client disconnect
+        loop.run_in_executor(None, run_sync)
 
     async def event_generator():
-        # Start executor in a thread so we don't block the event loop
-        fut = loop.run_in_executor(None, run_sync)
         try:
             while True:
                 try:
-                    event = await asyncio.wait_for(queue.get(), timeout=300.0)
+                    event = await asyncio.wait_for(event_queue.get(), timeout=300.0)
                 except asyncio.TimeoutError:
                     yield "data: " + json.dumps({"type": "error", "message": "分析超時"}, ensure_ascii=False) + "\n\n"
                     break
                 yield "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
                 if event.get("type") in ("done", "error"):
                     break
+        except asyncio.CancelledError:
+            # Client disconnected — clean up observer only.
+            # The analysis job continues in its thread and persists to DB.
+            logger.debug("SSE observer disconnected (session=%s)", session_id)
+            raise
         finally:
-            try:
-                await asyncio.wait_for(fut, timeout=5.0)
-            except asyncio.CancelledError:
-                pass
-            except asyncio.TimeoutError:
-                # Cleanup taking longer than 5s is treated as an expected timeout; no warning.
-                logger.debug("agent executor cleanup timed out after 5s for session %s", session_id)
-            except Exception as exc:
-                logger.warning("agent executor cleanup error (ignored): %s", exc, exc_info=True)
+            job_manager.detach_observer(session_id, event_queue)
 
     return StreamingResponse(
         event_generator(),
@@ -507,3 +536,37 @@ async def agent_chat_stream(request: ChatRequest):
             "Connection": "keep-alive",
         },
     )
+
+
+@router.get(
+    "/chat/job/{session_id}",
+    response_model=dict,
+    responses={
+        200: {"description": "Job status"},
+        404: {"description": "No job found for this session"},
+    },
+    summary="查詢對話分析 Job 狀態",
+    description="根據 session_id 查詢當前或最近的分析 job 狀態。可用於前端斷線重連後判斷分析是否仍在執行。",
+)
+async def get_chat_job_status(session_id: str):
+    """
+    查詢對話分析 Job 狀態。
+
+    Frontend 在 session 切換後返回時呼叫此端點：
+    - QUEUED/RUNNING: 分析仍在執行，可以重新連線 SSE stream
+    - COMPLETED: 分析已完成，結果已持久化到 DB
+    - FAILED: 分析失敗
+    - 404: 沒有任何 job 記錄（可能是新 session 或過期已清理）
+    """
+    from src.agent.job_manager import get_chat_job_manager
+
+    job_info = get_chat_job_manager().get_job_info(session_id)
+    if job_info is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "not_found",
+                "message": f"Session {session_id} 沒有執行中的分析 job",
+            },
+        )
+    return job_info.to_dict()

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修復] 對話分析 Job 生命週期分離：切換 session 時不再終止後端分析執行，分析在 ThreadPoolExecutor 中獨立完成並持久化結果到 DB；新增 ChatJobManager 追蹤 Job 狀態，支援重新連線觀察執行中的分析；返回 session 時自動檢測 RUNNING Job 並輪詢完成。
+- [新功能] 新增 `GET /api/v1/agent/chat/job/{session_id}` 端點查詢對話分析 Job 狀態（queued/running/completed/failed）。
+- [檔案] 新增 `src/agent/job_manager.py` 對話分析 Job 管理器，用於將執行生命週期與 SSE HTTP 連接分離。
+
 - [修復] 台股日報將支撐失效條件明確限定為有效跌破支撐區下緣，並移除由成交金額縮減直接推論賣壓收斂的敘事；TWSE FMTQIK 總額改以「市場成交金額」標示。
 
 - [新功能] 台股日報新增以官方 TWSE/TPEx 完成日線為基礎的決定性技術分析快照與分析優先閱讀版面，涵蓋 MA5/10/20/60/120、Wilder RSI14、MACD、ATR、客觀 K 線、支撐壓力、反彈確認/失效及分交易所成交金額；缺漏資料依來源局部抑制，不使用 Yahoo/FinMind 總報酬作 OHLC fallback，舊紀錄維持相容。
